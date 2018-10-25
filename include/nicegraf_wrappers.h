@@ -25,6 +25,8 @@ SOFTWARE.
 #include "nicegraf.h"
 #include <utility>
 
+namespace ngf {
+
 /**
  * A move-only RAII wrapper over Nicegraf objects that provides
  * unique ownership semantics
@@ -44,6 +46,7 @@ public:
     destroy_if_necessary();
     handle_ = other.handle_;
     other.handle_ = nullptr;
+    return *this;
   }
 
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
@@ -75,7 +78,7 @@ private:
     } \
     static void destroy(ngf_##name *handle) { ngf_destroy_##name(handle); } \
   }; \
-  using ngf_owned_##name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
+  using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
 NGF_DEFINE_WRAPPER_TYPE(shader_stage);
 NGF_DEFINE_WRAPPER_TYPE(descriptors_layout);
@@ -99,5 +102,6 @@ struct ngf_descriptor_set_ManagementFuncs {
     ngf_destroy_descriptor_set(handle);
   }
 };
-using ngf_owned_descriptor_set = ngf_handle<ngf_descriptor_set,
-                                            ngf_descriptor_set_ManagementFuncs>;
+using descriptor_set = ngf_handle<ngf_descriptor_set,
+                                  ngf_descriptor_set_ManagementFuncs>;
+}  // namespace ngf
