@@ -106,7 +106,7 @@ struct ngf_graphics_pipeline {
   ngf_vertex_buf_binding_desc *vert_buf_bindings;
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
-  ngf_pipeline_layout *layout;
+  const ngf_pipeline_layout *layout;
 };
 
 typedef struct {
@@ -356,8 +356,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   assert(result);
   
   ngf_error err_code = NGF_ERROR_OK;
-  ngf_swapchain_info *swapchain_info = info->swapchain_info;
-  ngf_context *shared = info->shared_context;
+  const ngf_swapchain_info *swapchain_info = info->swapchain_info;
+  const ngf_context *shared = info->shared_context;
 
   *result = NGF_ALLOC(ngf_context);
   ngf_context *ctx = *result;
@@ -450,7 +450,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     };
     ctx->surface = eglCreateWindowSurface(ctx->dpy,
                                           ctx->cfg,
-                                          swapchain_info->native_handle,
+                                          (EGLNativeWindowType)swapchain_info->native_handle,
                                           egl_surface_attribs);
     if (ctx->surface == EGL_NO_SURFACE) {
       err_code = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
@@ -753,7 +753,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->blend = *(info->blend);
   pipeline->tessellation = *(info->tessellation);
   
-  ngf_vertex_input_info *input = info->input_info;
+  const ngf_vertex_input_info *input = info->input_info;
 
   // Copy over vertex buffer binding information.
   pipeline->nvert_buf_bindings = input->nvert_buf_bindings;
