@@ -320,10 +320,10 @@ typedef struct {
  */
 typedef struct {
   /**Pointer to array of structures describing the vertex buffer binding used.*/
-  ngf_vertex_buf_binding_desc *vert_buf_bindings; 
+  const ngf_vertex_buf_binding_desc *vert_buf_bindings; 
   uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings
                                          used.*/
-  ngf_vertex_attrib_desc *attribs; /**< Ptr to array of attrib descriptions.*/
+  const ngf_vertex_attrib_desc *attribs; /**< Ptr to array of attrib descriptions.*/
   uint32_t nattribs; /**< Number of attribute descriptions.*/
 } ngf_vertex_input_info;
 
@@ -640,19 +640,19 @@ typedef enum {
  * Specifies information for creation of a graphics pipeline.
  */
 typedef struct {
-  ngf_shader_stage *shader_stages[5];
+  const ngf_shader_stage *shader_stages[5];
   uint32_t nshader_stages;
-  ngf_irect2d *viewport;
-  ngf_irect2d *scissor;
-  ngf_rasterization_info *rasterization;
-  ngf_multisample_info *multisample;
-  ngf_depth_stencil_info *depth_stencil;
-  ngf_blend_info *blend;
+  const ngf_irect2d *viewport;
+  const ngf_irect2d *scissor;
+  const ngf_rasterization_info *rasterization;
+  const ngf_multisample_info *multisample;
+  const ngf_depth_stencil_info *depth_stencil;
+  const ngf_blend_info *blend;
   uint32_t dynamic_state_mask;
-  ngf_tessellation_info *tessellation;
-  ngf_vertex_input_info *input_info;
+  const ngf_tessellation_info *tessellation;
+  const ngf_vertex_input_info *input_info;
   ngf_primitive_type primitive_type;
-  ngf_pipeline_layout *layout;
+  const ngf_pipeline_layout *layout;
 } ngf_graphics_pipeline_info;
 
 /**
@@ -686,7 +686,7 @@ typedef struct {
  * Specifies information about a rendertarget.
  */
 typedef struct {
-  ngf_attachment *attachments;
+  const ngf_attachment *attachments;
   uint32_t nattachments;
 } ngf_render_target_info;
 
@@ -764,14 +764,14 @@ typedef struct {
  * Draw sub-operation sets up and makes a draw call.
  */
 typedef struct {
-  ngf_dynamic_state_command *dynamic_state_cmds;
+  const ngf_dynamic_state_command *dynamic_state_cmds;
   uint32_t ndynamic_state_cmds;
   uint32_t ndescriptor_set_bind_ops;
-  ngf_descriptor_set_bind_op *descriptor_set_bind_ops;
-  ngf_vertex_buf_bind_op *vertex_buf_bind_ops;
+  const ngf_descriptor_set_bind_op *descriptor_set_bind_ops;
+  const ngf_vertex_buf_bind_op *vertex_buf_bind_ops;
   uint32_t nvertex_buf_bind_ops;
   ngf_draw_mode mode;
-  ngf_index_buf_bind_op *index_buf_bind_op;
+  const ngf_index_buf_bind_op *index_buf_bind_op;
   uint32_t first_element;
   uint32_t nelements;
   uint32_t ninstances;
@@ -782,7 +782,7 @@ typedef struct {
  */
 typedef struct {
   const ngf_graphics_pipeline *pipeline;  /**< Pipeline to bind.*/
-  ngf_draw_subop_info *subops;  /**< Drawcalls to execute with the pipeline.*/
+  const ngf_draw_subop_info *subops;  /**< Drawcalls to execute with the pipeline.*/
   uint32_t nsubops;  /**< Number of drawcalls.*/
 } ngf_draw_op_info;
 
@@ -839,11 +839,11 @@ typedef struct ngf_context ngf_context;
  * Configures a Nicegraf context.
  */
 typedef struct {
-  ngf_swapchain_info *swapchain_info; /**< Configures the swapchain that the
-                                           context will be presenting to. This
-                                           can be NULL if all rendering is done
-                                           off-screen.*/
-  ngf_context *shared_context; /**< A reference to another context; the newly
+  const ngf_swapchain_info *swapchain_info; /**< Configures the swapchain that the
+                                                 context will be presenting to. This
+                                                 can be NULL if all rendering is done
+                                                 off-screen.*/
+  const ngf_context *shared_context; /**< A reference to another context; the newly
                                     created context will have access to the
                                     other one's resources (such as buffers and
                                     textures) and vice versa. Can be NULL.*/
