@@ -85,11 +85,17 @@ void ngf_util_create_default_graphics_pipeline_data(
     .patch_vertices = 0u
   };
   result->tessellation_info = ti;
-  result->scissor = result->viewport = *window_size;
+  uint32_t dynamic_state_mask = 0u;
+  if (window_size != NULL) {
+    result->scissor = result->viewport = *window_size;
+  } else {
+    dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT |
+                         NGF_DYNAMIC_STATE_SCISSOR;
+  }
   ngf_graphics_pipeline_info gpi = {
     .blend = &result->blend_info,
     .depth_stencil = &result->depth_stencil_info,
-    .dynamic_state_mask = 0u,
+    .dynamic_state_mask = dynamic_state_mask,
     .input_info = &result->vertex_input_info,
     .primitive_type = NGF_PRIMITIVE_TYPE_TRIANGLE_LIST,
     .multisample = &result->multisample_info,
