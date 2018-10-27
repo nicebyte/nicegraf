@@ -44,6 +44,11 @@ SOFTWARE.
 #define alloca _alloca
 #endif
 
+typedef struct {
+  uint32_t ngf_binding_id;
+  uint32_t native_binding_id;
+} _ngf_native_binding;
+
 struct ngf_context {
   EGLDisplay dpy;
   EGLContext ctx;
@@ -70,7 +75,7 @@ struct ngf_descriptors_layout {
 
 struct ngf_descriptor_set {
   ngf_descriptor_write *bind_ops;
-  GLuint *target_bindings;
+  uint32_t *bindings;
   uint32_t nslots;
 };
 
@@ -103,10 +108,11 @@ struct ngf_graphics_pipeline {
   ngf_blend_info blend;
   uint32_t dynamic_state_mask;
   ngf_tessellation_info tessellation;
-  ngf_vertex_buf_binding_desc *vert_buf_bindings;
+  const ngf_vertex_buf_binding_desc *vert_buf_bindings;
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
   const ngf_pipeline_layout *layout;
+  const _ngf_native_binding **binding_map;
 };
 
 typedef struct {
@@ -682,15 +688,15 @@ ngf_error ngf_create_descriptor_set(const ngf_descriptors_layout *layout,
     goto ngf_create_descriptor_set_cleanup;
   }
 
-  set->target_bindings = NGF_ALLOCN(GLuint, set->nslots);
-  if (set->target_bindings == NULL) {
+  set->bindings = NGF_ALLOCN(GLuint, set->nslots);
+  if (set->bindings == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_descriptor_set_cleanup;
   }
 
   for (size_t s = 0; s < set->nslots; ++s) {
     set->bind_ops[s].type = layout->info.descriptors[s].type;
-    set->target_bindings[s] = layout->info.descriptors[s].id;
+    set->bindings[s] = layout->info.descriptors[s].id;
   }
 
 ngf_create_descriptor_set_cleanup:
@@ -706,8 +712,8 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set *set) {
     if (set->nslots > 0 && set->bind_ops) {
       NGF_FREEN(set->bind_ops, set->nslots);
     }
-    if (set->nslots > 0 && set->target_bindings) {
-      NGF_FREEN(set->target_bindings, set->nslots);
+    if (set->nslots > 0 && set->bindings) {
+      NGF_FREEN(set->bindings, set->nslots);
     }
     NGF_FREE(set);
   }
@@ -721,7 +727,7 @@ ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
     bool found_binding = false;
     for (uint32_t s = 0u; s < set->nslots; ++s) {
       if (set->bind_ops[s].type == write->type &&
-          set->target_bindings[s] == write->binding) {
+          set->bindings[s] == write->binding) {
         set->bind_ops[s] = *write;
         found_binding = true;
         break;
@@ -758,18 +764,54 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Copy over vertex buffer binding information.
   pipeline->nvert_buf_bindings = input->nvert_buf_bindings;
   if (input->nvert_buf_bindings > 0) {
-    pipeline->vert_buf_bindings =
+    ngf_vertex_buf_binding_desc *vert_buf_bindings =
         NGF_ALLOCN(ngf_vertex_buf_binding_desc,
                    input->nvert_buf_bindings);
+    pipeline->vert_buf_bindings = vert_buf_bindings;
     if (pipeline->vert_buf_bindings == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto ngf_create_pipeline_cleanup;
     }
-    memcpy(pipeline->vert_buf_bindings,
+    memcpy(vert_buf_bindings,
            input->vert_buf_bindings,
            sizeof(ngf_vertex_buf_binding_desc) * input->nvert_buf_bindings);
   } else {
     pipeline->vert_buf_bindings = NULL;
+  }
+
+  // Create a map of NGF -> OpenGL bindings.
+  const ngf_pipeline_layout_info *pipeline_layout = &(info->layout->info);
+  _ngf_native_binding **binding_map =
+      NGF_ALLOCN(_ngf_native_binding*, pipeline_layout->ndescriptors_layouts);
+  pipeline->binding_map = binding_map;
+  if (pipeline->binding_map == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_create_pipeline_cleanup;
+  }
+  memset(binding_map, 0,
+         sizeof(_ngf_native_binding*) * pipeline_layout->ndescriptors_layouts);
+  uint32_t total_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
+  for (uint32_t set = 0u; set < pipeline_layout->ndescriptors_layouts; ++set) {
+    uint32_t set_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
+    const ngf_descriptors_layout_info *set_layout =
+        &pipeline_layout->descriptors_layouts[set]->info;
+    binding_map[set] = NGF_ALLOCN(_ngf_native_binding,
+                                  set_layout->ndescriptors + 1);
+    if (binding_map[set] == NULL) {
+      err = NGF_ERROR_OUTOFMEM;
+      goto ngf_create_pipeline_cleanup;
+    }
+    binding_map[set][set_layout->ndescriptors].ngf_binding_id = (uint32_t)(-1);
+    for (uint32_t b = 0u; b < set_layout->ndescriptors; ++b) {
+      _ngf_native_binding *mapping = &binding_map[set][b];
+      const ngf_descriptor_info *desc_info = &set_layout->descriptors[b];
+      const ngf_descriptor_type desc_type = desc_info->type;
+      mapping->ngf_binding_id = desc_info->id;
+      mapping->native_binding_id = total_c[desc_type] + (set_c[desc_type]++);
+    }
+    for (uint32_t i = 0u; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+      total_c[i] += set_c[i];
+    }
   }
 
   // Store attribute format in VAO.
@@ -826,6 +868,14 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
     if (pipeline->nvert_buf_bindings > 0 &&
         pipeline->vert_buf_bindings) {
       NGF_FREEN(pipeline->vert_buf_bindings, pipeline->nvert_buf_bindings);
+    }
+    if (pipeline->binding_map) {
+      for (uint32_t set = 0u; set < pipeline->layout->info.ndescriptors_layouts; ++set) {
+        if (pipeline->binding_map[set]) {
+          NGF_FREE(pipeline->binding_map[set]);
+        }
+      }
+      NGF_FREE(pipeline->binding_map);
     }
     glDeleteProgramPipelines(1, &pipeline->program_pipeline);
     glDeleteVertexArrays(1, &pipeline->vao);
@@ -1600,7 +1650,17 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         const ngf_descriptor_set *set = descriptor_set_bind_op->set;
         for (size_t j = 0; j < set->nslots; ++j) {
           const ngf_descriptor_write *rbop = &(set->bind_ops[j]);
-          uint32_t binding_index = set->target_bindings[j];
+          const uint32_t ngf_binding = set->bindings[j];
+          const uint32_t ngf_set = descriptor_set_bind_op->slot;
+          const _ngf_native_binding *binding_map = pipeline->binding_map[ngf_set];
+          uint32_t b_idx = 0u;
+          while (binding_map[b_idx].ngf_binding_id != ngf_binding && 
+                 binding_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
+          if (binding_map[b_idx].native_binding_id == (uint32_t)(-1)) {
+            return NGF_ERROR_INVALID_BINDING;
+          }
+          uint32_t native_binding = binding_map[b_idx].ngf_binding_id;
+
           // TODO: assert compatibility w/ descriptor set layout?
           switch (rbop->type) {
           case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
@@ -1608,7 +1668,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
                 &(rbop->op.buffer_bind);
             glBindBufferRange(
               GL_UNIFORM_BUFFER,
-              binding_index,
+              native_binding,
               buf_bind_op->buffer->glbuffer,
               buf_bind_op->offset,
               buf_bind_op->range);
@@ -1617,7 +1677,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
           case NGF_DESCRIPTOR_LOADSTORE_IMAGE: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glBindImageTexture(binding_index,
+            glBindImageTexture(native_binding,
                                img_bind_op->image_subresource.image->glimage,
                                img_bind_op->image_subresource.mip_level,
                                img_bind_op->image_subresource.layered,
@@ -1629,7 +1689,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
           case NGF_DESCRIPTOR_TEXTURE: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glActiveTexture(binding_index);
+            glActiveTexture(native_binding);
             glBindTexture(img_bind_op->image_subresource.image->bind_point,
                           img_bind_op->image_subresource.image->glimage);
             break;
@@ -1637,16 +1697,16 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
           case NGF_DESCRIPTOR_SAMPLER: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glBindSampler(binding_index, img_bind_op->sampler->glsampler);
+            glBindSampler(native_binding, img_bind_op->sampler->glsampler);
             break;
             }
           case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glActiveTexture(GL_TEXTURE0 + binding_index);
+            glActiveTexture(GL_TEXTURE0 + native_binding);
             glBindTexture(img_bind_op->image_subresource.image->bind_point,
                           img_bind_op->image_subresource.image->glimage);
-            glBindSampler(binding_index, img_bind_op->sampler->glsampler); 
+            glBindSampler(native_binding, img_bind_op->sampler->glsampler); 
             break;
             }
           default:
