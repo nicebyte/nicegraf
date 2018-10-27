@@ -82,7 +82,6 @@ private:
 
 NGF_DEFINE_WRAPPER_TYPE(shader_stage);
 NGF_DEFINE_WRAPPER_TYPE(descriptors_layout);
-NGF_DEFINE_WRAPPER_TYPE(pipeline_layout);
 NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
 NGF_DEFINE_WRAPPER_TYPE(image);
 NGF_DEFINE_WRAPPER_TYPE(sampler);
