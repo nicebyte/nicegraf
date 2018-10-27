@@ -1163,7 +1163,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info *info, ngf_buffer **result) {
 ngf_error ngf_populate_buffer(ngf_buffer *buf,
                               size_t offset,
                               size_t size,
-                              void *data) {
+                              const void *data) {
   assert(buf);
   assert(data);
   glBindBuffer(buf->bind_point, buf->glbuffer);
