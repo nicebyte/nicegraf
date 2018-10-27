@@ -79,10 +79,6 @@ struct ngf_descriptor_set {
   uint32_t nslots;
 };
 
-struct ngf_pipeline_layout {
-  ngf_pipeline_layout_info info;
-};
-
 struct ngf_image {
   GLuint glimage;
   GLenum bind_point;
@@ -111,7 +107,7 @@ struct ngf_graphics_pipeline {
   const ngf_vertex_buf_binding_desc *vert_buf_bindings;
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
-  const ngf_pipeline_layout *layout;
+  uint32_t ndescriptors_layouts;
   const _ngf_native_binding **binding_map;
 };
 
@@ -626,48 +622,6 @@ void ngf_destroy_descriptors_layout(ngf_descriptors_layout *layout) {
   }
 }
 
-ngf_error ngf_create_pipeline_layout(const ngf_pipeline_layout_info *info,
-                                     ngf_pipeline_layout **result) {
-  assert(info);
-  assert(result);
-  ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_pipeline_layout);
-  ngf_pipeline_layout *layout = *result;
-  if (layout == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_pipeline_layout_cleanup;
-  }
-
-  layout->info.ndescriptors_layouts = info->ndescriptors_layouts;
-  layout->info.descriptors_layouts =
-      NGF_ALLOCN(ngf_descriptors_layout*, info->ndescriptors_layouts);
-  if (layout->info.descriptors_layouts == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_pipeline_layout_cleanup;
-  }
-  memcpy((*result)->info.descriptors_layouts,
-         info->descriptors_layouts,
-         sizeof(ngf_descriptors_layout_info*) * info->ndescriptors_layouts);
-
-ngf_create_pipeline_layout_cleanup:
-  if (err != NGF_ERROR_OK) {
-    ngf_destroy_pipeline_layout(layout);
-  }
-
-  return err;
-}
-
-void ngf_destroy_pipeline_layout(ngf_pipeline_layout *layout) {
-  if (layout != NULL) {
-    if (layout->info.ndescriptors_layouts > 0 &&
-        layout->info.descriptors_layouts != NULL) {
-      NGF_FREEN(layout->info.descriptors_layouts,
-                layout->info.ndescriptors_layouts);
-    }
-    NGF_FREE(layout);
-  }
-}
-
 ngf_error ngf_create_descriptor_set(const ngf_descriptors_layout *layout,
                                     ngf_descriptor_set **result) {
   assert(layout);
@@ -780,7 +734,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
 
   // Create a map of NGF -> OpenGL bindings.
-  const ngf_pipeline_layout_info *pipeline_layout = &(info->layout->info);
+  const ngf_pipeline_layout_info *pipeline_layout = info->layout;
+  pipeline->ndescriptors_layouts = pipeline_layout->ndescriptors_layouts;
   _ngf_native_binding **binding_map =
       NGF_ALLOCN(_ngf_native_binding*, pipeline_layout->ndescriptors_layouts);
   pipeline->binding_map = binding_map;
@@ -847,9 +802,6 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                        info->shader_stages[s]->glprogram);
   }
 
-  // Set pipeline layout.
-  pipeline->layout = info->layout;
-
   // Set dynamic state mask.
   pipeline->dynamic_state_mask = info->dynamic_state_mask;
 
@@ -870,7 +822,7 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
       NGF_FREEN(pipeline->vert_buf_bindings, pipeline->nvert_buf_bindings);
     }
     if (pipeline->binding_map) {
-      for (uint32_t set = 0u; set < pipeline->layout->info.ndescriptors_layouts; ++set) {
+      for (uint32_t set = 0u; set < pipeline->ndescriptors_layouts; ++set) {
         if (pipeline->binding_map[set]) {
           NGF_FREE(pipeline->binding_map[set]);
         }
@@ -1642,16 +1594,14 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         const ngf_descriptor_set_bind_op *descriptor_set_bind_op =
             &(subop->descriptor_set_bind_ops[i]);
         if (descriptor_set_bind_op->slot >
-            pipeline->layout->info.ndescriptors_layouts) {
+            pipeline->ndescriptors_layouts) {
           return NGF_ERROR_INVALID_RESOURCE_SET_BINDING;
         }
-        const ngf_descriptors_layout *descriptors_layout =
-            pipeline->layout->info.descriptors_layouts[descriptor_set_bind_op->slot];
+        const uint32_t ngf_set = descriptor_set_bind_op->slot;
         const ngf_descriptor_set *set = descriptor_set_bind_op->set;
         for (size_t j = 0; j < set->nslots; ++j) {
           const ngf_descriptor_write *rbop = &(set->bind_ops[j]);
           const uint32_t ngf_binding = set->bindings[j];
-          const uint32_t ngf_set = descriptor_set_bind_op->slot;
           const _ngf_native_binding *binding_map = pipeline->binding_map[ngf_set];
           uint32_t b_idx = 0u;
           while (binding_map[b_idx].ngf_binding_id != ngf_binding && 

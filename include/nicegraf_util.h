@@ -52,7 +52,7 @@ typedef struct {
  * The state is set to match OpenGL defaults and can be adjusted later.
  */
 void ngf_util_create_default_graphics_pipeline_data(
-    ngf_pipeline_layout *layout,
+    ngf_pipeline_layout_info *layout,
     const ngf_irect2d *viewport,
     ngf_util_graphics_pipeline_data *result);
 
@@ -60,7 +60,7 @@ void ngf_util_create_default_graphics_pipeline_data(
  * Stores data for a simple pipeline layout with a single descriptor set.
  */
 typedef struct {
-  ngf_pipeline_layout *pipeline_layout;
+  ngf_pipeline_layout_info pipeline_layout;
   ngf_descriptors_layout **descriptors_layouts;
   uint32_t ndescriptors_layouts;
 } ngf_util_layout_data;
