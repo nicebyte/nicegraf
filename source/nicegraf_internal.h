@@ -47,8 +47,8 @@ extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 
 #define NGF_ALLOC(type) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), 1))
 #define NGF_ALLOCN(type, n) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), n))
-#define NGF_FREE(ptr) (NGF_ALLOC_CB->free(ptr, sizeof(*ptr), 1))
-#define NGF_FREEN(ptr, n) (NGF_ALLOC_CB->free(ptr, sizeof(*ptr), n))
+#define NGF_FREE(ptr) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1))
+#define NGF_FREEN(ptr, n) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n))
 
 #if defined(_MSC_VER)
 #include <stdlib.h>

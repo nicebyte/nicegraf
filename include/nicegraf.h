@@ -489,7 +489,8 @@ typedef enum {
   NGF_DESCRIPTOR_LOADSTORE_IMAGE,
   NGF_DESCRIPTOR_TEXTURE,
   NGF_DESCRIPTOR_SAMPLER,
-  NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER
+  NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER,
+  NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
 
 /**
@@ -532,7 +533,7 @@ typedef struct ngf_descriptor_set ngf_descriptor_set;
  */
 typedef struct {
   uint32_t ndescriptors_layouts;
-  ngf_descriptors_layout **descriptors_layouts;
+  const ngf_descriptors_layout **descriptors_layouts;
 } ngf_pipeline_layout_info;
 
 /**
