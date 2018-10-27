@@ -34,7 +34,7 @@ SOFTWARE.
 #endif
 
 void ngf_util_create_default_graphics_pipeline_data(
-    ngf_pipeline_layout *layout,
+    ngf_pipeline_layout_info *layout,
     const ngf_irect2d *window_size,
     ngf_util_graphics_pipeline_data *result) {
   ngf_blend_info bi = {
@@ -126,17 +126,8 @@ ngf_error ngf_util_create_simple_layout_data(
   err = ngf_create_descriptors_layout(&ds_layout_info,
                                       &(result->descriptors_layouts[0]));
   if (err != NGF_ERROR_OK) return err;
-  ngf_pipeline_layout_info pipeline_layout_info = {
-    .ndescriptors_layouts = 1u,
-    .descriptors_layouts = &result->descriptors_layouts[0]
-  };
-  err = ngf_create_pipeline_layout(&pipeline_layout_info,
-                                   &result->pipeline_layout);
-  if (err != NGF_ERROR_OK) {
-    ngf_destroy_descriptors_layout(result->descriptors_layouts[0]);
-    NGF_FREE(result->descriptors_layouts);
-    return err;
-  }
+  result->pipeline_layout.ndescriptors_layouts = 1u;
+  result->pipeline_layout.descriptors_layouts = &result->descriptors_layouts[0];
   return err;
 }
 
@@ -145,7 +136,6 @@ ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
                                       ngf_util_layout_data *result) {
   assert(stage_layouts);
   assert(result); 
-  result->pipeline_layout = NULL;
   result->descriptors_layouts = NULL;
   result->ndescriptors_layouts = 0u;
   ngf_descriptors_layout_info *descriptor_set_layouts = NULL;
@@ -219,18 +209,14 @@ ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
     if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
   }
 
-  ngf_pipeline_layout_info pipeline_layout_info;
-  pipeline_layout_info.ndescriptors_layouts = set_count;
-  pipeline_layout_info.descriptors_layouts = result->descriptors_layouts;
-  err = ngf_create_pipeline_layout(&pipeline_layout_info,
-                                   &result->pipeline_layout);
-  if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
+  result->pipeline_layout.ndescriptors_layouts = set_count;
+  result->pipeline_layout.descriptors_layouts = result->descriptors_layouts;
 
 ngf_util_create_layout_data_cleanup:
   if (err != NGF_ERROR_OK) {
-    ngf_destroy_pipeline_layout(result->pipeline_layout);
-    for (uint32_t i = 0u; i < result->ndescriptors_layouts; ++i) 
+    for (uint32_t i = 0u; i < result->ndescriptors_layouts; ++i) {
       ngf_destroy_descriptors_layout(result->descriptors_layouts[i]);
+    }
   }
   for (uint32_t i = 0u;
       descriptor_count_estimates != NULL &&

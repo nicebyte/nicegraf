@@ -537,11 +537,6 @@ typedef struct {
 } ngf_pipeline_layout_info;
 
 /**
- * Pipeline layout object.
- */
-typedef struct ngf_pipeline_layout ngf_pipeline_layout;
-
-/**
  * Buffer object
  */
 typedef struct ngf_buffer ngf_buffer;
@@ -653,7 +648,7 @@ typedef struct {
   const ngf_tessellation_info *tessellation;
   const ngf_vertex_input_info *input_info;
   ngf_primitive_type primitive_type;
-  const ngf_pipeline_layout *layout;
+  const ngf_pipeline_layout_info *layout;
 } ngf_graphics_pipeline_info;
 
 /**
@@ -904,17 +899,6 @@ ngf_error ngf_create_descriptors_layout(const ngf_descriptors_layout_info *info,
  * Destroy the given descriptor set layout object.
  */
 void ngf_destroy_descriptors_layout(ngf_descriptors_layout *layout);
-
-/**
- * Creates a new pipeline layout object.
- */
-ngf_error ngf_create_pipeline_layout(const ngf_pipeline_layout_info *info,
-                                     ngf_pipeline_layout **result);
-
-/**
- * Destroys the given pipeline layout.
- */
-void ngf_destroy_pipeline_layout(ngf_pipeline_layout *layout);
 
 /**
  * Create a new descriptor set conforming to the given layout.
