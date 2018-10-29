@@ -122,7 +122,7 @@ ngf_error ngf_util_create_simple_layout_data(
   };
   result->ndescriptors_layouts = 1u;
   result->descriptors_layouts = NGF_ALLOC(ngf_descriptor_set_layout*);
-  err = ngf_create_descriptors_layout(&ds_layout_info,
+  err = ngf_create_descriptor_set_layout(&ds_layout_info,
                                       &(result->descriptors_layouts[0]));
   if (err != NGF_ERROR_OK) return err;
   result->pipeline_layout.ndescriptors_layouts = 1u;
@@ -203,8 +203,8 @@ ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
   }
 
   for (uint32_t s = 0u; s < set_count; ++s) {
-    err = ngf_create_descriptors_layout(&descriptor_set_layouts[s],
-                                        &result->descriptors_layouts[s]);
+    err = ngf_create_descriptor_set_layout(&descriptor_set_layouts[s],
+                                           &result->descriptors_layouts[s]);
     if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
   }
 
