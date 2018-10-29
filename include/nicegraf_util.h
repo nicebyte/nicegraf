@@ -61,7 +61,7 @@ void ngf_util_create_default_graphics_pipeline_data(
  */
 typedef struct {
   ngf_pipeline_layout_info pipeline_layout;
-  ngf_descriptors_layout **descriptors_layouts;
+  ngf_descriptor_set_layout **descriptors_layouts;
   uint32_t ndescriptors_layouts;
 } ngf_util_layout_data;
 

@@ -81,7 +81,7 @@ private:
   using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
 NGF_DEFINE_WRAPPER_TYPE(shader_stage);
-NGF_DEFINE_WRAPPER_TYPE(descriptors_layout);
+NGF_DEFINE_WRAPPER_TYPE(descriptor_set_layout);
 NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
 NGF_DEFINE_WRAPPER_TYPE(image);
 NGF_DEFINE_WRAPPER_TYPE(sampler);
@@ -93,7 +93,7 @@ NGF_DEFINE_WRAPPER_TYPE(context);
 
 // special case for descriptor sets
 struct ngf_descriptor_set_ManagementFuncs {
-  using InitType = ngf_descriptors_layout;
+  using InitType = ngf_descriptor_set_layout;
   static ngf_error create(const InitType *layout, ngf_descriptor_set **set) {
     return ngf_create_descriptor_set(layout, set);
   }
