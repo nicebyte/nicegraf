@@ -1530,61 +1530,68 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       // Set dynamic pipeline state.
       for (size_t i = 0; i < subop->ndynamic_state_cmds; ++i) {
         const ngf_dynamic_state_command *cmd = &(subop->dynamic_state_cmds[i]);
-        switch (cmd->state) {
-        case NGF_DYNAMIC_STATE_VIEWPORT:
-          glViewport(cmd->viewport.x,
-                     cmd->viewport.y,
-                     cmd->viewport.width,
-                     cmd->viewport.height);
-          break;
-        case NGF_DYNAMIC_STATE_SCISSOR:
-          glScissor(cmd->scissor.x,
-                    cmd->scissor.y,
-                    cmd->scissor.width,
-                    cmd->scissor.height);
-          break;
-        case NGF_DYNAMIC_STATE_LINE_WIDTH:
-          glLineWidth(cmd->line_width);
-          break;
-        case NGF_DYNAMIC_STATE_BLEND_CONSTANTS:
-          glBlendFunc(cmd->blend_factors.sfactor,
-                      cmd->blend_factors.dfactor);
-          break;
-        case NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK:
-          glStencilMaskSeparate(GL_FRONT, cmd->stencil_write_mask.front);
-          glStencilMaskSeparate(GL_BACK, cmd->stencil_write_mask.back);
-          break;
-        case NGF_DYNAMIC_STATE_STENCIL_COMPARE_MASK: {
-          GLint back_func, front_func, front_ref, back_ref;
-          glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
-          glGetIntegerv(GL_STENCIL_FUNC, &front_func);
-          glGetIntegerv(GL_STENCIL_BACK_REF, &back_ref);
-          glGetIntegerv(GL_STENCIL_REF, &front_ref);
-          glStencilFuncSeparate(GL_FRONT,
-                                front_func,
-                                front_ref,
-                                cmd->stencil_compare_mask.front);
-          glStencilFuncSeparate(GL_BACK,
-                                back_func,
-                                back_ref,
-                                cmd->stencil_compare_mask.back);
-          break;
-          }
-        case NGF_DYNAMIC_STATE_STENCIL_REFERENCE: {
-          GLint back_func, front_func, front_mask, back_mask;
-          glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
-          glGetIntegerv(GL_STENCIL_FUNC, &front_func);
-          glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &back_mask);
-          glGetIntegerv(GL_STENCIL_VALUE_MASK, &front_mask);
-          glStencilFuncSeparate(GL_FRONT,
-                                front_func,
-                                cmd->stencil_reference.front,
-                                front_mask);
-          glStencilFuncSeparate(GL_BACK,
-                                back_func,
-                                cmd->stencil_reference.back,
-                                back_mask);         
-          break;
+        if ((pipeline->dynamic_state_mask & cmd->state) == cmd->state) {
+          switch (cmd->state) {
+          case NGF_DYNAMIC_STATE_VIEWPORT:
+          case NGF_DYNAMIC_STATE_SCISSOR:
+          case NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR:
+            if (cmd->state & NGF_DYNAMIC_STATE_VIEWPORT) {
+              glViewport(cmd->viewport.x,
+                         cmd->viewport.y,
+                         cmd->viewport.width,
+                         cmd->viewport.height);
+            }
+            if (cmd->state & NGF_DYNAMIC_STATE_SCISSOR) {
+              glScissor(cmd->scissor.x,
+                        cmd->scissor.y,
+                        cmd->scissor.width,
+                        cmd->scissor.height);
+            }
+            break;
+
+          case NGF_DYNAMIC_STATE_LINE_WIDTH:
+            glLineWidth(cmd->line_width);
+            break;
+          case NGF_DYNAMIC_STATE_BLEND_CONSTANTS:
+            glBlendFunc(cmd->blend_factors.sfactor,
+                        cmd->blend_factors.dfactor);
+            break;
+          case NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK:
+            glStencilMaskSeparate(GL_FRONT, cmd->stencil_write_mask.front);
+            glStencilMaskSeparate(GL_BACK, cmd->stencil_write_mask.back);
+            break;
+          case NGF_DYNAMIC_STATE_STENCIL_COMPARE_MASK: {
+            GLint back_func, front_func, front_ref, back_ref;
+            glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
+            glGetIntegerv(GL_STENCIL_FUNC, &front_func);
+            glGetIntegerv(GL_STENCIL_BACK_REF, &back_ref);
+            glGetIntegerv(GL_STENCIL_REF, &front_ref);
+            glStencilFuncSeparate(GL_FRONT,
+                                  front_func,
+                                  front_ref,
+                                  cmd->stencil_compare_mask.front);
+            glStencilFuncSeparate(GL_BACK,
+                                  back_func,
+                                  back_ref,
+                                  cmd->stencil_compare_mask.back);
+            break;
+            }
+          case NGF_DYNAMIC_STATE_STENCIL_REFERENCE: {
+            GLint back_func, front_func, front_mask, back_mask;
+            glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
+            glGetIntegerv(GL_STENCIL_FUNC, &front_func);
+            glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &back_mask);
+            glGetIntegerv(GL_STENCIL_VALUE_MASK, &front_mask);
+            glStencilFuncSeparate(GL_FRONT,
+                                  front_func,
+                                  cmd->stencil_reference.front,
+                                  front_mask);
+            glStencilFuncSeparate(GL_BACK,
+                                  back_func,
+                                  cmd->stencil_reference.back,
+                                  back_mask);         
+            break;
+            }
           }
         }
       }
