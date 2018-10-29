@@ -514,12 +514,12 @@ typedef struct {
 typedef struct {
   ngf_descriptor_info *descriptors;
   uint32_t ndescriptors;
-} ngf_descriptors_layout_info;
+} ngf_descriptor_set_layout_info;
 
 /**
  * Descriptor layout object.
  */
-typedef struct ngf_descriptors_layout ngf_descriptors_layout;
+typedef struct ngf_descriptor_set_layout ngf_descriptor_set_layout;
 
 /**
  * Descriptor set object.
@@ -533,7 +533,7 @@ typedef struct ngf_descriptor_set ngf_descriptor_set;
  */
 typedef struct {
   uint32_t ndescriptors_layouts;
-  const ngf_descriptors_layout **descriptors_layouts;
+  const ngf_descriptor_set_layout **descriptors_layouts;
 } ngf_pipeline_layout_info;
 
 /**
@@ -892,18 +892,18 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage);
  * @param result shall be initialized to point to a descriptor set layout object
  *  if the function succeeds.
  */
-ngf_error ngf_create_descriptors_layout(const ngf_descriptors_layout_info *info,
-                                        ngf_descriptors_layout **result);
+ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *info,
+                                        ngf_descriptor_set_layout **result);
 
 /**
  * Destroy the given descriptor set layout object.
  */
-void ngf_destroy_descriptors_layout(ngf_descriptors_layout *layout);
+void ngf_destroy_descriptors_layout(ngf_descriptor_set_layout *layout);
 
 /**
  * Create a new descriptor set conforming to the given layout.
  */
-ngf_error ngf_create_descriptor_set(const ngf_descriptors_layout *layout,
+ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout *layout,
                                     ngf_descriptor_set **set);
 
 /**

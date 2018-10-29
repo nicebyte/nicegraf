@@ -69,8 +69,8 @@ struct ngf_buffer {
   GLenum access_type;
 };
 
-struct ngf_descriptors_layout {
-  ngf_descriptors_layout_info info;
+struct ngf_descriptor_set_layout {
+  ngf_descriptor_set_layout_info info;
 };
 
 struct ngf_descriptor_set {
@@ -582,13 +582,13 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   }
 }
 
-ngf_error ngf_create_descriptors_layout(const ngf_descriptors_layout_info *info,
-                                        ngf_descriptors_layout **result) {
+ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *info,
+                                        ngf_descriptor_set_layout **result) {
   assert(info);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_descriptors_layout);
-  ngf_descriptors_layout *layout = *result;
+  *result = NGF_ALLOC(ngf_descriptor_set_layout);
+  ngf_descriptor_set_layout *layout = *result;
   if (layout == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_descriptors_layout_cleanup;
@@ -612,7 +612,7 @@ ngf_create_descriptors_layout_cleanup:
   return err;
 }
 
-void ngf_destroy_descriptors_layout(ngf_descriptors_layout *layout) {
+void ngf_destroy_descriptors_layout(ngf_descriptor_set_layout *layout) {
   if (layout != NULL) {
     if (layout->info.ndescriptors > 0 &&
         layout->info.descriptors) {
@@ -622,7 +622,7 @@ void ngf_destroy_descriptors_layout(ngf_descriptors_layout *layout) {
   }
 }
 
-ngf_error ngf_create_descriptor_set(const ngf_descriptors_layout *layout,
+ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout *layout,
                                     ngf_descriptor_set **result) {
   assert(layout);
   assert(result);
@@ -748,7 +748,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   uint32_t total_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
   for (uint32_t set = 0u; set < pipeline_layout->ndescriptors_layouts; ++set) {
     uint32_t set_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
-    const ngf_descriptors_layout_info *set_layout =
+    const ngf_descriptor_set_layout_info *set_layout =
         &pipeline_layout->descriptors_layouts[set]->info;
     binding_map[set] = NGF_ALLOCN(_ngf_native_binding,
                                   set_layout->ndescriptors + 1);
