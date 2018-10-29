@@ -607,7 +607,7 @@ ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info 
 
 ngf_create_descriptor_set_layout_cleanup:
   if (err != NGF_ERROR_OK) {
-    ngf_destroy_descriptors_layout(layout);
+    ngf_destroy_descriptor_set_layout(layout);
   }
   return err;
 }
