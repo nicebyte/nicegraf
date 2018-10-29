@@ -894,13 +894,13 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage);
  * @param result shall be initialized to point to a descriptor set layout object
  *  if the function succeeds.
  */
-ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *info,
-                                        ngf_descriptor_set_layout **result);
+ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info *info,
+                                           ngf_descriptor_set_layout **result);
 
 /**
  * Destroy the given descriptor set layout object.
  */
-void ngf_destroy_descriptors_layout(ngf_descriptor_set_layout *layout);
+void ngf_destroy_descriptor_set_layout(ngf_descriptor_set_layout *layout);
 
 /**
  * Create a new descriptor set conforming to the given layout.

@@ -582,8 +582,8 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   }
 }
 
-ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *info,
-                                        ngf_descriptor_set_layout **result) {
+ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info *info,
+                                           ngf_descriptor_set_layout **result) {
   assert(info);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
@@ -591,7 +591,7 @@ ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *in
   ngf_descriptor_set_layout *layout = *result;
   if (layout == NULL) {
     err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_descriptors_layout_cleanup;
+    goto ngf_create_descriptor_set_layout_cleanup;
   }
 
   layout->info.ndescriptors = info->ndescriptors;
@@ -599,20 +599,20 @@ ngf_error ngf_create_descriptors_layout(const ngf_descriptor_set_layout_info *in
                                         info->ndescriptors);
   if (layout->info.descriptors == NULL) {
     err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_descriptors_layout_cleanup;
+    goto ngf_create_descriptor_set_layout_cleanup;
   }
   memcpy(layout->info.descriptors,
          info->descriptors,
          sizeof(ngf_descriptor_info) * info->ndescriptors);
 
-ngf_create_descriptors_layout_cleanup:
+ngf_create_descriptor_set_layout_cleanup:
   if (err != NGF_ERROR_OK) {
     ngf_destroy_descriptors_layout(layout);
   }
   return err;
 }
 
-void ngf_destroy_descriptors_layout(ngf_descriptor_set_layout *layout) {
+void ngf_destroy_descriptor_set_layout(ngf_descriptor_set_layout *layout) {
   if (layout != NULL) {
     if (layout->info.ndescriptors > 0 &&
         layout->info.descriptors) {
