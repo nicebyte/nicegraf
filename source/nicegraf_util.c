@@ -214,7 +214,7 @@ ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
 ngf_util_create_layout_data_cleanup:
   if (err != NGF_ERROR_OK) {
     for (uint32_t i = 0u; i < result->ndescriptors_layouts; ++i) {
-      ngf_destroy_descriptors_layout(result->descriptors_layouts[i]);
+      ngf_destroy_descriptor_set_layout(result->descriptors_layouts[i]);
     }
   }
   for (uint32_t i = 0u;
