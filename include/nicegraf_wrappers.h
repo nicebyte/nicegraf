@@ -55,7 +55,9 @@ public:
   }
 
   T* get() { return handle_; }
+  const T* get() const { return handle_; }
   operator T*() { return handle_; }
+  operator const T*() const { return handle_; }
 
   void reset(T *new_handle) { destroy_if_necessary(); handle_ = new_handle; }
 
