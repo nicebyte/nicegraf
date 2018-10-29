@@ -89,8 +89,7 @@ void ngf_util_create_default_graphics_pipeline_data(
   if (window_size != NULL) {
     result->scissor = result->viewport = *window_size;
   } else {
-    dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT |
-                         NGF_DYNAMIC_STATE_SCISSOR;
+    dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR;
   }
   ngf_graphics_pipeline_info gpi = {
     .blend = &result->blend_info,
