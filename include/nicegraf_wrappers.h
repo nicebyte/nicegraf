@@ -49,6 +49,8 @@ public:
     return *this;
   }
 
+  typedef typename ObjectManagementFuncs::InitType init_type;
+
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
     destroy_if_necessary();
     return ObjectManagementFuncs::create(&info, &handle_);
