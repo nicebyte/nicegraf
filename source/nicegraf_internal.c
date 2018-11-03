@@ -47,3 +47,42 @@ void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks) {
   }
 }
 
+_ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks) {
+  _ngf_block_allocator *alloc = NGF_ALLOC(_ngf_block_allocator);
+  const uint32_t total_unaligned_block_size =
+      block_size + sizeof(_ngf_blkalloc_block);
+  const uint32_t total_aligned_block_size =
+      total_unaligned_block_size +
+      (total_unaligned_block_size % sizeof(_ngf_blkalloc_block*));
+  alloc->chunk = NGF_ALLOCN(uint8_t, block_size * nblocks);
+  alloc->block_size = block_size;
+  alloc->nblocks = nblocks;
+  alloc->freelist = (_ngf_blkalloc_block*)alloc->chunk;
+  for (uint32_t b = 0u; b < nblocks - 1u; ++b) {
+    _ngf_blkalloc_block *blk =
+        (_ngf_blkalloc_block*)(alloc->chunk + total_aligned_block_size * b);
+    _ngf_blkalloc_block *next_blk =
+        (_ngf_blkalloc_block*)(alloc->chunk + total_aligned_block_size * (b + 1u));
+    blk->next_free = next_blk;
+  }
+  alloc->freelist = (_ngf_blkalloc_block*)alloc->chunk;
+  return alloc;
+}
+
+void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc) {
+  NGF_FREEN(alloc->chunk, alloc->block_size * alloc->nblocks);
+  NGF_FREE(alloc);
+}
+
+void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc) {
+  _ngf_blkalloc_block *blk = alloc->freelist;
+  alloc->freelist = blk->next_free;
+  return blk->data;
+}
+
+void _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr) {
+  _ngf_blkalloc_block *blk =
+      (_ngf_blkalloc_block*)((uint8_t*)ptr - sizeof(_ngf_blkalloc_block*));
+  blk->next_free = alloc->freelist;
+  alloc->freelist = blk;
+}
