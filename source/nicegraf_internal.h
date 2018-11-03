@@ -43,13 +43,16 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 extern "C" {
 #endif
 
+// Custom allocation callbacks.
 extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 
+// Convenience macros for invoking custom memory allocation callbacks.
 #define NGF_ALLOC(type) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), 1))
 #define NGF_ALLOCN(type, n) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), n))
 #define NGF_FREE(ptr) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1))
 #define NGF_FREEN(ptr, n) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n))
 
+// Macro for determining size of arrays.
 #if defined(_MSC_VER)
 #include <stdlib.h>
 #define NGF_ARRAYSIZE(arr) _countof(arr)
@@ -57,26 +60,29 @@ extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 #define NGF_ARRAYSIZE(arr) (sizeof(arr)/sizeof(arr[0]))
 #endif
 
+// For when you don't feel like comparing structs field-by-field.
 #define NGF_STRUCT_EQ(s1, s2) (sizeof(s1) == sizeof(s2) && \
                                memcmp((void*)&s1, (void*)&s2, sizeof(s1)) == 0)
 
+// It is $CURRENT_YEAR and C does not have a standard thing for this.
 #define NGF_MAX(a, b) (a > b ? a : b)
 
-typedef struct _ngf_blkalloc_block {
-  struct _ngf_blkalloc_block *next_free;
-  uint8_t data[];
-} _ngf_blkalloc_block;
+// A fast fixed-size block allocator.
+typedef struct _ngf_block_allocator _ngf_block_allocator;
 
-typedef struct {
-  uint8_t *chunk;
-  _ngf_blkalloc_block *freelist;
-  uint32_t block_size;
-  uint32_t nblocks;
-} _ngf_block_allocator;
-
+// Creates a new block allocator with a given fixed `block_size` and a given
+// initial capacity of `nblocks`.
 _ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks);
+
+// Destroys the given block allocator. All unfreed pointers obtained from the
+// destroyed allocator become invalid.
 void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc);
+
+// Allocates the next free block from the allocator. Returns NULL on error.
 void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc);
+
+// Returns the given block to the allocator.
+// Freeing a NULL pointer does nothing.
 void _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 #ifdef __cplusplus
