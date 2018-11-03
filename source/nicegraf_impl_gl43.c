@@ -500,11 +500,88 @@ void ngf_destroy_context(ngf_context *ctx) {
 
 ngf_error _ngf_compile_shader(const char *source, GLint source_len,
                               const char *debug_name,
-                              GLenum stage, GLuint *result) {
+                              GLenum stage,
+                              const ngf_specialization_info *spec_info,
+                              GLuint *result) {
   ngf_error err = NGF_ERROR_OK;
   *result = GL_NONE;
+
+  // Obtain separate pointers to the first line of input (#version directive)
+  // and the rest of input. We will later insert additional defines between them.
+  const char *first_line = source;
+  const char *rest_of_source = source;
+  while(*(rest_of_source++) != '\n' &&
+        (rest_of_source - source < source_len));
+  const GLint first_line_len = (rest_of_source - source);
+
+  // Space for chunk pointers and chunk lengths.
+  const uint32_t nsource_chunks =
+      2u + (spec_info == NULL ? 0u : 1u);
+  const char *source_chunks[3];
+  GLint source_chunk_lengths[3];
+
+  // Fill out chunk and chunk length data, generating additional defines from
+  // the specialization constant data and inserting them between the first line
+  // and the rest of the code.
+  source_chunks[0] = first_line;
+  source_chunk_lengths[0] = first_line_len;
+
+  char *spec_defines = NULL;
+  if (spec_info != NULL) {
+    static char spec_define_template[] =
+        NGF_EMULATED_SPEC_CONST_PREFIX "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+    const uint32_t spec_define_max_size = NGF_ARRAYSIZE(spec_define_template);
+    const uint32_t defines_buffer_size =
+        spec_define_max_size * spec_info->nspecializations;
+    spec_defines = NGF_ALLOCN(char, defines_buffer_size);
+    uint32_t defines_length = 0u;
+    for (uint32_t i= 0u; i < nsource_chunks - 1u; ++i) {
+      const ngf_constant_specialization *spec = &spec_info->specializations[i];
+      char *buf = spec_defines + defines_length;
+      uint32_t max_write_len = defines_buffer_size - defines_length;
+      uint32_t bytes_written = snprintf(buf, max_write_len, "%s%d ",
+                                        NGF_EMULATED_SPEC_CONST_PREFIX,
+                                        spec->constant_id);
+      if (bytes_written < max_write_len) {
+        defines_length += bytes_written;
+        max_write_len -= bytes_written;
+        buf += bytes_written;
+      } else {
+
+      }
+
+      const uint8_t *data = (uint8_t*)spec_info->value_buffer + spec->offset;
+      #define STRINGIFY_CONSTANT_VALUE(format, type) \
+          bytes_written = snprintf(buf, max_write_len, format "\n", *(const type*)data); \
+          break;
+      switch (spec->type) {
+      case NGF_TYPE_DOUBLE: STRINGIFY_CONSTANT_VALUE("%f", double);
+      case NGF_TYPE_FLOAT:
+      case NGF_TYPE_HALF_FLOAT: STRINGIFY_CONSTANT_VALUE("%f", float);
+      case NGF_TYPE_INT8: STRINGIFY_CONSTANT_VALUE("%d", int8_t);
+      case NGF_TYPE_INT16: STRINGIFY_CONSTANT_VALUE("%d", int16_t);
+      case NGF_TYPE_INT32: STRINGIFY_CONSTANT_VALUE("%d", int32_t);
+      case NGF_TYPE_UINT8: STRINGIFY_CONSTANT_VALUE("%d", uint8_t);
+      case NGF_TYPE_UINT16: STRINGIFY_CONSTANT_VALUE("%d", uint16_t);
+      case NGF_TYPE_UINT32: STRINGIFY_CONSTANT_VALUE("%d", uint32_t);
+      default: assert(false);
+      }
+      #undef STRINGIZE_VALUE
+      if (bytes_written < max_write_len) {
+        defines_length += bytes_written;
+      } else {
+        assert(false);
+      }
+    }
+    source_chunks[1] = spec_defines;
+    source_chunk_lengths[1] = defines_length;
+   }
+  source_chunks[nsource_chunks - 1u] = rest_of_source;
+  source_chunk_lengths[nsource_chunks - 1u] = source_len - first_line_len;
+
+  // Compile the shader.
   GLuint shader = glCreateShader(stage);
-  glShaderSource(shader, 1, &source, &source_len);
+  glShaderSource(shader, nsource_chunks, source_chunks, source_chunk_lengths);
   glCompileShader(shader);
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
@@ -563,7 +640,12 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   }
 
 _ngf_compile_shader_cleanup:
-  if (shader != GL_NONE) glDeleteShader(shader);
+  if (shader != GL_NONE) {
+    glDeleteShader(shader);
+  }
+  if (spec_defines != NULL) {
+    NGF_FREEN(spec_defines, spec_info->nspecializations);
+   }
   if (err != NGF_ERROR_OK && *result != GL_NONE) {
     glDeleteProgram(*result);
   }
@@ -588,7 +670,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   stage->gltype = gl_stage_type;
   stage->glstagebit = gl_shader_stage_bit(info->type);
   err = _ngf_compile_shader(info->content, size, info->debug_name,
-                            gl_stage_type, &stage->glprogram);
+                            gl_stage_type, NULL, &stage->glprogram);
 
 ngf_create_shader_stage_cleanup:
   if (err != NGF_ERROR_OK) {
