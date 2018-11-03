@@ -635,6 +635,29 @@ typedef enum {
 } ngf_primitive_type;
 
 /**
+ * A constant specialization entry, sets the value for a single
+ * specialization constant.
+ */
+typedef struct {
+  uint32_t constant_id; /**< ID of the specialization constant used in the
+                             shader stage */
+  uint32_t offset; /**< Offset at which the user-provided value is stored in
+                        the specialization buffer. */
+  ngf_type type; /**< Type of the specialization constant. */
+} ngf_constant_specialization;
+
+/**
+ * Sets specialization constant values for a pipeline.
+ */
+typedef struct {
+  ngf_constant_specialization  *specializations; /**< List of specialization
+                                                      entries. */
+  uint32_t nspecializations; /**< Number of specialization entries. */
+  void *value_buffer; /**< Pointer to a buffer containing the values for the
+                           specialization constants. */
+} ngf_specialization_info;
+
+/**
  * Specifies information for creation of a graphics pipeline.
  */
 typedef struct {
@@ -651,6 +674,7 @@ typedef struct {
   const ngf_vertex_input_info *input_info;
   ngf_primitive_type primitive_type;
   const ngf_pipeline_layout_info *layout;
+  const ngf_specialization_info *spec_info;
 } ngf_graphics_pipeline_info;
 
 /**
