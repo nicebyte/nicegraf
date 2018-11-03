@@ -64,7 +64,9 @@ struct ngf_shader_stage {
   GLuint glprogram;
   GLenum gltype;
   GLenum glstagebit;
-  const char *source_code;
+
+  char *source_code;
+  uint32_t source_code_size;
 };
 
 struct ngf_buffer {
@@ -114,6 +116,8 @@ struct ngf_graphics_pipeline {
   GLenum primitive_type;
   uint32_t ndescriptors_layouts;
   const _ngf_native_binding **binding_map;
+  GLuint owned_stages[NGF_STAGE_COUNT];
+  uint32_t nowned_stages;
 };
 
 typedef struct {
@@ -529,7 +533,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   char *spec_defines = NULL;
   if (spec_info != NULL) {
     static char spec_define_template[] =
-        NGF_EMULATED_SPEC_CONST_PREFIX "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        "#define " NGF_EMULATED_SPEC_CONST_PREFIX "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
     const uint32_t spec_define_max_size = NGF_ARRAYSIZE(spec_define_template);
     const uint32_t defines_buffer_size =
         spec_define_max_size * spec_info->nspecializations;
@@ -539,7 +543,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       const ngf_constant_specialization *spec = &spec_info->specializations[i];
       char *buf = spec_defines + defines_length;
       uint32_t max_write_len = defines_buffer_size - defines_length;
-      uint32_t bytes_written = snprintf(buf, max_write_len, "%s%d ",
+      uint32_t bytes_written = snprintf(buf, max_write_len, "#define %s%d ",
                                         NGF_EMULATED_SPEC_CONST_PREFIX,
                                         spec->constant_id);
       if (bytes_written < max_write_len) {
@@ -658,19 +662,27 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   assert(result);
   ngf_error err = NGF_ERROR_OK;
   ngf_shader_stage *stage = NULL;
-  const GLenum gl_stage_type = gl_shader_stage(info->type);
-  GLuint shader = glCreateShader(gl_stage_type);
-  GLint size = (GLint)info->content_length;
   *result = NGF_ALLOC(ngf_shader_stage);
   stage = *result;
   if (stage == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_shader_stage_cleanup;
   }
-  stage->gltype = gl_stage_type;
+  stage->gltype = gl_shader_stage(info->type);
   stage->glstagebit = gl_shader_stage_bit(info->type);
-  err = _ngf_compile_shader(info->content, size, info->debug_name,
-                            gl_stage_type, NULL, &stage->glprogram);
+  stage->source_code_size = (GLint)info->content_length;
+  err = _ngf_compile_shader(info->content, stage->source_code_size,
+                            info->debug_name, stage->gltype, NULL,
+                            &stage->glprogram);
+
+  // Save off the source code in case we need to recompile for pipelines
+  // doing specialization.
+  stage->source_code = NGF_ALLOCN(char, stage->source_code_size);
+  if (stage->source_code == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_create_shader_stage_cleanup;
+  }
+  strncpy(stage->source_code, info->content, info->content_length);
 
 ngf_create_shader_stage_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -682,6 +694,10 @@ ngf_create_shader_stage_cleanup:
 void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   if (stage != NULL) {
     glDeleteProgram(stage->glprogram);
+    if (stage->source_code != NULL) {
+      NGF_FREEN(stage->source_code, stage->source_code_size);
+    }
+    NGF_FREE(stage);
   }
 }
 
@@ -898,11 +914,29 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     err = NGF_ERROR_OUT_OF_BOUNDS;
     goto ngf_create_pipeline_cleanup;
   }
+  pipeline->nowned_stages = 0u;
   glGenProgramPipelines(1, &pipeline->program_pipeline);
-  for (size_t s = 0; s < info->nshader_stages; ++s) {
-    glUseProgramStages(pipeline->program_pipeline,
-                       info->shader_stages[s]->glstagebit,
-                       info->shader_stages[s]->glprogram);
+  if (info->spec_info->nspecializations == 0u) {
+    for (size_t s = 0; s < info->nshader_stages; ++s) {
+      glUseProgramStages(pipeline->program_pipeline,
+                         info->shader_stages[s]->glstagebit,
+                         info->shader_stages[s]->glprogram);
+    }
+  } else {
+    for (size_t s = 0; s < info->nshader_stages; ++s) {
+      err =
+          _ngf_compile_shader(info->shader_stages[s]->source_code,
+                              info->shader_stages[s]->source_code_size,
+                              "",
+                              info->shader_stages[s]->gltype,
+                              info->spec_info,
+                              &pipeline->
+                                  owned_stages[pipeline->nowned_stages++]);
+
+      glUseProgramStages(pipeline->program_pipeline,
+                         info->shader_stages[s]->glstagebit,
+                         pipeline->owned_stages[s]);
+    }   
   }
 
   // Set dynamic state mask.
@@ -934,6 +968,9 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
     }
     glDeleteProgramPipelines(1, &pipeline->program_pipeline);
     glDeleteVertexArrays(1, &pipeline->vao);
+    for (uint32_t s = 0u; s < pipeline->nowned_stages; ++s) {
+      glDeleteProgram(pipeline->owned_stages[s]);
+    }
     NGF_FREEN(pipeline, 1);
   }
 }
