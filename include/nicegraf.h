@@ -126,6 +126,7 @@ typedef enum {
   NGF_STAGE_GEOMETRY,
   NGF_STAGE_FRAGMENT,
   // TODO: compute pipelines
+  NGF_STAGE_COUNT
 } ngf_stage_type;
 
 /**
