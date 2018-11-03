@@ -45,6 +45,7 @@ typedef struct {
   ngf_irect2d scissor;
   ngf_irect2d viewport;
   ngf_tessellation_info tessellation_info;
+  ngf_specialization_info spec_info;
 } ngf_util_graphics_pipeline_data;
 
 /**
