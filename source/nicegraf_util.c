@@ -91,6 +91,12 @@ void ngf_util_create_default_graphics_pipeline_data(
   } else {
     dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR;
   }
+  ngf_specialization_info spi = {
+    .specializations = NULL,
+    .nspecializations = 0u,
+    .value_buffer = NULL
+  };
+  result->spec_info = spi;
   ngf_graphics_pipeline_info gpi = {
     .blend = &result->blend_info,
     .depth_stencil = &result->depth_stencil_info,
@@ -104,7 +110,8 @@ void ngf_util_create_default_graphics_pipeline_data(
     .layout = layout,
     .scissor = &result->scissor,
     .viewport = &result->viewport,
-    .tessellation = &result->tessellation_info
+    .tessellation = &result->tessellation_info,
+    .spec_info = &result->spec_info
   };
   result->pipeline_info = gpi;
 }
