@@ -44,6 +44,10 @@ SOFTWARE.
 #define alloca _alloca
 #endif
 
+#if !defined(NGF_EMULATED_SPEC_CONST_PREFIX)
+#define NGF_EMULATED_SPEC_CONST_PREFIX "SPIRV_CROSS_CONSTANT_ID_"
+#endif
+
 typedef struct {
   uint32_t ngf_binding_id;
   uint32_t native_binding_id;
@@ -60,6 +64,7 @@ struct ngf_shader_stage {
   GLuint glprogram;
   GLenum gltype;
   GLenum glstagebit;
+  const char *source_code;
 };
 
 struct ngf_buffer {
@@ -493,16 +498,13 @@ void ngf_destroy_context(ngf_context *ctx) {
   }
 }
 
-ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
-                                  ngf_shader_stage **result) {
-  assert(info);
-  assert(result);
+ngf_error _ngf_compile_shader(const char *source, GLint source_len,
+                              const char *debug_name,
+                              GLenum stage, GLuint *result) {
   ngf_error err = NGF_ERROR_OK;
-  ngf_shader_stage *stage = NULL;
-  const GLenum gl_stage_type = gl_shader_stage(info->type);
-  GLuint shader = glCreateShader(gl_stage_type);
-  GLint size = (GLint)info->content_length;
-  glShaderSource(shader, 1, &info->content, &size);
+  *result = GL_NONE;
+  GLuint shader = glCreateShader(stage);
+  glShaderSource(shader, 1, &source, &source_len);
   glCompileShader(shader);
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
@@ -519,18 +521,64 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
       char *info_log = malloc(info_log_length + 1);
       info_log[info_log_length] = '\0';
       glGetShaderInfoLog(shader, info_log_length, &info_log_length, info_log);
-      if (info->debug_name) {
+      if (debug_name) {
         char msg[100];
         snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error compiling %s",
-                 info->debug_name);
+                 debug_name);
         NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
       }
       NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
       free(info_log);
     }
     err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
-    goto ngf_create_shader_stage_cleanup;
+    goto _ngf_compile_shader_cleanup;
   }
+  *result = glCreateProgram();
+  glProgramParameteri(*result, GL_PROGRAM_SEPARABLE, GL_TRUE);
+  glAttachShader(*result, shader);
+  glLinkProgram(*result);
+  GLint link_status;
+  glGetProgramiv(*result, GL_LINK_STATUS, &link_status);
+  glDetachShader(*result, shader);
+  if (link_status != GL_TRUE) {
+    if (NGF_DEBUG_CALLBACK) {
+      // See previous comment about debug callback.
+      GLint info_log_length = 0;
+      glGetProgramiv(*result, GL_INFO_LOG_LENGTH, &info_log_length);
+      char *info_log = malloc(info_log_length + 1);
+      info_log[info_log_length] = '\0';
+      glGetProgramInfoLog(*result, info_log_length, &info_log_length,
+                          info_log);
+      if (debug_name) {
+        char msg[100];
+        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error linking %s",
+                 debug_name);
+        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
+      }
+      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
+      free(info_log);
+    }
+    err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    goto _ngf_compile_shader_cleanup;
+  }
+
+_ngf_compile_shader_cleanup:
+  if (shader != GL_NONE) glDeleteShader(shader);
+  if (err != NGF_ERROR_OK && *result != GL_NONE) {
+    glDeleteProgram(*result);
+  }
+  return err;
+}
+
+ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
+                                  ngf_shader_stage **result) {
+  assert(info);
+  assert(result);
+  ngf_error err = NGF_ERROR_OK;
+  ngf_shader_stage *stage = NULL;
+  const GLenum gl_stage_type = gl_shader_stage(info->type);
+  GLuint shader = glCreateShader(gl_stage_type);
+  GLint size = (GLint)info->content_length;
   *result = NGF_ALLOC(ngf_shader_stage);
   stage = *result;
   if (stage == NULL) {
@@ -539,37 +587,10 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   }
   stage->gltype = gl_stage_type;
   stage->glstagebit = gl_shader_stage_bit(info->type);
-  stage->glprogram = glCreateProgram();
-  glProgramParameteri(stage->glprogram, GL_PROGRAM_SEPARABLE, GL_TRUE);
-  glAttachShader(stage->glprogram, shader);
-  glLinkProgram(stage->glprogram);
-  GLint link_status;
-  glGetProgramiv(stage->glprogram, GL_LINK_STATUS, &link_status);
-  glDetachShader(stage->glprogram, shader);
-  if (link_status != GL_TRUE) {
-    if (NGF_DEBUG_CALLBACK) {
-      // See previous comment about debug callback.
-      GLint info_log_length = 0;
-      glGetProgramiv(stage->glprogram, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc(info_log_length + 1);
-      info_log[info_log_length] = '\0';
-      glGetProgramInfoLog(stage->glprogram, info_log_length, &info_log_length,
-                          info_log);
-      if (info->debug_name) {
-        char msg[100];
-        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error linking %s",
-                 info->debug_name);
-        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
-      }
-      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
-      free(info_log);
-    }
-    err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
-    goto ngf_create_shader_stage_cleanup;
-  }
+  err = _ngf_compile_shader(info->content, size, info->debug_name,
+                            gl_stage_type, &stage->glprogram);
 
 ngf_create_shader_stage_cleanup:
-  if (shader != GL_NONE) glDeleteShader(shader);
   if (err != NGF_ERROR_OK) {
     ngf_destroy_shader_stage(stage);
   }
