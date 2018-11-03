@@ -62,6 +62,23 @@ extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 
 #define NGF_MAX(a, b) (a > b ? a : b)
 
+typedef struct _ngf_blkalloc_block {
+  struct _ngf_blkalloc_block *next_free;
+  uint8_t data[];
+} _ngf_blkalloc_block;
+
+typedef struct {
+  uint8_t *chunk;
+  _ngf_blkalloc_block *freelist;
+  uint32_t block_size;
+  uint32_t nblocks;
+} _ngf_block_allocator;
+
+_ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks);
+void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc);
+void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc);
+void _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
+
 #ifdef __cplusplus
 }
 #endif
