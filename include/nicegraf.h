@@ -161,7 +161,8 @@ typedef enum {
 typedef enum {
   NGF_CULL_MODE_BACK = 0, /**< Cull back-facing polygons.*/
   NGF_CULL_MODE_FRONT, /**< Cull front-facing polygons. */
-  NGF_CULL_MODE_FRONT_AND_BACK /**< Cull all.*/
+  NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all.*/
+  NGF_CULL_MODE_NONE /**< Never cull triangles. */
 } ngf_cull_mode;
 
 /**
