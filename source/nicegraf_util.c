@@ -74,7 +74,7 @@ void ngf_util_create_default_graphics_pipeline_data(
   };
   result->multisample_info = msi;
   ngf_rasterization_info ri = {
-    .cull_mode = NGF_CULL_MODE_BACK,
+    .cull_mode = NGF_CULL_MODE_NONE,
     .discard = false,
     .front_face = NGF_FRONT_FACE_COUNTER_CLOCKWISE,
     .line_width = 1.0f,

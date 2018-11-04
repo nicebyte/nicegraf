@@ -204,7 +204,10 @@ static GLenum gl_cull_mode(ngf_cull_mode m) {
   static const GLenum cull_mode[] = {
     GL_BACK,
     GL_FRONT,
-    GL_FRONT_AND_BACK
+    GL_FRONT_AND_BACK,
+    GL_NONE // not really a valid culling mode but GL has no
+            // separate enum entry for "no culling", it's turned
+            // on and off with a function call.
   };
   return cull_mode[(size_t)(m)];
 }
@@ -1492,6 +1495,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
   assert(rt);
   assert(ndrawops == 0u || (ndrawops > 0u && drawops));
 
+  static bool force_pipeline_update = true; //force a pipeline update on first call.
+
   glBindFramebuffer(GL_FRAMEBUFFER, rt->framebuffer);
   // TODO: assert renderpass <-> rendertarget compatibility.
   GLbitfield clear_mask = 0;
@@ -1528,17 +1533,19 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
   for (size_t o = 0; o < ndrawops; ++o) {
     ngf_draw_op *op = drawops[o];
     const ngf_graphics_pipeline *pipeline = op->pipeline;
-    if (PIPELINE_CACHE.id != pipeline->id) {
+    if (PIPELINE_CACHE.id != pipeline->id || force_pipeline_update) {
       PIPELINE_CACHE.id = pipeline->id;
       glBindProgramPipeline(pipeline->program_pipeline);
-      if (!NGF_STRUCT_EQ(pipeline->viewport, PIPELINE_CACHE.viewport)) {
+      if (!NGF_STRUCT_EQ(pipeline->viewport, PIPELINE_CACHE.viewport) ||
+          force_pipeline_update) {
         glViewport(pipeline->viewport.x,
                    pipeline->viewport.y,
                    pipeline->viewport.width,
                    pipeline->viewport.height);
       }
 
-      if (!NGF_STRUCT_EQ(pipeline->scissor, PIPELINE_CACHE.scissor)) {
+      if (!NGF_STRUCT_EQ(pipeline->scissor, PIPELINE_CACHE.scissor) ||
+          force_pipeline_update) {
         glScissor(pipeline->scissor.x,
                   pipeline->scissor.y,
                   pipeline->scissor.width,
@@ -1547,28 +1554,37 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
 
       const ngf_rasterization_info *rast = &(pipeline->rasterization);
       ngf_rasterization_info *cached_rast = &(PIPELINE_CACHE.rasterization);
-      if (cached_rast->discard != rast->discard) {
+      if (cached_rast->discard != rast->discard || force_pipeline_update) {
         if (rast->discard) {
           glEnable(GL_RASTERIZER_DISCARD);
         } else {
           glDisable(GL_RASTERIZER_DISCARD);
         }
       }
-      if (cached_rast->polygon_mode != rast->polygon_mode) {
+      if (cached_rast->polygon_mode != rast->polygon_mode ||
+          force_pipeline_update) {
         glPolygonMode(GL_FRONT_AND_BACK, gl_poly_mode(rast->polygon_mode));
       }
-      if (cached_rast->cull_mode != rast->cull_mode) {
-        glCullFace(gl_cull_mode(rast->cull_mode));
+      if (cached_rast->cull_mode != rast->cull_mode || force_pipeline_update) {
+        if (rast->cull_mode != NGF_CULL_MODE_NONE) {
+          glEnable(GL_CULL_FACE);
+          glCullFace(gl_cull_mode(rast->cull_mode));
+        } else {
+          glDisable(GL_CULL_FACE);
+        }
       }
-      if (cached_rast->front_face != rast->front_face) {
+      if (cached_rast->front_face != rast->front_face ||
+          force_pipeline_update) {
         glFrontFace(gl_face(rast->front_face));
       }
-      if (cached_rast->line_width != rast->line_width) {
+      if (cached_rast->line_width != rast->line_width ||
+          force_pipeline_update) {
         glLineWidth(rast->line_width);
       }
 
       if (PIPELINE_CACHE.multisample.multisample !=
-          pipeline->multisample.multisample) {
+          pipeline->multisample.multisample ||
+          force_pipeline_update) {
         if (pipeline->multisample.multisample) {
           glEnable(GL_MULTISAMPLE);
         } else {
@@ -1577,7 +1593,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       }
 
       if (PIPELINE_CACHE.multisample.alpha_to_coverage !=
-          pipeline->multisample.alpha_to_coverage) {
+          pipeline->multisample.alpha_to_coverage || force_pipeline_update) {
         if (pipeline->multisample.alpha_to_coverage) {
           glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
         } else {
@@ -1588,7 +1604,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       const ngf_depth_stencil_info *depth_stencil = &(pipeline->depth_stencil);
       ngf_depth_stencil_info *cached_depth_stencil =
           &(PIPELINE_CACHE.depth_stencil);
-      if (cached_depth_stencil->depth_test != depth_stencil->depth_test) {
+      if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
+          force_pipeline_update) {
         if (depth_stencil->depth_test) {
           glEnable(GL_DEPTH_TEST);
           glDepthFunc(gl_compare(depth_stencil->depth_compare));
@@ -1596,7 +1613,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
           glDisable(GL_DEPTH_TEST);
         }
       }
-      if (cached_depth_stencil->depth_write != depth_stencil->depth_write) {
+      if (cached_depth_stencil->depth_write != depth_stencil->depth_write ||
+          force_pipeline_update) {
         if (depth_stencil->depth_write) {
           glDepthMask(GL_TRUE);
         } else {
@@ -1607,7 +1625,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
           !NGF_STRUCT_EQ(cached_depth_stencil->back_stencil,
                          depth_stencil->back_stencil) ||
           !NGF_STRUCT_EQ(cached_depth_stencil->front_stencil,
-                         depth_stencil->front_stencil)) {
+                         depth_stencil->front_stencil) ||
+          force_pipeline_update) {
         if (depth_stencil->stencil_test) {
           glEnable(GL_STENCIL_TEST);
           glStencilFuncSeparate(
@@ -1639,7 +1658,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         }
       }
       if (cached_depth_stencil->min_depth != depth_stencil->min_depth ||
-          cached_depth_stencil->max_depth != depth_stencil->max_depth) {
+          cached_depth_stencil->max_depth != depth_stencil->max_depth ||
+          force_pipeline_update) {
         glDepthRangef(depth_stencil->min_depth, depth_stencil->max_depth);
       }
 
@@ -1647,7 +1667,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       ngf_blend_info *cached_blend = &(PIPELINE_CACHE.blend);
       if (cached_blend->enable != blend->enable ||
           cached_blend->sfactor != blend->sfactor ||
-          cached_blend->dfactor != blend->dfactor) {
+          cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
         if (blend->enable) {
           glEnable(GL_BLEND);
           glBlendFunc(gl_blendfactor(blend->sfactor),
@@ -1658,12 +1678,14 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       }
 
       if (PIPELINE_CACHE.tessellation.patch_vertices !=
-          pipeline->tessellation.patch_vertices) {
-        glPatchParameteri(GL_PATCH_VERTICES, pipeline->tessellation.patch_vertices);
+          pipeline->tessellation.patch_vertices || force_pipeline_update) {
+        glPatchParameteri(GL_PATCH_VERTICES,
+                          pipeline->tessellation.patch_vertices);
       }
       glBindVertexArray(pipeline->vao);
       PIPELINE_CACHE = *pipeline;
     }
+    force_pipeline_update = false;
 
     for (size_t s = 0; s < op->nsubops; ++s) {
       const ngf_draw_subop *subop = &(op->subops[s]);
