@@ -53,11 +53,34 @@ typedef struct {
   uint32_t native_binding_id;
 } _ngf_native_binding;
 
+struct ngf_graphics_pipeline {
+  uint32_t id;
+  GLuint program_pipeline;
+  GLuint vao;
+  ngf_irect2d viewport;
+  ngf_irect2d scissor;
+  ngf_rasterization_info rasterization;
+  ngf_multisample_info multisample;
+  ngf_depth_stencil_info depth_stencil;
+  ngf_blend_info blend;
+  uint32_t dynamic_state_mask;
+  ngf_tessellation_info tessellation;
+  const ngf_vertex_buf_binding_desc *vert_buf_bindings;
+  uint32_t nvert_buf_bindings;
+  GLenum primitive_type;
+  uint32_t ndescriptors_layouts;
+  const _ngf_native_binding **binding_map;
+  GLuint owned_stages[NGF_STAGE_COUNT];
+  uint32_t nowned_stages;
+};
+
 struct ngf_context {
   EGLDisplay dpy;
   EGLContext ctx;
   EGLConfig cfg;
   EGLSurface surface;
+  ngf_graphics_pipeline cached_state;
+  bool force_pipeline_update;
 };
 
 struct ngf_shader_stage {
@@ -97,27 +120,6 @@ struct ngf_image {
 
 struct ngf_sampler {
   GLuint glsampler;
-};
-
-struct ngf_graphics_pipeline {
-  uint32_t id;
-  GLuint program_pipeline;
-  GLuint vao;
-  ngf_irect2d viewport;
-  ngf_irect2d scissor;
-  ngf_rasterization_info rasterization;
-  ngf_multisample_info multisample;
-  ngf_depth_stencil_info depth_stencil;
-  ngf_blend_info blend;
-  uint32_t dynamic_state_mask;
-  ngf_tessellation_info tessellation;
-  const ngf_vertex_buf_binding_desc *vert_buf_bindings;
-  uint32_t nvert_buf_bindings;
-  GLenum primitive_type;
-  uint32_t ndescriptors_layouts;
-  const _ngf_native_binding **binding_map;
-  GLuint owned_stages[NGF_STAGE_COUNT];
-  uint32_t nowned_stages;
 };
 
 typedef struct {
@@ -472,6 +474,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     }
   }
 
+  ctx->force_pipeline_update = true;
+
 ngf_create_context_cleanup:
   if (err_code != NGF_ERROR_OK) {
     ngf_destroy_context(ctx);
@@ -486,9 +490,14 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   return NGF_ERROR_OK;
 }
 
+NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
+
 ngf_error ngf_set_context(ngf_context *ctx) {
   assert(ctx);
   bool result = eglMakeCurrent(ctx->dpy, ctx->surface, ctx->surface, ctx->ctx);
+  if (result) {
+    CURRENT_CONTEXT = ctx;
+  }
   return result ? NGF_ERROR_OK : NGF_ERROR_INVALID_CONTEXT;
 }
 
@@ -1486,7 +1495,6 @@ void ngf_destroy_pass(ngf_pass *pass) {
   }
 }
 
-static ngf_graphics_pipeline PIPELINE_CACHE;
 ngf_error ngf_execute_pass(const ngf_pass *pass,
                            const ngf_render_target *rt,
                            ngf_draw_op **drawops,
@@ -1495,7 +1503,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
   assert(rt);
   assert(ndrawops == 0u || (ndrawops > 0u && drawops));
 
-  static bool force_pipeline_update = true; //force a pipeline update on first call.
+  const ngf_graphics_pipeline *cached_state = &CURRENT_CONTEXT->cached_state;
+  const bool force_pipeline_update = CURRENT_CONTEXT->force_pipeline_update;
 
   glBindFramebuffer(GL_FRAMEBUFFER, rt->framebuffer);
   // TODO: assert renderpass <-> rendertarget compatibility.
@@ -1533,10 +1542,10 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
   for (size_t o = 0; o < ndrawops; ++o) {
     ngf_draw_op *op = drawops[o];
     const ngf_graphics_pipeline *pipeline = op->pipeline;
-    if (PIPELINE_CACHE.id != pipeline->id || force_pipeline_update) {
-      PIPELINE_CACHE.id = pipeline->id;
+    if (cached_state->id != pipeline->id || force_pipeline_update) {
+      CURRENT_CONTEXT->cached_state.id = pipeline->id;
       glBindProgramPipeline(pipeline->program_pipeline);
-      if (!NGF_STRUCT_EQ(pipeline->viewport, PIPELINE_CACHE.viewport) ||
+      if (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
           force_pipeline_update) {
         glViewport(pipeline->viewport.x,
                    pipeline->viewport.y,
@@ -1544,7 +1553,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
                    pipeline->viewport.height);
       }
 
-      if (!NGF_STRUCT_EQ(pipeline->scissor, PIPELINE_CACHE.scissor) ||
+      if (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
           force_pipeline_update) {
         glScissor(pipeline->scissor.x,
                   pipeline->scissor.y,
@@ -1553,7 +1562,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       }
 
       const ngf_rasterization_info *rast = &(pipeline->rasterization);
-      ngf_rasterization_info *cached_rast = &(PIPELINE_CACHE.rasterization);
+      const ngf_rasterization_info *cached_rast = &(cached_state->rasterization);
       if (cached_rast->discard != rast->discard || force_pipeline_update) {
         if (rast->discard) {
           glEnable(GL_RASTERIZER_DISCARD);
@@ -1582,7 +1591,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         glLineWidth(rast->line_width);
       }
 
-      if (PIPELINE_CACHE.multisample.multisample !=
+      if (cached_state->multisample.multisample !=
           pipeline->multisample.multisample ||
           force_pipeline_update) {
         if (pipeline->multisample.multisample) {
@@ -1592,7 +1601,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         }
       }
 
-      if (PIPELINE_CACHE.multisample.alpha_to_coverage !=
+      if (cached_state->multisample.alpha_to_coverage !=
           pipeline->multisample.alpha_to_coverage || force_pipeline_update) {
         if (pipeline->multisample.alpha_to_coverage) {
           glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
@@ -1602,8 +1611,8 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       }
 
       const ngf_depth_stencil_info *depth_stencil = &(pipeline->depth_stencil);
-      ngf_depth_stencil_info *cached_depth_stencil =
-          &(PIPELINE_CACHE.depth_stencil);
+      const ngf_depth_stencil_info *cached_depth_stencil =
+          &(cached_state->depth_stencil);
       if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
           force_pipeline_update) {
         if (depth_stencil->depth_test) {
@@ -1664,7 +1673,7 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
       }
 
       const ngf_blend_info *blend = &(pipeline->blend);
-      ngf_blend_info *cached_blend = &(PIPELINE_CACHE.blend);
+      const ngf_blend_info *cached_blend = &(cached_state->blend);
       if (cached_blend->enable != blend->enable ||
           cached_blend->sfactor != blend->sfactor ||
           cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
@@ -1677,15 +1686,15 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
         }
       }
 
-      if (PIPELINE_CACHE.tessellation.patch_vertices !=
+      if (cached_state->tessellation.patch_vertices !=
           pipeline->tessellation.patch_vertices || force_pipeline_update) {
         glPatchParameteri(GL_PATCH_VERTICES,
                           pipeline->tessellation.patch_vertices);
       }
       glBindVertexArray(pipeline->vao);
-      PIPELINE_CACHE = *pipeline;
+      CURRENT_CONTEXT->cached_state = *pipeline;
     }
-    force_pipeline_update = false;
+    CURRENT_CONTEXT->force_pipeline_update = false;
 
     for (size_t s = 0; s < op->nsubops; ++s) {
       const ngf_draw_subop *subop = &(op->subops[s]);
@@ -1855,24 +1864,24 @@ ngf_error ngf_execute_pass(const ngf_pass *pass,
 
       if (subop->nelements > 0u) {
         if (subop->mode == NGF_DRAW_MODE_DIRECT) {
-          glDrawArrays(PIPELINE_CACHE.primitive_type, subop->first_element,
+          glDrawArrays(cached_state->primitive_type, subop->first_element,
                        subop->nelements);
         } else if (subop->mode == NGF_DRAW_MODE_DIRECT_INSTANCED) {
-          glDrawArraysInstanced(PIPELINE_CACHE.primitive_type,
+          glDrawArraysInstanced(cached_state->primitive_type,
                                 subop->first_element,
                                 subop->nelements,
                                 subop->ninstances);
         } else if (subop->mode == NGF_DRAW_MODE_INDEXED) {
           glBindBuffer(subop->index_buf_bind_op.buffer->bind_point,
                        subop->index_buf_bind_op.buffer->glbuffer);
-          glDrawElements(PIPELINE_CACHE.primitive_type,
+          glDrawElements(cached_state->primitive_type,
                          subop->nelements,
                          gl_type(subop->index_buf_bind_op.type),
                          (void*)(uintptr_t)subop->first_element);
         } else if (subop->mode == NGF_DRAW_MODE_INDEXED_INSTANCED) {
           glBindBuffer(subop->index_buf_bind_op.buffer->bind_point,
                        subop->index_buf_bind_op.buffer->glbuffer);
-          glDrawElementsInstanced(PIPELINE_CACHE.primitive_type,
+          glDrawElementsInstanced(cached_state->primitive_type,
                                   subop->nelements,
                                   gl_type(subop->index_buf_bind_op.type),
                                   (void*)(uintptr_t)subop->first_element,
