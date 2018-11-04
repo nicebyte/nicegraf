@@ -81,6 +81,8 @@ struct ngf_context {
   EGLSurface surface;
   ngf_graphics_pipeline cached_state;
   bool force_pipeline_update;
+  bool has_swapchain;
+  ngf_present_mode present_mode;
 };
 
 struct ngf_shader_stage {
@@ -394,11 +396,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   // Set present mode.
   if (swapchain_info != NULL) {
-    if (swapchain_info->present_mode == NGF_PRESENTATION_MODE_FIFO) {
-      eglSwapInterval(ctx->dpy, 1);
-    } else if (swapchain_info->present_mode == NGF_PRESENTATION_MODE_IMMEDIATE) {
-      eglSwapInterval(ctx->dpy, 0);
-    }
+    ctx->has_swapchain = true;
+    ctx->present_mode = swapchain_info->present_mode;
+  } else {
+    ctx->has_swapchain = false;
   }
 
   // Choose EGL config.
@@ -497,6 +498,13 @@ ngf_error ngf_set_context(ngf_context *ctx) {
   bool result = eglMakeCurrent(ctx->dpy, ctx->surface, ctx->surface, ctx->ctx);
   if (result) {
     CURRENT_CONTEXT = ctx;
+  }
+  if (ctx->has_swapchain) {
+    if (ctx->present_mode == NGF_PRESENTATION_MODE_FIFO) {
+      eglSwapInterval(ctx->dpy, 1);
+    } else {
+      eglSwapInterval(ctx->dpy, 0);
+    }
   }
   return result ? NGF_ERROR_OK : NGF_ERROR_INVALID_CONTEXT;
 }
