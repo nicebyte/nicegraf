@@ -875,6 +875,11 @@ typedef struct {
 } ngf_context_info;
 
 /**
+ * Encodes a series of rendering commands.
+ */
+typedef struct ngf_cmd_buffer ngf_cmd_buffer;
+
+/**
  * Set the memory allocation callbacks that the library will use for its
  * internal needs.
  * By default, stdlib's malloc and free are used.
@@ -1078,6 +1083,14 @@ void ngf_destroy_pass(ngf_pass *pass);
  * Wait for all pending rendering commands to complete.
  */
 void ngf_finish();
+
+ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result);
+void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buffer);
+ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf);
+ngf_error ngf_cmd_buffer_stop(ngf_cmd_buffer *buf);
+ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
+void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
+void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 
 /**
  * Execute draw calls.
