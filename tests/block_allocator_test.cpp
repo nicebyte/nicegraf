@@ -25,10 +25,21 @@ TEST_CASE("Basic block allocator functionality", "[blkalloc_basic]") {
   REQUIRE(null_blk == NULL);
   for (uint32_t i = 0u; i < num_max_entries; ++i) {
     REQUIRE(data[i]->p2 == (void*)data[i]);
-    _ngf_blkalloc_free(allocator, data[i]);
+    _ngf_blkalloc_error err = _ngf_blkalloc_free(allocator, data[i]);
+    REQUIRE(err == _NGF_BLK_NO_ERROR);
   }
   test_data *blk = (test_data*)_ngf_blkalloc_alloc(allocator);
+  REQUIRE(blk != NULL);
+  _ngf_block_allocator *alloc2 =
+      _ngf_blkalloc_create(sizeof(test_data), num_max_entries);
+  _ngf_blkalloc_error err = _ngf_blkalloc_free(alloc2, blk);
+  REQUIRE(err == _NGF_BLK_WRONG_ALLOCATOR);
+  err = _ngf_blkalloc_free(allocator, blk);
+  REQUIRE(err == _NGF_BLK_NO_ERROR);
+  err = _ngf_blkalloc_free(allocator, blk);
+  REQUIRE(err == _NGF_BLK_DOUBLE_FREE);
   _ngf_blkalloc_destroy(allocator);
+  _ngf_blkalloc_destroy(alloc2);
 }
 
 TEST_CASE("Block allocator fuzz test", "[blkalloc_fuzz]") {
@@ -62,7 +73,8 @@ TEST_CASE("Block allocator fuzz test", "[blkalloc_fuzz]") {
       if (data[idx] != nullptr) {
         --active_blocks;
         REQUIRE(data[idx]->p1 == (test_data*)data[idx]);
-        _ngf_blkalloc_free(allocator, data[idx]);
+        _ngf_blkalloc_error err = _ngf_blkalloc_free(allocator, data[idx]);
+        REQUIRE(err == _NGF_BLK_NO_ERROR);
         data[idx] = nullptr;
       }
     }
