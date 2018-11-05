@@ -360,7 +360,7 @@ typedef enum {
  * color space, and an appropriate transfer function is applied to them to
  * covert them to the sRGB colorspace before writing them to the target.
  * Using an sRGB format in a sampled image means that all color values stored in
- * the image are interpreted to be in the linear color space, and all read
+ * the image are interpreted to be in the sRGB color space, and all read
  * operations automatically apply a transfer function to convert the values from
  * sRGB to linear color space.
  */
