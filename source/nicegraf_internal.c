@@ -47,19 +47,34 @@ void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks) {
   }
 }
 
-typedef struct _ngf_blkalloc_block {
-  struct _ngf_blkalloc_block *next_free;
+typedef struct _ngf_blkalloc_block  _ngf_blkalloc_block;
+
+typedef struct {
+  _ngf_blkalloc_block *next_free;
+  uint32_t marker_and_tag;
+} _ngf_blkalloc_block_header;
+
+struct _ngf_blkalloc_block {
+  _ngf_blkalloc_block_header header;
   uint8_t data[];
-} _ngf_blkalloc_block;
+};
 
 struct _ngf_block_allocator {
   uint8_t *chunk;
   _ngf_blkalloc_block *freelist;
   uint32_t block_size;
   uint32_t nblocks;
+  uint32_t tag;
 };
 
+static const uint32_t MARKER_MASK = (1u << 31);
+
 _ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks) {
+  static NGF_THREADLOCAL uint32_t next_tag = 0u;
+  if (next_tag == 0u) {
+    uint32_t threadid = (uint32_t)pthread_getthreadid_np();
+    next_tag = (~MARKER_MASK) & (threadid << 16);
+  }
   _ngf_block_allocator *alloc = NGF_ALLOC(_ngf_block_allocator);
   const uint32_t total_unaligned_block_size =
       block_size + sizeof(_ngf_blkalloc_block);
@@ -75,8 +90,10 @@ _ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks
         (_ngf_blkalloc_block*)(alloc->chunk + alloc->block_size * b);
     _ngf_blkalloc_block *next_blk =
         (_ngf_blkalloc_block*)(alloc->chunk + alloc->block_size * (b + 1u));
-    blk->next_free = (b < nblocks - 1u) ? next_blk : NULL;
+    blk->header.next_free = (b < nblocks - 1u) ? next_blk : NULL;
+    blk->header.marker_and_tag = (~MARKER_MASK) & next_tag;
   }
+  alloc->tag = next_tag++;
   alloc->freelist = (_ngf_blkalloc_block*)alloc->chunk;
   return alloc;
 }
@@ -90,17 +107,31 @@ void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc) {
   _ngf_blkalloc_block *blk = alloc->freelist;
   void *result = NULL;
   if (blk != NULL) {
-    alloc->freelist = blk->next_free;
+    alloc->freelist = blk->header.next_free;
     result = blk->data;
+    blk->header.marker_and_tag |= MARKER_MASK;
   }
   return result;
 }
 
-void _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr) {
+_ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr) {
+  _ngf_blkalloc_error result = _NGF_BLK_NO_ERROR;
   if (ptr != NULL) {
     _ngf_blkalloc_block *blk = 
-        (_ngf_blkalloc_block*)((uint8_t*)ptr - sizeof(_ngf_blkalloc_block*));
-    blk->next_free = alloc->freelist;
-    alloc->freelist = blk;
+        (_ngf_blkalloc_block*)((uint8_t*)ptr - offsetof(_ngf_blkalloc_block, data));
+
+    uint32_t blk_tag = (~MARKER_MASK) & blk->header.marker_and_tag;
+    uint32_t my_tag = alloc->tag;
+    uint32_t blk_marker = MARKER_MASK & blk->header.marker_and_tag;
+    if (blk_marker == 0u) {
+      result = _NGF_BLK_DOUBLE_FREE;
+    } else if (my_tag == blk_tag) {
+      blk->header.next_free = alloc->freelist;
+      blk->header.marker_and_tag &= (~MARKER_MASK);
+      alloc->freelist = blk;
+    } else {
+      result = _NGF_BLK_WRONG_ALLOCATOR;
+    }
   }
+  return result;
 }
