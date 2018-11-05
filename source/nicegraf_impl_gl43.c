@@ -202,9 +202,13 @@ typedef struct _ngf_emulated_cmd {
     } stencil_compare_mask;
     struct {
       uint32_t slot;
-      ngf_descriptor_set *set;
+      const ngf_descriptor_set *set;
     } descriptor_set_bind_op;
-    ngf_buffer *vertex_buffer;
+    struct {
+      uint32_t binding;
+      uint32_t offset;
+      const ngf_buffer *buf;
+    } vertex_buffer_bind_op;
     ngf_buffer *index_buffer;
     struct {
       uint32_t nelements;
@@ -1573,7 +1577,7 @@ ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
   assert(result);
   ngf_error err = NGF_ERROR_OK;
   *result = NGF_ALLOC(ngf_cmd_buffer);
-  ngf_cmd_buffer *buf = result;
+  ngf_cmd_buffer *buf = *result;
   if (buf == NULL) {
     err = NGF_ERROR_OUTOFMEM;
   }
@@ -1700,9 +1704,18 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
   _NGF_APPENDCMD(buf, cmd);
 }
 
+void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
+                                const ngf_buffer *vbuf, uint32_t binding, uint32_t offset) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->vertex_buffer_bind_op.binding = binding;
+  cmd->vertex_buffer_bind_op.buf = vbuf;
+  cmd->vertex_buffer_bind_op.offset = offset;
+  _NGF_APPENDCMD(buf, cmd);
+}
+
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
-  ngf_graphics_pipeline *bound_pipeline = NULL;
+  const ngf_graphics_pipeline *bound_pipeline = NULL;
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
     for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next; cmd != NULL; cmd = cmd->next) {
@@ -2000,6 +2013,26 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             assert(0);
           }
         }
+        break;
+      }
+
+      case _NGF_CMD_BIND_VERTEX_BUFFER: {
+        GLsizei stride = 0;
+        bool found_binding = false;
+        for (uint32_t b = 0;
+             !found_binding && b < bound_pipeline->nvert_buf_bindings;
+             ++b) {
+          if (bound_pipeline->vert_buf_bindings[b].binding ==
+              cmd->vertex_buffer_bind_op.binding) {
+            stride = bound_pipeline->vert_buf_bindings[b].stride;
+            found_binding = true;
+          }
+        }
+        assert(found_binding);
+        glBindVertexBuffer(cmd->vertex_buffer_bind_op.binding,
+                           cmd->vertex_buffer_bind_op.buf->glbuffer,
+                           cmd->vertex_buffer_bind_op.offset,
+                           stride); 
         break;
       }
 
