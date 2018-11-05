@@ -157,7 +157,6 @@ struct ngf_pass {
   uint32_t nloadops;
 };
 
-
 typedef enum {
   _NGF_CMD_BIND_PIPELINE,
   _NGF_CMD_BEGIN_PASS,
@@ -173,10 +172,12 @@ typedef enum {
   _NGF_CMD_BIND_VERTEX_BUFFERS,
   _NGF_CMD_BIND_INDEX_BUFFER,
   _NGF_CMD_DRAW,
-  _NGF_CMD_DRAW_INDEXED
+  _NGF_CMD_DRAW_INDEXED,
+  _NGF_CMD_NONE
 } _ngf_emulated_cmd_type;
 
-typedef struct {
+typedef struct _ngf_emulated_cmd {
+  struct _ngf_emulated_cmd *next;
   _ngf_emulated_cmd_type type;
   union {
     ngf_graphics_pipeline *pipeline;
@@ -214,6 +215,13 @@ typedef struct {
     } draw;
   };
 } _ngf_emulated_cmd;
+
+struct ngf_cmd_buffer {
+  _ngf_emulated_cmd *first_cmd;
+  _ngf_emulated_cmd *last_cmd;
+  bool recording;
+  bool renderpass_active;
+};
 
 static GLenum gl_shader_stage(ngf_stage_type stage) {
   static const GLenum stages[] = {
@@ -1560,6 +1568,62 @@ void ngf_destroy_pass(ngf_pass *pass) {
     }
     NGF_FREE(pass);
   }
+}
+
+ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
+  assert(result);
+  ngf_error err = NGF_ERROR_OK;
+  *result = NGF_ALLOC(ngf_cmd_buffer);
+  ngf_cmd_buffer *buf = result;
+  if (buf == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+  }
+  buf->first_cmd = buf->last_cmd = NULL;
+  buf->recording = buf->renderpass_active = false;
+  return err;
+}
+
+void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buf) {
+  if (buf != NULL) {
+    bool has_first_cmd = buf->first_cmd != NULL;
+    bool has_last_cmd = buf->last_cmd != NULL;
+    assert((has_first_cmd ^ has_last_cmd) &&
+            buf->last_cmd->next == NULL);
+    if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
+      for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
+        _ngf_blkalloc_free(COMMAND_POOL, c);
+      }
+    }
+    NGF_FREE(buf);
+  }
+}
+
+ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf) {
+  assert(buf);
+  ngf_error err = NGF_ERROR_OK;
+  if (buf->recording) {
+    err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
+  } else {
+    buf->recording = true;
+    assert(buf->first_cmd == NULL && buf->last_cmd == NULL);
+    buf->first_cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+    if (buf->first_cmd == NULL) {
+      err = NGF_ERROR_OUTOFMEM;
+      NGF_FREE(buf);
+    } else {
+      buf->first_cmd->type = _NGF_CMD_NONE;
+      buf->last_cmd = buf->first_cmd;
+    }
+  }
+  return err;
+}
+
+ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf) {
+  assert(buf);
+  ngf_error err = NGF_ERROR_OK;
+  if (buf->recording) err = NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
+  buf->recording = false;
+  return err;
 }
 
 ngf_error ngf_execute_pass(const ngf_pass *pass,
