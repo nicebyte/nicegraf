@@ -200,7 +200,10 @@ typedef struct _ngf_emulated_cmd {
       uint32_t front;
       uint32_t back;
     } stencil_compare_mask;
-    ngf_descriptor_set *descriptor_set;
+    struct {
+      uint32_t slot;
+      ngf_descriptor_set *set;
+    } descriptor_set_bind_op;
     ngf_buffer *vertex_buffer;
     ngf_buffer *index_buffer;
     struct {
@@ -1688,8 +1691,18 @@ void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
   _NGF_APPENDCMD(buf, cmd);
 }
 
+void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
+                                 const ngf_descriptor_set *set,
+                                 uint32_t slot) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->descriptor_set_bind_op.slot = slot;
+  cmd->descriptor_set_bind_op.set = set;
+  _NGF_APPENDCMD(buf, cmd);
+}
+
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
+  ngf_graphics_pipeline *bound_pipeline = NULL;
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
     for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next; cmd != NULL; cmd = cmd->next) {
@@ -1851,6 +1864,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           CURRENT_CONTEXT->cached_state = *pipeline;
         }
         CURRENT_CONTEXT->force_pipeline_update = false;
+        bound_pipeline = pipeline;
         break; }
 
       case _NGF_CMD_VIEWPORT:
@@ -1912,6 +1926,80 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                               back_func,
                               cmd->stencil_reference.back,
                               back_mask);         
+        break;
+      }
+
+      case _NGF_CMD_BIND_DESCRIPTOR_SET: {
+        if (cmd->descriptor_set_bind_op.slot >
+            bound_pipeline->ndescriptors_layouts) {
+          return NGF_ERROR_INVALID_RESOURCE_SET_BINDING;
+        }
+        const uint32_t ngf_set = cmd->descriptor_set_bind_op.slot;
+        const ngf_descriptor_set *set = cmd->descriptor_set_bind_op.set;
+        for (size_t j = 0; j < set->nslots; ++j) {
+          const ngf_descriptor_write *rbop = &(set->bind_ops[j]);
+          const uint32_t ngf_binding = set->bindings[j];
+          const _ngf_native_binding *binding_map = bound_pipeline->binding_map[ngf_set];
+          uint32_t b_idx = 0u;
+          while (binding_map[b_idx].ngf_binding_id != ngf_binding && 
+                 binding_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
+          if (binding_map[b_idx].native_binding_id == (uint32_t)(-1)) {
+            return NGF_ERROR_INVALID_BINDING;
+          }
+          uint32_t native_binding = binding_map[b_idx].ngf_binding_id;
+
+          // TODO: assert compatibility w/ descriptor set layout?
+          switch (rbop->type) {
+          case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+            const ngf_descriptor_write_buffer *buf_bind_op =
+                &(rbop->op.buffer_bind);
+            glBindBufferRange(
+              GL_UNIFORM_BUFFER,
+              native_binding,
+              buf_bind_op->buffer->glbuffer,
+              buf_bind_op->offset,
+              buf_bind_op->range);
+            break;
+            }
+          case NGF_DESCRIPTOR_LOADSTORE_IMAGE: {
+            const ngf_descriptor_write_image_sampler *img_bind_op =
+                &(rbop->op.image_sampler_bind);
+            glBindImageTexture(native_binding,
+                               img_bind_op->image_subresource.image->glimage,
+                               img_bind_op->image_subresource.mip_level,
+                               img_bind_op->image_subresource.layered,
+                               img_bind_op->image_subresource.layer,
+                               GL_READ_ONLY, // TODO: fix
+                               GL_RGB8); // TODO: fix
+            break;
+            }
+          case NGF_DESCRIPTOR_TEXTURE: {
+            const ngf_descriptor_write_image_sampler *img_bind_op =
+                &(rbop->op.image_sampler_bind);
+            glActiveTexture(native_binding);
+            glBindTexture(img_bind_op->image_subresource.image->bind_point,
+                          img_bind_op->image_subresource.image->glimage);
+            break;
+            }
+          case NGF_DESCRIPTOR_SAMPLER: {
+            const ngf_descriptor_write_image_sampler *img_bind_op =
+                &(rbop->op.image_sampler_bind);
+            glBindSampler(native_binding, img_bind_op->sampler->glsampler);
+            break;
+            }
+          case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+            const ngf_descriptor_write_image_sampler *img_bind_op =
+                &(rbop->op.image_sampler_bind);
+            glActiveTexture(GL_TEXTURE0 + native_binding);
+            glBindTexture(img_bind_op->image_subresource.image->bind_point,
+                          img_bind_op->image_subresource.image->glimage);
+            glBindSampler(native_binding, img_bind_op->sampler->glsampler); 
+            break;
+            }
+          default:
+            assert(0);
+          }
+        }
         break;
       }
 
