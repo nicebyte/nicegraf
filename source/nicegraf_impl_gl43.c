@@ -1626,6 +1626,19 @@ ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf) {
   return err;
 }
 
+#define _NGF_APPENDCMD(buf, cmd) { \
+    cmd->next = NULL; \
+    buf->last_cmd->next = cmd; \
+    buf->last_cmd = cmd; }
+
+
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BIND_PIPELINE;
+  cmd->pipeline = pipeline;
+  _NGF_APPENDCMD(buf, cmd);
+}
+
 ngf_error ngf_execute_pass(const ngf_pass *pass,
                            const ngf_render_target *rt,
                            ngf_draw_op **drawops,
