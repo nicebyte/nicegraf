@@ -1093,8 +1093,9 @@ void ngf_finish();
 ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result);
 void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buffer);
 ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf);
-ngf_error ngf_cmd_buffer_stop(ngf_cmd_buffer *buf);
+ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf);
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline);
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 
