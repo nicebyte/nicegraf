@@ -209,7 +209,7 @@ typedef struct _ngf_emulated_cmd {
       uint32_t offset;
       const ngf_buffer *buf;
     } vertex_buffer_bind_op;
-    ngf_buffer *index_buffer;
+    const ngf_buffer *index_buffer;
     struct {
       uint32_t nelements;
       uint32_t ninstances;
@@ -1690,6 +1690,7 @@ void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width) {
 void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
                            ngf_blend_factor sfactor, ngf_blend_factor dfactor) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BLEND_CONSTANTS;
   cmd->blend_factors.sfactor = sfactor;
   cmd->blend_factors.dfactor = dfactor;
   _NGF_APPENDCMD(buf, cmd);
@@ -1699,6 +1700,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
                                  const ngf_descriptor_set *set,
                                  uint32_t slot) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BIND_DESCRIPTOR_SET;
   cmd->descriptor_set_bind_op.slot = slot;
   cmd->descriptor_set_bind_op.set = set;
   _NGF_APPENDCMD(buf, cmd);
@@ -1707,9 +1709,17 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
 void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
                                 const ngf_buffer *vbuf, uint32_t binding, uint32_t offset) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BIND_VERTEX_BUFFER;
   cmd->vertex_buffer_bind_op.binding = binding;
   cmd->vertex_buffer_bind_op.buf = vbuf;
   cmd->vertex_buffer_bind_op.offset = offset;
+  _NGF_APPENDCMD(buf, cmd);
+}
+
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
+  cmd->index_buffer = idxbuf;
   _NGF_APPENDCMD(buf, cmd);
 }
 
@@ -2035,6 +2045,11 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                            stride); 
         break;
       }
+
+      case _NGF_CMD_BIND_INDEX_BUFFER:
+        glBindBuffer(cmd->index_buffer->bind_point,
+                     cmd->index_buffer->glbuffer);
+        break;
 
       default:
         assert(false);
