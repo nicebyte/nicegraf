@@ -66,8 +66,14 @@ typedef enum {
   NGF_ERROR_CANT_SHARE_CONTEXT,
   NGF_ERROR_BEGIN_FRAME_FAILED,
   NGF_ERROR_END_FRAME_FAILED,
-  NGF_ERROR_OUT_OF_BOUNDS /**< The operation would have resulted in an out of
+  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
                                bounds access. */
+  NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING, /**< An attempt was made to start recording a
+                                               command buffer that was already in a
+                                               recording state. */
+  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING, /**< An attempt was made to finish recording
+                                               a cmd buffer that was not recording. */
+  /*..add new errors above this line */
 } ngf_error ;
 
 /**
