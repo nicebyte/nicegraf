@@ -34,6 +34,7 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_mutex_unlock(m) (LeaveCriticalSection(m),0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m),0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m),0)
+#define pthread_getthreadid_np() (GetCurrentThreadId())
 #else
 #define NGF_THREADLOCAL __thread
 #include <pthread.h>
@@ -81,9 +82,15 @@ void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc);
 // Allocates the next free block from the allocator. Returns NULL on error.
 void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc);
 
+typedef enum {
+  _NGF_BLK_NO_ERROR,
+  _NGF_BLK_DOUBLE_FREE,
+  _NGF_BLK_WRONG_ALLOCATOR
+} _ngf_blkalloc_error;
+
 // Returns the given block to the allocator.
 // Freeing a NULL pointer does nothing.
-void _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
+_ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 #ifdef __cplusplus
 }
