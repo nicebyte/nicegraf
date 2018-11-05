@@ -157,6 +157,64 @@ struct ngf_pass {
   uint32_t nloadops;
 };
 
+
+typedef enum {
+  _NGF_CMD_BIND_PIPELINE,
+  _NGF_CMD_BEGIN_PASS,
+  _NGF_CMD_END_PASS,
+  _NGF_CMD_VIEWPORT,
+  _NGF_CMD_SCISSOR,
+  _NGF_CMD_LINE_WIDTH,
+  _NGF_CMD_BLEND_CONSTANTS,
+  _NGF_CMD_STENCIL_REFERENCE,
+  _NGF_CMD_STENCIL_WRITE_MASK,
+  _NGF_CMD_STENCIL_COMPARE_MASK,
+  _NGF_CMD_BIND_DESCRIPTOR_SETS,
+  _NGF_CMD_BIND_VERTEX_BUFFERS,
+  _NGF_CMD_BIND_INDEX_BUFFER,
+  _NGF_CMD_DRAW,
+  _NGF_CMD_DRAW_INDEXED
+} _ngf_emulated_cmd_type;
+
+typedef struct {
+  _ngf_emulated_cmd_type type;
+  union {
+    ngf_graphics_pipeline *pipeline;
+    ngf_irect2d viewport;
+    ngf_irect2d scissor;
+    float line_width;
+    struct {
+      ngf_blend_factor sfactor;
+      ngf_blend_factor dfactor;
+    } blend_factors;
+    struct {
+      uint32_t front;
+      uint32_t back;
+    } stencil_reference;
+    struct {
+      uint32_t front;
+      uint32_t back;
+    } stencil_write_mask;
+    struct {
+      uint32_t front;
+      uint32_t back;
+    } stencil_compare_mask;
+    struct {
+      ngf_descriptor_set *s;
+    } descriptor_sets;
+    struct {
+      ngf_buffer *vb;
+    } vertex_buffers;
+    ngf_buffer *index_buffer;
+    struct {
+      uint32_t nelements;
+      uint32_t ninstances;
+      uint32_t first_element;
+      bool indexed;
+    } draw;
+  };
+} _ngf_emulated_cmd;
+
 static GLenum gl_shader_stage(ngf_stage_type stage) {
   static const GLenum stages[] = {
     GL_VERTEX_SHADER,
@@ -492,6 +550,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
 }
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
+NGF_THREADLOCAL _ngf_block_allocator *COMMAND_POOL = NULL;
 
 ngf_error ngf_set_context(ngf_context *ctx) {
   assert(ctx);
