@@ -1595,6 +1595,9 @@ void ngf_destroy_pass(ngf_pass *pass) {
 
 ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
   assert(result);
+  if (COMMAND_POOL == NULL) {
+    COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_emulated_cmd), 65000u);
+  }
   ngf_error err = NGF_ERROR_OK;
   *result = NGF_ALLOC(ngf_cmd_buffer);
   ngf_cmd_buffer *buf = *result;
@@ -1676,7 +1679,8 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *scissor) {
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front, uint32_t back) {
+void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
+                               uint32_t back) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_STENCIL_REFERENCE;
   cmd->stencil_reference.front = front;
@@ -1684,7 +1688,8 @@ void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front, uint32_t bac
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front, uint32_t back) {
+void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front,
+                                  uint32_t back) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_STENCIL_COMPARE_MASK;
   cmd->stencil_compare_mask.front = front;
@@ -1692,7 +1697,8 @@ void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front, uint32_t 
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_stencil_write_mask(ngf_cmd_buffer *buf, uint32_t front, uint32_t back) {
+void ngf_cmd_stencil_write_mask(ngf_cmd_buffer *buf, uint32_t front,
+                                uint32_t back) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_STENCIL_WRITE_MASK;
   cmd->stencil_write_mask.front = front;
@@ -1708,7 +1714,8 @@ void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width) {
 }
 
 void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
-                           ngf_blend_factor sfactor, ngf_blend_factor dfactor) {
+                           ngf_blend_factor sfactor,
+                           ngf_blend_factor dfactor) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BLEND_CONSTANTS;
   cmd->blend_factors.sfactor = sfactor;
@@ -1727,7 +1734,8 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
 }
 
 void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
-                                const ngf_buffer *vbuf, uint32_t binding, uint32_t offset) {
+                                const ngf_buffer *vbuf,
+                                uint32_t binding, uint32_t offset) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BIND_VERTEX_BUFFER;
   cmd->vertex_buffer_bind_op.binding = binding;
@@ -1796,7 +1804,6 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   cmd->draw.indexed = false;
   _NGF_APPENDCMD(buf, cmd);
 }
-
 
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
