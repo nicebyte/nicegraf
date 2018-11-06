@@ -602,34 +602,6 @@ typedef enum {
 } ngf_dynamic_state_flags;
 
 /**
- * A command affecting dynamic state of the pipeline.
- */
-typedef struct {
-  ngf_dynamic_state_flags state; /**< Which aspect is affected.*/
-  union {
-    ngf_irect2d viewport;
-    ngf_irect2d scissor;
-    float line_width;
-    struct {
-      ngf_blend_factor sfactor;
-      ngf_blend_factor dfactor;
-    } blend_factors;
-    struct {
-      uint32_t front;
-      uint32_t back;
-    } stencil_reference;
-    struct {
-      uint32_t front;
-      uint32_t back;
-    } stencil_write_mask;
-    struct {
-      uint32_t front;
-      uint32_t back;
-    } stencil_compare_mask;
-  };
-} ngf_dynamic_state_command;
-
-/**
  * Primitive types to use for draw operations.
  * Some back-ends may not support all of the primitive types.
  */
@@ -757,66 +729,6 @@ typedef struct {
   ngf_buffer_access_freq access_freq; /**< Access frequency.*/
   ngf_buffer_access_type access_type; /**< Access type.*/
 } ngf_buffer_info;
-
-/**
- * Vertex buffer bind operation parameters.
- */
-typedef struct {
-  const ngf_buffer *buffer; /**< Buffer object to bind.*/
-  uint32_t offset; /**<  Offset at which to bind the buffer.*/
-  uint32_t binding;  /**< Index of the binding.*/
-} ngf_vertex_buf_bind_op;
-
-/**
- * Index buffer binding parameter.
- */
-typedef struct {
-  const ngf_buffer *buffer; /**< Buffer object to bind.*/
-  ngf_type type; /**< Type of elements in the index buffer. */
-} ngf_index_buf_bind_op;
-
-/**
- * Types of draw operations.
- */
-typedef enum {
-  NGF_DRAW_MODE_DIRECT = 0,
-  NGF_DRAW_MODE_INDEXED,
-  NGF_DRAW_MODE_DIRECT_INSTANCED,
-  NGF_DRAW_MODE_INDEXED_INSTANCED
-} ngf_draw_mode;
-
-typedef struct {
-  ngf_descriptor_set *set;
-  uint32_t slot;
-} ngf_descriptor_set_bind_op;
-
-/**
- * Draw sub-operation sets up and makes a draw call.
- */
-typedef struct {
-  const ngf_dynamic_state_command *dynamic_state_cmds;
-  uint32_t ndynamic_state_cmds;
-  uint32_t ndescriptor_set_bind_ops;
-  const ngf_descriptor_set_bind_op *descriptor_set_bind_ops;
-  const ngf_vertex_buf_bind_op *vertex_buf_bind_ops;
-  uint32_t nvertex_buf_bind_ops;
-  ngf_draw_mode mode;
-  const ngf_index_buf_bind_op *index_buf_bind_op;
-  uint32_t first_element;
-  uint32_t nelements;
-  uint32_t ninstances;
-} ngf_draw_subop_info; 
-
-/**
- * Draw operation binds a pipeline and executes several drawcalls with it.
- */
-typedef struct {
-  const ngf_graphics_pipeline *pipeline;  /**< Pipeline to bind.*/
-  const ngf_draw_subop_info *subops;  /**< Drawcalls to execute with the pipeline.*/
-  uint32_t nsubops;  /**< Number of drawcalls.*/
-} ngf_draw_op_info;
-
-typedef struct ngf_draw_op ngf_draw_op;
 
 /**
  * Specifies a rendertarget clear operation.
@@ -1063,17 +975,6 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
 void ngf_destroy_buffer(ngf_buffer *buffer);
 
 /**
- * Create a new draw operation object.
- */
-ngf_error ngf_create_draw_op(const ngf_draw_op_info *info,
-                             ngf_draw_op **result);
-
-/**
- * Destroy a given draw operation.
- */
-void ngf_destroy_draw_op(ngf_draw_op *op);
-
-/**
  * Create a render pass object.
  * @param info render pass configuration
  */
@@ -1123,19 +1024,6 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances);
-/**
- * Execute draw calls.
- * @param pass The render pass object that specifies load operation for all of
- *  the render target's attachments.
- * @param rt The rendertarget that will be affected by the draw calls. It must
- *  be compatible with the render pass.
- * @param drawops Pointer to an array of draw operation specifications.
- * @param ndrawops Number of elements in the array of draw operations.
- */
-ngf_error ngf_execute_pass(const ngf_pass *pass,
-                           const ngf_render_target *rt,
-                           ngf_draw_op **drawops,
-                           const uint32_t ndrawops);
 
 /**
  * Initialize Nicegraf.
