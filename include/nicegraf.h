@@ -1098,7 +1098,31 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline);
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
-
+void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
+                               uint32_t back);
+void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front,
+                                  uint32_t back);
+void ngf_cmd_stencil_write_mask(ngf_cmd_buffer *buf, uint32_t front,
+                                uint32_t back);
+void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width);
+void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
+                           ngf_blend_factor sfactor,
+                           ngf_blend_factor dfactor);
+void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
+                                 const ngf_descriptor_set *set,
+                                 uint32_t slot);
+void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
+                                const ngf_buffer *vbuf,
+                                uint32_t binding, uint32_t offset);
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
+                               ngf_type index_type);
+void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
+                        const ngf_render_target *target, uint32_t nclears,
+                        ngf_clear_info *clears);
+void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
+void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+                  uint32_t first_element, uint32_t nelements,
+                  uint32_t ninstances);
 /**
  * Execute draw calls.
  * @param pass The render pass object that specifies load operation for all of
