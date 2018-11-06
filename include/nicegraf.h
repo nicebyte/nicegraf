@@ -794,6 +794,36 @@ typedef struct {
 
 /**
  * Encodes a series of rendering commands.
+ * Internally, a command buffer may be in any of the following four states:
+ *   - reset;
+ *   - recording;
+ *   - ready;
+ *   - submitted.
+ * Every newly created command buffer is in the "reset" state.
+ * When a command buffer is in the "reset" state, it is ready for a new
+ * series of rendering commands to be recorded into it.
+ * Once the recording begins (via a call to `ngf_cmd_buffer_start`), the command
+ * buffer transitions into the "recording" state.
+ * Recording commands into a command buffer is done by calling `ngf_cmd_*` (i.e.
+ * `ngf_cmd_bind_pipeline` etc.). All command-recording functions require the
+ * command buffer to be in the "recording" state.
+ * Once all the commands have been recorded, the buffer needs to be transitioned
+ * into the "ready" state via * a call to `ngf_cmd_buffer_end`.
+ * Only command buffers in the "ready" state may be submitted for execution (via
+ * a call to `ngf_cmd_buffer_submit`), which transitions them into the
+ * "submitted" state.
+ * The results of re-submitting a command buffer that is already in the
+ * "submitted" state are undefined.
+ * Once a command buffer is in either "ready" or "submitted" state, it is
+ * impossible to append new commands to it. It is, however, possible to begin
+ * recording a new, separate batch of commands by calling `ngf_cmd_buffer_start`
+ * which implicitly transitions the buffer to the "reset" state if it is ready
+ * or submitted.
+ * Command buffers may be recorded in parrallel on different threads. Recording
+ * and destroying a command buffer must always be done by the same thread that
+ * created it.
+ * Submitting a command buffer for execution may be done by a different thread,
+ * as long as the submitting and recording threads have shared contexts.
  */
 typedef struct ngf_cmd_buffer ngf_cmd_buffer;
 
@@ -991,11 +1021,43 @@ void ngf_destroy_pass(ngf_pass *pass);
  */
 void ngf_finish();
 
+/**
+ * Creates a new command buffer that is in the "reset" state.
+ */
 ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result);
+
+/**
+ * Frees resources associated with the given command buffer.
+ * Any work previously submitted via this command buffer will be finished
+ * asynchronously.
+ */
 void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buffer);
+
+/**
+ * Begin recording a new batch of commands into a given command buffer,
+ * transitioning it into "recording" state.
+ * The command buffer must be either "reset", "ready" or "submitted".
+ * If the command buffer is either "ready" or "submitted", its state is
+ * implicitly transitioned to "reset" before becoming "recording".
+ * Note that if the buffer was "ready", the commands previously recorded into it
+ * will be lost and never executed.
+ */
 ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf);
+
+/**
+ * Finishes recording a batch of commands into a buffer and transitions it into
+ * the "ready" state.
+ * The command buffer needs to be in the "recording" state.
+ */
 ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf);
+
+/**
+ * Submits the commands recorded in the given command buffer for execution.
+ * The command buffer must be in the "ready" state, and will be transitioned to
+ * the "submitted" state.
+ */
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
+
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline);
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
