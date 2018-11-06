@@ -83,6 +83,7 @@ struct ngf_context {
   bool force_pipeline_update;
   bool has_swapchain;
   ngf_present_mode present_mode;
+  ngf_type bound_index_buffer_type;
 };
 
 struct ngf_shader_stage {
@@ -147,8 +148,8 @@ struct ngf_draw_op {
 
 struct ngf_render_target {
   GLuint framebuffer;
-  ngf_attachment_type attachment_types[7];
   uint32_t nattachments;
+  ngf_attachment_type attachment_types[];
 };
 
 struct ngf_pass {
@@ -159,8 +160,10 @@ struct ngf_pass {
 
 typedef enum {
   _NGF_CMD_BIND_PIPELINE,
-  _NGF_CMD_BEGIN_PASS,
-  _NGF_CMD_END_PASS,
+  _NGF_CMD_BIND_FRAMEBUFFER,
+  _NGF_CMD_CLEAR_COLOR,
+  _NGF_CMD_CLEAR_DEPTH,
+  _NGF_CMD_CLEAR_STENCIL,
   _NGF_CMD_VIEWPORT,
   _NGF_CMD_SCISSOR,
   _NGF_CMD_LINE_WIDTH,
@@ -209,7 +212,17 @@ typedef struct _ngf_emulated_cmd {
       uint32_t offset;
       const ngf_buffer *buf;
     } vertex_buffer_bind_op;
-    const ngf_buffer *index_buffer;
+    const ngf_render_target *framebuffer;
+    struct {
+      float color[4];
+      uint32_t attachment;
+    } clear_color;
+    float clear_depth;
+    uint32_t clear_stencil;
+    struct {
+      const ngf_buffer *index_buffer;
+      ngf_type type;
+    } index_buffer_bind;
     struct {
       uint32_t nelements;
       uint32_t ninstances;
@@ -1232,13 +1245,20 @@ void ngf_destroy_sampler(ngf_sampler *sampler) {
 }
 
 ngf_error ngf_default_render_target(ngf_render_target **result) {
-  static ngf_render_target default_target;
-  default_target.framebuffer = 0;
-  default_target.attachment_types[0] = NGF_ATTACHMENT_COLOR;
-  default_target.attachment_types[1] = NGF_ATTACHMENT_DEPTH;
-  default_target.attachment_types[2] = NGF_ATTACHMENT_STENCIL;
-  default_target.nattachments = 3;
-  *result = &default_target;
+  static NGF_THREADLOCAL ngf_render_target *default_target = NULL;
+  if (default_target == NULL) {
+    default_target =
+        (ngf_render_target*) NGF_ALLOCN(uint8_t,
+                                        offsetof(ngf_render_target,
+                                                 attachment_types) +
+                                        3u * sizeof(ngf_attachment_type));
+  }
+  default_target->framebuffer = 0;
+  default_target->attachment_types[0] = NGF_ATTACHMENT_COLOR;
+  default_target->attachment_types[1] = NGF_ATTACHMENT_DEPTH;
+  default_target->attachment_types[2] = NGF_ATTACHMENT_STENCIL;
+  default_target->nattachments = 3;
+  *result = default_target;
   return NGF_ERROR_OK;
 }
 
@@ -1716,16 +1736,71 @@ void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf) {
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
+                               ngf_type index_type) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
-  cmd->index_buffer = idxbuf;
+  cmd->index_buffer_bind.index_buffer = idxbuf;
+  cmd->index_buffer_bind.type = index_type;
   _NGF_APPENDCMD(buf, cmd);
 }
 
+void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
+                        const ngf_render_target *target, uint32_t nclears,
+                        ngf_clear_info *clears) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_BIND_FRAMEBUFFER;
+  cmd->framebuffer = target;
+  _NGF_APPENDCMD(buf, cmd);
+  cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  uint32_t clear = 0u;
+  for (uint32_t l = 0u; l < pass->nloadops; ++l) {
+    const ngf_attachment_load_op op = pass->loadops[l];
+    if (op == NGF_LOAD_OP_CLEAR) {
+      cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+      switch (target->attachment_types[l]) {
+      case NGF_ATTACHMENT_COLOR:
+        cmd->type = _NGF_CMD_CLEAR_COLOR;
+        memcpy(cmd->clear_color.color, clears[clear].clear_color,
+               sizeof(cmd->clear_color));
+        break;
+      case NGF_ATTACHMENT_DEPTH:
+        cmd->type = _NGF_CMD_CLEAR_DEPTH;
+        cmd->clear_depth = clears[clear].clear_depth;
+        break;
+      case NGF_ATTACHMENT_STENCIL:
+        cmd->type = _NGF_CMD_CLEAR_STENCIL;
+        cmd->clear_stencil = clears->clear_stencil;
+        break;
+      default: assert(false);
+      }
+      ++clear;
+      _NGF_APPENDCMD(buf, cmd);
+    }
+  }
+  buf->renderpass_active = true;
+}
+
+void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
+  buf->renderpass_active = false;
+}
+
+void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+                  uint32_t first_element, uint32_t nelements,
+                  uint32_t ninstances) {
+  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  cmd->type = _NGF_CMD_DRAW;
+  cmd->draw.first_element = first_element;
+  cmd->draw.nelements = nelements;
+  cmd->draw.ninstances = ninstances;
+  cmd->draw.indexed = false;
+  _NGF_APPENDCMD(buf, cmd);
+}
+
+
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
-  const ngf_graphics_pipeline *bound_pipeline = NULL;
+  const ngf_graphics_pipeline *bound_pipeline = &(CURRENT_CONTEXT->cached_state);
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
     for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next; cmd != NULL; cmd = cmd->next) {
@@ -2047,10 +2122,47 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
       }
 
       case _NGF_CMD_BIND_INDEX_BUFFER:
-        glBindBuffer(cmd->index_buffer->bind_point,
-                     cmd->index_buffer->glbuffer);
+        glBindBuffer(cmd->index_buffer_bind.index_buffer->bind_point,
+                     cmd->index_buffer_bind.index_buffer->glbuffer);
+        CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
         break;
 
+      case _NGF_CMD_BIND_FRAMEBUFFER:
+        glBindFramebuffer(GL_FRAMEBUFFER, cmd->framebuffer->framebuffer);
+        break;
+      case _NGF_CMD_CLEAR_DEPTH:
+        glClearDepth(cmd->clear_depth);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        break;
+      case _NGF_CMD_CLEAR_STENCIL:
+        glClearStencil(cmd->clear_stencil);
+        glClear(GL_STENCIL_BUFFER_BIT);
+        break;
+      case _NGF_CMD_CLEAR_COLOR:
+        glClearBufferfv(GL_COLOR, cmd->clear_color.attachment, cmd->clear_color.color);
+        break;
+      case _NGF_CMD_DRAW:
+        if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+          glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
+                       cmd->draw.nelements);
+        } else if (!cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+          glDrawArraysInstanced(bound_pipeline->primitive_type,
+                                cmd->draw.first_element,
+                                cmd->draw.nelements,
+                                cmd->draw.ninstances);
+        } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+          glDrawElements(bound_pipeline->primitive_type,
+                         cmd->draw.nelements,
+                         gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                         (void*)(uintptr_t)cmd->draw.first_element);
+        } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+          glDrawElementsInstanced(bound_pipeline->primitive_type,
+                                  cmd->draw.nelements,
+                                  gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                                  (void*)(uintptr_t)cmd->draw.first_element,
+                                  cmd->draw.ninstances);
+        }
+        break;
       default:
         assert(false);
       }
