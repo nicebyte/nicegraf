@@ -125,27 +125,6 @@ struct ngf_sampler {
   GLuint glsampler;
 };
 
-typedef struct {
-  ngf_dynamic_state_command *dynamic_state_cmds;
-  uint32_t ndynamic_state_cmds;
-  uint32_t ndescriptor_set_bind_ops;
-  ngf_descriptor_set_bind_op *descriptor_set_bind_ops;
-  ngf_draw_mode mode;
-  GLenum primitive;
-  ngf_index_buf_bind_op index_buf_bind_op;
-  ngf_vertex_buf_bind_op *vertex_buf_bind_ops;
-  uint32_t nvertex_buf_bind_ops;
-  uint32_t first_element;
-  uint32_t nelements;
-  uint32_t ninstances;
-} ngf_draw_subop;
-
-struct ngf_draw_op {
-  const ngf_graphics_pipeline *pipeline;
-  ngf_draw_subop *subops;
-  uint32_t nsubops;
-};
-
 struct ngf_render_target {
   GLuint framebuffer;
   uint32_t nattachments;
@@ -204,13 +183,13 @@ typedef struct _ngf_emulated_cmd {
       uint32_t back;
     } stencil_compare_mask;
     struct {
-      uint32_t slot;
       const ngf_descriptor_set *set;
+      uint32_t slot;
     } descriptor_set_bind_op;
     struct {
+      const ngf_buffer *buf;
       uint32_t binding;
       uint32_t offset;
-      const ngf_buffer *buf;
     } vertex_buffer_bind_op;
     const ngf_render_target *framebuffer;
     struct {
@@ -1436,117 +1415,6 @@ void ngf_destroy_buffer(ngf_buffer *buffer) {
   }
 }
 
-ngf_error ngf_create_draw_op(const ngf_draw_op_info *info,
-                             ngf_draw_op **result) {
-  assert(info);
-  assert(result);
-
-  ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_draw_op);
-  ngf_draw_op *op = *result;
-
-  if (op == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_draw_op_cleanup;
-  }
-
-  op->pipeline = info->pipeline;
-  op->nsubops = info->nsubops;
-  op->subops = NGF_ALLOCN(ngf_draw_subop, info->nsubops);
-  if (op->subops == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_draw_op_cleanup;
-  }
-  memset(op->subops, 0, sizeof(ngf_draw_subop) * info->nsubops);
-
-  for (size_t s = 0; s < info->nsubops; ++s) {
-    ngf_draw_subop *subop = &(op->subops[s]);
-    const ngf_draw_subop_info *subop_info = &(info->subops[s]);
-    subop->ndynamic_state_cmds = subop_info->ndynamic_state_cmds;
-    if (subop_info->ndynamic_state_cmds > 0) {
-      subop->dynamic_state_cmds =
-        NGF_ALLOCN(ngf_dynamic_state_command, subop_info->ndynamic_state_cmds);
-      if (subop->dynamic_state_cmds == NULL) {
-        err = NGF_ERROR_OUTOFMEM;
-        goto ngf_create_draw_op_cleanup;
-      }
-      memcpy(subop->dynamic_state_cmds,
-             subop_info->dynamic_state_cmds,
-             sizeof(ngf_dynamic_state_command) * subop->ndynamic_state_cmds);
-    }
-
-    subop->ndescriptor_set_bind_ops = subop_info->ndescriptor_set_bind_ops;
-    subop->descriptor_set_bind_ops =
-        NGF_ALLOCN(ngf_descriptor_set_bind_op, subop->ndescriptor_set_bind_ops);
-    if (subop->descriptor_set_bind_ops == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_draw_op_cleanup;
-    }
-    memcpy(subop->descriptor_set_bind_ops,
-           subop_info->descriptor_set_bind_ops,
-           sizeof(ngf_descriptor_set_bind_op) * subop->ndescriptor_set_bind_ops);
-    subop->mode = subop_info->mode;
-    subop->first_element = subop_info->first_element;
-    subop->nelements = subop_info->nelements;
-    subop->ninstances = subop_info->ninstances;
-
-    if (subop->mode == NGF_DRAW_MODE_INDEXED ||
-        subop->mode == NGF_DRAW_MODE_INDEXED_INSTANCED) {
-      const ngf_buffer *index_buffer = subop_info->index_buf_bind_op->buffer;
-      ngf_type element_type = subop_info->index_buf_bind_op->type; 
-      if (index_buffer->bind_point != GL_ELEMENT_ARRAY_BUFFER ||
-          (element_type != NGF_TYPE_UINT16 && element_type != NGF_TYPE_UINT32)) {
-        err = NGF_ERROR_INVALID_INDEX_BUFFER_BINDING;
-        goto ngf_create_draw_op_cleanup;
-      }
-      subop->index_buf_bind_op = *(subop_info->index_buf_bind_op);
-    }
-
-    subop->vertex_buf_bind_ops = NGF_ALLOCN(ngf_vertex_buf_bind_op,
-                                            subop_info->nvertex_buf_bind_ops);
-    if (subop->vertex_buf_bind_ops == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_draw_op_cleanup;
-    }
-    subop->nvertex_buf_bind_ops = subop_info->nvertex_buf_bind_ops;
-    memcpy(subop->vertex_buf_bind_ops,
-           subop_info->vertex_buf_bind_ops,
-           sizeof(ngf_vertex_buf_bind_op) * subop->nvertex_buf_bind_ops);
-  }
-  op->nsubops = info->nsubops;
-ngf_create_draw_op_cleanup:
-  if (err != NGF_ERROR_OK) {
-    ngf_destroy_draw_op(op);
-  }
-  return err;
-}
-
-void ngf_destroy_draw_op(ngf_draw_op *op) {
-  if (op != NULL) {
-    for (size_t i = 0; i < op->nsubops; ++i) {
-      if (op->subops[i].dynamic_state_cmds &&
-          op->subops[i].ndynamic_state_cmds > 0) {
-        NGF_FREEN(op->subops[i].dynamic_state_cmds,
-                  op->subops[i].ndynamic_state_cmds);
-      }
-      if (op->subops[i].descriptor_set_bind_ops &&
-          op->subops[i].ndescriptor_set_bind_ops > 0) {
-        NGF_FREEN(op->subops[i].descriptor_set_bind_ops,
-                  op->subops[i].ndescriptor_set_bind_ops);
-      }
-      if (op->subops[i].nvertex_buf_bind_ops > 0 &&
-          op->subops[i].vertex_buf_bind_ops != NULL) {
-        NGF_FREEN(op->subops[i].vertex_buf_bind_ops,
-                  op->subops[i].nvertex_buf_bind_ops);
-      }
-    }
-    if (op->nsubops > 0 && op->subops) {
-      NGF_FREEN(op->subops, op->nsubops);
-    }
-    NGF_FREE(op);
-  }
-}
-
 ngf_error ngf_create_pass(const ngf_pass_info *info, ngf_pass **result) {
   assert(info);
   assert(result);
@@ -2177,11 +2045,6 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   }
   return NGF_ERROR_OK;
 }
-
-ngf_error ngf_execute_pass(const ngf_pass *pass,
-                           const ngf_render_target *rt,
-                           ngf_draw_op **drawops,
-                           const uint32_t ndrawops) {}
 
 void ngf_finish() {
   glFlush();
