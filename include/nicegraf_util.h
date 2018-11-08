@@ -46,14 +46,18 @@ typedef struct {
   ngf_irect2d viewport;
   ngf_tessellation_info tessellation_info;
   ngf_specialization_info spec_info;
+  ngf_pipeline_layout_info layout_info;
 } ngf_util_graphics_pipeline_data;
 
 /**
  * Creates configuration data for a graphics pipeline with a given layout.
  * The state is set to match OpenGL defaults and can be adjusted later.
+ * @param viewport If not NULL, the pipeline's viewport and scissor regions
+                   will be configured to this area. If NULL, the viewport and
+                   scissor will be possible to adjust dynamically.
+ * @param result Pipeline configuration data will be stored here.
  */
 void ngf_util_create_default_graphics_pipeline_data(
-    ngf_pipeline_layout_info *layout,
     const ngf_irect2d *viewport,
     ngf_util_graphics_pipeline_data *result);
 
