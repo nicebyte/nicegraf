@@ -116,10 +116,9 @@ void ngf_util_create_default_graphics_pipeline_data(
   result->pipeline_info = gpi;
 }
 
-ngf_error ngf_util_create_simple_layout_data(
-    ngf_descriptor_info *desc,
-    uint32_t ndesc,
-    ngf_util_layout_data *result) {
+ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
+                                        uint32_t ndesc,
+                                        ngf_pipeline_layout_info *result) {
   assert(desc);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
@@ -131,15 +130,16 @@ ngf_error ngf_util_create_simple_layout_data(
   result->descriptors_layouts = NGF_ALLOC(ngf_descriptor_set_layout*);
   err = ngf_create_descriptor_set_layout(&ds_layout_info,
                                       &(result->descriptors_layouts[0]));
-  if (err != NGF_ERROR_OK) return err;
-  result->pipeline_layout.ndescriptors_layouts = 1u;
-  result->pipeline_layout.descriptors_layouts = &result->descriptors_layouts[0];
+  if (err != NGF_ERROR_OK) {
+    NGF_FREE(result->descriptors_layouts);
+    return err;
+  }
   return err;
 }
 
-ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
-                                      uint32_t nstages,
-                                      ngf_util_layout_data *result) {
+ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
+                                 uint32_t nstages,
+                                 ngf_pipeline_layout_info *result) {
   assert(stage_layouts);
   assert(result); 
   result->descriptors_layouts = NULL;
@@ -214,9 +214,6 @@ ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
                                            &result->descriptors_layouts[s]);
     if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
   }
-
-  result->pipeline_layout.ndescriptors_layouts = set_count;
-  result->pipeline_layout.descriptors_layouts = result->descriptors_layouts;
 
 ngf_util_create_layout_data_cleanup:
   if (err != NGF_ERROR_OK) {
