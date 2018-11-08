@@ -58,35 +58,30 @@ void ngf_util_create_default_graphics_pipeline_data(
     ngf_util_graphics_pipeline_data *result);
 
 /**
- * Stores data for a simple pipeline layout with a single descriptor set.
- */
-typedef struct {
-  ngf_pipeline_layout_info pipeline_layout;
-  ngf_descriptor_set_layout **descriptors_layouts;
-  uint32_t ndescriptors_layouts;
-} ngf_util_layout_data;
-
-/**
  * Creates a simple pipeline layout with just a single descriptor set.
  * @param desc pointer to an array of descriptor configurations. All of these
  *  descriptors will be added to the set.
  * @param ndesc number of descriptors in the array.
+ * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
+ *               be populated by this function. The descriptor set within it
+ *               must be freed by the caller when it is no longer necessary.
  */
-ngf_error ngf_util_create_simple_layout_data(
-    ngf_descriptor_info *desc,
-    uint32_t ndesc,
-    ngf_util_layout_data *result);
+ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
+                                        uint32_t ndesc,
+                                        ngf_pipeline_layout_info *result);
 
 /**
  * Creates a pipeline layout from shader metadata produced by ngf_shaderc.
  * @param stage_layouts pointer to an array of pointers to buffers containing
  *  shader metadata
  * @param nstages number of elements in the array pointed to bt `stage_layouts`
- * @param result data for the newly created layout shall be stored here.
+ * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
+ *               be populated by this function. The descriptor sets within it
+ *               must be freed by the caller when it is no longer necessary.
  */
-ngf_error ngf_util_create_layout_data(uint32_t **stage_layouts,
-                                      uint32_t nstages,
-                                      ngf_util_layout_data *result);
+ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
+                                 uint32_t nstages,
+                                 ngf_pipeline_layout_info *result);
 #ifdef __cplusplus
 }
 #endif
