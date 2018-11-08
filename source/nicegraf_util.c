@@ -34,7 +34,6 @@ SOFTWARE.
 #endif
 
 void ngf_util_create_default_graphics_pipeline_data(
-    ngf_pipeline_layout_info *layout,
     const ngf_irect2d *window_size,
     ngf_util_graphics_pipeline_data *result) {
   ngf_blend_info bi = {
@@ -97,6 +96,11 @@ void ngf_util_create_default_graphics_pipeline_data(
     .value_buffer = NULL
   };
   result->spec_info = spi;
+  ngf_pipeline_layout_info pli = {
+    .ndescriptors_layouts = 0u,
+    .descriptors_layouts = NULL
+  };
+  result->layout_info  = pli;
   ngf_graphics_pipeline_info gpi = {
     .blend = &result->blend_info,
     .depth_stencil = &result->depth_stencil_info,
@@ -107,7 +111,7 @@ void ngf_util_create_default_graphics_pipeline_data(
     .shader_stages = {NULL},
     .nshader_stages = 0u,
     .rasterization = &result->rasterization_info,
-    .layout = layout,
+    .layout = &result->layout_info,
     .scissor = &result->scissor,
     .viewport = &result->viewport,
     .tessellation = &result->tessellation_info,
@@ -129,7 +133,7 @@ ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
   result->ndescriptors_layouts = 1u;
   result->descriptors_layouts = NGF_ALLOC(ngf_descriptor_set_layout*);
   err = ngf_create_descriptor_set_layout(&ds_layout_info,
-                                      &(result->descriptors_layouts[0]));
+                                         &(result->descriptors_layouts[0]));
   if (err != NGF_ERROR_OK) {
     NGF_FREE(result->descriptors_layouts);
     return err;
