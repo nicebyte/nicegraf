@@ -35,7 +35,7 @@ extern "C" {
  * Use the `pipeline_info` member of this struct to initialize a new pipeline
  * object.
  */
-typedef struct {
+typedef struct ngf_util_graphics_pipeline_data {
   ngf_graphics_pipeline_info pipeline_info ;
   ngf_blend_info blend_info;
   ngf_depth_stencil_info depth_stencil_info;
