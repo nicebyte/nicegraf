@@ -76,6 +76,7 @@ target_link_libraries(nicegraf ${NICEGRAF_DEPS})
 target_compile_options(nicegraf PRIVATE ${NICEGRAF_COMPILE_OPTS})
 
 add_library (nicegraf_util ${NICEGRAF_UTIL_SOURCES})
+target_compile_options(nicegraf_util PRIVATE ${NICEGRAF_COMPILE_OPTS})
 target_include_directories(nicegraf_util PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include)
 target_link_libraries(nicegraf_util nicegraf)
