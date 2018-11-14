@@ -34,6 +34,8 @@ SOFTWARE.
 extern "C" {
 #endif
 
+#pragma region ngf_type_declarations
+
 /**
  * Error codes.
  * Nicegraf functions report errors via return values. Results are stored in
@@ -830,6 +832,9 @@ typedef struct ngf_context_info {
  */
 typedef struct ngf_cmd_buffer ngf_cmd_buffer;
 
+#pragma endregion
+
+#pragma region ngf_function_declarations 
 /**
  * Set the memory allocation callbacks that the library will use for its
  * internal needs.
@@ -1153,6 +1158,7 @@ ngf_error ngf_begin_frame(ngf_context *ctx);
  * @return Error codes: NGF_ERROR_END_FRAME_FAILED
  */
 ngf_error ngf_end_frame(ngf_context *ctx);
+#pragma endregion
 
 #ifdef __cplusplus
 }
