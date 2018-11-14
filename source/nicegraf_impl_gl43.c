@@ -416,12 +416,16 @@ void GL_APIENTRY ngf_gl_debug_callback(GLenum source,
                                        GLsizei length,
                                        const GLchar* message,
                                        const void* userdata) {
+  _NGF_FAKE_USE(length, severity, source, type, id);
   if (NGF_DEBUG_CALLBACK) {
     NGF_DEBUG_CALLBACK(message, userdata);
   }
 }
 
-ngf_error ngf_initialize(ngf_device_preference dev_pref) {return NGF_ERROR_OK;}
+ngf_error ngf_initialize(ngf_device_preference dev_pref) {
+  _NGF_FAKE_USE(dev_pref);
+  return NGF_ERROR_OK;
+}
 
 ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
@@ -543,6 +547,7 @@ ngf_create_context_cleanup:
 ngf_error ngf_resize_context(ngf_context *ctx,
                              uint32_t new_width,
                              uint32_t new_height) {
+  _NGF_FAKE_USE(ctx, new_width, new_height);
   return NGF_ERROR_OK;
 }
 
@@ -871,8 +876,8 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set *set) {
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
                                       const uint32_t nwrites,
                                       ngf_descriptor_set *set) {
-  for (size_t s = 0; s < nwrites; ++s) {
-    const ngf_descriptor_write *write = &(writes[s]);
+  for (size_t w = 0; w < nwrites; ++w) {
+    const ngf_descriptor_write *write = &(writes[w]);
     bool found_binding = false;
     for (uint32_t s = 0u; s < set->nslots; ++s) {
       if (set->bind_ops[s].type == write->type &&
@@ -1274,6 +1279,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       attachment = GL_STENCIL_ATTACHMENT;
       break;
     default:
+      attachment = GL_COLOR_ATTACHMENT0;
       assert(0);
     }
     if (!a->image_ref.image->is_renderbuffer &&
@@ -1955,12 +1961,12 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
       case _NGF_CMD_BIND_VERTEX_BUFFER: {
         GLsizei stride = 0;
         bool found_binding = false;
-        for (uint32_t b = 0;
-             !found_binding && b < bound_pipeline->nvert_buf_bindings;
-             ++b) {
-          if (bound_pipeline->vert_buf_bindings[b].binding ==
+        for (uint32_t binding = 0;
+             !found_binding && binding < bound_pipeline->nvert_buf_bindings;
+             ++binding) {
+          if (bound_pipeline->vert_buf_bindings[binding].binding ==
               cmd->vertex_buffer_bind_op.binding) {
-            stride = bound_pipeline->vert_buf_bindings[b].stride;
+            stride = bound_pipeline->vert_buf_bindings[binding].stride;
             found_binding = true;
           }
         }
@@ -1994,9 +2000,11 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             case NGF_ATTACHMENT_DEPTH:
               glClearBufferfv(GL_DEPTH, 0, &clear->clear_depth);
               break;
-            case NGF_ATTACHMENT_STENCIL:
-              glClearBufferiv(GL_STENCIL, 0, &clear->clear_stencil);
+            case NGF_ATTACHMENT_STENCIL: {
+              GLint v = clear->clear_stencil;
+              glClearBufferiv(GL_STENCIL, 0, &v);
               break;
+            }
             }
           }
         }
@@ -2072,7 +2080,10 @@ void ngf_end_debug_group() {
   glPopDebugGroup();
 }
 
-ngf_error ngf_begin_frame(ngf_context *ctx) { return NGF_ERROR_OK; }
+ngf_error ngf_begin_frame(ngf_context *ctx) {
+  _NGF_FAKE_USE(ctx);
+  return NGF_ERROR_OK;
+}
 
 ngf_error ngf_end_frame(ngf_context *ctx) {
   return eglSwapBuffers(ctx->dpy, ctx->surface)

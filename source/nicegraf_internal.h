@@ -92,6 +92,14 @@ typedef enum {
 // Freeing a NULL pointer does nothing.
 _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
+// For fixing unreferenced parameter warnings.
+#define _NGF_FAKE_USE(...) if(0){(__VA_ARGS__);}
+
+// MSVC warnings that are safe to ignore.
+#pragma warning(disable:4201)
+#pragma warning(disable:4200)
+#pragma warning(disable:4204)
+
 #ifdef __cplusplus
 }
 #endif
