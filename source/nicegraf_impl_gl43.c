@@ -1672,7 +1672,7 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   cmd->draw.first_element = first_element;
   cmd->draw.nelements = nelements;
   cmd->draw.ninstances = ninstances;
-  cmd->draw.indexed = false;
+  cmd->draw.indexed = indexed;
   _NGF_APPENDCMD(buf, cmd);
 }
 
