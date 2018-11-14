@@ -1058,7 +1058,8 @@ ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf);
  */
 ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline);
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
+                           const ngf_graphics_pipeline *pipeline);
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
 void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
