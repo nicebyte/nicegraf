@@ -1515,7 +1515,9 @@ ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf) {
 ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf) {
   assert(buf);
   ngf_error err = NGF_ERROR_OK;
-  if (buf->recording) err = NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
+  if (!buf->recording) {
+    err = NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
+  }
   buf->recording = false;
   return err;
 }
