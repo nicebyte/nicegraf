@@ -39,7 +39,7 @@ extern "C" {
  * Nicegraf functions report errors via return values. Results are stored in
  * output arguments.
  */
-typedef enum {
+typedef enum ngf_error {
   NGF_ERROR_OK = 0, /**< No error, operation finished successfully. */
   NGF_ERROR_OUTOFMEM, /**< Host memory allocation failed. */
   NGF_ERROR_FAILED_TO_CREATE_PIPELINE,
@@ -79,7 +79,7 @@ typedef enum {
 /**
  * Device hints.
  */
-typedef enum {
+typedef enum ngf_device_preference {
   NGF_DEVICE_PREFERENCE_DISCRETE, /**< Prefer discrete GPU. */
   NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
   NGF_DEVICE_PREFERENCE_DONTCARE /**< No GPU preference. */
@@ -88,7 +88,7 @@ typedef enum {
 /**
  * Possible present modes.
  */
-typedef enum {
+typedef enum ngf_present_mode {
   NGF_PRESENTATION_MODE_FIFO, /**< Frames get queued ("wait for vsync") */
   NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
 } ngf_present_mode;
@@ -96,7 +96,7 @@ typedef enum {
 /**
  * Represents a rectangular, axis-aligned 2D region with integer coordinates.
  */
-typedef struct {
+typedef struct ngf_irect2d {
   int32_t x; /**< X coord of lower-left corner. */
   int32_t y; /**< Y coord of lower-left corner. */
   uint32_t width;
@@ -106,7 +106,7 @@ typedef struct {
 /**
  * Represents a rectangular, axis-aligned 3D volume.
  */
-typedef struct {
+typedef struct ngf_extent3d {
   uint32_t width;
   uint32_t height;
   uint32_t depth;
@@ -115,7 +115,7 @@ typedef struct {
 /**
  * Three-dimensional offset.
  */
-typedef struct {
+typedef struct ngf_offset3d {
   int32_t x;
   int32_t y;
   int32_t z;
@@ -125,7 +125,7 @@ typedef struct {
  * Shader stage types.
  * Note that some back-ends might not support all of these.
  */
-typedef enum {
+typedef enum ngf_stage_type {
   NGF_STAGE_VERTEX = 0,
   NGF_STAGE_TESSELLATION_CONTROL,
   NGF_STAGE_TESSELLATION_EVALUATION,
@@ -138,7 +138,7 @@ typedef enum {
 /**
  * Describes a programmable shader stage.
  */
-typedef struct {
+typedef struct ngf_shader_stage_info {
   ngf_stage_type type; /**< Stage type (vert/frag/etc.) */
   const char *content; /**< May be text or binary, depending on the backend.*/
   uint32_t content_length; /**< Number of bytes in the content buffer. */
@@ -155,7 +155,7 @@ typedef struct ngf_shader_stage ngf_shader_stage;
  * Ways to draw polygons.
  * Some back-ends might not support all of these.
   */
-typedef enum {
+typedef enum ngf_polygon_mode {
   NGF_POLYGON_MODE_FILL = 0, /**< Fill entire polyoon.*/
   NGF_POLYGON_MODE_LINE, /**< Outline only.*/
   NGF_POLYGON_MODE_POINT  /**< Vertices only.*/
@@ -164,7 +164,7 @@ typedef enum {
 /**
  * Which polygons to cull.
  */
-typedef enum {
+typedef enum ngf_cull_mode {
   NGF_CULL_MODE_BACK = 0, /**< Cull back-facing polygons.*/
   NGF_CULL_MODE_FRONT, /**< Cull front-facing polygons. */
   NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all.*/
@@ -174,7 +174,7 @@ typedef enum {
 /**
  * Ways to determine front-facing polygons.
  */
-typedef enum {
+typedef enum ngf_front_face_mode {
   NGF_FRONT_FACE_COUNTER_CLOCKWISE = 0, /**< CCW winding is front-facing.*/
   NGF_FRONT_FACE_CLOCKWISE /**< CW winding is front-facing. */
 } ngf_front_face_mode;
@@ -182,7 +182,7 @@ typedef enum {
 /**
  * Rasterization stage parameters.
  */
-typedef struct {
+typedef struct ngf_rasterization_info {
   bool discard; /**< Enable/disable rasterizer discard. Use in pipelines that
                      don't write fragment data.*/
   ngf_polygon_mode polygon_mode; /**< How to draw polygons.*/
@@ -194,7 +194,7 @@ typedef struct {
 /**
  * Compare operations used in depth and stencil tests.
  */
-typedef enum {
+typedef enum ngf_compare_op {
   NGF_NEVER = 0,
   NGF_LESS,
   NGF_LEQUAL,
@@ -208,7 +208,7 @@ typedef enum {
 /**
  * Operations that can be performed on stencil buffer.
  */
-typedef enum {
+typedef enum ngf_stencil_op {
   NGF_STENCIL_OP_KEEP = 0, /**< Don't touch.*/
   NGF_STENCIL_OP_ZERO, /**< Set to 0.*/
   NGF_STENCIL_OP_REPLACE, /**< Replace with reference value.*/
@@ -222,7 +222,7 @@ typedef enum {
 /**
  * Stencil operation description.
  */
-typedef struct {
+typedef struct ngf_stencil_info {
   ngf_stencil_op fail_op; /**< What to do on stencil test fail.*/
   ngf_stencil_op pass_op; /**< What to do on pass.*/
   ngf_stencil_op depth_fail_op; /**< When depth fails but stencil pass.*/
@@ -235,7 +235,7 @@ typedef struct {
 /**
  * Pipeline's depth/stencil state description.
  */
-typedef struct {
+typedef struct ngf_depth_stencil_info {
   float min_depth; /** Near end of the depth range. */
   float max_depth; /** Far end of the depth range. */
   bool depth_test; /**< Enable depth test.*/
@@ -252,7 +252,7 @@ typedef struct {
  * Where `source` is the incoming value, `dest` is the value already in the
  * frame buffer, and `sfactor` and `dfactor` are one of these values. 
  */
-typedef enum {
+typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ZERO = 0,
   NGF_BLEND_FACTOR_ONE,
   NGF_BLEND_FACTOR_SRC_COLOR,
@@ -272,7 +272,7 @@ typedef enum {
 /**
  * Pipeline's blend state description.
  */
-typedef struct {
+typedef struct ngf_blend_info {
   bool enable; /**< Enable blending.*/
   ngf_blend_factor sfactor; /**< Source factor.*/
   ngf_blend_factor dfactor; /**< Destination factor.*/
@@ -281,7 +281,7 @@ typedef struct {
 /**
  * Vertex attribute's input rate.
  */
-typedef enum {
+typedef enum ngf_input_rate {
   NGF_INPUT_RATE_VERTEX = 0, /**< attribute changes per-vertex*/
   NGF_INPUT_RATE_INSTANCE /**< attribute changes per-instance*/
 } ngf_input_rate;
@@ -289,7 +289,7 @@ typedef enum {
 /**
  * Vertex attribute component type.
  */
-typedef enum {
+typedef enum ngf_type {
   NGF_TYPE_INT8 = 0,
   NGF_TYPE_UINT8,
   NGF_TYPE_INT16,
@@ -304,7 +304,7 @@ typedef enum {
 /**
  * Specifies an attribute binding.
  */
-typedef struct {
+typedef struct ngf_vertex_buf_binding_desc {
   uint32_t binding;/**< Index of the binding that this structure describes.*/
   uint32_t stride; /**< Number of bytes between consecutive attribute values.*/
   ngf_input_rate input_rate; /**< Whether attributes read from this binding
@@ -314,7 +314,7 @@ typedef struct {
 /**
  * Specifies information about a vertex attribute.
  */
-typedef struct {
+typedef struct ngf_vertex_attrib_desc {
   uint32_t location; /**< Attribute index. */
   uint32_t binding; /**< Which vertex buffer binding to use.*/
   uint32_t offset; /**< Offset in the buffer at which attribute data starts.*/
@@ -326,7 +326,7 @@ typedef struct {
 /**
  * Specifies information about the pipeline's vertex input.
  */
-typedef struct {
+typedef struct ngf_vertex_input_info {
   /**Pointer to array of structures describing the vertex buffer binding used.*/
   const ngf_vertex_buf_binding_desc *vert_buf_bindings; 
   uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings
@@ -338,7 +338,7 @@ typedef struct {
 /**
  * Specifies state of multisampling. 
  */
-typedef struct {
+typedef struct ngf_multisample_info {
   bool multisample; /**< Whether to enable multisampling.*/
   bool alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
 } ngf_multisample_info;
@@ -346,14 +346,14 @@ typedef struct {
 /** Specifies tessellation-related state.
  * Only has meaning for back-ends that support tessellation.
  */
-typedef struct {
+typedef struct ngf_tessellation_info {
   uint32_t patch_vertices; /**< Number of verts per tessellation patch.*/
 } ngf_tessellation_info;
 
 /**
  * Possible image types.
  */
-typedef enum {
+typedef enum ngf_image_type {
   NGF_IMAGE_TYPE_IMAGE_2D = 0,
   NGF_IMAGE_TYPE_IMAGE_3D
 } ngf_image_type;
@@ -370,7 +370,7 @@ typedef enum {
  * operations automatically apply a transfer function to convert the values from
  * sRGB to linear color space.
  */
-typedef enum {
+typedef enum ngf_image_format {
   NGF_IMAGE_FORMAT_R8 = 0,
   NGF_IMAGE_FORMAT_RG8,
   NGF_IMAGE_FORMAT_RGB8,
@@ -398,7 +398,7 @@ typedef enum {
 /**
  * Swapchain configuration.
  */
-typedef struct {
+typedef struct ngf_swapchain_info {
   ngf_image_format cfmt; /**< Swapchain image format. */
   ngf_image_format dfmt; /**< Format to use for the depth buffer, if set to
                               NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
@@ -414,7 +414,7 @@ typedef struct {
 /**
  * Image usage flags.
  */
-typedef enum {
+typedef enum ngf_image_usage {
   NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
   NGF_IMAGE_USAGE_ATTACHMENT = 0x02   /**< Can be used as an attachment for a
                                            render target.*/
@@ -423,7 +423,7 @@ typedef enum {
 /**
  * Describes an image.
  */
-typedef struct {
+typedef struct ngf_image_info {
   ngf_image_type type;
   ngf_extent3d extent; /**< Width, height and depth (for 3d images) or no. of
                             layers (for layered images).*/
@@ -589,7 +589,7 @@ typedef struct ngf_graphics_pipeline ngf_graphics_pipeline;
  * Flags for specifying which aspects of the pipeline are to be configured
  * as dynamic.
  */
-typedef enum {
+typedef enum ngf_dynamic_state_flags {
   NGF_DYNAMIC_STATE_VIEWPORT = 0x01,
   NGF_DYNAMIC_STATE_SCISSOR = 0x02,
   NGF_DYNAMIC_STATE_LINE_WIDTH = 0x04,
@@ -605,7 +605,7 @@ typedef enum {
  * Primitive types to use for draw operations.
  * Some back-ends may not support all of the primitive types.
  */
-typedef enum {
+typedef enum ngf_primitive_type {
   NGF_PRIMITIVE_TYPE_TRIANGLE_LIST = 0,
   NGF_PRIMITIVE_TYPE_TRIANGLE_STRIP,
   NGF_PRIMITIVE_TYPE_TRIANGLE_FAN,
@@ -618,7 +618,7 @@ typedef enum {
  * A constant specialization entry, sets the value for a single
  * specialization constant.
  */
-typedef struct {
+typedef struct ngf_constant_specialization {
   uint32_t constant_id; /**< ID of the specialization constant used in the
                              shader stage */
   uint32_t offset; /**< Offset at which the user-provided value is stored in
@@ -629,7 +629,7 @@ typedef struct {
 /**
  * Sets specialization constant values for a pipeline.
  */
-typedef struct {
+typedef struct ngf_specialization_info {
   ngf_constant_specialization  *specializations; /**< List of specialization
                                                       entries. */
   uint32_t nspecializations; /**< Number of specialization entries. */
@@ -640,7 +640,7 @@ typedef struct {
 /**
  * Specifies information for creation of a graphics pipeline.
  */
-typedef struct {
+typedef struct ngf_graphics_pipeline_info {
   const ngf_shader_stage *shader_stages[5];
   uint32_t nshader_stages;
   const ngf_irect2d *viewport;
@@ -660,7 +660,7 @@ typedef struct {
 /**
  * Rendertarget attachment types.
  */
-typedef enum {
+typedef enum ngf_attachment_type {
   NGF_ATTACHMENT_COLOR = 0,
   NGF_ATTACHMENT_DEPTH,
   NGF_ATTACHMENT_STENCIL,
@@ -670,7 +670,7 @@ typedef enum {
 /**
  * What to do on attachment load.
  */
-typedef enum {
+typedef enum ngf_attachment_load_op {
   NGF_LOAD_OP_DONTCARE = 0,
   NGF_LOAD_OPKEEP,
   NGF_LOAD_OP_CLEAR
@@ -679,7 +679,7 @@ typedef enum {
 /**
  * Specifies information about a rendertarget attachment.
  */
-typedef struct {
+typedef struct ngf_attachment {
   ngf_image_ref image_ref; /**< Associated image subresource.*/
   ngf_attachment_type type; /**< Attachment type. */
 } ngf_attachment;
@@ -687,7 +687,7 @@ typedef struct {
 /**
  * Specifies information about a rendertarget.
  */
-typedef struct {
+typedef struct ngf_render_target_info {
   const ngf_attachment *attachments;
   uint32_t nattachments;
 } ngf_render_target_info;
@@ -700,21 +700,21 @@ typedef struct ngf_render_target ngf_render_target;
 /**
  * Types of buffer objects.
  */
-typedef enum {
+typedef enum ngf_buffer_type {
   NGF_BUFFER_TYPE_VERTEX = 0,
   NGF_BUFFER_TYPE_INDEX,
   NGF_BUFFER_TYPE_UNIFORM
 } ngf_buffer_type;
 
 // How frequently the buffer is accessed.
-typedef enum {
+typedef enum ngf_buffer_access_freq {
   NGF_BUFFER_USAGE_STATIC = 0, // Written once, read many times.
   NGF_BUFFER_USAGE_DYNAMIC, // Written many times, read many times.
   NGF_BUFFER_USAGE_STREAM, // Written once, read a few times.
 } ngf_buffer_access_freq;
 
 // How the buffer is being used on the GPU side.
-typedef enum {
+typedef enum ngf_buffer_access_type {
   NGF_BUFFER_ACCESS_DRAW = 0, // Consumed by draw operations.
   NGF_BUFFER_ACCESS_READ, // Application reads from the buffer.
   NGF_BUFFER_ACCESS_COPY // Copy destination.
@@ -723,7 +723,7 @@ typedef enum {
 /**
  * Specifies information about a buffer object.
  */
-typedef struct {
+typedef struct ngf_buffer_info {
   size_t size; /**< Size in bytes. */
   ngf_buffer_type type; /**< Type of buffer (vertex/uniform/etc.)*/
   ngf_buffer_access_freq access_freq; /**< Access frequency.*/
@@ -733,7 +733,7 @@ typedef struct {
 /**
  * Specifies a rendertarget clear operation.
  */
-typedef struct {
+typedef struct ngf_clear_info {
   float clear_color[4];
   float clear_depth;
   uint32_t clear_stencil;
@@ -744,7 +744,7 @@ typedef struct {
  * A renderpass is a series of drawcalls affecting a rendertarget, preceded by
  * an operation performed on all attachments of the rendertarget.
  */
-typedef struct {
+typedef struct ngf_pass_info {
   const ngf_attachment_load_op *loadops; /**< Operation to perform on each
                                               corresponding attachment of the
                                               rendertarget*/
@@ -769,7 +769,7 @@ typedef struct ngf_pass ngf_pass;
 /**
  * Specifies host memory allocation callbacks for the library's internal needs.
  */
-typedef struct {
+typedef struct ngf_allocation_callbacks {
   //TODO: specify alignments?
   void* (*allocate)(size_t obj_size, size_t nobjs);
   void (*free)(void *ptr, size_t obj_size, size_t nobjs);
@@ -783,7 +783,7 @@ typedef struct ngf_context ngf_context;
 /**
  * Configures a Nicegraf context.
  */
-typedef struct {
+typedef struct ngf_context_info {
   const ngf_swapchain_info *swapchain_info; /**< Configures the swapchain that the
                                                  context will be presenting to. This
                                                  can be NULL if all rendering is done
