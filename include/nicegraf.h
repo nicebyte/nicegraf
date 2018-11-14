@@ -745,17 +745,20 @@ typedef struct {
  * an operation performed on all attachments of the rendertarget.
  */
 typedef struct {
-  const ngf_clear_info *clears; /**< An array of clear operation descriptions.
-                                     Each entry in the array  corresponds to a
-                                     rendertarget attachment. If the load op is
-                                     not CLEAR, the entry is ignored, otherwise
-                                     it is used to specify the details of the
-                                     clear operation, such as the clear color
-                                     for color attachments.*/
   const ngf_attachment_load_op *loadops; /**< Operation to perform on each
                                               corresponding attachment of the
                                               rendertarget*/
   uint32_t nloadops; /**< Number of attachments.*/
+
+  /**
+   * An array of clear operation descriptions. It must contain one entry
+   * per each attachment that has its load op set to NGF_LOAD_OP_CLEAR.
+   * The operations must be specified in the same order as the attachments
+   * i.e. the first operation corresponds to the first attachment that has
+   * NGF_LOAD_OP_CLEAR, the second to the second one, etc.
+   * 
+   */
+  const ngf_clear_info *clears;
 } ngf_pass_info;
 
 /**
@@ -1081,8 +1084,7 @@ void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
 void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
                                ngf_type index_type);
 void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
-                        const ngf_render_target *target, uint32_t nclears,
-                        ngf_clear_info *clears);
+                        const ngf_render_target *target);
 void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
