@@ -541,8 +541,8 @@ ngf_create_context_cleanup:
 }
 
 ngf_error ngf_resize_context(ngf_context *ctx,
-                             size_t new_width,
-                             size_t new_height) {
+                             uint32_t new_width,
+                             uint32_t new_height) {
   return NGF_ERROR_OK;
 }
 

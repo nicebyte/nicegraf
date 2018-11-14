@@ -99,8 +99,8 @@ typedef enum {
 typedef struct {
   int32_t x; /**< X coord of lower-left corner. */
   int32_t y; /**< Y coord of lower-left corner. */
-  size_t width;
-  size_t height;
+  uint32_t width;
+  uint32_t height;
 } ngf_irect2d;
 
 /**
@@ -141,7 +141,7 @@ typedef enum {
 typedef struct {
   ngf_stage_type type; /**< Stage type (vert/frag/etc.) */
   const char *content; /**< May be text or binary, depending on the backend.*/
-  size_t content_length; /**< Number of bytes in the content buffer. */
+  uint32_t content_length; /**< Number of bytes in the content buffer. */
   const char *debug_name; /**< Optional name, will appear in debug logs,
                                may be NULL.*/
 } ngf_shader_stage_info;
@@ -404,9 +404,9 @@ typedef struct {
                               NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
                               be created. */
   int nsamples; /**< Number of samples per pixel (0 for non-multisampled) */
-  size_t capacity_hint; /**< Number of images in swapchain (may get ignored) */
-  size_t width; /**< Width of swapchain images in pixels. */
-  size_t height;/**< Height of swapchain images in pixels. */
+  uint32_t capacity_hint; /**< Number of images in swapchain (may get ignored) */
+  uint32_t width; /**< Width of swapchain images in pixels. */
+  uint32_t height;/**< Height of swapchain images in pixels. */
   uintptr_t native_handle;/**< HWND, ANativeWindow, NSWindow, etc. */
   ngf_present_mode present_mode; /**< Desired present mode. */
 } ngf_swapchain_info;
@@ -1125,8 +1125,8 @@ void ngf_destroy_context(ngf_context *ctx);
  * @return Error codes: NGF_ERROR_SWAPCHAIN_CREATION_FAILED, NGF_ERROR_OUTOFMEM
  */
 ngf_error ngf_resize_context(ngf_context *ctx,
-                             size_t new_width,
-                             size_t new_height);
+                             uint32_t new_width,
+                             uint32_t new_height);
 
 /**
  * Set a given Nicegraf context as current for the calling thread. All
