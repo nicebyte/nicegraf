@@ -1475,7 +1475,7 @@ void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buf) {
   if (buf != NULL) {
     bool has_first_cmd = buf->first_cmd != NULL;
     bool has_last_cmd = buf->last_cmd != NULL;
-    assert((has_first_cmd ^ has_last_cmd) &&
+    assert(!(has_first_cmd ^ has_last_cmd) &&
             buf->last_cmd->next == NULL);
     if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
       for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
