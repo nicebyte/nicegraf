@@ -159,7 +159,7 @@ typedef struct _ngf_emulated_cmd {
   struct _ngf_emulated_cmd *next;
   _ngf_emulated_cmd_type type;
   union {
-    ngf_graphics_pipeline *pipeline;
+    const ngf_graphics_pipeline *pipeline;
     ngf_irect2d viewport;
     ngf_irect2d scissor;
     float line_width;
