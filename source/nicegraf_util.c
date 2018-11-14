@@ -131,9 +131,9 @@ ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
     .ndescriptors = ndesc
   };
   result->ndescriptors_layouts = 1u;
-  result->descriptors_layouts = NGF_ALLOC(ngf_descriptor_set_layout*);
-  err = ngf_create_descriptor_set_layout(&ds_layout_info,
-                                         &(result->descriptors_layouts[0]));
+  ngf_descriptor_set_layout **dsl = NGF_ALLOC(ngf_descriptor_set_layout*);
+  result->descriptors_layouts = dsl;
+  err = ngf_create_descriptor_set_layout(&ds_layout_info, dsl);
   if (err != NGF_ERROR_OK) {
     NGF_FREE(result->descriptors_layouts);
     return err;
@@ -207,7 +207,8 @@ ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
   }
 
   result->ndescriptors_layouts = set_count;
-  result->descriptors_layouts = NGF_ALLOCN(ngf_descriptor_set_layout*, set_count);
+  ngf_descriptor_set_layout **dsls = NGF_ALLOCN(ngf_descriptor_set_layout*, set_count);
+  result->descriptors_layouts = dsls;
   if (result->descriptors_layouts == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_util_create_layout_data_cleanup;
@@ -215,14 +216,14 @@ ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
 
   for (uint32_t s = 0u; s < set_count; ++s) {
     err = ngf_create_descriptor_set_layout(&descriptor_set_layouts[s],
-                                           &result->descriptors_layouts[s]);
+                                           &dsls[s]);
     if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
   }
 
 ngf_util_create_layout_data_cleanup:
   if (err != NGF_ERROR_OK) {
     for (uint32_t i = 0u; i < result->ndescriptors_layouts; ++i) {
-      ngf_destroy_descriptor_set_layout(result->descriptors_layouts[i]);
+      ngf_destroy_descriptor_set_layout(dsls[i]);
     }
   }
   for (uint32_t i = 0u;
