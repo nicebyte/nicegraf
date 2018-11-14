@@ -592,7 +592,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   const char *rest_of_source = source;
   while(*(rest_of_source++) != '\n' &&
         (rest_of_source - source < source_len));
-  const GLint first_line_len = (rest_of_source - source);
+  const GLint first_line_len = (uint32_t)(rest_of_source - source);
 
   // Space for chunk pointers and chunk lengths.
   const uint32_t nsource_chunks =
@@ -1262,7 +1262,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
     GLenum attachment;
     switch (a->type) {
     case NGF_ATTACHMENT_COLOR:
-      attachment = GL_COLOR_ATTACHMENT0 + (ncolor_attachment++);
+      attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
       break;
     case NGF_ATTACHMENT_DEPTH:
       attachment = GL_DEPTH_ATTACHMENT;
@@ -2054,12 +2054,12 @@ void ngf_insert_log_message(const char *message) {
     GL_DEBUG_TYPE_MARKER,
     0,
     GL_DEBUG_SEVERITY_NOTIFICATION,
-    strlen(message),
+    (uint32_t)strlen(message),
     message);
 }
 
 void ngf_begin_debug_group(const char *title) {
-  glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, strlen(title), title);
+  glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, (uint32_t)strlen(title), title);
 }
 
 void ngf_end_debug_group() {
