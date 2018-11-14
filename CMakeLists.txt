@@ -25,13 +25,16 @@ project(nicegraf)
 
 #TODO: separate targets for different backend
 set(NGF_PLATFORM "GL")
-
 set(NICEGRAF_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c)
 
 set(EGL_NO_GLEW ON)
+
+if(WIN32)
+set (NICEGRAF_COMPILE_OPTS "/W4" "/WX")
+endif()
 
 if("${NGF_PLATFORM}" STREQUAL "GL")
   set(NICEGRAF_SOURCES
@@ -70,6 +73,7 @@ target_include_directories(nicegraf PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/source
 	${NICEGRAF_PRIVATE_INCLUDES})
 target_link_libraries(nicegraf ${NICEGRAF_DEPS})
+target_compile_options(nicegraf PRIVATE ${NICEGRAF_COMPILE_OPTS})
 
 add_library (nicegraf_util ${NICEGRAF_UTIL_SOURCES})
 target_include_directories(nicegraf_util PUBLIC

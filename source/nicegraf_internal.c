@@ -28,6 +28,7 @@ void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
 }
 
 void ngf_default_free(void *ptr, size_t s, size_t n) {
+  _NGF_FAKE_USE(s, n);
   free(ptr);
 }
 
