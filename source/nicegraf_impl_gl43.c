@@ -2029,7 +2029,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         assert(false);
       }
     }
-    _ngf_cmd_buffer_free_cmds(buf);
+    _ngf_cmd_buffer_free_cmds(bufs[b]);
   }
   return NGF_ERROR_OK;
 }
