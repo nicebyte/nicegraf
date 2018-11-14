@@ -1526,7 +1526,8 @@ ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf) {
     buf->last_cmd = cmd; }
 
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf, ngf_graphics_pipeline *pipeline) {
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
+                           const ngf_graphics_pipeline *pipeline) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BIND_PIPELINE;
   cmd->pipeline = pipeline;
