@@ -139,10 +139,7 @@ struct ngf_pass {
 
 typedef enum {
   _NGF_CMD_BIND_PIPELINE,
-  _NGF_CMD_BIND_FRAMEBUFFER,
-  _NGF_CMD_CLEAR_COLOR,
-  _NGF_CMD_CLEAR_DEPTH,
-  _NGF_CMD_CLEAR_STENCIL,
+  _NGF_CMD_BEGIN_PASS,
   _NGF_CMD_VIEWPORT,
   _NGF_CMD_SCISSOR,
   _NGF_CMD_LINE_WIDTH,
@@ -191,13 +188,10 @@ typedef struct _ngf_emulated_cmd {
       uint32_t binding;
       uint32_t offset;
     } vertex_buffer_bind_op;
-    const ngf_render_target *framebuffer;
     struct {
-      float color[4];
-      uint32_t attachment;
-    } clear_color;
-    float clear_depth;
-    uint32_t clear_stencil;
+      const ngf_render_target *target;
+      const ngf_pass *pass;
+    } begin_pass;
     struct {
       const ngf_buffer *index_buffer;
       ngf_type type;
@@ -1625,38 +1619,12 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
 }
 
 void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
-                        const ngf_render_target *target, uint32_t nclears,
-                        ngf_clear_info *clears) {
+                        const ngf_render_target *target) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
-  cmd->type = _NGF_CMD_BIND_FRAMEBUFFER;
-  cmd->framebuffer = target;
+  cmd->type = _NGF_CMD_BEGIN_PASS;
+  cmd->begin_pass.target = target;
+  cmd->begin_pass.pass = pass;
   _NGF_APPENDCMD(buf, cmd);
-  cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
-  uint32_t clear = 0u;
-  for (uint32_t l = 0u; l < pass->nloadops; ++l) {
-    const ngf_attachment_load_op op = pass->loadops[l];
-    if (op == NGF_LOAD_OP_CLEAR) {
-      cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
-      switch (target->attachment_types[l]) {
-      case NGF_ATTACHMENT_COLOR:
-        cmd->type = _NGF_CMD_CLEAR_COLOR;
-        memcpy(cmd->clear_color.color, clears[clear].clear_color,
-               sizeof(cmd->clear_color));
-        break;
-      case NGF_ATTACHMENT_DEPTH:
-        cmd->type = _NGF_CMD_CLEAR_DEPTH;
-        cmd->clear_depth = clears[clear].clear_depth;
-        break;
-      case NGF_ATTACHMENT_STENCIL:
-        cmd->type = _NGF_CMD_CLEAR_STENCIL;
-        cmd->clear_stencil = clears->clear_stencil;
-        break;
-      default: assert(false);
-      }
-      ++clear;
-      _NGF_APPENDCMD(buf, cmd);
-    }
-  }
   buf->renderpass_active = true;
 }
 
@@ -2005,20 +1973,31 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
         break;
 
-      case _NGF_CMD_BIND_FRAMEBUFFER:
-        glBindFramebuffer(GL_FRAMEBUFFER, cmd->framebuffer->framebuffer);
+      case _NGF_CMD_BEGIN_PASS: {
+        const ngf_pass *pass = cmd->begin_pass.pass;
+        const ngf_render_target *target = cmd->begin_pass.target;
+        glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
+        uint32_t c = 0u;
+        uint32_t color_clear = 0u;
+        for (uint32_t l = 0u; l < pass->nloadops; ++l) {
+          if (pass->loadops[l] == NGF_LOAD_OP_CLEAR) {
+            const ngf_clear_info *clear = &pass->clears[c++];
+            switch (target->attachment_types[l]) {
+            case NGF_ATTACHMENT_COLOR:
+              glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
+              break;
+            case NGF_ATTACHMENT_DEPTH:
+              glClearBufferfv(GL_DEPTH, 0, &clear->clear_depth);
+              break;
+            case NGF_ATTACHMENT_STENCIL:
+              glClearBufferiv(GL_STENCIL, 0, &clear->clear_stencil);
+              break;
+            }
+          }
+        }
         break;
-      case _NGF_CMD_CLEAR_DEPTH:
-        glClearDepth(cmd->clear_depth);
-        glClear(GL_DEPTH_BUFFER_BIT);
-        break;
-      case _NGF_CMD_CLEAR_STENCIL:
-        glClearStencil(cmd->clear_stencil);
-        glClear(GL_STENCIL_BUFFER_BIT);
-        break;
-      case _NGF_CMD_CLEAR_COLOR:
-        glClearBufferfv(GL_COLOR, cmd->clear_color.attachment, cmd->clear_color.color);
-        break;
+      }
+
       case _NGF_CMD_DRAW:
         if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
           glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
