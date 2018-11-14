@@ -48,6 +48,8 @@ SOFTWARE.
 #define NGF_EMULATED_SPEC_CONST_PREFIX "SPIRV_CROSS_CONSTANT_ID_"
 #endif
 
+#pragma region ngf_impl_type_definitions
+
 typedef struct {
   uint32_t ngf_binding_id;
   uint32_t native_binding_id;
@@ -211,7 +213,9 @@ struct ngf_cmd_buffer {
   bool recording;
   bool renderpass_active;
 };
+#pragma endregion
 
+#pragma region ngf_impl_enum_maps
 static GLenum gl_shader_stage(ngf_stage_type stage) {
   static const GLenum stages[] = {
     GL_VERTEX_SHADER,
@@ -405,6 +409,7 @@ static GLenum gl_wrap(ngf_sampler_wrap_mode e) {
   };
   return modes[e];
 }
+#pragma endregion
 
 void (*NGF_DEBUG_CALLBACK)(const char *message, const void *userdata) = NULL;
 void *NGF_DEBUG_USERDATA = NULL;
