@@ -1471,17 +1471,22 @@ ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
   return err;
 }
 
+void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer *buf) {
+  bool has_first_cmd = buf->first_cmd != NULL;
+  bool has_last_cmd = buf->last_cmd != NULL;
+  assert(!(has_first_cmd ^ has_last_cmd) &&
+          buf->last_cmd->next == NULL);
+  if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
+    for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
+      _ngf_blkalloc_free(COMMAND_POOL, c);
+    }
+  }
+  buf->first_cmd = buf->last_cmd = NULL;
+}
+
 void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buf) {
   if (buf != NULL) {
-    bool has_first_cmd = buf->first_cmd != NULL;
-    bool has_last_cmd = buf->last_cmd != NULL;
-    assert(!(has_first_cmd ^ has_last_cmd) &&
-            buf->last_cmd->next == NULL);
-    if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
-      for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
-        _ngf_blkalloc_free(COMMAND_POOL, c);
-      }
-    }
+    _ngf_cmd_buffer_free_cmds(buf);
     NGF_FREE(buf);
   }
 }
@@ -2024,6 +2029,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         assert(false);
       }
     }
+    _ngf_cmd_buffer_free_cmds(buf);
   }
   return NGF_ERROR_OK;
 }
