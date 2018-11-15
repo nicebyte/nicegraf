@@ -21,9 +21,33 @@ SOFTWARE.
 */
 
 #include "nicegraf.h"
-#include <Metal/Metal.h>
+#include "nicegraf_internal.h"
+#include <memory>
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
+#if defined(TARGET_OS_MAC)
+#import <AppKit/AppKit.h>
+#define _NGF_VIEW_TYPE NSView
+#elif defined(TARGET_OS_IPHONE)
+#import <UIKit/UIKit.h>
+#define _NGF_VIEW_TYPE UIView
+#endif
 
 id<MTLDevice> MTL_DEVICE = nil;
+
+struct _ngf_context_shared_state {
+  id<MTLCommandQueue> queue;
+};
+
+struct ngf_context {
+  id<MTLDevice> device = nil;
+  CAMetalLayer *layer = nil;
+  std::shared_ptr<_ngf_context_shared_state> shared_state;
+};
+
+static MTLPixelFormat get_mtl_pixel_format(ngf_image_format) {
+  return MTLPixelFormatBGRA8Unorm;
+}
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   id<NSObject> dev_observer = nil;
@@ -43,5 +67,45 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 
 ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
+  ngf_error err = NGF_ERROR_OK;
+  *result = NGF_ALLOC(ngf_context);
+  ngf_context *ctx = *result;
 
+  if (ctx == nullptr) {
+    err = NGF_ERROR_OUTOFMEM;
+  }
+
+  ctx->device = MTL_DEVICE;
+  if (info->shared_context != nullptr) {
+    ctx->shared_state = info->shared_context->shared_state;
+  } else {
+    ctx->shared_state = std::make_shared<_ngf_context_shared_state>();
+    ctx->shared_state->queue = [ctx->device newCommandQueue];
+  }
+
+  if (info->swapchain_info) {
+    const ngf_swapchain_info *swapchain_info = info->swapchain_info;
+    ctx->layer = [CAMetalLayer layer];
+    ctx->layer.device = ctx->device;
+    CGSize size;
+    size.width = swapchain_info->width;
+    size.height = swapchain_info->height;
+    ctx->layer.drawableSize = size; 
+    ctx->layer.pixelFormat = get_mtl_pixel_format(swapchain_info->cfmt);
+    if (@available(macOS 10.13.2, *)) {
+      ctx->layer.maximumDrawableCount = swapchain_info->capacity_hint;
+    }
+    ctx->layer.displaySyncEnabled =
+        (swapchain_info->present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
+    // presents with transaction?
+    // extended dynamic range
+    // next drawable timeout
+    // color space
+    _NGF_VIEW_TYPE *window =
+        CFBridgingRelease((void*)swapchain_info->native_handle);
+    [window setLayer:ctx->layer];
+  }
+
+ngf_create_context_cleanup:
+  return err;
 }
