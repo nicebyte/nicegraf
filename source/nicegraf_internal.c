@@ -73,7 +73,7 @@ static const uint32_t MARKER_MASK = (1u << 31);
 _ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks) {
   static NGF_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
-    uint32_t threadid = (uint32_t)pthread_getthreadid_np();
+    uint32_t threadid = (uint32_t)_ngf_cur_thread_id();
     next_tag = (~MARKER_MASK) & (threadid << 16);
   }
   _ngf_block_allocator *alloc = NGF_ALLOC(_ngf_block_allocator);

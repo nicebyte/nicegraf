@@ -34,10 +34,16 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_mutex_unlock(m) (LeaveCriticalSection(m),0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m),0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m),0)
-#define pthread_getthreadid_np() (GetCurrentThreadId())
+#define _ngf_cur_thread_id() (GetCurrentThreadId())
 #else
 #define NGF_THREADLOCAL __thread
 #include <pthread.h>
+#if defined(__APPLE__)
+#define _ngf_cur_thread_id() pthread_mach_thread_np(pthread_self())
+#else
+#include <sys/types.h>
+#define _ngf_cur_thread_id() gettid()
+#endif
 #endif
 
 #ifdef __cplusplus
