@@ -73,8 +73,11 @@ typedef enum ngf_error {
   NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING, /**< An attempt was made to start recording a
                                                command buffer that was already in a
                                                recording state. */
-  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING, /**< An attempt was made to finish recording
-                                               a cmd buffer that was not recording. */
+  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING, /**< An attempt was made to finish
+                                               recording a cmd buffer that was
+                                               not recording. */
+  NGF_ERROR_CONTEXT_ALREADY_CURRENT,
+  NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
   /*..add new errors above this line */
 } ngf_error ;
 
@@ -1160,6 +1163,10 @@ ngf_error ngf_resize_context(ngf_context *ctx,
  * Set a given Nicegraf context as current for the calling thread. All
  * subsequent rendering operations invoked from the calling thread will affect
  * the given context.
+ *
+ * Once a context has been set as current on a thread, it cannot be migrated to
+ * another thread.
+ *
  * @param ctx The context to set as current.
  */
 ngf_error ngf_set_context(ngf_context *ctx);
