@@ -43,6 +43,7 @@ struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
   std::shared_ptr<_ngf_context_shared_state> shared_state;
+  ngf_swapchain_info swapchain_info;
 };
 
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
@@ -90,6 +91,29 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
 }
 
+CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
+                                   id<MTLDevice> device) {
+  CAMetalLayer *layer = [CAMetalLayer layer];
+  layer.device = device;
+  CGSize size;
+  size.width = swapchain_info.width;
+  size.height = swapchain_info.height;
+  layer.drawableSize = size; 
+  layer.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
+  if (@available(macOS 10.13.2, *)) {
+    layer.maximumDrawableCount = swapchain_info.capacity_hint;
+  }
+  if (@available(macOS 10.13, *)) {
+    layer.displaySyncEnabled =
+          (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
+  }
+  _NGF_VIEW_TYPE *view=
+        CFBridgingRelease((void*)swapchain_info.native_handle);
+  [view setLayer:layer];
+  swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
+  return layer;
+}
+
 ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
   *result = NGF_ALLOC(ngf_context);
@@ -108,24 +132,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   }
 
   if (info->swapchain_info) {
-    const ngf_swapchain_info *swapchain_info = info->swapchain_info;
-    ctx->layer = [CAMetalLayer layer];
-    ctx->layer.device = ctx->device;
-    CGSize size;
-    size.width = swapchain_info->width;
-    size.height = swapchain_info->height;
-    ctx->layer.drawableSize = size; 
-    ctx->layer.pixelFormat = get_mtl_pixel_format(swapchain_info->cfmt);
-    if (@available(macOS 10.13.2, *)) {
-      ctx->layer.maximumDrawableCount = swapchain_info->capacity_hint;
-    }
-    if (@available(macOS 10.13, *)) {
-      ctx->layer.displaySyncEnabled =
-          (swapchain_info->present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
-    }
-    _NGF_VIEW_TYPE *view=
-        CFBridgingRelease((void*)swapchain_info->native_handle);
-    [view setLayer:ctx->layer];
+    ctx->swapchain_info = *(info->swapchain_info);
+    ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
   }
 
   return NGF_ERROR_OK;
@@ -135,8 +143,16 @@ void ngf_destroy_context(ngf_context *ctx) {
   // TODO: unset current context
   ctx->device = nil;
   ctx->layer = nil;
-  ctx->shared_state.reset(nullptr);
+  ctx->shared_state.reset();
   NGF_FREE(ctx);
 }
 
+ngf_error ngf_resize_context(ngf_context *ctx,
+                             uint32_t new_width,
+                             uint32_t new_height) {
+  ctx->swapchain_info.width = new_width;
+  ctx->swapchain_info.height = new_height;
+  ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+  return NGF_ERROR_OK;
+}
 
