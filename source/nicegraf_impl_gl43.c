@@ -1485,8 +1485,7 @@ ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
 void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer *buf) {
   bool has_first_cmd = buf->first_cmd != NULL;
   bool has_last_cmd = buf->last_cmd != NULL;
-  assert(!(has_first_cmd ^ has_last_cmd) &&
-          buf->last_cmd->next == NULL);
+  assert(!(has_first_cmd ^ has_last_cmd));
   if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
     for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
       _ngf_blkalloc_free(COMMAND_POOL, c);
