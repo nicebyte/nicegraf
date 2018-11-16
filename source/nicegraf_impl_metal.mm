@@ -22,6 +22,7 @@ SOFTWARE.
 
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
+#include <new>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if defined(TARGET_OS_MAC)
@@ -114,10 +115,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
   *result = NGF_ALLOC(ngf_context);
   ngf_context *ctx = *result;
-
   if (ctx == nullptr) {
     return NGF_ERROR_OUTOFMEM;
   }
+  new(ctx) ngf_context();
 
   ctx->device = MTL_DEVICE;
   if (info->shared_context != nullptr) {
@@ -136,9 +137,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
 void ngf_destroy_context(ngf_context *ctx) {
   // TODO: unset current context
-  ctx->device = nil;
-  ctx->layer = nil;
-  ctx->queue = nil;
+  ctx->~ngf_context();
   NGF_FREE(ctx);
 }
 
