@@ -119,12 +119,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     if (@available(macOS 10.13.2, *)) {
       ctx->layer.maximumDrawableCount = swapchain_info->capacity_hint;
     }
-    ctx->layer.displaySyncEnabled =
-        (swapchain_info->present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
-    // presents with transaction?
-    // extended dynamic range
-    // next drawable timeout
-    // color space
+    if (@available(macOS 10.13, *)) {
+      ctx->layer.displaySyncEnabled =
+          (swapchain_info->present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
+    }
     _NGF_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info->native_handle);
     [view setLayer:ctx->layer];
@@ -132,3 +130,13 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   return NGF_ERROR_OK;
 }
+
+void ngf_destroy_context(ngf_context *ctx) {
+  // TODO: unset current context
+  ctx->device = nil;
+  ctx->layer = nil;
+  ctx->shared_state.reset(nullptr);
+  NGF_FREE(ctx);
+}
+
+
