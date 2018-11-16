@@ -125,9 +125,9 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     // extended dynamic range
     // next drawable timeout
     // color space
-    _NGF_VIEW_TYPE *window =
+    _NGF_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info->native_handle);
-    [window setLayer:ctx->layer];
+    [view setLayer:ctx->layer];
   }
 
   return NGF_ERROR_OK;
