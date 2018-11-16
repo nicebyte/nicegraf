@@ -39,8 +39,11 @@ struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
   id<MTLCommandQueue> queue = nil;
+  bool is_current = false;
   ngf_swapchain_info swapchain_info;
 };
+
+NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = nullptr;
 
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
   static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_UNDEFINED] = {
@@ -147,6 +150,17 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
   ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_set_context(ngf_context *ctx) {
+  if(CURRENT_CONTEXT != NULL) {
+    return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
+  } else if (ctx->is_current) {
+    return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
+  }
+  CURRENT_CONTEXT = ctx;
+  ctx->is_current = true;
   return NGF_ERROR_OK;
 }
 
