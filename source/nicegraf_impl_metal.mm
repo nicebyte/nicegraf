@@ -2,8 +2,8 @@
 Copyright © 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the Software), to deal in
-the Software without restriction, including without limitation the rights to
+this software and associated documentation files (the Software), to deal
+in the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
@@ -22,7 +22,6 @@ SOFTWARE.
 
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
-#include <memory>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if defined(TARGET_OS_MAC)
@@ -35,14 +34,10 @@ SOFTWARE.
 
 id<MTLDevice> MTL_DEVICE = nil;
 
-struct _ngf_context_shared_state {
-  id<MTLCommandQueue> queue;
-};
-
 struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
-  std::shared_ptr<_ngf_context_shared_state> shared_state;
+  id<MTLCommandQueue> queue = nil;
   ngf_swapchain_info swapchain_info;
 };
 
@@ -70,7 +65,7 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
     MTLPixelFormatDepth16Unorm,
     MTLPixelFormatDepth24Unorm_Stencil8,
   };
-  return fmt < NGF_IMAGE_FORMAT_UNDEFINED
+  return fmt >= NGF_IMAGE_FORMAT_UNDEFINED
              ? MTLPixelFormatInvalid
              : pixel_format[fmt];
 }
@@ -111,6 +106,7 @@ CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
         CFBridgingRelease((void*)swapchain_info.native_handle);
   [view setLayer:layer];
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
+
   return layer;
 }
 
@@ -125,17 +121,16 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   ctx->device = MTL_DEVICE;
   if (info->shared_context != nullptr) {
-    ctx->shared_state = info->shared_context->shared_state;
+    ctx->queue = info->shared_context->queue;
   } else {
-    ctx->shared_state = std::make_shared<_ngf_context_shared_state>();
-    ctx->shared_state->queue = [ctx->device newCommandQueue];
+    ctx->queue = [ctx->device newCommandQueue];
   }
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
     ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
   }
-
+  
   return NGF_ERROR_OK;
 }
 
@@ -143,7 +138,7 @@ void ngf_destroy_context(ngf_context *ctx) {
   // TODO: unset current context
   ctx->device = nil;
   ctx->layer = nil;
-  ctx->shared_state.reset();
+  ctx->queue = nil;
   NGF_FREE(ctx);
 }
 
