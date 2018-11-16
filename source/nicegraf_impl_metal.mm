@@ -45,8 +45,33 @@ struct ngf_context {
   std::shared_ptr<_ngf_context_shared_state> shared_state;
 };
 
-static MTLPixelFormat get_mtl_pixel_format(ngf_image_format) {
-  return MTLPixelFormatBGRA8Unorm;
+static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
+  static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_UNDEFINED] = {
+    MTLPixelFormatR8Unorm,
+    MTLPixelFormatRG8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatRGBA8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatRGBA8Unorm_sRGB,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatBGRA8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatBGRA8Unorm_sRGB,
+    MTLPixelFormatR32Float,
+    MTLPixelFormatRG32Float,
+    MTLPixelFormatInvalid, // RGB32F, Metal does not support.
+    MTLPixelFormatRGBA32Float,
+    MTLPixelFormatR16Float,
+    MTLPixelFormatRG16Float,
+    MTLPixelFormatInvalid, // RGB16F, Metal does not support.
+    MTLPixelFormatRGBA16Float,
+    MTLPixelFormatDepth32Float,
+    MTLPixelFormatDepth16Unorm,
+    MTLPixelFormatDepth24Unorm_Stencil8,
+  };
+  return fmt < NGF_IMAGE_FORMAT_UNDEFINED
+             ? MTLPixelFormatInvalid
+             : pixel_format[fmt];
 }
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
@@ -67,12 +92,11 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 
 ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
-  ngf_error err = NGF_ERROR_OK;
   *result = NGF_ALLOC(ngf_context);
   ngf_context *ctx = *result;
 
   if (ctx == nullptr) {
-    err = NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUTOFMEM;
   }
 
   ctx->device = MTL_DEVICE;
@@ -106,6 +130,5 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     [window setLayer:ctx->layer];
   }
 
-ngf_create_context_cleanup:
-  return err;
+  return NGF_ERROR_OK;
 }
