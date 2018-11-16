@@ -779,6 +779,29 @@ typedef struct ngf_allocation_callbacks {
 
 /**
  * Nicegraf rendering context.
+ * 
+ * A context represents the internal state of the library that is required for
+ * performing most of the library's functionality. This includes, but is not
+ * limited to: presenting rendered content in a window; creating and managing
+ * resources, such as images, buffers and command buffers; recording and
+ * submitting command buffers.
+ *
+ * Most operations, with the exception of `ngf_init` and context management
+ * functions, require a context to be "current" on the calling thread.
+ *
+ * Invoking `ngf_set_context` will make a context current on the calling thread.
+ * Once a context is made current on a thread, it cannot be migrated to another
+ * thread.
+ *
+ * The results of using resources created within one context, in another context
+ * are undefined, unless the two contexts are explicitly configured to share
+ * data. When contexts are configured as shared, resources created in one can be
+ * used in the other, and vice versa. Notably, command buffers created and
+ * recorded in one context, can be submitted in another, shared context.
+ *
+ * A context mainatins exclusive ownership of its swapchain (if it has one),
+ * and even shared contexts cannot acquire, present or render to images from
+ * that swapchain.
  */
 typedef struct ngf_context ngf_context;
 
