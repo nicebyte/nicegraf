@@ -78,6 +78,11 @@ typedef enum ngf_error {
                                                not recording. */
   NGF_ERROR_CONTEXT_ALREADY_CURRENT,
   NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
+
+  /** Specialization parameters were passed for a pipeline that uses shader
+   stages created from binaries on a backend that does not support
+   specialization constants natively. */
+  NGF_ERROR_CANNOT_SPECIALIZE_SHADER_STAGE_BINARY,
   /*..add new errors above this line */
 } ngf_error ;
 
@@ -941,14 +946,16 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
  * Obtain the shader stage's binary.
  * 
  * @param stage The stage to obtain the binary for.
+ * @param buf_size Maximum amount of bytes to write into `buffer`.
  * @param buffer A pointer to the beginning of the buffer into which the bytes
- *  will be written. The buffer must be appropriately sized. Obtain the
- *  required size with `ngf_get_binary_shader_stage_size`.
+ *  will be written. The buffer must be able to store at least `buf_size`
+ *  bytes.
  * @param format A backend-specific format code will be written here (see
  *   comments for `ngf_shader_stage_info`.
  */
  ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage *stage,
-                                       uint8_t *buffer, uint32_t *format);
+                                       size_t buf_size, void *buffer,
+                                       uint32_t *format);
 /**
  * Detsroys a given shader stage.
  */
