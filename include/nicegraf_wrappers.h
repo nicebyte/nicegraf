@@ -58,6 +58,11 @@ public:
 
   T* get() { return handle_; }
   const T* get() const { return handle_; }
+  T* release() {
+    T *tmp = handle_;
+    handle_ = nullptr;
+    return tmp;
+  }
   operator T*() { return handle_; }
   operator const T*() const { return handle_; }
 
