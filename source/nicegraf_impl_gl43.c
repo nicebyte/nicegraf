@@ -71,7 +71,7 @@ struct ngf_graphics_pipeline {
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
   uint32_t ndescriptors_layouts;
-  const _ngf_native_binding **binding_map;
+  _ngf_native_binding **binding_map;
   GLuint owned_stages[NGF_STAGE_COUNT];
   uint32_t nowned_stages;
 };
@@ -807,7 +807,8 @@ ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage *stage,
                                       void *buffer,
                                       uint32_t *format) {
   GLenum format_enum = GL_NONE;
-  glGetProgramBinary(stage->glprogram, buf_size, NULL, &format_enum, buffer);
+  glGetProgramBinary(stage->glprogram, (GLsizei)buf_size, NULL,
+                     &format_enum, buffer);
   *format =(uint32_t)format_enum;
   return NGF_ERROR_OK;
 }
@@ -1704,7 +1705,9 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   const ngf_graphics_pipeline *bound_pipeline = &(CURRENT_CONTEXT->cached_state);
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
-    for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next; cmd != NULL; cmd = cmd->next) {
+    for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next;
+         cmd != NULL;
+         cmd = cmd->next) {
       switch (cmd->type) {
       case _NGF_CMD_BIND_PIPELINE: {
         const ngf_graphics_pipeline *cached_state = &CURRENT_CONTEXT->cached_state;
@@ -1713,16 +1716,18 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         if (cached_state->id != pipeline->id || force_pipeline_update) {
           CURRENT_CONTEXT->cached_state.id = pipeline->id;
           glBindProgramPipeline(pipeline->program_pipeline);
-          if (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
-              force_pipeline_update) {
+          if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
+              (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
+               force_pipeline_update)) {
             glViewport(pipeline->viewport.x,
                        pipeline->viewport.y,
                        pipeline->viewport.width,
                        pipeline->viewport.height);
           }
 
-          if (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
-              force_pipeline_update) {
+          if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
+               (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
+                force_pipeline_update)) {
             glScissor(pipeline->scissor.x,
                       pipeline->scissor.y,
                       pipeline->scissor.width,
