@@ -588,6 +588,32 @@ void ngf_destroy_context(ngf_context *ctx) {
   }
 }
 
+ngf_error _ngf_check_link_status(GLuint program, const char *debug_name) {
+  GLint link_status;
+  glGetProgramiv(program, GL_LINK_STATUS, &link_status);
+  if (link_status != GL_TRUE) {
+    if (NGF_DEBUG_CALLBACK) {
+      // See previous comment about debug callback.
+      GLint info_log_length = 0;
+      glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
+      char *info_log = malloc(info_log_length + 1);
+      info_log[info_log_length] = '\0';
+      glGetProgramInfoLog(program, info_log_length, &info_log_length,
+                          info_log);
+      if (debug_name) {
+        char msg[100];
+        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error linking %s",
+                 debug_name);
+        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
+      }
+      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
+      free(info_log);
+    }
+    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+  }
+  return NGF_ERROR_OK;
+}
+
 ngf_error _ngf_compile_shader(const char *source, GLint source_len,
                               const char *debug_name,
                               GLenum stage,
@@ -704,28 +730,9 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   glProgramParameteri(*result, GL_PROGRAM_SEPARABLE, GL_TRUE);
   glAttachShader(*result, shader);
   glLinkProgram(*result);
-  GLint link_status;
-  glGetProgramiv(*result, GL_LINK_STATUS, &link_status);
   glDetachShader(*result, shader);
-  if (link_status != GL_TRUE) {
-    if (NGF_DEBUG_CALLBACK) {
-      // See previous comment about debug callback.
-      GLint info_log_length = 0;
-      glGetProgramiv(*result, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc(info_log_length + 1);
-      info_log[info_log_length] = '\0';
-      glGetProgramInfoLog(*result, info_log_length, &info_log_length,
-                          info_log);
-      if (debug_name) {
-        char msg[100];
-        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error linking %s",
-                 debug_name);
-        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
-      }
-      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
-      free(info_log);
-    }
-    err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+  err = _ngf_check_link_status(*result, debug_name);
+  if (err != NGF_ERROR_OK) {
     goto _ngf_compile_shader_cleanup;
   }
 
@@ -756,19 +763,29 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   }
   stage->gltype = gl_shader_stage(info->type);
   stage->glstagebit = gl_shader_stage_bit(info->type);
-  stage->source_code_size = (GLint)info->content_length;
-  err = _ngf_compile_shader(info->content, stage->source_code_size,
-                            info->debug_name, stage->gltype, NULL,
-                            &stage->glprogram);
+  if (!info->is_binary) { // Compile from source.
+    stage->source_code_size = (GLint)info->content_length;
+    err = _ngf_compile_shader(info->content, stage->source_code_size,
+                              info->debug_name, stage->gltype, NULL,
+                              &stage->glprogram);
 
-  // Save off the source code in case we need to recompile for pipelines
-  // doing specialization.
-  stage->source_code = NGF_ALLOCN(char, stage->source_code_size);
-  if (stage->source_code == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_shader_stage_cleanup;
+    // Save off the source code in case we need to recompile for pipelines
+    // doing specialization.
+    stage->source_code = NGF_ALLOCN(char, stage->source_code_size);
+    if (stage->source_code == NULL) {
+      err = NGF_ERROR_OUTOFMEM;
+      goto ngf_create_shader_stage_cleanup;
+    }
+    strncpy(stage->source_code, info->content, info->content_length);
+  } else { // Set binary.
+    stage->glprogram = glCreateProgram();
+    glProgramBinary(stage->glprogram, info->binary_format,
+                    info->content, info->content_length);
+    err = _ngf_check_link_status(stage->glprogram, info->debug_name);
+    if (err != NGF_ERROR_OK) { goto ngf_create_shader_stage_cleanup; }
+    stage->source_code = NULL;
+    stage->source_code_size = 0u;
   }
-  strncpy(stage->source_code, info->content, info->content_length);
 
 ngf_create_shader_stage_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -776,6 +793,25 @@ ngf_create_shader_stage_cleanup:
   }
   return err;
 }
+
+ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
+                                           size_t *size) {
+  GLint result = 0;
+  glGetProgramiv(stage->glprogram, GL_PROGRAM_BINARY_LENGTH, &result);
+  *size = (size_t)result;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage *stage,
+                                      size_t buf_size,
+                                      void *buffer,
+                                      uint32_t *format) {
+  GLenum format_enum = GL_NONE;
+  glGetProgramBinary(stage->glprogram, buf_size, NULL, &format_enum, buffer);
+  *format =(uint32_t)format_enum;
+  return NGF_ERROR_OK;
+}
+
 
 void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   if (stage != NULL) {
@@ -1009,19 +1045,23 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                          info->shader_stages[s]->glprogram);
     }
   } else {
-    for (size_t s = 0; s < info->nshader_stages; ++s) {
-      err =
-          _ngf_compile_shader(info->shader_stages[s]->source_code,
-                              info->shader_stages[s]->source_code_size,
-                              "",
-                              info->shader_stages[s]->gltype,
-                              info->spec_info,
-                              &pipeline->
-                                  owned_stages[pipeline->nowned_stages++]);
+    for (size_t s = 0; err == NGF_ERROR_OK && s < info->nshader_stages; ++s) {
+      if (info->shader_stages[s]->source_code != NULL) {
+        err =
+            _ngf_compile_shader(info->shader_stages[s]->source_code,
+                                info->shader_stages[s]->source_code_size,
+                                "",
+                                info->shader_stages[s]->gltype,
+                                info->spec_info,
+                                &pipeline->
+                                    owned_stages[pipeline->nowned_stages++]);
 
-      glUseProgramStages(pipeline->program_pipeline,
-                         info->shader_stages[s]->glstagebit,
-                         pipeline->owned_stages[s]);
+        glUseProgramStages(pipeline->program_pipeline,
+                           info->shader_stages[s]->glstagebit,
+                           pipeline->owned_stages[s]);
+      } else {
+        err = NGF_ERROR_CANNOT_SPECIALIZE_SHADER_STAGE_BINARY;
+      }
     }   
   }
 
