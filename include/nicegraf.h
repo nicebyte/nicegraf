@@ -149,10 +149,48 @@ typedef struct ngf_shader_stage_info {
   uint32_t content_length; /**< Number of bytes in the content buffer. */
   const char *debug_name; /**< Optional name, will appear in debug logs,
                                may be NULL.*/
+  bool is_binary; /**< Indicates whether `content` is the source code, or a
+                       binary blob. Backends that only support binaries (e.g.
+                       Vulkan) ignore this flag. */
+
+  /** 
+   * Indicates the binary format.The value is backend-specific:
+   *   - On Vulkan, it should always be 0;
+   *   - On Metal, 0 indicates a macOS binary, 1 indicates an iOS binary;
+   *   - On OpenGL, it should be whatever `ngf_get_binary_shader_stage`
+   *     returned when reading back the binary.
+   */
+  uint32_t binary_format;
 } ngf_shader_stage_info;
 
 /**
- * Compiled code for a shader stage.
+ * A programmable stage of the rendering pipeline.
+ *
+ * Programmable stages are specified using backend-specific blobs of
+ * data. In general, there are two kinds of blobs - text and binary.
+ * Backends may support either or both.
+ *
+ * Text blobs require a compilation step which may produce compile errors.
+ * The detailed information abou compile errors is reported via the debug
+ * callback mechanism.
+ * 
+ * On some back-ends, the full compile/link step be repeated during pipeline
+ * creation (if using constant specialization). This does not apply to
+ * back-ends that support specialization natively with no extensions (i.e.
+ * Vulkan and Metal).
+ *
+ * Binary blobs have a notion of format, which is backend-specific. For
+ * example, Metal binaries may come in iOS or macOS flavors.
+ *
+ * Some backends allow you to obtain the binary representation of the shader
+ * stage even if it was specified using a text blob. If this binary is cached,
+ * compilation can be skipped during the next run. Keep in mind that OpenGL
+ * binaries are not transferable across machines.
+ *
+ * Note that on back-ends that do not support constant specialization natively
+ * (i.e. OpenGL), it is impossible to specialize constants for a shader stage
+ * that was created from a binary - it only works if the source code is
+ * available.
  */
 typedef struct ngf_shader_stage ngf_shader_stage;
 
@@ -332,11 +370,13 @@ typedef struct ngf_vertex_attrib_desc {
  * Specifies information about the pipeline's vertex input.
  */
 typedef struct ngf_vertex_input_info {
-  /**Pointer to array of structures describing the vertex buffer binding used.*/
+  /**
+   * Pointer to array of structures describing the vertex buffer binding
+   * used.
+   */
   const ngf_vertex_buf_binding_desc *vert_buf_bindings; 
-  uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings
-                                         used.*/
-  const ngf_vertex_attrib_desc *attribs; /**< Ptr to array of attrib descriptions.*/
+  uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings used.*/
+  const ngf_vertex_attrib_desc *attribs; /**< Ptr to attrib descriptions.*/
   uint32_t nattribs; /**< Number of attribute descriptions.*/
 } ngf_vertex_input_info;
 
@@ -370,10 +410,10 @@ typedef enum ngf_image_type {
  * color values output by the fragment stage are interpreted as being in linear
  * color space, and an appropriate transfer function is applied to them to
  * covert them to the sRGB colorspace before writing them to the target.
- * Using an sRGB format in a sampled image means that all color values stored in
- * the image are interpreted to be in the sRGB color space, and all read
- * operations automatically apply a transfer function to convert the values from
- * sRGB to linear color space.
+ * Using an sRGB format in a sampled image means that all color values stored
+ * in the image are interpreted to be in the sRGB color space, and all read
+ * operations automatically apply a transfer function to convert the values
+ * from sRGB to linear color space.
  */
 typedef enum ngf_image_format {
   NGF_IMAGE_FORMAT_R8 = 0,
@@ -409,7 +449,7 @@ typedef struct ngf_swapchain_info {
                               NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
                               be created. */
   int nsamples; /**< Number of samples per pixel (0 for non-multisampled) */
-  uint32_t capacity_hint; /**< Number of images in swapchain (may get ignored) */
+  uint32_t capacity_hint; /**< Number of images in swapchain (may be ignored)*/
   uint32_t width; /**< Width of swapchain images in pixels. */
   uint32_t height;/**< Height of swapchain images in pixels. */
   uintptr_t native_handle;/**< HWND, ANativeWindow, NSWindow, etc. */
@@ -878,22 +918,37 @@ void ngf_begin_debug_group(const char *title);
 void ngf_end_debug_group();
 
 /**
- * Creates a shader stage from its description.
- * For certain back-ends that means compiling shaders from source.
- * On back-ends that compile shaders from source, the debug message callback
- * will be invoked on a compile or link error, if the callback had previously
- * been set.
- * On some back-ends, the full compile/link step might be deferred until later,
- * meaning any errors will be reported via callback when attempting to actually
- * use the shader stage.
- * @param stages A `ngf_shader_stage_info`s storing information (code,type) for
- *  the stage.
+ * Create a shader stage from its description.
+ *
+ * @param stages A `ngf_shader_stage_info` storing the content and other data
+ *  for the stage.
  * @param result Newly created stage will be stored here.
  * @return 
  */
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   ngf_shader_stage **result);
 
+/**
+ * Obtain the size (in bytes) of the shader stage's corresponding binary.
+ * 
+ * @param stage The stage to obtain the size of.
+ * @param size Result will be written here.
+ */
+ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
+                                           size_t *size);
+
+/**
+ * Obtain the shader stage's binary.
+ * 
+ * @param stage The stage to obtain the binary for.
+ * @param buffer A pointer to the beginning of the buffer into which the bytes
+ *  will be written. The buffer must be appropriately sized. Obtain the
+ *  required size with `ngf_get_binary_shader_stage_size`.
+ * @param format A backend-specific format code will be written here (see
+ *   comments for `ngf_shader_stage_info`.
+ */
+ ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage *stage,
+                                       uint8_t *buffer, uint32_t *format);
 /**
  * Detsroys a given shader stage.
  */
