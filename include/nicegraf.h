@@ -83,6 +83,9 @@ typedef enum ngf_error {
    stages created from binaries on a backend that does not support
    specialization constants natively. */
   NGF_ERROR_CANNOT_SPECIALIZE_SHADER_STAGE_BINARY,
+
+  /** The specified binary format is not supported by the system.*/
+  NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT,
   /*..add new errors above this line */
 } ngf_error ;
 
@@ -176,7 +179,7 @@ typedef struct ngf_shader_stage_info {
  * Backends may support either or both.
  *
  * Text blobs require a compilation step which may produce compile errors.
- * The detailed information abou compile errors is reported via the debug
+ * The detailed information about compile errors is reported via the debug
  * callback mechanism.
  * 
  * On some back-ends, the full compile/link step be repeated during pipeline

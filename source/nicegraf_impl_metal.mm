@@ -45,6 +45,11 @@ struct ngf_context {
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = nullptr;
 
+struct ngf_shader_stage {
+  id<MTLLibrary> func_lib = nil;
+  ngf_stage_type type;
+};
+
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
   static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_UNDEFINED] = {
     MTLPixelFormatR8Unorm,
@@ -116,6 +121,8 @@ CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
 
 ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
+  assert(info);
+  assert(result);
   *result = NGF_ALLOC(ngf_context);
   ngf_context *ctx = *result;
   if (ctx == nullptr) {
@@ -140,6 +147,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
 void ngf_destroy_context(ngf_context *ctx) {
   // TODO: unset current context
+  assert(ctx);
   ctx->~ngf_context();
   NGF_FREE(ctx);
 }
@@ -147,6 +155,7 @@ void ngf_destroy_context(ngf_context *ctx) {
 ngf_error ngf_resize_context(ngf_context *ctx,
                              uint32_t new_width,
                              uint32_t new_height) {
+  assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
   ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
@@ -164,3 +173,67 @@ ngf_error ngf_set_context(ngf_context *ctx) {
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
+                                  ngf_shader_stage **result) {
+  assert(info);
+  assert(result);
+  
+  *result = NGF_ALLOC(ngf_shader_stage);
+  ngf_shader_stage *stage = *result;
+  if (stage == nullptr) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  new(stage) ngf_shader_stage();
+  
+  stage->type = info->type;
+
+  // Create a MTLLibrary for this stage.
+  if (!info->is_binary) { // Either compile from source...
+    NSString *source = [NSString initWithBytes:info->content
+                                 length:info->content_length
+                                 encoding:NSUTF8StringEncoding];
+    MTLCompileOptions *opts = [MTLCompileOptions new];
+    NSError *err = nil;
+    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithSource:source
+                                  options:opts
+                                  error:&err];
+    if (!stage->func_lib) {
+      // TODO: call debug callback with error message here.
+      ngf_destroy_shader_stage(stage);
+      return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;    
+    }
+  } else { // ...or set binary.
+#if defined(TARGET_OS_MAC)
+    uint32_t required_format = 0u;
+#else
+    uint32_t required_format = 1u;
+#endif
+    if (info->binary_format != required_format) {
+      ngf_destroy_shader_stage(stage);
+      return NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT;
+    }
+    dispatch_data_t libdata = dispatch_data_create(info->content,
+                                                   info->content_length,
+                                                   dispatch_get_main_queue(),
+                                                   ^{});
+    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithData:libdata];
+    if (!stage->func_lib) {
+      ngf_destroy_shader_stage(stage);
+      return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    }
+  }
+
+  // Set debug name.
+  if (info->debug_name != nullptr) {
+    stage->func_lib.label = [NSString initWithUTF8String:info->debug_name];
+  }
+
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
+  if (stage != nullptr) {
+    stage->~ngf_shader_stage();
+    NGF_FREE(stage);
+  }
+}
