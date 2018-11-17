@@ -2,7 +2,7 @@
 Copyright © 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the Software), to deal
+this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
@@ -11,7 +11,7 @@ subject to the following conditions:
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -21,6 +21,7 @@ SOFTWARE.
 */
 
 #include "nicegraf.h"
+#include "nicegraf_wrappers.h"
 #include "nicegraf_internal.h"
 #include <new>
 #import <Metal/Metal.h>
@@ -79,6 +80,26 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
              : pixel_format[fmt];
 }
 
+template <class NgfObjType, void(*Dtor)(NgfObjType*)>
+class _ngf_object_nursery {
+public:
+  explicit _ngf_object_nursery(NgfObjType *memory) : ptr_(memory) {
+    new(memory) NgfObjType();
+  }
+  ~_ngf_object_nursery() { if(ptr_ != nullptr) { Dtor(ptr_); } }
+  NgfObjType* operator->() { return ptr_; }
+  NgfObjType* release() {
+    NgfObjType *tmp = ptr_;
+    ptr_ = nullptr;
+    return tmp;
+  }
+  operator bool() { return ptr_ == nullptr; }
+private:
+  NgfObjType *ptr_;
+};
+
+#define _NGF_NURSERY(type) _ngf_object_nursery<ngf_##type, ngf_destroy_##type>
+
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   id<NSObject> dev_observer = nil;
   const NSArray<id<MTLDevice>> *devices =
@@ -123,12 +144,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
   assert(info);
   assert(result);
-  *result = NGF_ALLOC(ngf_context);
-  ngf_context *ctx = *result;
-  if (ctx == nullptr) {
+  _NGF_NURSERY(context) ctx(NGF_ALLOC(ngf_context));
+  if (!ctx) {
     return NGF_ERROR_OUTOFMEM;
   }
-  new(ctx) ngf_context();
 
   ctx->device = MTL_DEVICE;
   if (info->shared_context != nullptr) {
@@ -141,7 +160,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     ctx->swapchain_info = *(info->swapchain_info);
     ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
   }
-  
+ 
+  *result = ctx.release(); 
   return NGF_ERROR_OK;
 }
 
@@ -177,13 +197,11 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   ngf_shader_stage **result) {
   assert(info);
   assert(result);
-  
-  *result = NGF_ALLOC(ngf_shader_stage);
-  ngf_shader_stage *stage = *result;
-  if (stage == nullptr) {
+ 
+  _NGF_NURSERY(shader_stage) stage(NGF_ALLOC(ngf_shader_stage)); 
+  if (!stage) {
     return NGF_ERROR_OUTOFMEM;
   }
-  new(stage) ngf_shader_stage();
   
   stage->type = info->type;
 
@@ -199,7 +217,6 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   error:&err];
     if (!stage->func_lib) {
       // TODO: call debug callback with error message here.
-      ngf_destroy_shader_stage(stage);
       return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;    
     }
   } else { // ...or set binary.
@@ -209,7 +226,6 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     uint32_t required_format = 1u;
 #endif
     if (info->binary_format != required_format) {
-      ngf_destroy_shader_stage(stage);
       return NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT;
     }
     dispatch_data_t libdata = dispatch_data_create(info->content,
@@ -218,7 +234,6 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                                    ^{});
     stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithData:libdata];
     if (!stage->func_lib) {
-      ngf_destroy_shader_stage(stage);
       return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
     }
   }
@@ -228,6 +243,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     stage->func_lib.label = [NSString initWithUTF8String:info->debug_name];
   }
 
+  *result = stage.release();
   return NGF_ERROR_OK;
 }
 
