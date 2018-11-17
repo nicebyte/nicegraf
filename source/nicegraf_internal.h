@@ -2,7 +2,7 @@
 Copyright © 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
+this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
@@ -41,8 +41,9 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 #if defined(__APPLE__)
 #define _ngf_cur_thread_id() pthread_mach_thread_np(pthread_self())
 #else
-#include <sys/types.h>
-#define _ngf_cur_thread_id() gettid()
+#include <unistd.h>
+#include <sys/syscall.h>
+#define _ngf_cur_thread_id() syscall(SYS_gettid)
 #endif
 #endif
 
