@@ -591,7 +591,7 @@ typedef struct ngf_descriptor_set ngf_descriptor_set;
  */
 typedef struct {
   uint32_t ndescriptors_layouts;
-  const ngf_descriptor_set_layout **descriptors_layouts;
+  ngf_descriptor_set_layout **descriptors_layouts;
 } ngf_pipeline_layout_info;
 
 /**
