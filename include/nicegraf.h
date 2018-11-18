@@ -86,6 +86,9 @@ typedef enum ngf_error {
 
   /** The specified binary format is not supported by the system.*/
   NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT,
+
+  /** Current backend does not support reading back shader stage binaries.*/
+  NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY,
   /*..add new errors above this line */
 } ngf_error ;
 
