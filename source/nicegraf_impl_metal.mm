@@ -211,7 +211,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 
   // Create a MTLLibrary for this stage.
   if (!info->is_binary) { // Either compile from source...
-    NSString *source = [[NSString new] initWithBytes:info->content
+    NSString *source = [[NSString alloc] initWithBytes:info->content
                                  length:info->content_length
                                  encoding:NSUTF8StringEncoding];
     MTLCompileOptions *opts = [MTLCompileOptions new];
@@ -246,7 +246,8 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 
   // Set debug name.
   if (info->debug_name != nullptr) {
-    stage->func_lib.label = [[NSString new] initWithUTF8String:info->debug_name];
+    stage->func_lib.label = [[NSString alloc]
+                               initWithUTF8String:info->debug_name];
   }
 
   *result = stage.release();
