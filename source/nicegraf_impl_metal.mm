@@ -51,6 +51,10 @@ struct ngf_shader_stage {
   ngf_stage_type type;
 };
 
+struct ngf_graphics_pipeline {
+  id<MTLRenderPipelineState> pipeline = nil;
+};
+
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
   static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_UNDEFINED] = {
     MTLPixelFormatR8Unorm,
@@ -207,7 +211,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 
   // Create a MTLLibrary for this stage.
   if (!info->is_binary) { // Either compile from source...
-    NSString *source = [NSString initWithBytes:info->content
+    NSString *source = [[NSString new] initWithBytes:info->content
                                  length:info->content_length
                                  encoding:NSUTF8StringEncoding];
     MTLCompileOptions *opts = [MTLCompileOptions new];
@@ -232,7 +236,9 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                                    info->content_length,
                                                    dispatch_get_main_queue(),
                                                    ^{});
-    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithData:libdata];
+    NSError *err;
+    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithData:libdata
+                                               error:&err];
     if (!stage->func_lib) {
       return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
     }
@@ -240,7 +246,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 
   // Set debug name.
   if (info->debug_name != nullptr) {
-    stage->func_lib.label = [NSString initWithUTF8String:info->debug_name];
+    stage->func_lib.label = [[NSString new] initWithUTF8String:info->debug_name];
   }
 
   *result = stage.release();
@@ -253,3 +259,27 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
     NGF_FREE(stage);
   }
 }
+
+ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage_info *info,
+                                      ngf_shader_stage **result) {
+  return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
+}
+
+ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
+                                           size_t *size) {
+  return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
+}
+
+ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
+                                       ngf_graphics_pipeline **result) {
+  assert(info);
+  assert(result);
+  _NGF_NURSERY(graphics_pipeline) pipeline(NGF_ALLOC(ngf_graphics_pipeline));
+  if (!pipeline) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  *result = pipeline.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {}
