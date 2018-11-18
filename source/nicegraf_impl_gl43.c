@@ -2085,15 +2085,27 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                 cmd->draw.nelements,
                                 cmd->draw.ninstances);
         } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+          size_t elem_size =
+              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                          : 4;
           glDrawElements(bound_pipeline->primitive_type,
                          cmd->draw.nelements,
                          gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                         (void*)(uintptr_t)cmd->draw.first_element);
+                         (void*)(uintptr_t)(cmd->draw.first_element *
+                                            elem_size));
         } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+          size_t elem_size =
+              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                          : 4;
           glDrawElementsInstanced(bound_pipeline->primitive_type,
                                   cmd->draw.nelements,
                                   gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                                  (void*)(uintptr_t)cmd->draw.first_element,
+                                  (void*)((uintptr_t)(cmd->draw.first_element *
+                                                      elem_size)),  
                                   cmd->draw.ninstances);
         }
         break;
