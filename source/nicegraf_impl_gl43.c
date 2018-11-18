@@ -1884,6 +1884,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         }
         CURRENT_CONTEXT->force_pipeline_update = false;
         bound_pipeline = pipeline;
+        glEnable(GL_SCISSOR_TEST);
         break; }
 
       case _NGF_CMD_VIEWPORT:
@@ -2054,6 +2055,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
         uint32_t c = 0u;
         uint32_t color_clear = 0u;
+        glDisable(GL_SCISSOR_TEST);
         for (uint32_t l = 0u; l < pass->nloadops; ++l) {
           if (pass->loadops[l] == NGF_LOAD_OP_CLEAR) {
             const ngf_clear_info *clear = &pass->clears[c++];
@@ -2072,6 +2074,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             }
           }
         }
+        glEnable(GL_SCISSOR_TEST);
         break;
       }
 
