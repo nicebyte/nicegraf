@@ -97,7 +97,7 @@ public:
     ptr_ = nullptr;
     return tmp;
   }
-  operator bool() { return ptr_ == nullptr; }
+  operator bool() { return ptr_ != nullptr; }
 private:
   NgfObjType *ptr_;
 };
