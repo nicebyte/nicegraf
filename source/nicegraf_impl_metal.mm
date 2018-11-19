@@ -24,6 +24,7 @@ SOFTWARE.
 #include "nicegraf_wrappers.h"
 #include "nicegraf_internal.h"
 #include <new>
+#include <memory>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if defined(TARGET_OS_MAC)
@@ -36,12 +37,24 @@ SOFTWARE.
 
 id<MTLDevice> MTL_DEVICE = nil;
 
+typedef struct _ngf_attachment {
+  id<MTLTexture> texture = nil;
+  ngf_image_ref subresource;
+} _ngf_attachment;
+
+struct ngf_render_target {
+  std::unique_ptr<_ngf_attachment[]> color_attachments;
+  std::unique_ptr<_ngf_attachment> depth_attachment;
+  std::unique_ptr<_ngf_attachment> stencil_attachment;
+};
+
 struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
   id<MTLCommandQueue> queue = nil;
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
+  ngf_render_target default_rt;
 };
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = nullptr;
@@ -125,6 +138,26 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
 }
 
+ngf_error ngf_begin_frame(ngf_context *ctx) {
+  assert(ctx && ctx == CURRENT_CONTEXT);
+  id<CAMetalDrawable> drawable = [ctx->layer nextDrawable];
+  if (!drawable) {
+    return NGF_ERROR_NO_FRAME;
+  }
+  ctx->default_rt.color_attachments[0].texture = drawable.texture;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_default_render_target(ngf_render_target **result) {
+  assert(result);
+  if (CURRENT_CONTEXT->layer) {
+    *result = &CURRENT_CONTEXT->default_rt;
+    return NGF_ERROR_OK;
+  } else {
+    return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;;
+  }
+}
+
 CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
                                    id<MTLDevice> device) {
   CAMetalLayer *layer = [CAMetalLayer layer];
@@ -168,6 +201,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
     ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+    ctx->default_rt.color_attachments.reset(new _ngf_attachment[1]);
   }
  
   *result = ctx.release(); 
@@ -332,11 +366,6 @@ void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
 }
 
-ngf_error ngf_default_render_target(ngf_render_target **result) {
-  *result = nullptr;
-  return NGF_ERROR_OK;
-}
-
 ngf_error ngf_populate_image(ngf_image *image,
                              uint32_t level,
                              ngf_offset3d offset,
@@ -352,6 +381,5 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_begin_frame(ngf_context*) { return NGF_ERROR_OK; }
 ngf_error ngf_end_frame(ngf_context*) { return NGF_ERROR_OK; }
 
