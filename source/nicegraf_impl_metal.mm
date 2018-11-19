@@ -276,16 +276,42 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
   return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
 }
 
-ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline **result) {
-  assert(info);
-  assert(result);
-  _NGF_NURSERY(graphics_pipeline) pipeline(NGF_ALLOC(ngf_graphics_pipeline));
-  if (!pipeline) {
-    return NGF_ERROR_OUTOFMEM;
-  }
-  *result = pipeline.release();
+#define PLACEHOLDER_CREATE_DESTROY(name) \
+ngf_error ngf_create_##name(const ngf_##name##_info*, \
+                              ngf_##name **result) { \
+  *result = nullptr; return NGF_ERROR_OK; } \
+void ngf_destroy_##name(ngf_##name *) {}
+
+PLACEHOLDER_CREATE_DESTROY(graphics_pipeline)
+PLACEHOLDER_CREATE_DESTROY(buffer)
+PLACEHOLDER_CREATE_DESTROY(image)
+PLACEHOLDER_CREATE_DESTROY(sampler)
+PLACEHOLDER_CREATE_DESTROY(render_target)
+PLACEHOLDER_CREATE_DESTROY(pass)
+PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
+
+ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout*,
+                                    ngf_descriptor_set **result) {
+  *result = nullptr;
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {}
+void ngf_destroy_descriptor_set(ngf_descriptor_set*) {}
+
+#define PLACEHOLDER_CMD(name, ...) \
+void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
+
+PLACEHOLDER_CMD(bind_pipeline, const ngf_graphics_pipeline*)
+PLACEHOLDER_CMD(viewport, const ngf_irect2d*)
+PLACEHOLDER_CMD(scissor, const ngf_irect2d*)
+PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
+PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
+PLACEHOLDER_CMD(stencil_write_make, uint32_t uint32_t)
+PLACEHOLDER_CMD(line_width, float)
+PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
+PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
+PLACEHOLDER_CMD(bind_vertex_buffer, const ngf_buffer*, uint32_t, uint32_t)
+PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
+PLACEHOLDER_CMD(begin_pass, const ngf_pass*, const ngf_render_target*)
+void ngf_cmd_end_pass(ngf_cmd_buffer*){}
+PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
