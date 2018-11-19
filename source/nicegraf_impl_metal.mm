@@ -315,3 +315,41 @@ PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
 PLACEHOLDER_CMD(begin_pass, const ngf_pass*, const ngf_render_target*)
 void ngf_cmd_end_pass(ngf_cmd_buffer*){}
 PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
+
+ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
+                                      const uint32_t nwrites,
+                                      ngf_descriptor_set *set) {
+  return NGF_ERROR_OK;
+}
+
+void ngf_debug_message_callback(void *userdata,
+                                void (*callback)(const char*, const void*)) {
+}
+
+ngf_error ngf_default_render_target(ngf_render_target **result) {
+  *result = nullptr;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_populate_image(ngf_image *image,
+                             uint32_t level,
+                             ngf_offset3d offset,
+                             ngf_extent3d dimensions,
+                             const void *data) {
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_populate_buffer(ngf_buffer *buf,
+                              size_t offset,
+                              size_t size,
+                              const void *data) {
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_end_frame(ngf_context*) { return NGF_ERROR_OK; }
+
+
+
+
+
+
