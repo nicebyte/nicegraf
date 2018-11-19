@@ -1522,7 +1522,7 @@ void ngf_destroy_pass(ngf_pass *pass) {
   }
 }
 
-ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result) {
+ngf_error ngf_create_cmd_buffer(ngf_cmd_buffer **result) {
   assert(result);
   if (COMMAND_POOL == NULL) {
     COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_emulated_cmd), 65000u);
@@ -1550,14 +1550,14 @@ void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer *buf) {
   buf->first_cmd = buf->last_cmd = NULL;
 }
 
-void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buf) {
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buf) {
   if (buf != NULL) {
     _ngf_cmd_buffer_free_cmds(buf);
     NGF_FREE(buf);
   }
 }
 
-ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf) {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *buf) {
   assert(buf);
   ngf_error err = NGF_ERROR_OK;
   if (buf->recording) {
@@ -1577,7 +1577,7 @@ ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf) {
   return err;
 }
 
-ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf) {
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *buf) {
   assert(buf);
   ngf_error err = NGF_ERROR_OK;
   if (!buf->recording) {
@@ -1715,7 +1715,7 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   _NGF_APPENDCMD(buf, cmd);
 }
 
-ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
+ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
   const ngf_graphics_pipeline *bound_pipeline = &(CURRENT_CONTEXT->cached_state);
   for (uint32_t b = 0u; b < nbuffers; ++b) {
