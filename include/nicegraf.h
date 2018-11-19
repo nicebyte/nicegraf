@@ -89,6 +89,12 @@ typedef enum ngf_error {
 
   /** Current backend does not support reading back shader stage binaries.*/
   NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY,
+
+  /** Current context has no default render target*/
+  NGF_ERROR_NO_DEFAULT_RENDER_TARGET,
+
+  /** Failed to acquire frame from the swapchain.*/
+  NGF_ERROR_NO_FRAME,
   /*..add new errors above this line */
 } ngf_error ;
 
