@@ -23,47 +23,66 @@ SOFTWARE.
 cmake_minimum_required(VERSION 3.0.2)
 project(nicegraf)
 
-#TODO: separate targets for different backend
-set(NGF_PLATFORM "GL")
-set(NICEGRAF_SOURCES
+set(EGL_NO_GLEW ON)
+
+set(NICEGRAF_PUBLIC_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/include)
+set(NICEGRAF_PRIVATE_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/source)
+
+if(WIN32)
+  set (COMMON_COMPILE_OPTS "/W4" "/WX")
+else()
+  set(COMMON_COMPILE_OPTS "-Wall" "-Wconversion")
+endif()
+set(NICEGRAF_COMPILE_OPTS ${COMMON_COMPILE_OPTS})
+
+add_library(nicegraf_internal
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c)
 
-set(EGL_NO_GLEW ON)
+target_include_directories(nicegraf_internal PRIVATE
+    ${NICEGRAF_PUBLIC_INCLUDES}
+    ${NICEGRAF_PRIVATE_INCLUDES})
 
-if(WIN32)
-set (NICEGRAF_COMPILE_OPTS "/W4" "/WX")
-endif()
+set(NICEGRAF_DEPS nicegraf_internal)
 
-if("${NGF_PLATFORM}" STREQUAL "GL")
+
+if (APPLE)
   set(NICEGRAF_SOURCES
     ${NICEGRAF_SOURCES}
-    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
-    ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/EGL/EGL)
-  set(NICEGRAF_DEPS
-      ${NICEGRAF_DEPS}
-      egl)
-elseif("${NGF_PLATFORM}" STREQUAL "VK")
-  find_package(Vulkan REQUIRED)
-  get_property(VK_INCLUDE_PATH TARGET Vulkan::Vulkan PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-  add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
-  set(NICEGRAF_SOURCES
-    ${NICEGRAF_SOURCES}
-    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/volk)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
-  set(NICEGRAF_DEPS
-      ${NICEGRAF_DEPS}
-      volk
-      vma)
-  set(NICEGRAF_PRIVATE_INCLUDES ${VK_INCLUDE_PATH})
+    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm)
+  set(NICEGRAF_COMPILE_OPTS ${NICEGRAF_COMPILE_OPTS} "--std=c++14")
+else()
+  set(NGF_PLATFORM "GL")
+  if("${NGF_PLATFORM}" STREQUAL "GL")
+    set(NICEGRAF_SOURCES
+      ${NICEGRAF_SOURCES}
+      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
+      ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/EGL/EGL)
+    set(NICEGRAF_DEPS
+        ${NICEGRAF_DEPS}
+        egl)
+  elseif("${NGF_PLATFORM}" STREQUAL "VK")
+    find_package(Vulkan REQUIRED)
+    get_property(VK_INCLUDE_PATH TARGET Vulkan::Vulkan PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+    add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
+    set(NICEGRAF_SOURCES
+      ${NICEGRAF_SOURCES}
+      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/volk)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
+    set(NICEGRAF_DEPS
+        ${NICEGRAF_DEPS}
+        volk
+        vma)
+    set(NICEGRAF_PRIVATE_INCLUDES 
+        ${NICEGRAF_PRIVATE_INCLUDES} ${VK_INCLUDE_PATH})
+  endif()
 endif()
 
 set(NICEGRAF_UTIL_SOURCES
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
-    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_util.c)
 
 add_library (nicegraf ${NICEGRAF_SOURCES})
@@ -76,8 +95,8 @@ target_link_libraries(nicegraf ${NICEGRAF_DEPS})
 target_compile_options(nicegraf PRIVATE ${NICEGRAF_COMPILE_OPTS})
 
 add_library (nicegraf_util ${NICEGRAF_UTIL_SOURCES})
-target_compile_options(nicegraf_util PRIVATE ${NICEGRAF_COMPILE_OPTS})
+target_compile_options(nicegraf_util PRIVATE ${COMMON_COMPILE_OPTS})
 target_include_directories(nicegraf_util PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/include)
-target_link_libraries(nicegraf_util nicegraf)
+target_link_libraries(nicegraf_util nicegraf nicegraf_internal)
 
