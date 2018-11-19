@@ -105,6 +105,7 @@ private:
 #define _NGF_NURSERY(type) _ngf_object_nursery<ngf_##type, ngf_destroy_##type>
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
+#if defined(TARGET_OS_MAC)
   id<NSObject> dev_observer = nil;
   const NSArray<id<MTLDevice>> *devices =
       MTLCopyAllDevicesWithObserver(&dev_observer,
@@ -116,6 +117,10 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
     found_device = (dev_pref != NGF_DEVICE_PREFERENCE_DISCRETE) ||
                    !MTL_DEVICE.lowPower;
   }
+#else
+  MTL_DEVICE = MTLCreateSystemDefaultDevice();
+  found_device = (MTL_DEVICE != nil);
+#endif
 
   return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
 }
