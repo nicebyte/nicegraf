@@ -1120,14 +1120,14 @@ void ngf_finish();
 /**
  * Creates a new command buffer that is in the "reset" state.
  */
-ngf_error ngf_cmd_buffer_create(ngf_cmd_buffer **result);
+ngf_error ngf_create_cmd_buffer(ngf_cmd_buffer **result);
 
 /**
  * Frees resources associated with the given command buffer.
  * Any work previously submitted via this command buffer will be finished
  * asynchronously.
  */
-void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buffer);
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer);
 
 /**
  * Begin recording a new batch of commands into a given command buffer,
@@ -1138,21 +1138,21 @@ void ngf_cmd_buffer_destroy(ngf_cmd_buffer *buffer);
  * Note that if the buffer was "ready", the commands previously recorded into it
  * will be lost and never executed.
  */
-ngf_error ngf_cmd_buffer_start(ngf_cmd_buffer *buf);
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *buf);
 
 /**
  * Finishes recording a batch of commands into a buffer and transitions it into
  * the "ready" state.
  * The command buffer needs to be in the "recording" state.
  */
-ngf_error ngf_cmd_buffer_end(ngf_cmd_buffer *buf);
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *buf);
 
 /**
  * Submits the commands recorded in the given command buffer for execution.
  * The command buffer must be in the "ready" state, and will be transitioned to
  * the "submitted" state.
  */
-ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs);
+ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs);
 
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline);
