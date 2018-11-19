@@ -1522,7 +1522,9 @@ void ngf_destroy_pass(ngf_pass *pass) {
   }
 }
 
-ngf_error ngf_create_cmd_buffer(ngf_cmd_buffer **result) {
+ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
+                                ngf_cmd_buffer **result) {
+  _NGF_FAKE_USE(info);
   assert(result);
   if (COMMAND_POOL == NULL) {
     COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_emulated_cmd), 65000u);

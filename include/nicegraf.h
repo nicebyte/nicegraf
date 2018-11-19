@@ -874,6 +874,10 @@ typedef struct ngf_context_info {
   bool debug; /**< Whether to enable debug features. */
 } ngf_context_info;
 
+typedef struct ngf_cmd_buffer_info {
+  uint32_t flags; /**< Reserved for future use. */
+} ngf_cmd_buffer_info;
+
 /**
  * Encodes a series of rendering commands.
  * Internally, a command buffer may be in any of the following four states:
@@ -1120,7 +1124,8 @@ void ngf_finish();
 /**
  * Creates a new command buffer that is in the "reset" state.
  */
-ngf_error ngf_create_cmd_buffer(ngf_cmd_buffer **result);
+ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
+                                ngf_cmd_buffer **result);
 
 /**
  * Frees resources associated with the given command buffer.
