@@ -621,7 +621,8 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
                               GLuint *result) {
   ngf_error err = NGF_ERROR_OK;
   *result = GL_NONE;
-
+  _NGF_FAKE_USE(spec_info);
+/*
   // Obtain separate pointers to the first line of input (#version directive)
   // and the rest of input. We will later insert additional defines between them.
   const char *first_line = source;
@@ -682,7 +683,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       case NGF_TYPE_UINT32: STRINGIFY_CONSTANT_VALUE("%d", uint32_t);
       default: assert(false);
       }
-      #undef STRINGIZE_VALUE
+      #undef STRINGIFY_CONSTANT_VALUE
       if (bytes_written < max_write_len) {
         defines_length += bytes_written;
       } else {
@@ -693,11 +694,12 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
     source_chunk_lengths[1] = defines_length;
    }
   source_chunks[nsource_chunks - 1u] = rest_of_source;
-  source_chunk_lengths[nsource_chunks - 1u] = source_len - first_line_len;
+  source_chunk_lengths[nsource_chunks - 1u] = source_len - first_line_len;*/
 
   // Compile the shader.
   GLuint shader = glCreateShader(stage);
-  glShaderSource(shader, nsource_chunks, source_chunks, source_chunk_lengths);
+  //glShaderSource(shader, nsource_chunks, source_chunks, source_chunk_lengths);
+  glShaderSource(shader, 1u, &source, &source_len);
   glCompileShader(shader);
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
@@ -740,9 +742,9 @@ _ngf_compile_shader_cleanup:
   if (shader != GL_NONE) {
     glDeleteShader(shader);
   }
-  if (spec_defines != NULL) {
+  /*if (spec_defines != NULL) {
     NGF_FREEN(spec_defines, spec_info->nspecializations);
-   }
+  }*/
   if (err != NGF_ERROR_OK && *result != GL_NONE) {
     glDeleteProgram(*result);
   }
@@ -763,28 +765,27 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   }
   stage->gltype = gl_shader_stage(info->type);
   stage->glstagebit = gl_shader_stage_bit(info->type);
+  stage->source_code = NULL;
+  stage->source_code_size = 0u;
   if (!info->is_binary) { // Compile from source.
-    stage->source_code_size = (GLint)info->content_length;
-    err = _ngf_compile_shader(info->content, stage->source_code_size,
-                              info->debug_name, stage->gltype, NULL,
-                              &stage->glprogram);
-
     // Save off the source code in case we need to recompile for pipelines
     // doing specialization.
-    stage->source_code = NGF_ALLOCN(char, stage->source_code_size);
+    stage->source_code = NGF_ALLOCN(char, info->content_length);
     if (stage->source_code == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto ngf_create_shader_stage_cleanup;
     }
+    stage->source_code_size = (GLint)info->content_length;
     strncpy(stage->source_code, info->content, info->content_length);
+    err = _ngf_compile_shader(stage->source_code, stage->source_code_size,
+                              info->debug_name, stage->gltype, NULL,
+                              &stage->glprogram);
   } else { // Set binary.
     stage->glprogram = glCreateProgram();
     glProgramBinary(stage->glprogram, info->binary_format,
                     info->content, info->content_length);
     err = _ngf_check_link_status(stage->glprogram, info->debug_name);
     if (err != NGF_ERROR_OK) { goto ngf_create_shader_stage_cleanup; }
-    stage->source_code = NULL;
-    stage->source_code_size = 0u;
   }
 
 ngf_create_shader_stage_cleanup:
@@ -1473,12 +1474,26 @@ ngf_error ngf_create_pass(const ngf_pass_info *info, ngf_pass **result) {
     goto ngf_create_pass_cleanup;
   }
   pass->nloadops = info->nloadops;
-  pass->clears = NGF_ALLOCN(ngf_clear_info, info->nloadops);
-  if (pass->clears == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_pass_cleanup;
+
+  uint32_t nclears = 0u;
+  for (uint32_t i = 0u; i < info->nloadops; ++i) {
+    if (info->loadops[i] == NGF_LOAD_OP_CLEAR) ++nclears;
   }
-  memcpy(pass->clears, info->clears, sizeof(ngf_clear_info) * pass->nloadops);
+
+  if (info->clears) {
+    assert(nclears > 0u);
+    pass->clears = NGF_ALLOCN(ngf_clear_info, nclears);
+    if (pass->clears == NULL) {
+      err = NGF_ERROR_OUTOFMEM;
+      goto ngf_create_pass_cleanup;
+    }
+    memcpy(pass->clears,
+           info->clears,
+           sizeof(ngf_clear_info) * nclears);
+  } else {
+    pass->clears = NULL;
+  }
+
   pass->loadops = NGF_ALLOCN(ngf_attachment_load_op, info->nloadops);
   if (pass->loadops == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -1869,6 +1884,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         }
         CURRENT_CONTEXT->force_pipeline_update = false;
         bound_pipeline = pipeline;
+        glEnable(GL_SCISSOR_TEST);
         break; }
 
       case _NGF_CMD_VIEWPORT:
@@ -2039,6 +2055,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
         uint32_t c = 0u;
         uint32_t color_clear = 0u;
+        glDisable(GL_SCISSOR_TEST);
         for (uint32_t l = 0u; l < pass->nloadops; ++l) {
           if (pass->loadops[l] == NGF_LOAD_OP_CLEAR) {
             const ngf_clear_info *clear = &pass->clears[c++];
@@ -2057,6 +2074,7 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             }
           }
         }
+        glEnable(GL_SCISSOR_TEST);
         break;
       }
 
@@ -2070,15 +2088,27 @@ ngf_error ngf_cmd_buffer_submit(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                 cmd->draw.nelements,
                                 cmd->draw.ninstances);
         } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+          size_t elem_size =
+              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                          : 4;
           glDrawElements(bound_pipeline->primitive_type,
                          cmd->draw.nelements,
                          gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                         (void*)(uintptr_t)cmd->draw.first_element);
+                         (void*)(uintptr_t)(cmd->draw.first_element *
+                                            elem_size));
         } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+          size_t elem_size =
+              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                          : 4;
           glDrawElementsInstanced(bound_pipeline->primitive_type,
                                   cmd->draw.nelements,
                                   gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                                  (void*)(uintptr_t)cmd->draw.first_element,
+                                  (void*)((uintptr_t)(cmd->draw.first_element *
+                                                      elem_size)),  
                                   cmd->draw.ninstances);
         }
         break;
