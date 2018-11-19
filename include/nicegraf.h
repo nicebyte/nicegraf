@@ -728,7 +728,7 @@ typedef enum ngf_attachment_type {
  */
 typedef enum ngf_attachment_load_op {
   NGF_LOAD_OP_DONTCARE = 0,
-  NGF_LOAD_OPKEEP,
+  NGF_LOAD_OP_KEEP,
   NGF_LOAD_OP_CLEAR
 } ngf_attachment_load_op;
 
