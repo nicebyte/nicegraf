@@ -289,6 +289,7 @@ PLACEHOLDER_CREATE_DESTROY(sampler)
 PLACEHOLDER_CREATE_DESTROY(render_target)
 PLACEHOLDER_CREATE_DESTROY(pass)
 PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
+PLACEHOLDER_CREATE_DESTROY(cmd_buffer)
 
 ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout*,
                                     ngf_descriptor_set **result) {
@@ -315,6 +316,11 @@ PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
 PLACEHOLDER_CMD(begin_pass, const ngf_pass*, const ngf_render_target*)
 void ngf_cmd_end_pass(ngf_cmd_buffer*){}
 PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
+
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer*) { return NGF_ERROR_OK; }
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer*) { return NGF_ERROR_OK; }
+ngf_error ngf_submit_cmd_buffer(uint32_t, ngf_cmd_buffer**) {
+  return NGF_ERROR_OK; }
 
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
                                       const uint32_t nwrites,
@@ -346,10 +352,6 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_begin_frame(ngf_context*) { return NGF_ERROR_OK; }
 ngf_error ngf_end_frame(ngf_context*) { return NGF_ERROR_OK; }
-
-
-
-
-
 
