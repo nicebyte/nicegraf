@@ -27,10 +27,10 @@ SOFTWARE.
 #include <memory>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
-#if defined(TARGET_OS_MAC)
+#if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
 #define _NGF_VIEW_TYPE NSView
-#elif defined(TARGET_OS_IPHONE)
+#else
 #import <UIKit/UIKit.h>
 #define _NGF_VIEW_TYPE UIView
 #endif
@@ -89,8 +89,13 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
     MTLPixelFormatInvalid, // RGB16F, Metal does not support.
     MTLPixelFormatRGBA16Float,
     MTLPixelFormatDepth32Float,
+#if TARGET_OS_OSX
     MTLPixelFormatDepth16Unorm,
     MTLPixelFormatDepth24Unorm_Stencil8,
+#else
+    MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
+    MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
+#endif
   };
   return fmt >= NGF_IMAGE_FORMAT_UNDEFINED
              ? MTLPixelFormatInvalid
@@ -118,7 +123,7 @@ private:
 #define _NGF_NURSERY(type) _ngf_object_nursery<ngf_##type, ngf_destroy_##type>
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
-#if defined(TARGET_OS_MAC)
+#if TARGET_OS_OSX
   id<NSObject> dev_observer = nil;
   const NSArray<id<MTLDevice>> *devices =
       MTLCopyAllDevicesWithObserver(&dev_observer,
@@ -132,7 +137,7 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   }
 #else
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
-  found_device = (MTL_DEVICE != nil);
+  bool found_device = (MTL_DEVICE != nil);
 #endif
 
   return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
@@ -167,6 +172,7 @@ CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
   size.height = swapchain_info.height;
   layer.drawableSize = size; 
   layer.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
+#if TARGET_OS_OSX
   if (@available(macOS 10.13.2, *)) {
     layer.maximumDrawableCount = swapchain_info.capacity_hint;
   }
@@ -174,9 +180,16 @@ CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
     layer.displaySyncEnabled =
           (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
   }
+#endif
   _NGF_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info.native_handle);
+#if TARGET_OS_OSX
   [view setLayer:layer];
+#else
+  [view.layer addSublayer:layer];
+  [layer setContentsScale:view.layer.contentsScale];
+  [layer setPosition:view.center];
+#endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
   return layer;
@@ -263,7 +276,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
       return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;    
     }
   } else { // ...or set binary.
-#if defined(TARGET_OS_MAC)
+#if TARGET_OS_OSX
     uint32_t required_format = 0u;
 #else
     uint32_t required_format = 1u;
