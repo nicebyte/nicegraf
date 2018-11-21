@@ -561,6 +561,9 @@ NGF_THREADLOCAL _ngf_block_allocator *COMMAND_POOL = NULL;
 
 ngf_error ngf_set_context(ngf_context *ctx) {
   assert(ctx);
+  if (CURRENT_CONTEXT == ctx) return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
+  if (CURRENT_CONTEXT && (CURRENT_CONTEXT != ctx)) return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
+
   bool result = eglMakeCurrent(ctx->dpy, ctx->surface, ctx->surface, ctx->ctx);
   if (result) {
     CURRENT_CONTEXT = ctx;
