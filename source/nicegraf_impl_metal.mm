@@ -153,7 +153,12 @@ ngf_error ngf_begin_frame(ngf_context *ctx) {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_default_render_target(ngf_render_target **result) {
+ngf_error ngf_default_render_target(
+  ngf_attachment_load_op color_load_op,
+  ngf_attachment_load_op depth_load_op,
+  const ngf_clear *clear_color,
+  const ngf_clear *clear_depth,
+  ngf_render_target **result) {
   assert(result);
   if (CURRENT_CONTEXT->layer) {
     *result = &CURRENT_CONTEXT->default_rt;
@@ -334,7 +339,6 @@ PLACEHOLDER_CREATE_DESTROY(buffer)
 PLACEHOLDER_CREATE_DESTROY(image)
 PLACEHOLDER_CREATE_DESTROY(sampler)
 PLACEHOLDER_CREATE_DESTROY(render_target)
-PLACEHOLDER_CREATE_DESTROY(pass)
 PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
 PLACEHOLDER_CREATE_DESTROY(cmd_buffer)
 
@@ -360,7 +364,7 @@ PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
 PLACEHOLDER_CMD(bind_vertex_buffer, const ngf_buffer*, uint32_t, uint32_t)
 PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
-PLACEHOLDER_CMD(begin_pass, const ngf_pass*, const ngf_render_target*)
+PLACEHOLDER_CMD(begin_pass, const ngf_render_target*)
 void ngf_cmd_end_pass(ngf_cmd_buffer*){}
 PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
 
