@@ -458,22 +458,6 @@ typedef enum ngf_image_format {
 } ngf_image_format;
 
 /**
- * Swapchain configuration.
- */
-typedef struct ngf_swapchain_info {
-  ngf_image_format cfmt; /**< Swapchain image format. */
-  ngf_image_format dfmt; /**< Format to use for the depth buffer, if set to
-                              NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
-                              be created. */
-  int nsamples; /**< Number of samples per pixel (0 for non-multisampled) */
-  uint32_t capacity_hint; /**< Number of images in swapchain (may be ignored)*/
-  uint32_t width; /**< Width of swapchain images in pixels. */
-  uint32_t height;/**< Height of swapchain images in pixels. */
-  uintptr_t native_handle;/**< HWND, ANativeWindow, NSWindow, etc. */
-  ngf_present_mode present_mode; /**< Desired present mode. */
-} ngf_swapchain_info;
-
-/**
  * Image usage flags.
  */
 typedef enum ngf_image_usage {
@@ -508,6 +492,84 @@ typedef struct {
   uint32_t layer; /**< Layer within the image.*/
   bool layered; /**< Whether the referred image is layered.*/
 } ngf_image_ref;
+
+/**
+ * Rendertarget attachment types.
+ */
+typedef enum ngf_attachment_type {
+  NGF_ATTACHMENT_COLOR = 0,
+  NGF_ATTACHMENT_DEPTH,
+  NGF_ATTACHMENT_STENCIL,
+  NGF_ATTACHMENT_DEPTH_STENCIL
+} ngf_attachment_type;
+
+/**
+ * What to do on attachment load.
+ */
+typedef enum ngf_attachment_load_op {
+  NGF_LOAD_OP_DONTCARE = 0,
+  NGF_LOAD_OP_KEEP,
+  NGF_LOAD_OP_CLEAR
+} ngf_attachment_load_op;
+
+/**
+ * Specifies a rendertarget clear operation.
+ */
+typedef union ngf_clear_info {
+  float clear_color[4];
+  float clear_depth;
+  uint32_t clear_stencil;
+} ngf_clear;
+
+/**
+ * Specifies information about a rendertarget attachment.
+ */
+typedef struct ngf_attachment {
+  ngf_image_ref image_ref; /**< Associated image subresource.*/
+  ngf_attachment_type type; /**< Attachment type. */
+
+  /**
+   * Indicates what to do with this attachment at the beginning of a render
+   * pass.
+   */
+  ngf_attachment_load_op load_op;
+
+  /**
+   * If the `load_op` field  is NGF_LOAD_OP_CLEAR, contains the value(s) to
+   * clear the attachment to, otherwise this field is ignored.
+   */
+  ngf_clear clear;
+ } ngf_attachment;
+
+/**
+ * Specifies information about a rendertarget.
+ */
+typedef struct ngf_render_target_info {
+  const ngf_attachment *attachments;
+  uint32_t nattachments;
+} ngf_render_target_info;
+
+/**
+ * Framebuffer
+ */
+typedef struct ngf_render_target ngf_render_target;
+
+
+/**
+ * Swapchain configuration.
+ */
+typedef struct ngf_swapchain_info {
+  ngf_image_format cfmt; /**< Swapchain image format. */
+  ngf_image_format dfmt; /**< Format to use for the depth buffer, if set to
+                              NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
+                              be created. */
+  int nsamples; /**< Number of samples per pixel (0 for non-multisampled) */
+  uint32_t capacity_hint; /**< Number of images in swapchain (may be ignored)*/
+  uint32_t width; /**< Width of swapchain images in pixels. */
+  uint32_t height;/**< Height of swapchain images in pixels. */
+  uintptr_t native_handle;/**< HWND, ANativeWindow, NSWindow, etc. */
+  ngf_present_mode present_mode; /**< Desired present mode. */
+} ngf_swapchain_info;
 
 /**
  *  Min/mag filters.
@@ -720,46 +782,6 @@ typedef struct ngf_graphics_pipeline_info {
 } ngf_graphics_pipeline_info;
 
 /**
- * Rendertarget attachment types.
- */
-typedef enum ngf_attachment_type {
-  NGF_ATTACHMENT_COLOR = 0,
-  NGF_ATTACHMENT_DEPTH,
-  NGF_ATTACHMENT_STENCIL,
-  NGF_ATTACHMENT_DEPTH_STENCIL
-} ngf_attachment_type;
-
-/**
- * What to do on attachment load.
- */
-typedef enum ngf_attachment_load_op {
-  NGF_LOAD_OP_DONTCARE = 0,
-  NGF_LOAD_OP_KEEP,
-  NGF_LOAD_OP_CLEAR
-} ngf_attachment_load_op;
-
-/**
- * Specifies information about a rendertarget attachment.
- */
-typedef struct ngf_attachment {
-  ngf_image_ref image_ref; /**< Associated image subresource.*/
-  ngf_attachment_type type; /**< Attachment type. */
-} ngf_attachment;
-
-/**
- * Specifies information about a rendertarget.
- */
-typedef struct ngf_render_target_info {
-  const ngf_attachment *attachments;
-  uint32_t nattachments;
-} ngf_render_target_info;
-
-/**
- * Framebuffer
- */
-typedef struct ngf_render_target ngf_render_target;
-
-/**
  * Types of buffer objects.
  */
 typedef enum ngf_buffer_type {
@@ -791,42 +813,6 @@ typedef struct ngf_buffer_info {
   ngf_buffer_access_freq access_freq; /**< Access frequency.*/
   ngf_buffer_access_type access_type; /**< Access type.*/
 } ngf_buffer_info;
-
-/**
- * Specifies a rendertarget clear operation.
- */
-typedef struct ngf_clear_info {
-  float clear_color[4];
-  float clear_depth;
-  uint32_t clear_stencil;
-} ngf_clear_info;
-
-/**
- * Specifies a renderpass.
- * A renderpass is a series of drawcalls affecting a rendertarget, preceded by
- * an operation performed on all attachments of the rendertarget.
- */
-typedef struct ngf_pass_info {
-  const ngf_attachment_load_op *loadops; /**< Operation to perform on each
-                                              corresponding attachment of the
-                                              rendertarget*/
-  uint32_t nloadops; /**< Number of attachments.*/
-
-  /**
-   * An array of clear operation descriptions. It must contain one entry
-   * per each attachment that has its load op set to NGF_LOAD_OP_CLEAR.
-   * The operations must be specified in the same order as the attachments
-   * i.e. the first operation corresponds to the first attachment that has
-   * NGF_LOAD_OP_CLEAR, the second to the second one, etc.
-   * 
-   */
-  const ngf_clear_info *clears;
-} ngf_pass_info;
-
-/**
- * Renderpass object.
- */
-typedef struct ngf_pass ngf_pass;
 
 /**
  * Specifies host memory allocation callbacks for the library's internal needs.
@@ -1060,10 +1046,34 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
 void ngf_destroy_sampler(ngf_sampler *sampler);
 
 /**
- * Obtain a pointer to the default render target for the current context
- * (i.e. swapchain image).
+ * Obtain a render target associated with the the current context's
+ * swapchain. If the current context does not have a swapchain, the result will
+ * be a null pointer. Otherwise, it will be a render target that has a
+ * color attachment associated with the context's swapchain. If the swapchain
+ * was created with an accompanying depth buffer, the render target will
+ * have an attachment for that as well.
+ * It is the responsibility of the caller to free the returned render target 
+ * object.
+ * @param color_load_op specifies the operation to perform on the color
+ *  attachment the render target at the beginning of a rend render pass.
+ * @param depth_load_op if the context's swap chain has an accompanying depth
+ *  buffer, specifies the operation to perform on it at the beginning of a
+ *  render pass. Otherwise, this value is ignored.
+ * @param clear_color If `color_load_op` is `NGF_LOAD_OP_CLEAR`, specifies the
+ *  color to clear the color attachment of the render target to. Otherwise,
+    this value is ignored.
+ * @param clear_depth If the current context's swapchain has an accompanying
+ *   depth buffer AND the `depth_load_op` parameter of this function was set to
+ *   `NGF_LOAD_OP_CLEAR`, this paramener specifies the value to clear the depth
+ *   buffer to. Otherwise, this parameter is ignored.
+ *
  */
-ngf_error ngf_default_render_target(ngf_render_target **result);
+ngf_error ngf_default_render_target(
+  ngf_attachment_load_op color_load_op,
+  ngf_attachment_load_op depth_load_op,
+  const ngf_clear *clear_color,
+  const ngf_clear *clear_depth,
+  ngf_render_target **result);
 
 /**
  * Create a new rendertarget with the given configuration.
@@ -1109,18 +1119,6 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
  * Destroy the given buffer.
  */
 void ngf_destroy_buffer(ngf_buffer *buffer);
-
-/**
- * Create a render pass object.
- * @param info render pass configuration
- */
-ngf_error ngf_create_pass(const ngf_pass_info *info, ngf_pass **result);
-
-/**
- * Destroy a given pass.
- * @param pass the render pass object to destroy.
- */
-void ngf_destroy_pass(ngf_pass *pass);
 
 /**
  * Wait for all pending rendering commands to complete.
@@ -1187,8 +1185,7 @@ void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
                                 uint32_t binding, uint32_t offset);
 void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
                                ngf_type index_type);
-void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
-                        const ngf_render_target *target);
+void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target);
 void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
