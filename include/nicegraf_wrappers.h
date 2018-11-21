@@ -98,6 +98,7 @@ NGF_DEFINE_WRAPPER_TYPE(sampler);
 NGF_DEFINE_WRAPPER_TYPE(render_target);
 NGF_DEFINE_WRAPPER_TYPE(buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
+NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
 // special case for descriptor sets
 struct ngf_descriptor_set_ManagementFuncs {
