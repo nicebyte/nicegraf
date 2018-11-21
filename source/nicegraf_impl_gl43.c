@@ -76,6 +76,12 @@ struct ngf_graphics_pipeline {
   uint32_t nowned_stages;
 };
 
+struct ngf_render_target {
+  GLuint framebuffer;
+  uint32_t nattachments;
+  ngf_attachment attachment_infos[];
+};
+
 struct ngf_context {
   EGLDisplay dpy;
   EGLContext ctx;
@@ -84,6 +90,7 @@ struct ngf_context {
   ngf_graphics_pipeline cached_state;
   bool force_pipeline_update;
   bool has_swapchain;
+  bool has_depth;
   ngf_present_mode present_mode;
   ngf_type bound_index_buffer_type;
 };
@@ -127,14 +134,8 @@ struct ngf_sampler {
   GLuint glsampler;
 };
 
-struct ngf_render_target {
-  GLuint framebuffer;
-  uint32_t nattachments;
-  ngf_attachment_type attachment_types[];
-};
-
 struct ngf_pass {
-  ngf_clear_info *clears;
+  ngf_clear *clears;
   ngf_attachment_load_op *loadops;
   uint32_t nloadops;
 };
@@ -192,7 +193,6 @@ typedef struct _ngf_emulated_cmd {
     } vertex_buffer_bind_op;
     struct {
       const ngf_render_target *target;
-      const ngf_pass *pass;
     } begin_pass;
     struct {
       const ngf_buffer *index_buffer;
@@ -500,6 +500,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     err_code = NGF_ERROR_CONTEXT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
+  ctx->has_depth = (swapchain_info->dfmt != NGF_IMAGE_FORMAT_UNDEFINED);
 
   // Create context with chosen config.
   EGLint is_debug = info->debug;
@@ -537,6 +538,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       err_code = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+  } else {
+    ctx->surface = EGL_NO_SURFACE;
   }
 
   ctx->force_pipeline_update = true;
@@ -1269,21 +1272,47 @@ void ngf_destroy_sampler(ngf_sampler *sampler) {
   NGF_FREE(sampler);
 }
 
-ngf_error ngf_default_render_target(ngf_render_target **result) {
-  static NGF_THREADLOCAL ngf_render_target *default_target = NULL;
-  if (default_target == NULL) {
-    default_target =
-        (ngf_render_target*) NGF_ALLOCN(uint8_t,
-                                        offsetof(ngf_render_target,
-                                                 attachment_types) +
-                                        3u * sizeof(ngf_attachment_type));
+ngf_error ngf_default_render_target(
+    ngf_attachment_load_op color_load_op,
+    ngf_attachment_load_op depth_load_op,
+    const ngf_clear *clear_color,
+    const ngf_clear *clear_depth,
+    ngf_render_target **result) {
+  assert(result);
+  if (CURRENT_CONTEXT->has_swapchain) {
+    ngf_render_target *default_render_target =
+      (ngf_render_target*)NGF_ALLOCN(uint8_t,
+                                    offsetof(ngf_render_target,
+                                             attachment_infos) +
+                                    3u * sizeof(ngf_attachment));
+    if (default_render_target == NULL) {
+      return NGF_ERROR_OUTOFMEM;
+    }
+    ngf_attachment *default_color_attachment =
+        &default_render_target->attachment_infos[0];
+    default_color_attachment->type = NGF_ATTACHMENT_COLOR;
+    default_color_attachment->load_op = color_load_op;
+    if (color_load_op == NGF_LOAD_OP_CLEAR) {
+      assert(clear_color);
+      default_color_attachment->clear = *clear_color;
+    }
+    default_render_target->nattachments = 1u;
+    if (CURRENT_CONTEXT->has_depth) {
+      ngf_attachment *default_depth_attachment =
+          &default_render_target->attachment_infos[1];
+      default_depth_attachment->type = NGF_ATTACHMENT_DEPTH;
+      default_depth_attachment->load_op = depth_load_op;
+      if (depth_load_op == NGF_LOAD_OP_CLEAR) {
+        assert(clear_depth);
+        default_depth_attachment->clear = *clear_depth;
+       }
+      default_render_target->nattachments += 1u;
+    }
+    default_render_target->framebuffer = 0;
+    *result = default_render_target;
+  } else {
+    *result = NULL;
   }
-  default_target->framebuffer = 0;
-  default_target->attachment_types[0] = NGF_ATTACHMENT_COLOR;
-  default_target->attachment_types[1] = NGF_ATTACHMENT_DEPTH;
-  default_target->attachment_types[2] = NGF_ATTACHMENT_STENCIL;
-  default_target->nattachments = 3;
-  *result = default_target;
   return NGF_ERROR_OK;
 }
 
@@ -1295,7 +1324,11 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   assert(info->nattachments < 7);
 
   ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_render_target);
+  *result = (ngf_render_target*) NGF_ALLOCN(uint8_t,
+                                            offsetof(ngf_render_target,
+                                                     attachment_infos) +
+                                              sizeof(ngf_attachment) *
+                                              info->nattachments);
   ngf_render_target *render_target = *result;
   if (render_target == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -1310,42 +1343,42 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   render_target->nattachments = info->nattachments;
   for (size_t i = 0; i < info->nattachments; ++i) {
     const ngf_attachment *a = &(info->attachments[i]);
-    render_target->attachment_types[i] = a->type;
-    GLenum attachment;
+    render_target->attachment_infos[i] = *a;
+    GLenum gl_attachment;
     switch (a->type) {
     case NGF_ATTACHMENT_COLOR:
-      attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
+      gl_attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
       break;
     case NGF_ATTACHMENT_DEPTH:
-      attachment = GL_DEPTH_ATTACHMENT;
+      gl_attachment = GL_DEPTH_ATTACHMENT;
       break;
     case NGF_ATTACHMENT_DEPTH_STENCIL:
-      attachment = GL_DEPTH_STENCIL_ATTACHMENT;
+      gl_attachment = GL_DEPTH_STENCIL_ATTACHMENT;
       break;
     case NGF_ATTACHMENT_STENCIL:
-      attachment = GL_STENCIL_ATTACHMENT;
+      gl_attachment = GL_STENCIL_ATTACHMENT;
       break;
     default:
-      attachment = GL_COLOR_ATTACHMENT0;
+      gl_attachment = GL_COLOR_ATTACHMENT0;
       assert(0);
     }
     if (!a->image_ref.image->is_renderbuffer &&
         (a->image_ref.layered ||
          a->image_ref.image->bind_point != GL_TEXTURE_2D_ARRAY)) {
       glFramebufferTexture(GL_FRAMEBUFFER,
-                           attachment,
+                           gl_attachment,
                            a->image_ref.image->glimage,
                            a->image_ref.mip_level);
     } else if (!a->image_ref.image->is_renderbuffer) {
       glFramebufferTextureLayer(GL_FRAMEBUFFER,
-                                attachment,
+                                gl_attachment,
                                 a->image_ref.image->glimage,
                                 a->image_ref.mip_level,
                                 a->image_ref.layer);
     } else {
       glBindRenderbuffer(GL_RENDERBUFFER, 0);
       glFramebufferRenderbuffer(GL_FRAMEBUFFER,
-                                attachment,
+                                gl_attachment,
                                 GL_RENDERBUFFER,
                                 a->image_ref.image->glimage);
     }
@@ -1368,7 +1401,9 @@ ngf_create_render_target_cleanup:
 
 void ngf_destroy_render_target(ngf_render_target *render_target) {
   if (render_target != NULL) {
-    glDeleteFramebuffers(1, &(render_target->framebuffer));
+    if (render_target->framebuffer != 0) {
+      glDeleteFramebuffers(1, &(render_target->framebuffer));
+    }
     NGF_FREE(render_target);
   }
 }
@@ -1459,66 +1494,6 @@ void ngf_destroy_buffer(ngf_buffer *buffer) {
   if (buffer != NULL) {
     glDeleteBuffers(1, &(buffer->glbuffer));
     NGF_FREE(buffer);
-  }
-}
-
-ngf_error ngf_create_pass(const ngf_pass_info *info, ngf_pass **result) {
-  assert(info);
-  assert(result);
-
-  ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_pass);
-  ngf_pass *pass = *result;
-  if (pass == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_pass_cleanup;
-  }
-  pass->nloadops = info->nloadops;
-
-  uint32_t nclears = 0u;
-  for (uint32_t i = 0u; i < info->nloadops; ++i) {
-    if (info->loadops[i] == NGF_LOAD_OP_CLEAR) ++nclears;
-  }
-
-  if (info->clears) {
-    assert(nclears > 0u);
-    pass->clears = NGF_ALLOCN(ngf_clear_info, nclears);
-    if (pass->clears == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_pass_cleanup;
-    }
-    memcpy(pass->clears,
-           info->clears,
-           sizeof(ngf_clear_info) * nclears);
-  } else {
-    pass->clears = NULL;
-  }
-
-  pass->loadops = NGF_ALLOCN(ngf_attachment_load_op, info->nloadops);
-  if (pass->loadops == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_pass_cleanup;
-  }
-  memcpy(pass->loadops,
-         info->loadops,
-         sizeof(ngf_attachment_load_op) * pass->nloadops);
-
-ngf_create_pass_cleanup:
-  if (err != NGF_ERROR_OK) {
-    ngf_destroy_pass(pass);
-  }
-  return err;
-}
-
-void ngf_destroy_pass(ngf_pass *pass) {
-  if (pass != NULL) {
-    if (pass->nloadops > 0 && pass->clears) {
-      NGF_FREEN(pass->clears, pass->nloadops);
-    }
-    if (pass->nloadops > 0 && pass->loadops) {
-      NGF_FREEN(pass->loadops, pass->nloadops);
-    }
-    NGF_FREE(pass);
   }
 }
 
@@ -1691,12 +1666,10 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_pass *pass,
-                        const ngf_render_target *target) {
+void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BEGIN_PASS;
   cmd->begin_pass.target = target;
-  cmd->begin_pass.pass = pass;
   _NGF_APPENDCMD(buf, cmd);
   buf->renderpass_active = true;
 }
@@ -2052,16 +2025,15 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         break;
 
       case _NGF_CMD_BEGIN_PASS: {
-        const ngf_pass *pass = cmd->begin_pass.pass;
         const ngf_render_target *target = cmd->begin_pass.target;
         glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
-        uint32_t c = 0u;
         uint32_t color_clear = 0u;
         glDisable(GL_SCISSOR_TEST);
-        for (uint32_t l = 0u; l < pass->nloadops; ++l) {
-          if (pass->loadops[l] == NGF_LOAD_OP_CLEAR) {
-            const ngf_clear_info *clear = &pass->clears[c++];
-            switch (target->attachment_types[l]) {
+        for (uint32_t a = 0u; a < target->nattachments; ++a) {
+          const ngf_attachment *attachment = &target->attachment_infos[a];
+          if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
+            const ngf_clear *clear = &attachment->clear;
+            switch (target->attachment_infos[a].type) {
             case NGF_ATTACHMENT_COLOR:
               glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
               break;
