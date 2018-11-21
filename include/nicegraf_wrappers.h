@@ -34,6 +34,7 @@ namespace ngf {
 template <class T, class ObjectManagementFuncs>
 class ngf_handle {
 public:
+  explicit ngf_handle(T *raw) : handle_(raw) {}
   ngf_handle() : handle_(nullptr) {}
   ngf_handle(const ngf_handle&) = delete;
   ngf_handle(ngf_handle &&other) : handle_(nullptr) {
@@ -96,7 +97,6 @@ NGF_DEFINE_WRAPPER_TYPE(image);
 NGF_DEFINE_WRAPPER_TYPE(sampler);
 NGF_DEFINE_WRAPPER_TYPE(render_target);
 NGF_DEFINE_WRAPPER_TYPE(buffer);
-NGF_DEFINE_WRAPPER_TYPE(pass);
 NGF_DEFINE_WRAPPER_TYPE(context);
 
 // special case for descriptor sets
