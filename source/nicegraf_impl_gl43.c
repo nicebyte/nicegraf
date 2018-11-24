@@ -628,89 +628,116 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   ngf_error err = NGF_ERROR_OK;
   *result = GL_NONE;
   _NGF_FAKE_USE(spec_info);
-/*
+  GLuint shader = GL_NONE;
+
   // Obtain separate pointers to the first line of input (#version directive)
-  // and the rest of input. We will later insert additional defines between them.
+  // and the rest of input. We will later insert additional defines between
+  // them.
   const char *first_line = source;
-  const char *rest_of_source = source;
+  while (*first_line != '#' && first_line - source < source_len) first_line++;
+  if (strncmp(first_line, "#version", 8u)) {
+    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+  }
+  const char *rest_of_source = first_line;
   while(*(rest_of_source++) != '\n' &&
         (rest_of_source - source < source_len));
-  const GLint first_line_len = (uint32_t)(rest_of_source - source);
+  const GLint first_line_len = (GLint)(rest_of_source - first_line);
 
-  // Space for chunk pointers and chunk lengths.
-  const uint32_t nsource_chunks =
-      2u + (spec_info == NULL ? 0u : 1u);
+  // We will split the shader source into up to 3 chunks that will be fed to
+  // glShaderSource.
+  // The first chunk will always be the "#version..." line.
+  // If constant specialization is being done (spec_info != NULL), the second
+  // chunk will contain the corresponding #defines and the third chunk will
+  // contain the rest of the shader code.
+  // If no specialization is being done, the second chunk will contain the rest
+  // of the shader code, and there will be no third chunk.
+  const uint32_t nsource_chunks = 2u + (spec_info == NULL ? 0u : 1u);
   const char *source_chunks[3];
   GLint source_chunk_lengths[3];
-
-  // Fill out chunk and chunk length data, generating additional defines from
-  // the specialization constant data and inserting them between the first line
-  // and the rest of the code.
+  
+  // First chunk - always the "#version..." line. 
   source_chunks[0] = first_line;
   source_chunk_lengths[0] = first_line_len;
 
-  char *spec_defines = NULL;
+  char *defines_buffer = NULL;
   if (spec_info != NULL) {
+    // Specialization is being done - generate appropriate #defines for the
+    // second source chunk.
     static char spec_define_template[] =
-        "#define " NGF_EMULATED_SPEC_CONST_PREFIX "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+        "#define "
+        NGF_EMULATED_SPEC_CONST_PREFIX
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
+
+    // Allocate enough space to hold all the #defines.
     const uint32_t spec_define_max_size = NGF_ARRAYSIZE(spec_define_template);
     const uint32_t defines_buffer_size =
         spec_define_max_size * spec_info->nspecializations;
-    spec_defines = NGF_ALLOCN(char, defines_buffer_size);
-    uint32_t defines_length = 0u;
-    for (uint32_t i= 0u; i < nsource_chunks - 1u; ++i) {
+    defines_buffer = NGF_ALLOCN(char, defines_buffer_size);
+    if (defines_buffer == NULL) {
+      err = NGF_ERROR_OUTOFMEM;
+      goto _ngf_compile_shader_cleanup;
+    }
+
+    // Generate a #define for each specialization entry.
+    char *defines_buffer_write_ptr = defines_buffer;
+    for (uint32_t i= 0u; i < spec_info->nspecializations; ++i) {
+      // Specialization entry.
       const ngf_constant_specialization *spec = &spec_info->specializations[i];
-      char *buf = spec_defines + defines_length;
-      uint32_t max_write_len = defines_buffer_size - defines_length;
-      uint32_t bytes_written = snprintf(buf, max_write_len, "#define %s%d ",
-                                        NGF_EMULATED_SPEC_CONST_PREFIX,
-                                        spec->constant_id);
-      if (bytes_written < max_write_len) {
-        defines_length += bytes_written;
-        max_write_len -= bytes_written;
-        buf += bytes_written;
-      } else {
 
-      }
-
+      // Ptr to spec constant value.
       const uint8_t *data = (uint8_t*)spec_info->value_buffer + spec->offset;
-      #define STRINGIFY_CONSTANT_VALUE(format, type) \
-          bytes_written = snprintf(buf, max_write_len, format "\n", *(const type*)data); \
-          break;
+
+      uint32_t bytes_written = 0u; // bytes written during this iteration.
+
+      // Write the #define to the buffer
+      #define WRITE_SPEC_DEFINE(format, type) \
+          bytes_written = snprintf(defines_buffer_write_ptr,\
+                                   spec_define_max_size, \
+                                   "#define %s%d " format "\n",\
+                                   NGF_EMULATED_SPEC_CONST_PREFIX, \
+                                   spec->constant_id, \
+                                   *(const type*)data);
       switch (spec->type) {
-      case NGF_TYPE_DOUBLE: STRINGIFY_CONSTANT_VALUE("%f", double);
+      case NGF_TYPE_DOUBLE: WRITE_SPEC_DEFINE("%f", double); break;
       case NGF_TYPE_FLOAT:
-      case NGF_TYPE_HALF_FLOAT: STRINGIFY_CONSTANT_VALUE("%f", float);
-      case NGF_TYPE_INT8: STRINGIFY_CONSTANT_VALUE("%d", int8_t);
-      case NGF_TYPE_INT16: STRINGIFY_CONSTANT_VALUE("%d", int16_t);
-      case NGF_TYPE_INT32: STRINGIFY_CONSTANT_VALUE("%d", int32_t);
-      case NGF_TYPE_UINT8: STRINGIFY_CONSTANT_VALUE("%d", uint8_t);
-      case NGF_TYPE_UINT16: STRINGIFY_CONSTANT_VALUE("%d", uint16_t);
-      case NGF_TYPE_UINT32: STRINGIFY_CONSTANT_VALUE("%d", uint32_t);
+      case NGF_TYPE_HALF_FLOAT: WRITE_SPEC_DEFINE("%f", float); break;
+      case NGF_TYPE_INT8: WRITE_SPEC_DEFINE("%d", int8_t); break;
+      case NGF_TYPE_INT16: WRITE_SPEC_DEFINE("%d", int16_t); break;
+      case NGF_TYPE_INT32: WRITE_SPEC_DEFINE("%d", int32_t); break;
+      case NGF_TYPE_UINT8: WRITE_SPEC_DEFINE("%d", uint8_t); break;
+      case NGF_TYPE_UINT16: WRITE_SPEC_DEFINE("%d", uint16_t); break;
+      case NGF_TYPE_UINT32: WRITE_SPEC_DEFINE("%d", uint32_t); break;
       default: assert(false);
       }
-      #undef STRINGIFY_CONSTANT_VALUE
-      if (bytes_written < max_write_len) {
-        defines_length += bytes_written;
+      #undef WRITE_SPEC_DEFINE
+
+      // Verify that snprintf did not discard any characters (if it did, that
+      // means the written string was too long).
+      if (bytes_written < spec_define_max_size) {
+        defines_buffer_write_ptr += bytes_written;
       } else {
-        assert(false);
+        err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+        goto _ngf_compile_shader_cleanup;
       }
     }
-    source_chunks[1] = spec_defines;
-    source_chunk_lengths[1] = defines_length;
-   }
+    source_chunks[1] = defines_buffer;
+    source_chunk_lengths[1] =
+        (GLint)(defines_buffer_write_ptr - defines_buffer);
+  }
+
+  // Final source chunk - rest of the shader code.
   source_chunks[nsource_chunks - 1u] = rest_of_source;
-  source_chunk_lengths[nsource_chunks - 1u] = source_len - first_line_len;*/
+  source_chunk_lengths[nsource_chunks - 1u] = source_len -
+                                              (GLint)(rest_of_source - source);
 
   // Compile the shader.
-  GLuint shader = glCreateShader(stage);
-  //glShaderSource(shader, nsource_chunks, source_chunks, source_chunk_lengths);
-  glShaderSource(shader, 1u, &source, &source_len);
+  shader = glCreateShader(stage);
+  glShaderSource(shader, nsource_chunks, source_chunks, source_chunk_lengths);
   glCompileShader(shader);
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
   if (compile_status != GL_TRUE) {
-    if (NGF_DEBUG_CALLBACK) {
+    if (true/*NGF_DEBUG_CALLBACK*/) {
       // Note: theoretically, the OpenGL debug callback extension should
       // invoke the debug callback on shader compilation failure.
       // In practice, it varies between vendors, so we just force-call the
@@ -748,9 +775,9 @@ _ngf_compile_shader_cleanup:
   if (shader != GL_NONE) {
     glDeleteShader(shader);
   }
-  /*if (spec_defines != NULL) {
-    NGF_FREEN(spec_defines, spec_info->nspecializations);
-  }*/
+  if (defines_buffer != NULL) {
+    NGF_FREEN(defines_buffer, spec_info->nspecializations);
+  }
   if (err != NGF_ERROR_OK && *result != GL_NONE) {
     glDeleteProgram(*result);
   }
