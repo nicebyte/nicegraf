@@ -37,6 +37,8 @@ SOFTWARE.
 
 id<MTLDevice> MTL_DEVICE = nil;
 
+#pragma mark ngf_struct_definitions
+
 struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
@@ -68,8 +70,10 @@ struct ngf_graphics_pipeline {
   id<MTLRenderPipelineState> pipeline = nil;
 };
 
+#pragma mark ngf_enum_maps
+
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
-  static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_UNDEFINED] = {
+  static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_COUNT] = {
     MTLPixelFormatR8Unorm,
     MTLPixelFormatRG8Unorm,
     MTLPixelFormatInvalid, // RGB8, Metal does not support.
@@ -111,6 +115,21 @@ static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
   return action[op];
 }
 
+static MTLDataType get_mtl_type(ngf_type type) {
+  static const MTLDataType types[NGF_TYPE_COUNT] = {
+    MTLDataTypeNone, /* Int8, Metal does not support.*/
+    MTLDataTypeNone, /*UInt8, Metal does not support*/
+    MTLDataTypeShort,
+    MTLDataTypeUShort,
+    MTLDataTypeInt,
+    MTLDataTypeUInt,
+    MTLDataTypeFloat,
+    MTLDataTypeHalf,
+    MTLDataTypeNone /* Double,Metal does not support.*/
+  };
+  return types[type];
+}
+
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
 class _ngf_object_nursery {
 public:
@@ -132,6 +151,8 @@ private:
 #define _NGF_NURSERY(type, name) \
   _ngf_object_nursery<ngf_##type, ngf_destroy_##type> \
       name(NGF_ALLOC(ngf_##type));
+
+#pragma mark ngf_function_implementations
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 #if TARGET_OS_OSX
@@ -379,18 +400,46 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
   assert(result);
-  auto mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
-  mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+  auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
+  mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm; // TODO: fix
+  auto *spec_consts = [MTLFunctionConstantValues new];
+  if (info->spec_info != nullptr) {
+    for (uint32_t s = 0u; s < info->spec_info->nspecializations; ++s) {
+      const ngf_constant_specialization *spec = &info->spec_info->specializations[s];
+      MTLDataType type = get_mtl_type(spec->type);
+      if (type == MTLDataTypeNone) {
+        return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+      }
+      [spec_consts setConstantValue:((uint8_t*)info->spec_info->value_buffer + spec->offset)
+                               type:get_mtl_type(spec->type)
+                            atIndex:spec->constant_id];
+    }
+  }
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
     const ngf_shader_stage *stage = info->shader_stages[s];
+    NSError *err = nil;
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
-      mtl_pipe_desc.vertexFunction =
-          [stage->func_lib newFunctionWithName:@"main0"];
+      if (info->spec_info) {
+        mtl_pipe_desc.vertexFunction =
+            [stage->func_lib newFunctionWithName:@"main0"
+                             constantValues:spec_consts
+                             error:&err];
+      } else {
+        mtl_pipe_desc.vertexFunction =
+        [stage->func_lib newFunctionWithName:@"main0"];
+      }
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc.fragmentFunction);
-      mtl_pipe_desc.fragmentFunction =
-          [stage->func_lib newFunctionWithName:@"main0"];
+      if (info->spec_info) {
+        mtl_pipe_desc.fragmentFunction =
+            [stage->func_lib newFunctionWithName:@"main0"
+                             constantValues:spec_consts
+                             error:&err];
+      } else {
+        mtl_pipe_desc.fragmentFunction =
+            [stage->func_lib newFunctionWithName:@"main0"];
+      }
     }
   }
   _NGF_NURSERY(graphics_pipeline, pipeline);
