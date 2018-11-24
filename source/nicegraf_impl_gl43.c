@@ -217,7 +217,7 @@ struct ngf_cmd_buffer {
 
 #pragma region ngf_impl_enum_maps
 static GLenum gl_shader_stage(ngf_stage_type stage) {
-  static const GLenum stages[] = {
+  static const GLenum stages[NGF_STAGE_COUNT] = {
     GL_VERTEX_SHADER,
     GL_TESS_CONTROL_SHADER,
     GL_TESS_EVALUATION_SHADER,
@@ -228,7 +228,7 @@ static GLenum gl_shader_stage(ngf_stage_type stage) {
 }
 
 static GLenum gl_shader_stage_bit(ngf_stage_type stage) {
-  static const GLenum stages[] = {
+  static const GLenum stages[NGF_STAGE_COUNT] = {
     GL_VERTEX_SHADER_BIT,
     GL_TESS_CONTROL_SHADER_BIT,
     GL_TESS_EVALUATION_SHADER_BIT,
@@ -239,7 +239,7 @@ static GLenum gl_shader_stage_bit(ngf_stage_type stage) {
 }
 
 static GLenum gl_type(ngf_type t) {
-  static const GLenum types[] = {
+  static const GLenum types[NGF_TYPE_COUNT] = {
     GL_BYTE,
     GL_UNSIGNED_BYTE,
     GL_SHORT,
@@ -255,7 +255,7 @@ static GLenum gl_type(ngf_type t) {
 }
 
 static GLenum gl_poly_mode(ngf_polygon_mode m) {
-  static const GLenum poly_mode[] = {
+  static const GLenum poly_mode[NGF_POLYGON_MODE_COUNT] = {
     GL_FILL,
     GL_LINE,
     GL_POINT
@@ -264,7 +264,7 @@ static GLenum gl_poly_mode(ngf_polygon_mode m) {
 }
 
 static GLenum gl_cull_mode(ngf_cull_mode m) {
-  static const GLenum cull_mode[] = {
+  static const GLenum cull_mode[NGF_CULL_MODE_COUNT] = {
     GL_BACK,
     GL_FRONT,
     GL_FRONT_AND_BACK,
@@ -276,7 +276,7 @@ static GLenum gl_cull_mode(ngf_cull_mode m) {
 }
 
 static GLenum gl_face(ngf_front_face_mode m) {
-  static const GLenum face[] = {
+  static const GLenum face[NGF_FRONT_FACE_COUNT] = {
     GL_CCW,
     GL_CW
   };
@@ -284,7 +284,7 @@ static GLenum gl_face(ngf_front_face_mode m) {
 }
 
 static GLenum gl_compare(ngf_compare_op op) {
-  static const GLenum compare[] = {
+  static const GLenum compare[NGF_COMPARE_OP_COUNT] = {
     GL_NEVER,
     GL_LESS,
     GL_LEQUAL,
@@ -292,14 +292,14 @@ static GLenum gl_compare(ngf_compare_op op) {
     GL_GEQUAL,
     GL_GREATER,
     GL_NOTEQUAL,
-    GL_ALWAYS
+    GL_ALWAYS,
   };
 
   return compare[(size_t)(op)];
 }
 
 static GLenum gl_stencil_op(ngf_stencil_op op) {
-  static const GLenum o[] = {
+  static const GLenum o[NGF_STENCIL_OP_COUNT] = {
     GL_KEEP,
     GL_ZERO,
     GL_REPLACE,
@@ -314,7 +314,7 @@ static GLenum gl_stencil_op(ngf_stencil_op op) {
 }
 
 static GLenum gl_blendfactor(ngf_blend_factor f) {
-  static const GLenum factor[] = {
+  static const GLenum factor[NGF_BLEND_FACTOR_COUNT] = {
     GL_ZERO,
     GL_ONE,
     GL_SRC_COLOR,
@@ -334,7 +334,7 @@ static GLenum gl_blendfactor(ngf_blend_factor f) {
 }
 
 static GLenum get_gl_primitive_type(ngf_primitive_type p) {
-  static const GLenum primitives[] = {
+  static const GLenum primitives[NGF_PRIMITIVE_TYPE_COUNT] = {
     GL_TRIANGLES,
     GL_TRIANGLE_STRIP,
     GL_TRIANGLE_FAN,
@@ -359,7 +359,7 @@ typedef struct {
 } glformat;
 
 static glformat get_glformat(ngf_image_format f) {
-  static const glformat formats[] = {
+  static const glformat formats[NGF_IMAGE_FORMAT_COUNT] = {
     {GL_R8, GL_RED, GL_UNSIGNED_BYTE, 8, 0, 0, 0, 0, 0, false},
     {GL_RG8, GL_RG, GL_UNSIGNED_BYTE, 8, 8, 0, 0, 0, 0, false},
     {GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE, 8, 8, 8, 0, 0, 0, false},
@@ -401,7 +401,7 @@ static GLenum gl_filter(ngf_sampler_filter f) {
 }
 
 static GLenum gl_wrap(ngf_sampler_wrap_mode e) {
-  static const GLenum modes[] = {
+  static const GLenum modes[NGF_WRAP_MODE_COUNT] = {
     GL_CLAMP_TO_EDGE,
     GL_CLAMP_TO_BORDER,
     GL_REPEAT,

@@ -218,7 +218,8 @@ typedef struct ngf_shader_stage ngf_shader_stage;
 typedef enum ngf_polygon_mode {
   NGF_POLYGON_MODE_FILL = 0, /**< Fill entire polyoon.*/
   NGF_POLYGON_MODE_LINE, /**< Outline only.*/
-  NGF_POLYGON_MODE_POINT  /**< Vertices only.*/
+  NGF_POLYGON_MODE_POINT, /**< Vertices only.*/
+  NGF_POLYGON_MODE_COUNT
 } ngf_polygon_mode;
 
 /**
@@ -228,7 +229,8 @@ typedef enum ngf_cull_mode {
   NGF_CULL_MODE_BACK = 0, /**< Cull back-facing polygons.*/
   NGF_CULL_MODE_FRONT, /**< Cull front-facing polygons. */
   NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all.*/
-  NGF_CULL_MODE_NONE /**< Never cull triangles. */
+  NGF_CULL_MODE_NONE, /**< Never cull triangles. */
+  NGF_CULL_MODE_COUNT
 } ngf_cull_mode;
 
 /**
@@ -236,7 +238,8 @@ typedef enum ngf_cull_mode {
  */
 typedef enum ngf_front_face_mode {
   NGF_FRONT_FACE_COUNTER_CLOCKWISE = 0, /**< CCW winding is front-facing.*/
-  NGF_FRONT_FACE_CLOCKWISE /**< CW winding is front-facing. */
+  NGF_FRONT_FACE_CLOCKWISE, /**< CW winding is front-facing. */
+  NGF_FRONT_FACE_COUNT
 } ngf_front_face_mode;
 
 /**
@@ -255,14 +258,15 @@ typedef struct ngf_rasterization_info {
  * Compare operations used in depth and stencil tests.
  */
 typedef enum ngf_compare_op {
-  NGF_NEVER = 0,
-  NGF_LESS,
-  NGF_LEQUAL,
-  NGF_EQUAL,
-  NGF_GEQUAL,
-  NGF_GREATER,
-  NGF_NEQUAL,
-  NGF_ALWAYS
+  NGF_COMPARE_OP_NEVER = 0, /**< Comparison test never succeeds. */
+  NGF_COMPARE_OP_LESS, /**< Comparison test succeeds if A < B. */
+  NGF_COMPARE_OP_LEQUAL, /**< Comparison test succeeds if A <= B. */
+  NGF_COMPARE_OP_EQUAL, /**< Comparison test succeeds if A == B. */
+  NGF_COMPARE_OP_GEQUAL, /**< Comparison test succeeds if A >= B. */
+  NGF_COMPARE_OP_GREATER, /**< Comparison test succeeds if A > B. */
+  NGF_COMPARE_OP_NEQUAL, /**< Comparison test succeeds if A != B. */
+  NGF_COMPARE_OP_ALWAYS, /**< Comparison test always succeeds. */
+  NGF_COMPARE_OP_COUNT
 } ngf_compare_op;
 
 /**
@@ -276,7 +280,8 @@ typedef enum ngf_stencil_op {
   NGF_STENCIL_OP_INCR_WRAP, /**< Increment, wrapping to 0.*/
   NGF_STENCIL_OP_DECR_CLAMP, /**< Decrement, clamping to 0.*/
   NGF_STENCIL_OP_DECR_WRAP, /**< Decrement, wrapping to max value.*/
-  NGF_STENCIL_OP_INVERT /**< Bitwise invert*/
+  NGF_STENCIL_OP_INVERT, /**< Bitwise invert*/
+  NGF_STENCIL_OP_COUNT
 } ngf_stencil_op ;
 
 /**
@@ -327,6 +332,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
   NGF_BLEND_FACTOR_CONSTANT_ALPHA,
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+  NGF_BLEND_FACTOR_COUNT
 } ngf_blend_factor;
 
 /**
@@ -358,7 +364,8 @@ typedef enum ngf_type {
   NGF_TYPE_UINT32,
   NGF_TYPE_FLOAT,
   NGF_TYPE_HALF_FLOAT,
-  NGF_TYPE_DOUBLE
+  NGF_TYPE_DOUBLE,
+  NGF_TYPE_COUNT
 } ngf_type;
 
 /**
@@ -454,7 +461,8 @@ typedef enum ngf_image_format {
   NGF_IMAGE_FORMAT_DEPTH32,
   NGF_IMAGE_FORMAT_DEPTH16,
   NGF_IMAGE_FORMAT_DEPTH24_STENCIL8,
-  NGF_IMAGE_FORMAT_UNDEFINED
+  NGF_IMAGE_FORMAT_UNDEFINED,
+  NGF_IMAGE_FORMAT_COUNT
 } ngf_image_format;
 
 /**
@@ -588,7 +596,8 @@ typedef enum {
   NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
   NGF_WRAP_MODE_CLAMP_TO_BORDER,
   NGF_WRAP_MODE_REPEAT,
-  NGF_WRAP_MODE_MIRRORED_REPEAT
+  NGF_WRAP_MODE_MIRRORED_REPEAT,
+  NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
 
 /**
@@ -735,7 +744,8 @@ typedef enum ngf_primitive_type {
   NGF_PRIMITIVE_TYPE_TRIANGLE_FAN,
   NGF_PRIMITIVE_TYPE_LINE_LIST,
   NGF_PRIMITIVE_TYPE_LINE_STRIP,
-  NGF_PRIMITIVE_TYPE_PATCH_LIST
+  NGF_PRIMITIVE_TYPE_PATCH_LIST,
+  NGF_PRIMITIVE_TYPE_COUNT
 } ngf_primitive_type;
 
 /**
