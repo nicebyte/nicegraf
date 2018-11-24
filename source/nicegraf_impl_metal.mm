@@ -480,6 +480,29 @@ void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
 }
 
+void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+  MTLViewport viewport;
+  viewport.originX = r->x;
+  viewport.originY = r->y;
+  viewport.width = r->width;
+  viewport.height = r->height;
+
+  // TODO: fix
+  viewport.znear = 0.0f;
+  viewport.zfar = 1.0f;
+
+  [buf->active_rce setViewport:viewport];
+}
+
+void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+  MTLScissorRect scissor;
+  scissor.x = (NSUInteger)r->x;
+  scissor.y = (NSUInteger)r->y;
+  scissor.width = r->width;
+  scissor.height = r->height;
+  [buf->active_rce setScissorRect:scissor];
+}
+
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
@@ -518,8 +541,6 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set*) {}
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
 
-PLACEHOLDER_CMD(viewport, const ngf_irect2d*)
-PLACEHOLDER_CMD(scissor, const ngf_irect2d*)
 PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_write_make, uint32_t uint32_t)
