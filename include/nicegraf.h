@@ -47,7 +47,7 @@ typedef enum ngf_error {
   NGF_ERROR_FAILED_TO_CREATE_PIPELINE,
   NGF_ERROR_INCOMPLETE_PIPELINE, /**< Some information required to create
                                       a pipeline object was not provided.*/
-  NGF_ERROR_CANT_POPULATE_IMAGE, /**< Ulpoading data to image failed. */
+  NGF_ERROR_CANT_POPULATE_IMAGE, /**< Uploading data to image failed. */
   NGF_ERROR_IMAGE_CREATION_FAILED,
   NGF_ERROR_CREATE_SHADER_STAGE_FAILED, /**< On certain back-ends this means
                                              that compiling or linking code for
@@ -191,7 +191,7 @@ typedef struct ngf_shader_stage_info {
  * The detailed information about compile errors is reported via the debug
  * callback mechanism.
  * 
- * On some back-ends, the full compile/link step be repeated during pipeline
+ * On some back-ends, the full compile/link step may be repeated during pipeline
  * creation (if using constant specialization). This does not apply to
  * back-ends that support specialization natively with no extensions (i.e.
  * Vulkan and Metal).
