@@ -1,5 +1,5 @@
 /**
-Copyright © 2018 nicegraf contributors
+Copyright (c) 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal
@@ -129,7 +129,9 @@ private:
   NgfObjType *ptr_;
 };
 
-#define _NGF_NURSERY(type) _ngf_object_nursery<ngf_##type, ngf_destroy_##type>
+#define _NGF_NURSERY(type, name) \
+  _ngf_object_nursery<ngf_##type, ngf_destroy_##type> \
+      name(NGF_ALLOC(ngf_##type));
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 #if TARGET_OS_OSX
@@ -177,7 +179,7 @@ ngf_error ngf_default_render_target(
   ngf_render_target **result) {
   assert(result);
   if (CURRENT_CONTEXT->layer) {
-    _NGF_NURSERY(render_target) rt(NGF_ALLOC(ngf_render_target));
+    _NGF_NURSERY(render_target, rt);
     rt->is_default = true;
     rt->pass_descriptor = [MTLRenderPassDescriptor new];
     rt->pass_descriptor.colorAttachments[0].texture = nil;
@@ -236,7 +238,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
   assert(info);
   assert(result);
-  _NGF_NURSERY(context) ctx(NGF_ALLOC(ngf_context));
+  _NGF_NURSERY(context, ctx);
   if (!ctx) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -291,7 +293,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   assert(info);
   assert(result);
  
-  _NGF_NURSERY(shader_stage) stage(NGF_ALLOC(ngf_shader_stage)); 
+  _NGF_NURSERY(shader_stage, stage);
   if (!stage) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -310,6 +312,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   error:&err];
     if (!stage->func_lib) {
       // TODO: call debug callback with error message here.
+      NSLog(@"%@\n", err);
       return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;    
     }
   } else { // ...or set binary.
@@ -372,9 +375,47 @@ void ngf_destroy_render_target(ngf_render_target *rt) {
   }
 }
 
+ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
+                                       ngf_graphics_pipeline **result) {
+  assert(info);
+  assert(result);
+  auto mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
+  mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+  for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
+    const ngf_shader_stage *stage = info->shader_stages[s];
+    if (stage->type == NGF_STAGE_VERTEX) {
+      assert(!mtl_pipe_desc.vertexFunction);
+      mtl_pipe_desc.vertexFunction =
+          [stage->func_lib newFunctionWithName:@"main0"];
+    } else if (stage->type == NGF_STAGE_FRAGMENT) {
+      assert(!mtl_pipe_desc.fragmentFunction);
+      mtl_pipe_desc.fragmentFunction =
+          [stage->func_lib newFunctionWithName:@"main0"];
+    }
+  }
+  _NGF_NURSERY(graphics_pipeline, pipeline);
+  NSError *err = nil;
+  pipeline->pipeline = [CURRENT_CONTEXT->device
+      newRenderPipelineStateWithDescriptor:mtl_pipe_desc
+      error:&err];
+  if (err) {
+    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+  } else {
+    *result = pipeline.release();
+    return NGF_ERROR_OK;
+  }
+}
+
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipe) {
+  if (pipe != nullptr) {
+    pipe->~ngf_graphics_pipeline();
+    NGF_FREE(pipe);
+  }
+}
+
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
                                 ngf_cmd_buffer **result) {
-  _NGF_NURSERY(cmd_buffer) cmd_buffer(NGF_ALLOC(ngf_cmd_buffer));
+  _NGF_NURSERY(cmd_buffer, cmd_buffer);
   *result = cmd_buffer.release();
   return NGF_ERROR_OK;
 }
@@ -432,13 +473,17 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
   cmd_buffer->active_rce = nil;
 }
 
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
+                           const ngf_graphics_pipeline *pipeline) {
+  [cmd_buffer->active_rce setRenderPipelineState:pipeline->pipeline];
+}
+
 #define PLACEHOLDER_CREATE_DESTROY(name) \
 ngf_error ngf_create_##name(const ngf_##name##_info*, \
                               ngf_##name **result) { \
   *result = nullptr; return NGF_ERROR_OK; } \
 void ngf_destroy_##name(ngf_##name *) {}
 
-PLACEHOLDER_CREATE_DESTROY(graphics_pipeline)
 PLACEHOLDER_CREATE_DESTROY(buffer)
 PLACEHOLDER_CREATE_DESTROY(image)
 PLACEHOLDER_CREATE_DESTROY(sampler)
@@ -455,7 +500,6 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set*) {}
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
 
-PLACEHOLDER_CMD(bind_pipeline, const ngf_graphics_pipeline*)
 PLACEHOLDER_CMD(viewport, const ngf_irect2d*)
 PLACEHOLDER_CMD(scissor, const ngf_irect2d*)
 PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
