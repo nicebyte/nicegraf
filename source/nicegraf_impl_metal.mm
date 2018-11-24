@@ -37,27 +37,27 @@ SOFTWARE.
 
 id<MTLDevice> MTL_DEVICE = nil;
 
-typedef struct _ngf_attachment {
-  id<MTLTexture> texture = nil;
-  ngf_image_ref subresource;
-} _ngf_attachment;
-
-struct ngf_render_target {
-  std::unique_ptr<_ngf_attachment[]> color_attachments;
-  std::unique_ptr<_ngf_attachment> depth_attachment;
-  std::unique_ptr<_ngf_attachment> stencil_attachment;
-};
-
 struct ngf_context {
   id<MTLDevice> device = nil;
   CAMetalLayer *layer = nil;
   id<MTLCommandQueue> queue = nil;
+  id<CAMetalDrawable> next_drawable = nil;
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
-  ngf_render_target default_rt;
+  id<MTLCommandBuffer> pending_cmd_buffer = nil;
 };
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = nullptr;
+
+struct ngf_render_target {
+  mutable MTLRenderPassDescriptor *pass_descriptor = nil;
+  bool is_default = false;
+};
+
+struct ngf_cmd_buffer {
+  id<MTLCommandBuffer> mtl_cmd_buffer = nil;
+  id<MTLRenderCommandEncoder> active_rce = nil;
+};
 
 struct ngf_shader_stage {
   id<MTLLibrary> func_lib = nil;
@@ -100,6 +100,15 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
   return fmt >= NGF_IMAGE_FORMAT_UNDEFINED
              ? MTLPixelFormatInvalid
              : pixel_format[fmt];
+}
+
+static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
+  static const MTLLoadAction action[] = {
+    MTLLoadActionDontCare,
+    MTLLoadActionLoad,
+    MTLLoadActionClear
+  };
+  return action[op];
 }
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
@@ -145,11 +154,18 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   assert(ctx && ctx == CURRENT_CONTEXT);
-  id<CAMetalDrawable> drawable = [ctx->layer nextDrawable];
-  if (!drawable) {
-    return NGF_ERROR_NO_FRAME;
+  CURRENT_CONTEXT->next_drawable = [ctx->layer nextDrawable];
+  return (!CURRENT_CONTEXT->next_drawable) ?  NGF_ERROR_NO_FRAME : NGF_ERROR_OK;
+}
+
+ngf_error ngf_end_frame(ngf_context*) {
+  if(CURRENT_CONTEXT->next_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
+    [CURRENT_CONTEXT->pending_cmd_buffer
+       presentDrawable:CURRENT_CONTEXT->next_drawable];
+    [CURRENT_CONTEXT->pending_cmd_buffer commit];
+    CURRENT_CONTEXT->next_drawable = nil;
+    CURRENT_CONTEXT->pending_cmd_buffer = nil;
   }
-  ctx->default_rt.color_attachments[0].texture = drawable.texture;
   return NGF_ERROR_OK;
 }
 
@@ -161,7 +177,23 @@ ngf_error ngf_default_render_target(
   ngf_render_target **result) {
   assert(result);
   if (CURRENT_CONTEXT->layer) {
-    *result = &CURRENT_CONTEXT->default_rt;
+    _NGF_NURSERY(render_target) rt(NGF_ALLOC(ngf_render_target));
+    rt->is_default = true;
+    rt->pass_descriptor = [MTLRenderPassDescriptor new];
+    rt->pass_descriptor.colorAttachments[0].texture = nil;
+    rt->pass_descriptor.colorAttachments[0].loadAction =
+        get_mtl_load_action(color_load_op);
+    rt->pass_descriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+    if (color_load_op == NGF_LOAD_OP_CLEAR) {
+      assert(clear_color);
+      rt->pass_descriptor.colorAttachments[0].clearColor =
+          MTLClearColorMake(clear_color->clear_color[0],
+                            clear_color->clear_color[1],
+                            clear_color->clear_color[2],
+                            clear_color->clear_color[3]);
+    }
+    // TODO: depth
+    *result = rt.release();
     return NGF_ERROR_OK;
   } else {
     return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;;
@@ -219,7 +251,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
     ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
-    ctx->default_rt.color_attachments.reset(new _ngf_attachment[1]);
+    // TODO: depth
   }
  
   *result = ctx.release(); 
@@ -328,6 +360,78 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
   return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
 }
 
+ngf_error ngf_create_render_target(const ngf_render_target_info *info,
+                                   ngf_render_target **result) {
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_render_target(ngf_render_target *rt) {
+  if (rt != nullptr) {
+    rt->~ngf_render_target();
+    NGF_FREE(rt);
+  }
+}
+
+ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
+                                ngf_cmd_buffer **result) {
+  _NGF_NURSERY(cmd_buffer) cmd_buffer(NGF_ALLOC(ngf_cmd_buffer));
+  *result = cmd_buffer.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
+  if (cmd_buffer != nullptr) {
+    cmd_buffer->~ngf_cmd_buffer();
+    NGF_FREE(cmd_buffer);
+  }
+}
+
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
+  assert(cmd_buffer);
+  cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
+  cmd_buffer->active_rce = nil;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
+  if (cmd_buffer->active_rce) {
+    [cmd_buffer->active_rce endEncoding];
+  }
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_submit_cmd_buffer(uint32_t n, ngf_cmd_buffer **cmd_buffers) {
+  if (CURRENT_CONTEXT->pending_cmd_buffer) {
+    [CURRENT_CONTEXT->pending_cmd_buffer commit];
+    CURRENT_CONTEXT->pending_cmd_buffer = nil;
+  }
+  for (uint32_t b = 0u; b < n - 1u; ++b) {
+    [cmd_buffers[b]->mtl_cmd_buffer commit];
+  }
+  CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[n - 1u]->mtl_cmd_buffer;
+  return NGF_ERROR_OK;
+}
+
+void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
+                        const ngf_render_target *rt) {
+  if (cmd_buffer->active_rce) {
+    [cmd_buffer->active_rce endEncoding];
+  }
+  if (rt->is_default) {
+    rt->pass_descriptor.colorAttachments[0].texture =
+      CURRENT_CONTEXT->next_drawable.texture;
+    // TODO: depth
+  }
+  cmd_buffer->active_rce =
+      [cmd_buffer->mtl_cmd_buffer
+       renderCommandEncoderWithDescriptor:rt->pass_descriptor];
+}
+
+void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
+  [cmd_buffer->active_rce endEncoding];
+  cmd_buffer->active_rce = nil;
+}
+
 #define PLACEHOLDER_CREATE_DESTROY(name) \
 ngf_error ngf_create_##name(const ngf_##name##_info*, \
                               ngf_##name **result) { \
@@ -338,9 +442,7 @@ PLACEHOLDER_CREATE_DESTROY(graphics_pipeline)
 PLACEHOLDER_CREATE_DESTROY(buffer)
 PLACEHOLDER_CREATE_DESTROY(image)
 PLACEHOLDER_CREATE_DESTROY(sampler)
-PLACEHOLDER_CREATE_DESTROY(render_target)
 PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
-PLACEHOLDER_CREATE_DESTROY(cmd_buffer)
 
 ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout*,
                                     ngf_descriptor_set **result) {
@@ -364,14 +466,7 @@ PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
 PLACEHOLDER_CMD(bind_vertex_buffer, const ngf_buffer*, uint32_t, uint32_t)
 PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
-PLACEHOLDER_CMD(begin_pass, const ngf_render_target*)
-void ngf_cmd_end_pass(ngf_cmd_buffer*){}
 PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
-
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer*) { return NGF_ERROR_OK; }
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer*) { return NGF_ERROR_OK; }
-ngf_error ngf_submit_cmd_buffer(uint32_t, ngf_cmd_buffer**) {
-  return NGF_ERROR_OK; }
 
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
                                       const uint32_t nwrites,
@@ -398,5 +493,4 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame(ngf_context*) { return NGF_ERROR_OK; }
 
