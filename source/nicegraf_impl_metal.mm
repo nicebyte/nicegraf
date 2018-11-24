@@ -399,6 +399,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
   if (err) {
+    NSLog(@"... [%@]\n", err);
+    // TODO: invoke debug callback
     return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
   } else {
     *result = pipeline.release();
@@ -475,8 +477,24 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
 
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline) {
-  [cmd_buffer->active_rce setRenderPipelineState:pipeline->pipeline];
+  [buf->active_rce setRenderPipelineState:pipeline->pipeline];
 }
+
+void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+                  uint32_t first_element, uint32_t nelements,
+                  uint32_t ninstances) {
+  if (!indexed) {
+    [buf->active_rce drawPrimitives:MTLPrimitiveTypeTriangle /*todo: read from pipe*/
+                      vertexStart:first_element
+                      vertexCount:nelements
+                      instanceCount:ninstances
+                      baseInstance:0];
+  } else {
+    assert(false);
+    /*TODO*/
+  }
+}
+
 
 #define PLACEHOLDER_CREATE_DESTROY(name) \
 ngf_error ngf_create_##name(const ngf_##name##_info*, \
@@ -510,7 +528,6 @@ PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
 PLACEHOLDER_CMD(bind_vertex_buffer, const ngf_buffer*, uint32_t, uint32_t)
 PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
-PLACEHOLDER_CMD(draw, bool, uint32_t, uint32_t, uint32_t)
 
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
                                       const uint32_t nwrites,
