@@ -46,7 +46,7 @@ void ngf_util_create_default_graphics_pipeline_data(
     .fail_op = NGF_STENCIL_OP_KEEP,
     .pass_op = NGF_STENCIL_OP_KEEP,
     .depth_fail_op = NGF_STENCIL_OP_KEEP,
-    .compare_op = NGF_EQUAL,
+    .compare_op = NGF_COMPARE_OP_EQUAL,
     .compare_mask = 0,
     .write_mask = 0,
     .reference = 0 
@@ -57,7 +57,7 @@ void ngf_util_create_default_graphics_pipeline_data(
     .stencil_test = false,
     .depth_test = false,
     .depth_write = false,
-    .depth_compare = NGF_LESS,
+    .depth_compare = NGF_COMPARE_OP_LESS,
     .front_stencil = default_stencil,
     .back_stencil = default_stencil
   };
