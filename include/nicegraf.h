@@ -349,7 +349,8 @@ typedef struct ngf_blend_info {
  */
 typedef enum ngf_input_rate {
   NGF_INPUT_RATE_VERTEX = 0, /**< attribute changes per-vertex*/
-  NGF_INPUT_RATE_INSTANCE /**< attribute changes per-instance*/
+  NGF_INPUT_RATE_INSTANCE, /**< attribute changes per-instance*/
+  NGF_INPUT_RATE_COUNT
 } ngf_input_rate;
 
 /**
