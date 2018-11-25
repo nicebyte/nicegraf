@@ -227,7 +227,7 @@ static GLenum gl_shader_stage(ngf_stage_type stage) {
   return stages[stage];
 }
 
-static GLenum gl_shader_stage_bit(ngf_stage_type stage) {
+static GLenum get_gl_shader_stage_bit(ngf_stage_type stage) {
   static const GLenum stages[NGF_STAGE_COUNT] = {
     GL_VERTEX_SHADER_BIT,
     GL_TESS_CONTROL_SHADER_BIT,
@@ -238,7 +238,7 @@ static GLenum gl_shader_stage_bit(ngf_stage_type stage) {
   return stages[stage];
 }
 
-static GLenum gl_type(ngf_type t) {
+static GLenum get_gl_type(ngf_type t) {
   static const GLenum types[NGF_TYPE_COUNT] = {
     GL_BYTE,
     GL_UNSIGNED_BYTE,
@@ -254,7 +254,7 @@ static GLenum gl_type(ngf_type t) {
   return types[t];
 }
 
-static GLenum gl_poly_mode(ngf_polygon_mode m) {
+static GLenum get_gl_poly_mode(ngf_polygon_mode m) {
   static const GLenum poly_mode[NGF_POLYGON_MODE_COUNT] = {
     GL_FILL,
     GL_LINE,
@@ -263,7 +263,7 @@ static GLenum gl_poly_mode(ngf_polygon_mode m) {
   return poly_mode[(size_t)(m)];
 }
 
-static GLenum gl_cull_mode(ngf_cull_mode m) {
+static GLenum get_gl_cull_mode(ngf_cull_mode m) {
   static const GLenum cull_mode[NGF_CULL_MODE_COUNT] = {
     GL_BACK,
     GL_FRONT,
@@ -275,7 +275,7 @@ static GLenum gl_cull_mode(ngf_cull_mode m) {
   return cull_mode[(size_t)(m)];
 }
 
-static GLenum gl_face(ngf_front_face_mode m) {
+static GLenum get_gl_face(ngf_front_face_mode m) {
   static const GLenum face[NGF_FRONT_FACE_COUNT] = {
     GL_CCW,
     GL_CW
@@ -283,7 +283,7 @@ static GLenum gl_face(ngf_front_face_mode m) {
   return face[(size_t)(m)];
 }
 
-static GLenum gl_compare(ngf_compare_op op) {
+static GLenum get_gl_compare(ngf_compare_op op) {
   static const GLenum compare[NGF_COMPARE_OP_COUNT] = {
     GL_NEVER,
     GL_LESS,
@@ -298,7 +298,7 @@ static GLenum gl_compare(ngf_compare_op op) {
   return compare[(size_t)(op)];
 }
 
-static GLenum gl_stencil_op(ngf_stencil_op op) {
+static GLenum get_gl_stencil_op(ngf_stencil_op op) {
   static const GLenum o[NGF_STENCIL_OP_COUNT] = {
     GL_KEEP,
     GL_ZERO,
@@ -313,7 +313,7 @@ static GLenum gl_stencil_op(ngf_stencil_op op) {
   return o[(size_t)(op)];
 }
 
-static GLenum gl_blendfactor(ngf_blend_factor f) {
+static GLenum get_gl_blendfactor(ngf_blend_factor f) {
   static const GLenum factor[NGF_BLEND_FACTOR_COUNT] = {
     GL_ZERO,
     GL_ONE,
@@ -358,7 +358,7 @@ typedef struct {
   bool    srgb;
 } glformat;
 
-static glformat get_glformat(ngf_image_format f) {
+static glformat get_gl_format(ngf_image_format f) {
   static const glformat formats[NGF_IMAGE_FORMAT_COUNT] = {
     {GL_R8, GL_RED, GL_UNSIGNED_BYTE, 8, 0, 0, 0, 0, 0, false},
     {GL_RG8, GL_RG, GL_UNSIGNED_BYTE, 8, 8, 0, 0, 0, 0, false},
@@ -389,7 +389,7 @@ static glformat get_glformat(ngf_image_format f) {
   return formats[f];
 }
 
-static GLenum gl_filter(ngf_sampler_filter f) {
+static GLenum get_gl_filter(ngf_sampler_filter f) {
   static const GLenum filters[] = {
     GL_NEAREST,
     GL_LINEAR,
@@ -400,7 +400,7 @@ static GLenum gl_filter(ngf_sampler_filter f) {
   return filters[f];
 }
 
-static GLenum gl_wrap(ngf_sampler_wrap_mode e) {
+static GLenum get_gl_wrap(ngf_sampler_wrap_mode e) {
   static const GLenum modes[NGF_WRAP_MODE_COUNT] = {
     GL_CLAMP_TO_EDGE,
     GL_CLAMP_TO_BORDER,
@@ -409,6 +409,7 @@ static GLenum gl_wrap(ngf_sampler_wrap_mode e) {
   };
   return modes[e];
 }
+
 #pragma endregion
 
 void (*NGF_DEBUG_CALLBACK)(const char *message, const void *userdata) = NULL;
@@ -471,8 +472,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   size_t a = 0;
   config_attribs[a++] = EGL_CONFORMANT; config_attribs[a++] = EGL_OPENGL_BIT;
   if (swapchain_info != NULL) {
-    const glformat color_format = get_glformat(swapchain_info->cfmt);
-    const glformat depth_stencil_format = get_glformat(swapchain_info->dfmt);
+    const glformat color_format = get_gl_format(swapchain_info->cfmt);
+    const glformat depth_stencil_format = get_gl_format(swapchain_info->dfmt);
     config_attribs[a++] = EGL_COLOR_BUFFER_TYPE;
     config_attribs[a++] = EGL_RGB_BUFFER;
     config_attribs[a++] = EGL_RED_SIZE;
@@ -521,7 +522,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   // Create surface if necessary.
   if (swapchain_info) {
-    const glformat color_format = get_glformat(swapchain_info->cfmt);
+    const glformat color_format = get_gl_format(swapchain_info->cfmt);
     EGLint egl_surface_attribs[] = {
       EGL_RENDER_BUFFER, swapchain_info->capacity_hint <= 1
                              ? EGL_SINGLE_BUFFER
@@ -797,7 +798,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     goto ngf_create_shader_stage_cleanup;
   }
   stage->gltype = gl_shader_stage(info->type);
-  stage->glstagebit = gl_shader_stage_bit(info->type);
+  stage->glstagebit = get_gl_shader_stage_bit(info->type);
   stage->source_code = NULL;
   stage->source_code_size = 0u;
   if (!info->is_binary) { // Compile from source.
@@ -1053,7 +1054,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     glEnableVertexAttribArray(attrib->location);
     glVertexAttribFormat(attrib->location,
                          attrib->size,
-                         gl_type(attrib->type),
+                         get_gl_type(attrib->type),
                          attrib->normalized,
                          attrib->offset);
     glVertexAttribBinding(attrib->location, attrib->binding);
@@ -1146,7 +1147,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
     return NGF_ERROR_OUTOFMEM;
   }
 
-  glformat glf = get_glformat(info->format);
+  glformat glf = get_gl_format(info->format);
   image->glformat = glf.format;
   image->gltype = glf.type;
   image->is_multisample = info->nsamples > 1;
@@ -1282,11 +1283,11 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   }
   
   glGenSamplers(1, &(sampler->glsampler));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER, gl_filter(info->min_filter));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER, gl_filter(info->mag_filter));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S, gl_wrap(info->wrap_s));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_T, gl_wrap(info->wrap_t));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_R, gl_wrap(info->wrap_r));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER, get_gl_filter(info->min_filter));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER, get_gl_filter(info->mag_filter));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S, get_gl_wrap(info->wrap_s));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_T, get_gl_wrap(info->wrap_t));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_R, get_gl_wrap(info->wrap_r));
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MIN_LOD, info->lod_min);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MAX_LOD, info->lod_max);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_LOD_BIAS, info->lod_bias);
@@ -1765,19 +1766,19 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           }
           if (cached_rast->polygon_mode != rast->polygon_mode ||
               force_pipeline_update) {
-            glPolygonMode(GL_FRONT_AND_BACK, gl_poly_mode(rast->polygon_mode));
+            glPolygonMode(GL_FRONT_AND_BACK, get_gl_poly_mode(rast->polygon_mode));
           }
           if (cached_rast->cull_mode != rast->cull_mode || force_pipeline_update) {
             if (rast->cull_mode != NGF_CULL_MODE_NONE) {
               glEnable(GL_CULL_FACE);
-              glCullFace(gl_cull_mode(rast->cull_mode));
+              glCullFace(get_gl_cull_mode(rast->cull_mode));
             } else {
               glDisable(GL_CULL_FACE);
             }
           }
           if (cached_rast->front_face != rast->front_face ||
               force_pipeline_update) {
-            glFrontFace(gl_face(rast->front_face));
+            glFrontFace(get_gl_face(rast->front_face));
           }
           if (cached_rast->line_width != rast->line_width ||
               force_pipeline_update) {
@@ -1810,7 +1811,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               force_pipeline_update) {
             if (depth_stencil->depth_test) {
               glEnable(GL_DEPTH_TEST);
-              glDepthFunc(gl_compare(depth_stencil->depth_compare));
+              glDepthFunc(get_gl_compare(depth_stencil->depth_compare));
             } else {
               glDisable(GL_DEPTH_TEST);
             }
@@ -1833,26 +1834,26 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               glEnable(GL_STENCIL_TEST);
               glStencilFuncSeparate(
                 GL_FRONT,
-                gl_compare(depth_stencil->front_stencil.compare_op),
+                get_gl_compare(depth_stencil->front_stencil.compare_op),
                 depth_stencil->front_stencil.reference,
                 depth_stencil->front_stencil.compare_mask);
               glStencilOpSeparate(
                 GL_FRONT,
-                gl_stencil_op(depth_stencil->front_stencil.fail_op),
-                gl_stencil_op(depth_stencil->front_stencil.depth_fail_op),
-                gl_stencil_op(depth_stencil->front_stencil.pass_op));
+                get_gl_stencil_op(depth_stencil->front_stencil.fail_op),
+                get_gl_stencil_op(depth_stencil->front_stencil.depth_fail_op),
+                get_gl_stencil_op(depth_stencil->front_stencil.pass_op));
               glStencilMaskSeparate(GL_FRONT,
                                     depth_stencil->front_stencil.write_mask);
               glStencilFuncSeparate(
                 GL_BACK,
-                gl_compare(depth_stencil->back_stencil.compare_op),
+                get_gl_compare(depth_stencil->back_stencil.compare_op),
                 depth_stencil->back_stencil.reference,
                 depth_stencil->back_stencil.compare_mask);
               glStencilOpSeparate(
                 GL_BACK,
-                gl_stencil_op(depth_stencil->back_stencil.fail_op),
-                gl_stencil_op(depth_stencil->back_stencil.depth_fail_op),
-                gl_stencil_op(depth_stencil->back_stencil.pass_op));
+                get_gl_stencil_op(depth_stencil->back_stencil.fail_op),
+                get_gl_stencil_op(depth_stencil->back_stencil.depth_fail_op),
+                get_gl_stencil_op(depth_stencil->back_stencil.pass_op));
               glStencilMaskSeparate(GL_BACK,
                                     depth_stencil->back_stencil.write_mask);
             } else { 
@@ -1872,8 +1873,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
             if (blend->enable) {
               glEnable(GL_BLEND);
-              glBlendFunc(gl_blendfactor(blend->sfactor),
-                          gl_blendfactor(blend->dfactor));
+              glBlendFunc(get_gl_blendfactor(blend->sfactor),
+                          get_gl_blendfactor(blend->dfactor));
             } else {
               glDisable(GL_BLEND);
             }
@@ -2099,7 +2100,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                                                           : 4;
           glDrawElements(bound_pipeline->primitive_type,
                          cmd->draw.nelements,
-                         gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                         get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
                          (void*)(uintptr_t)(cmd->draw.first_element *
                                             elem_size));
         } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
@@ -2110,7 +2111,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                                                           : 4;
           glDrawElementsInstanced(bound_pipeline->primitive_type,
                                   cmd->draw.nelements,
-                                  gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                                  get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
                                   (void*)((uintptr_t)(cmd->draw.first_element *
                                                       elem_size)),  
                                   cmd->draw.ninstances);
