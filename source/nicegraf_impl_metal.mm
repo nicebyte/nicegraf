@@ -59,6 +59,7 @@ struct ngf_render_target {
 struct ngf_cmd_buffer {
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
+  const ngf_graphics_pipeline *active_pipe = nullptr;
 };
 
 struct ngf_shader_stage {
@@ -68,6 +69,11 @@ struct ngf_shader_stage {
 
 struct ngf_graphics_pipeline {
   id<MTLRenderPipelineState> pipeline = nil;
+  MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
+};
+
+struct ngf_buffer {
+  id<MTLBuffer> mtl_buffer = nil;
 };
 
 #pragma mark ngf_enum_maps
@@ -126,6 +132,68 @@ static MTLDataType get_mtl_type(ngf_type type) {
     MTLDataTypeFloat,
     MTLDataTypeHalf,
     MTLDataTypeNone /* Double,Metal does not support.*/
+  };
+  return types[type];
+}
+
+static MTLVertexFormat get_mtl_attrib_format(ngf_type type, uint32_t size) {
+  static const MTLVertexFormat formats[NGF_TYPE_COUNT][4] = {
+    {MTLVertexFormatChar, MTLVertexFormatChar2,
+     MTLVertexFormatChar3, MTLVertexFormatChar4},
+    {MTLVertexFormatUChar, MTLVertexFormatUChar2,
+     MTLVertexFormatUChar3, MTLVertexFormatUChar4},
+    {MTLVertexFormatShort, MTLVertexFormatShort2,
+     MTLVertexFormatShort3, MTLVertexFormatShort4},
+    {MTLVertexFormatUShort, MTLVertexFormatUShort2,
+     MTLVertexFormatUShort3, MTLVertexFormatUShort4},
+    {MTLVertexFormatInt, MTLVertexFormatInt2,
+     MTLVertexFormatInt3, MTLVertexFormatInt4},
+    {MTLVertexFormatUInt, MTLVertexFormatUInt2,
+     MTLVertexFormatUInt3, MTLVertexFormatUInt4},
+    {MTLVertexFormatFloat, MTLVertexFormatFloat2,
+     MTLVertexFormatFloat3, MTLVertexFormatFloat4},
+    {MTLVertexFormatHalf, MTLVertexFormatHalf2,
+     MTLVertexFormatHalf3, MTLVertexFormatHalf4},
+    {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+     MTLVertexFormatInvalid, MTLVertexFormatInvalid}, // Double, Metal does not
+                                                      // support.
+  };
+  assert(size <= 4u && size > 0u);
+  return formats[type][size - 1u];
+}
+
+static MTLVertexStepFunction get_mtl_step_function(ngf_input_rate rate) {
+  static const MTLVertexStepFunction funcs[NGF_INPUT_RATE_COUNT] = {
+    MTLVertexStepFunctionPerVertex,
+    MTLVertexStepFunctionPerInstance
+  };
+  return funcs[rate];
+}
+
+static MTLPrimitiveTopologyClass
+get_mtl_primitive_topology_class(ngf_primitive_type type) {
+  static const MTLPrimitiveTopologyClass
+  topo_class[NGF_PRIMITIVE_TYPE_COUNT] = {
+    MTLPrimitiveTopologyClassTriangle,
+    MTLPrimitiveTopologyClassTriangle,
+    MTLPrimitiveTopologyClassUnspecified, // Triangle Fan, Metal does not
+                                          // support.
+    MTLPrimitiveTopologyClassLine,
+    MTLPrimitiveTopologyClassLine,
+    MTLPrimitiveTopologyClassUnspecified, // Patch list, tessellation not
+                                          // implemented yet.
+  };
+  return topo_class[type];
+}
+
+static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_type type) {
+  static const MTLPrimitiveType types[NGF_PRIMITIVE_TYPE_COUNT] = {
+    MTLPrimitiveTypeTriangle,
+    MTLPrimitiveTypeTriangleStrip,
+    MTLPrimitiveTypePoint, // Incorrect
+    MTLPrimitiveTypeLine,
+    MTLPrimitiveTypeLineStrip,
+    MTLPrimitiveTypePoint // Incorrect;
   };
   return types[type];
 }
@@ -396,57 +464,84 @@ void ngf_destroy_render_target(ngf_render_target *rt) {
   }
 }
 
+id<MTLFunction> _ngf_get_shader_main(id<MTLLibrary> func_lib,
+                                     MTLFunctionConstantValues *spec_consts) {
+  NSError *err = nil;
+  return spec_consts == nil
+           ? [func_lib newFunctionWithName:@"main0"]
+           : [func_lib newFunctionWithName:@"main0"
+                            constantValues:spec_consts
+                                     error:&err];
+}
+
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
   assert(result);
   auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
   mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm; // TODO: fix
-  auto *spec_consts = [MTLFunctionConstantValues new];
+  
+  // Populate specialization constant values.
+  MTLFunctionConstantValues *spec_consts = nil;
   if (info->spec_info != nullptr) {
+    spec_consts = [MTLFunctionConstantValues new];
     for (uint32_t s = 0u; s < info->spec_info->nspecializations; ++s) {
-      const ngf_constant_specialization *spec = &info->spec_info->specializations[s];
+      const ngf_constant_specialization *spec =
+          &info->spec_info->specializations[s];
       MTLDataType type = get_mtl_type(spec->type);
       if (type == MTLDataTypeNone) {
         return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
       }
-      [spec_consts setConstantValue:((uint8_t*)info->spec_info->value_buffer + spec->offset)
+      void *write_ptr =
+          ((uint8_t*)info->spec_info->value_buffer + spec->offset);
+      [spec_consts setConstantValue:write_ptr
                                type:get_mtl_type(spec->type)
                             atIndex:spec->constant_id];
     }
   }
+  
+  // Set stage functions.
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
     const ngf_shader_stage *stage = info->shader_stages[s];
-    NSError *err = nil;
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
-      if (info->spec_info) {
-        mtl_pipe_desc.vertexFunction =
-            [stage->func_lib newFunctionWithName:@"main0"
-                             constantValues:spec_consts
-                             error:&err];
-      } else {
-        mtl_pipe_desc.vertexFunction =
-        [stage->func_lib newFunctionWithName:@"main0"];
-      }
+      mtl_pipe_desc.vertexFunction =
+          _ngf_get_shader_main(stage->func_lib, spec_consts);
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc.fragmentFunction);
-      if (info->spec_info) {
-        mtl_pipe_desc.fragmentFunction =
-            [stage->func_lib newFunctionWithName:@"main0"
-                             constantValues:spec_consts
-                             error:&err];
-      } else {
-        mtl_pipe_desc.fragmentFunction =
-            [stage->func_lib newFunctionWithName:@"main0"];
-      }
+      mtl_pipe_desc.fragmentFunction =
+          _ngf_get_shader_main(stage->func_lib, spec_consts);
     }
   }
+  
+  // Configure vertex input.
+  const ngf_vertex_input_info &vertex_input_info = *info->input_info;
+  MTLVertexDescriptor *vert_desc = mtl_pipe_desc.vertexDescriptor;
+  for (uint32_t a = 0u; a < vertex_input_info.nattribs; ++a) {
+    MTLVertexAttributeDescriptor *attr_desc = vert_desc.attributes[a];
+    const ngf_vertex_attrib_desc &attr_info = vertex_input_info.attribs[a];
+    attr_desc.offset = vertex_input_info.attribs[a].offset;
+    attr_desc.bufferIndex = vertex_input_info.attribs[a].binding;
+    attr_desc.format = get_mtl_attrib_format(attr_info.type, attr_info.size);
+  }
+  for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
+    MTLVertexBufferLayoutDescriptor *binding_desc = vert_desc.layouts[b];
+    const ngf_vertex_buf_binding_desc &binding_info =
+        vertex_input_info.vert_buf_bindings[b];
+    binding_desc.stride = binding_info.stride;
+    binding_desc.stepFunction = get_mtl_step_function(binding_info.input_rate);
+  }
+  
+  // Set primitive topology.
+  mtl_pipe_desc.inputPrimitiveTopology =
+      get_mtl_primitive_topology_class(info->primitive_type);
+  
   _NGF_NURSERY(graphics_pipeline, pipeline);
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
+  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
   if (err) {
     NSLog(@"... [%@]\n", err);
     // TODO: invoke debug callback
@@ -461,6 +556,22 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipe) {
   if (pipe != nullptr) {
     pipe->~ngf_graphics_pipeline();
     NGF_FREE(pipe);
+  }
+}
+
+ngf_error ngf_create_buffer(const ngf_buffer_info *info,
+                            ngf_buffer **result) {
+  _NGF_NURSERY(buffer, buf);
+  buf->mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->size
+                     options:MTLResourceOptionCPUCacheModeWriteCombined];
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_buffer(ngf_buffer *buf) {
+  if (buf != nullptr) {
+    buf->~ngf_buffer();
+    NGF_FREE(buf);
   }
 }
 
@@ -522,11 +633,13 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
 void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
   [cmd_buffer->active_rce endEncoding];
   cmd_buffer->active_rce = nil;
+  cmd_buffer->active_pipe = nullptr;
 }
 
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline) {
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
+  buf->active_pipe = pipeline;
 }
 
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
@@ -556,7 +669,7 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
   if (!indexed) {
-    [buf->active_rce drawPrimitives:MTLPrimitiveTypeTriangle /*todo: read from pipe*/
+    [buf->active_rce drawPrimitives:buf->active_pipe->primitive_type
                       vertexStart:first_element
                       vertexCount:nelements
                       instanceCount:ninstances
@@ -567,6 +680,14 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   }
 }
 
+void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *cmd_buf,
+                                const ngf_buffer *buf,
+                                uint32_t binding,
+                                uint32_t offset) {
+  [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
+                                offset:offset
+                               atIndex:binding];
+}
 
 #define PLACEHOLDER_CREATE_DESTROY(name) \
 ngf_error ngf_create_##name(const ngf_##name##_info*, \
@@ -574,7 +695,6 @@ ngf_error ngf_create_##name(const ngf_##name##_info*, \
   *result = nullptr; return NGF_ERROR_OK; } \
 void ngf_destroy_##name(ngf_##name *) {}
 
-PLACEHOLDER_CREATE_DESTROY(buffer)
 PLACEHOLDER_CREATE_DESTROY(image)
 PLACEHOLDER_CREATE_DESTROY(sampler)
 PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
@@ -592,11 +712,10 @@ void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
 
 PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
-PLACEHOLDER_CMD(stencil_write_make, uint32_t uint32_t)
+PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
 PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
-PLACEHOLDER_CMD(bind_vertex_buffer, const ngf_buffer*, uint32_t, uint32_t)
 PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
 
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
@@ -621,7 +740,6 @@ ngf_error ngf_populate_buffer(ngf_buffer *buf,
                               size_t offset,
                               size_t size,
                               const void *data) {
+  memcpy((uint8_t*)[buf->mtl_buffer contents] + offset, data, size);
   return NGF_ERROR_OK;
 }
-
-
