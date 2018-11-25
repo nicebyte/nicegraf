@@ -60,6 +60,8 @@ struct ngf_cmd_buffer {
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
   const ngf_graphics_pipeline *active_pipe = nullptr;
+  id<MTLBuffer> bound_index_buffer = nil;
+  MTLIndexType bound_index_buffer_type;
 };
 
 struct ngf_shader_stage {
@@ -196,6 +198,11 @@ static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_type type) {
     MTLPrimitiveTypePoint // Incorrect;
   };
   return types[type];
+}
+
+static MTLIndexType get_mtl_index_type(ngf_type type) {
+  assert(type == NGF_TYPE_UINT16 || type == NGF_TYPE_UINT32);
+  return type == NGF_TYPE_UINT16 ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
 }
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
@@ -668,15 +675,21 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
+  MTLPrimitiveType prim_type = buf->active_pipe->primitive_type;
   if (!indexed) {
-    [buf->active_rce drawPrimitives:buf->active_pipe->primitive_type
+    [buf->active_rce drawPrimitives:prim_type
                       vertexStart:first_element
                       vertexCount:nelements
                       instanceCount:ninstances
                       baseInstance:0];
   } else {
-    assert(false);
-    /*TODO*/
+    MTLIndexType index_type = buf->bound_index_buffer_type;
+    size_t index_size =
+        index_type == MTLIndexTypeUInt16 ? sizeof(uint16_t) : sizeof(uint32_t);
+    [buf->active_rce drawIndexedPrimitives:prim_type
+     indexCount:nelements indexType:buf->bound_index_buffer_type
+     indexBuffer:buf->bound_index_buffer
+     indexBufferOffset:first_element * index_size];
   }
 }
 
@@ -687,6 +700,13 @@ void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *cmd_buf,
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                 offset:offset
                                atIndex:binding];
+}
+
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
+                               const ngf_buffer *buf,
+                               ngf_type type) {
+  cmd_buf->bound_index_buffer = buf->mtl_buffer;
+  cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
 #define PLACEHOLDER_CREATE_DESTROY(name) \
@@ -716,7 +736,6 @@ PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
 PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
-PLACEHOLDER_CMD(bind_index_buffer, const ngf_buffer*, ngf_type)
 
 ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
                                       const uint32_t nwrites,
