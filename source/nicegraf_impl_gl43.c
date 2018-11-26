@@ -111,6 +111,18 @@ struct ngf_buffer {
   GLenum access_type;
 };
 
+struct ngf_attrib_buffer {
+  GLuint glbuffer;
+};
+
+struct ngf_index_buffer {
+  GLuint glbuffer;
+};
+
+struct ngf_uniform_buffer {
+  GLuint glbuffer;
+};
+
 struct ngf_descriptor_set_layout {
   ngf_descriptor_set_layout_info info;
 };
@@ -151,7 +163,7 @@ typedef enum {
   _NGF_CMD_STENCIL_WRITE_MASK,
   _NGF_CMD_STENCIL_COMPARE_MASK,
   _NGF_CMD_BIND_DESCRIPTOR_SET,
-  _NGF_CMD_BIND_VERTEX_BUFFER,
+  _NGF_CMD_BIND_ATTRIB_BUFFER,
   _NGF_CMD_BIND_INDEX_BUFFER,
   _NGF_CMD_DRAW,
   _NGF_CMD_DRAW_INDEXED,
@@ -187,15 +199,15 @@ typedef struct _ngf_emulated_cmd {
       uint32_t slot;
     } descriptor_set_bind_op;
     struct {
-      const ngf_buffer *buf;
+      const ngf_attrib_buffer *buf;
       uint32_t binding;
       uint32_t offset;
-    } vertex_buffer_bind_op;
+    } attrib_buffer_bind_op;
     struct {
       const ngf_render_target *target;
     } begin_pass;
     struct {
-      const ngf_buffer *index_buffer;
+      const ngf_index_buffer *index_buffer;
       ngf_type type;
     } index_buffer_bind;
     struct {
@@ -408,6 +420,11 @@ static GLenum get_gl_wrap(ngf_sampler_wrap_mode e) {
     GL_MIRRORED_REPEAT
   };
   return modes[e];
+}
+
+static GLenum get_gl_buffer_usage(ngf_vertex_data_usage usage) {
+  return
+      usage == NGF_VERTEX_DATA_USAGE_STATIC ? GL_STATIC_DRAW : GL_STREAM_DRAW;
 }
 
 #pragma endregion
@@ -1458,6 +1475,71 @@ ngf_error ngf_resolve_render_target(const ngf_render_target *src,
   return NGF_ERROR_OK;
 }
 
+GLuint _ngf_create_vertex_data_buffer(GLenum type,
+                                      const ngf_vertex_data_info *info) {
+  assert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
+  GLuint buf;
+  glGenBuffers(1u, &buf);
+  glBindBuffer(type, buf);
+  GLenum gl_buffer_usage = get_gl_buffer_usage(info->usage_hint);
+
+  glBufferData(type, info->buffer_size, info->buffer_ptr,
+               gl_buffer_usage);
+
+  if (info->buffer_ptr == NULL) {
+    assert(info->fill_callback);
+    volatile void *buffer_data = glMapBufferRange(type,
+                                                  0u,
+                                                  info->buffer_size,
+                                                  GL_WRITE_ONLY);
+    info->fill_callback(buffer_data, info->buffer_size,
+                        info->fill_callback_userdata);
+    glUnmapBuffer(type);
+  }
+  return buf;
+}
+
+ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
+                                   ngf_attrib_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_attrib_buffer);
+  ngf_attrib_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->glbuffer = _ngf_create_vertex_data_buffer(GL_ARRAY_BUFFER, info);
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buf) {
+  if (buf != NULL) {
+    glDeleteBuffers(1u, &buf->glbuffer);
+    NGF_FREE(buf);
+  }
+}
+
+ngf_error ngf_create_index_buffer(const ngf_attrib_buffer_info *info,
+                                   ngf_index_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_index_buffer);
+  ngf_index_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->glbuffer = _ngf_create_vertex_data_buffer(GL_ELEMENT_ARRAY_BUFFER,
+                                                 info);
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
+  if (buf != NULL) {
+    glDeleteBuffers(1u, &buf->glbuffer);
+    NGF_FREE(buf);
+  }
+}
+
 ngf_error ngf_create_buffer(const ngf_buffer_info *info, ngf_buffer **result) {
   assert(info);
   assert(result);
@@ -1677,18 +1759,19 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
-                                const ngf_buffer *vbuf,
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
+                                const ngf_attrib_buffer *vbuf,
                                 uint32_t binding, uint32_t offset) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
-  cmd->type = _NGF_CMD_BIND_VERTEX_BUFFER;
-  cmd->vertex_buffer_bind_op.binding = binding;
-  cmd->vertex_buffer_bind_op.buf = vbuf;
-  cmd->vertex_buffer_bind_op.offset = offset;
+  cmd->type = _NGF_CMD_BIND_ATTRIB_BUFFER;
+  cmd->attrib_buffer_bind_op.binding = binding;
+  cmd->attrib_buffer_bind_op.buf = vbuf;
+  cmd->attrib_buffer_bind_op.offset = offset;
   _NGF_APPENDCMD(buf, cmd);
 }
 
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf,
+                               const ngf_index_buffer *idxbuf,
                                ngf_type index_type) {
   _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
   cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
@@ -2029,28 +2112,28 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         break;
       }
 
-      case _NGF_CMD_BIND_VERTEX_BUFFER: {
+      case _NGF_CMD_BIND_ATTRIB_BUFFER: {
         GLsizei stride = 0;
         bool found_binding = false;
         for (uint32_t binding = 0;
              !found_binding && binding < bound_pipeline->nvert_buf_bindings;
              ++binding) {
           if (bound_pipeline->vert_buf_bindings[binding].binding ==
-              cmd->vertex_buffer_bind_op.binding) {
+              cmd->attrib_buffer_bind_op.binding) {
             stride = bound_pipeline->vert_buf_bindings[binding].stride;
             found_binding = true;
           }
         }
         assert(found_binding);
-        glBindVertexBuffer(cmd->vertex_buffer_bind_op.binding,
-                           cmd->vertex_buffer_bind_op.buf->glbuffer,
-                           cmd->vertex_buffer_bind_op.offset,
+        glBindVertexBuffer(cmd->attrib_buffer_bind_op.binding,
+                           cmd->attrib_buffer_bind_op.buf->glbuffer,
+                           cmd->attrib_buffer_bind_op.offset,
                            stride); 
         break;
       }
 
       case _NGF_CMD_BIND_INDEX_BUFFER:
-        glBindBuffer(cmd->index_buffer_bind.index_buffer->bind_point,
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                      cmd->index_buffer_bind.index_buffer->glbuffer);
         CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
         break;
