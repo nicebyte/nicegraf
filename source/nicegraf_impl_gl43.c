@@ -121,6 +121,7 @@ struct ngf_index_buffer {
 
 struct ngf_uniform_buffer {
   GLuint glbuffer;
+  size_t size;
 };
 
 struct ngf_descriptor_set_layout {
@@ -1540,6 +1541,39 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
   }
 }
 
+ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
+                                    ngf_uniform_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_uniform_buffer);
+  ngf_uniform_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  glGenBuffers(1u, &buf->glbuffer);
+  glBindBuffer(GL_UNIFORM_BUFFER, buf->glbuffer);
+  buf->size = info->size;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
+                                   const void *data,
+                                   size_t size) {
+  if (size != buffer->size) {
+    return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
+  }
+  glBindBuffer(GL_UNIFORM_BUFFER, buffer->glbuffer);
+  glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STREAM_DRAW);
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
+  if (buf != NULL) {
+    glDeleteBuffers(1u, &buf->glbuffer);
+    NGF_FREE(buf);
+  }
+}
+
 ngf_error ngf_create_buffer(const ngf_buffer_info *info, ngf_buffer **result) {
   assert(info);
   assert(result);
@@ -2257,4 +2291,3 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
       ? NGF_ERROR_OK
       : NGF_ERROR_END_FRAME_FAILED;
 }
-
