@@ -96,6 +96,10 @@ typedef enum ngf_error {
 
   /** Failed to acquire frame from the swapchain.*/
   NGF_ERROR_NO_FRAME,
+
+  /** There was an attempt to write too little or too much data into a uniform
+      buffer. */
+  NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH
   /*..add new errors above this line */
 } ngf_error ;
 
@@ -422,6 +426,93 @@ typedef struct ngf_tessellation_info {
 } ngf_tessellation_info;
 
 /**
+ * Vertex data usage hints.
+ *
+ * These values hint the library how the vertex data (attributes and indices)
+ * is intended to be consumed on the graphics device side.
+ */
+typedef enum ngf_vertex_data_usage {
+  /**
+   * This hint indicates that the vertex data is intended to be read many times
+   * on the graphics device. An example usage scenario would be a character
+   * mesh.
+   */
+  NGF_VERTEX_DATA_USAGE_STATIC,
+
+  /**
+   * This hint indicates that the vertex data is intended to be consumed once,
+   * or very few times on the graphics device. An example would be displaying
+   * "immediate-mode" GUI.
+   */
+  NGF_VERTEX_DATA_USAGE_TRANSIENT
+ } ngf_vertex_data_usage;
+
+ /**
+  * Buffers can be populated directly by user-provided callbacks, potentially
+  * obviating the need for additional host-side memory allocations.
+  * The callback receives three parameters:
+  *   - a pointer to a region of host-visible device memory, into which the
+  *     user must write data (do not read from this buffer);
+  *   - the size of the buffer;
+  *   - a pointer to arbitrary user-provided data.
+  */
+ typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
+                                             void *userdata);
+
+ /**
+  * Vertex data description.
+  *
+  * This structure provides information necessary to create and populate a
+  * vertex attribute or index buffer.
+  */
+typedef struct ngf_vertex_data_info {
+  size_t buffer_size; /**< Buffer size in bytes. */
+
+  /**
+   * Pointer to the data that the buffer will be populated with. Set this to
+   * `NULL` to populate the buffer using a callback instead.
+   */
+  const void *buffer_ptr;
+
+  /**
+   * This callback will be invoked to populate the buffer with data if
+   * the \ref buffer_ptr field is set to `NULL` (otherwise this field is
+   * ignored).
+   */
+  ngf_buffer_populate_callback fill_callback;
+
+  /**
+   * This pointer shall be passed to \ref fill_callback as its third parameter.
+   */
+  void *fill_callback_userdata;
+  ngf_vertex_data_usage usage_hint;
+ } ngf_vertex_data_info;
+
+ typedef ngf_vertex_data_info ngf_attrib_buffer_info;
+ typedef ngf_vertex_data_info ngf_index_buffer_info;
+
+ /**
+  * A vertex attribute buffer.
+  */
+ typedef struct ngf_attrib_buffer ngf_attrib_buffer;
+
+ /**
+  * A vertex index buffer.
+  */
+ typedef struct ngf_index_buffer ngf_index_buffer;
+
+ /**
+  * Specifies the data necessary for the creation of a uniform buffer.
+  */
+ typedef struct ngf_uniform_buffer_info {
+   size_t size; /**< Size of the buffer in bytes. */
+ } ngf_uniform_buffer_info;
+
+ /**
+  * A uniform buffer.
+  */
+ typedef struct ngf_uniform_buffer ngf_uniform_buffer;
+/**
  * Possible image types.
  */
 typedef enum ngf_image_type {
@@ -688,7 +779,7 @@ typedef struct ngf_buffer ngf_buffer;
  * Specifies a buffer bind operation.
  */
 typedef struct {
-  const ngf_buffer *buffer; /**< Which buffer to bind.*/
+  const ngf_uniform_buffer *buffer; /**< Which buffer to bind.*/
   size_t offset; /**< Offset at which to bind the buffer.*/
   size_t range;  /**< Bound range.*/
 } ngf_descriptor_write_buffer;
@@ -825,94 +916,6 @@ typedef struct ngf_buffer_info {
   ngf_buffer_access_freq access_freq; /**< Access frequency.*/
   ngf_buffer_access_type access_type; /**< Access type.*/
 } ngf_buffer_info;
-
-/**
- * Vertex data usage hints.
- *
- * These values hint the library how the vertex data (attributes and indices)
- * is intended to be consumed on the graphics device side.
- */
-typedef enum ngf_vertex_data_usage {
-  /**
-   * This hint indicates that the vertex data is intended to be read many times
-   * on the graphics device. An example usage scenario would be a character
-   * mesh.
-   */
-  NGF_VERTEX_DATA_USAGE_STATIC,
-
-  /**
-   * This hint indicates that the vertex data is intended to be consumed once,
-   * or very few times on the graphics device. An example would be displaying
-   * "immediate-mode" GUI.
-   */
-  NGF_VERTEX_DATA_USAGE_TRANSIENT
- } ngf_vertex_data_usage;
-
- /**
-  * Buffers can be populated directly by user-provided callbacks, potentially
-  * obviating the need for additional host-side memory allocations.
-  * The callback receives three parameters:
-  *   - a pointer to a region of host-visible device memory, into which the
-  *     user must write data (do not read from this buffer);
-  *   - the size of the buffer;
-  *   - a pointer to arbitrary user-provided data.
-  */
- typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
-                                             void *userdata);
-
- /**
-  * Vertex data description.
-  *
-  * This structure provides information necessary to create and populate a
-  * vertex attribute or index buffer.
-  */
-typedef struct ngf_vertex_data_info {
-  size_t buffer_size; /**< Buffer size in bytes. */
-
-  /**
-   * Pointer to the data that the buffer will be populated with. Set this to
-   * `NULL` to populate the buffer using a callback instead.
-   */
-  void *buffer_ptr;
-
-  /**
-   * This callback will be invoked to populate the buffer with data if
-   * the \ref buffer_ptr field is set to `NULL` (otherwise this field is
-   * ignored).
-   */
-  ngf_buffer_populate_callback fill_callback;
-
-  /**
-   * This pointer shall be passed to \ref fill_callback as its third parameter.
-   */
-  void *fill_callback_userdata;
-  ngf_vertex_data_usage usage_hint;
- } ngf_vertex_data_info;
-
- typedef ngf_vertex_data_info ngf_attrib_buffer_info;
- typedef ngf_vertex_data_info ngf_index_buffer_info;
-
- /**
-  * A vertex attribute buffer.
-  */
- typedef struct ngf_attrib_buffer ngf_attrib_buffer;
-
- /**
-  * A vertex index buffer.
-  */
- typedef struct ngf_index_buffer ngf_index_buffer;
-
- /**
-  * Specifies the data necessary for the creation of a uniform buffer.
-  */
- typedef struct ngf_uniform_buffer_info {
-   size_t size; /**< Size of the buffer in bytes. */
- } ngf_uniform_buffer_info;
-
- /**
-  * A uniform buffer.
-  */
- typedef struct ngf_uniform_buffer ngf_uniform_buffer;
 
 /**
  * Specifies host memory allocation callbacks for the library's internal needs.
@@ -1246,7 +1249,10 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buffer);
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                      ngf_uniform_buffer **result);
-
+/**
+ * Discards the given uniform buffer.
+ */
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf);
 
 /**
  * Fill the given uniform buffer with data.
@@ -1258,7 +1264,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
  *             an error will be generated.
  */
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
-                                   void *data,
+                                   const void *data,
                                    size_t size);
 
 /**
