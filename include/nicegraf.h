@@ -885,39 +885,6 @@ typedef struct ngf_graphics_pipeline_info {
 } ngf_graphics_pipeline_info;
 
 /**
- * Types of buffer objects.
- */
-typedef enum ngf_buffer_type {
-  NGF_BUFFER_TYPE_VERTEX = 0,
-  NGF_BUFFER_TYPE_INDEX,
-  NGF_BUFFER_TYPE_UNIFORM
-} ngf_buffer_type;
-
-// How frequently the buffer is accessed.
-typedef enum ngf_buffer_access_freq {
-  NGF_BUFFER_USAGE_STATIC = 0, // Written once, read many times.
-  NGF_BUFFER_USAGE_DYNAMIC, // Written many times, read many times.
-  NGF_BUFFER_USAGE_STREAM, // Written once, read a few times.
-} ngf_buffer_access_freq;
-
-// How the buffer is being used on the GPU side.
-typedef enum ngf_buffer_access_type {
-  NGF_BUFFER_ACCESS_DRAW = 0, // Consumed by draw operations.
-  NGF_BUFFER_ACCESS_READ, // Application reads from the buffer.
-  NGF_BUFFER_ACCESS_COPY // Copy destination.
-} ngf_buffer_access_type;
-
-/**
- * Specifies information about a buffer object.
- */
-typedef struct ngf_buffer_info {
-  size_t size; /**< Size in bytes. */
-  ngf_buffer_type type; /**< Type of buffer (vertex/uniform/etc.)*/
-  ngf_buffer_access_freq access_freq; /**< Access frequency.*/
-  ngf_buffer_access_type access_type; /**< Access type.*/
-} ngf_buffer_info;
-
-/**
  * Specifies host memory allocation callbacks for the library's internal needs.
  */
 typedef struct ngf_allocation_callbacks {
@@ -1213,11 +1180,6 @@ ngf_error ngf_resolve_render_target(const ngf_render_target *src,
 void ngf_destroy_render_target(ngf_render_target *target);
 
 /**
- * Create a new buffer object.
- */
-ngf_error ngf_create_buffer(const ngf_buffer_info *info, ngf_buffer **result);
-
-/**
  * Creates a new vertex attribute buffer.
  * @param info see \ref ngf_attrib_buffer_info
  * @param result the new buffer handle will be stored here.
@@ -1266,23 +1228,6 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf);
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
                                    const void *data,
                                    size_t size);
-
-/**
- * Upload data to the given buffer.
- * @param buf the buffer object to modify.
- * @param offset offset at which the data should be written.
- * @param size size of the data being uploaded in bytes.
- * @param data pointer to a buffer holding the data.
- */
-ngf_error ngf_populate_buffer(ngf_buffer *buf,
-                              size_t offset,
-                              size_t size,
-                              const void *data);
-
-/**
- * Destroy the given buffer.
- */
-void ngf_destroy_buffer(ngf_buffer *buffer);
 
 /**
  * Wait for all pending rendering commands to complete.
