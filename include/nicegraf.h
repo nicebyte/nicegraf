@@ -1338,10 +1338,11 @@ void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
 void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
                                  const ngf_descriptor_set *set,
                                  uint32_t slot);
-void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *buf,
-                                const ngf_buffer *vbuf,
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
+                                const ngf_attrib_buffer *vbuf,
                                 uint32_t binding, uint32_t offset);
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf, const ngf_buffer *idxbuf,
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf,
+                               const ngf_index_buffer *idxbuf,
                                ngf_type index_type);
 void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target);
 void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
