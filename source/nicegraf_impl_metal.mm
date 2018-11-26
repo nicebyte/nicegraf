@@ -3,7 +3,7 @@ Copyright (c) 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights to
+in the Software without restriction, including without limitation the rights to/Users/nicebyte/Code/nicegraf-samples/02-spec-consts/main.cpp
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
@@ -75,6 +75,18 @@ struct ngf_graphics_pipeline {
 };
 
 struct ngf_buffer {
+  id<MTLBuffer> mtl_buffer = nil;
+};
+
+struct ngf_attrib_buffer {
+  id<MTLBuffer> mtl_buffer = nil;
+};
+
+struct ngf_index_buffer {
+  id<MTLBuffer> mtl_buffer = nil;
+};
+
+struct ngf_uniform_buffer {
   id<MTLBuffer> mtl_buffer = nil;
 };
 
@@ -566,20 +578,61 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipe) {
   }
 }
 
-ngf_error ngf_create_buffer(const ngf_buffer_info *info,
-                            ngf_buffer **result) {
-  _NGF_NURSERY(buffer, buf);
-  buf->mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->size
-                     options:MTLResourceOptionCPUCacheModeWriteCombined];
+id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
+  // TODO: take usage hint into account.
+  id<MTLBuffer> mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->buffer_size
+                           options:MTLResourceOptionCPUCacheModeWriteCombined];
+  if (info->buffer_ptr) {
+    memcpy((uint8_t*)[mtl_buffer contents],
+                      info->buffer_ptr, info->buffer_size);
+  } else {
+    assert(info->fill_callback);
+    info->fill_callback([mtl_buffer contents],
+                        info->buffer_size,
+                        info->fill_callback_userdata);
+  }
+  return mtl_buffer;
+}
+
+ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
+                                      ngf_attrib_buffer **result) {
+  _NGF_NURSERY(attrib_buffer, buf);
+  buf->mtl_buffer = _ngf_create_buffer(info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_buffer(ngf_buffer *buf) {
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buf) {
   if (buf != nullptr) {
-    buf->~ngf_buffer();
+    buf->~ngf_attrib_buffer();
     NGF_FREE(buf);
   }
+}
+
+ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
+                                   ngf_index_buffer **result) {
+  _NGF_NURSERY(index_buffer, buf);
+  buf->mtl_buffer = _ngf_create_buffer(info);
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
+  if (buf != nullptr) {
+    buf->~ngf_index_buffer();
+    NGF_FREE(buf);
+  }
+}
+
+ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
+                                    ngf_uniform_buffer **result) {
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {}
+
+ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer*, void*, size_t) {
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
@@ -598,6 +651,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
   assert(cmd_buffer);
+  cmd_buffer->mtl_cmd_buffer = nil;
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
   cmd_buffer->active_rce = nil;
   return NGF_ERROR_OK;
@@ -615,10 +669,14 @@ ngf_error ngf_submit_cmd_buffer(uint32_t n, ngf_cmd_buffer **cmd_buffers) {
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
   }
-  for (uint32_t b = 0u; b < n - 1u; ++b) {
-    [cmd_buffers[b]->mtl_cmd_buffer commit];
+  for (uint32_t b = 0u; b < n; ++b) {
+    if (b < n - 1u) {
+      [cmd_buffers[b]->mtl_cmd_buffer commit];
+    } else {
+      CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
+    }
+    cmd_buffers[b]->mtl_cmd_buffer = nil;
   }
-  CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[n - 1u]->mtl_cmd_buffer;
   return NGF_ERROR_OK;
 }
 
@@ -628,6 +686,7 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
     [cmd_buffer->active_rce endEncoding];
   }
   if (rt->is_default) {
+    assert(CURRENT_CONTEXT->next_drawable);
     rt->pass_descriptor.colorAttachments[0].texture =
       CURRENT_CONTEXT->next_drawable.texture;
     // TODO: depth
@@ -693,8 +752,8 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   }
 }
 
-void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *cmd_buf,
-                                const ngf_buffer *buf,
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *cmd_buf,
+                                const ngf_attrib_buffer *buf,
                                 uint32_t binding,
                                 uint32_t offset) {
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
@@ -703,7 +762,7 @@ void ngf_cmd_bind_vertex_buffer(ngf_cmd_buffer *cmd_buf,
 }
 
 void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
-                               const ngf_buffer *buf,
+                               const ngf_index_buffer *buf,
                                ngf_type type) {
   cmd_buf->bound_index_buffer = buf->mtl_buffer;
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
