@@ -853,11 +853,11 @@ typedef enum ngf_vertex_data_usage {
   * obviating the need for additional host-side memory allocations.
   * The callback receives three parameters:
   *   - a pointer to a region of host-visible device memory, into which the
-  *     user may write data;
+  *     user must write data (do not read from this buffer);
   *   - the size of the buffer;
   *   - a pointer to arbitrary user-provided data.
   */
- typedef void(*ngf_buffer_populate_callback)(void *buffer, size_t, 
+ typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
                                              void *userdata);
 
  /**
@@ -1162,8 +1162,10 @@ void ngf_destroy_sampler(ngf_sampler *sampler);
  * color attachment associated with the context's swapchain. If the swapchain
  * was created with an accompanying depth buffer, the render target will
  * have an attachment for that as well.
+ *
  * It is the responsibility of the caller to free the returned render target 
- * object.
+ * object. Doing so does not affect the swapchain.
+ *
  * @param color_load_op specifies the operation to perform on the color
  *  attachment the render target at the beginning of a rend render pass.
  * @param depth_load_op if the context's swap chain has an accompanying depth
