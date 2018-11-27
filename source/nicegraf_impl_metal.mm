@@ -23,6 +23,7 @@ SOFTWARE.
 #include "nicegraf.h"
 #include "nicegraf_wrappers.h"
 #include "nicegraf_internal.h"
+#include "emulated_descriptor_set.h"
 #include <new>
 #include <memory>
 #import <Metal/Metal.h>
@@ -786,6 +787,26 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
+void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
+                                 const ngf_descriptor_set *set,
+                                 uint32_t slot) {
+  for (uint32_t s = 0u; s < set->nslots; ++s) {
+    const ngf_descriptor_write *rbop = &set->bind_ops[s];
+    const uint32_t ngf_binding = set->bindings[s];
+    const uint32_t native_binding = ngf_binding; // TODO: fix
+    switch(rbop->type) {
+    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+      const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
+      
+      break;}
+    // TODO: texture
+    // TODO: sampler
+    // TODO: combined texture and sampler
+    // TODO: load/store image
+    }
+  }
+}
+
 #define PLACEHOLDER_CREATE_DESTROY(name) \
 ngf_error ngf_create_##name(const ngf_##name##_info*, \
                               ngf_##name **result) { \
@@ -794,15 +815,6 @@ void ngf_destroy_##name(ngf_##name *) {}
 
 PLACEHOLDER_CREATE_DESTROY(image)
 PLACEHOLDER_CREATE_DESTROY(sampler)
-PLACEHOLDER_CREATE_DESTROY(descriptor_set_layout)
-
-ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout*,
-                                    ngf_descriptor_set **result) {
-  *result = nullptr;
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_descriptor_set(ngf_descriptor_set*) {}
 
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
@@ -813,12 +825,6 @@ PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
 PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
-
-ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
-                                      const uint32_t nwrites,
-                                      ngf_descriptor_set *set) {
-  return NGF_ERROR_OK;
-}
 
 void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
