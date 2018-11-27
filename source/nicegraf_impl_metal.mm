@@ -88,6 +88,8 @@ struct ngf_index_buffer {
 
 struct ngf_uniform_buffer {
   id<MTLBuffer> mtl_buffer = nil;
+  uint32_t idx = 0u;
+  size_t size = 0u;
 };
 
 #pragma mark ngf_enum_maps
@@ -626,12 +628,28 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result) {
+  _NGF_NURSERY(uniform_buffer, buf);
+  buf->mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->size * 3u options:MTLResourceOptionCPUCacheModeWriteCombined];
+  buf->size = info->size;
+  *result = buf.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {}
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
+  if (buf != nullptr) {
+    buf->~ngf_uniform_buffer();
+    NGF_FREE(buf);
+  }
+}
 
-ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer*, void*, size_t) {
+ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf, void *data, size_t size) {
+  if (size != buf->size) {
+    return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
+  }
+  size_t offset = buf->idx * size;
+  void *target = (uint8_t*)buf->mtl_buffer.contents + offset;
+  memcpy(target, data, size);
+  buf->idx = (buf->idx + 1u) % 3u;
   return NGF_ERROR_OK;
 }
 
