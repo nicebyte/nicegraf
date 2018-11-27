@@ -39,13 +39,22 @@ add_library(nicegraf_internal
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c)
-
+    
 target_include_directories(nicegraf_internal PRIVATE
     ${NICEGRAF_PUBLIC_INCLUDES}
     ${NICEGRAF_PRIVATE_INCLUDES})
-
+    
 set(NICEGRAF_DEPS nicegraf_internal)
 
+add_library(nicegraf_emulated_descriptor_set
+    ${CMAKE_CURRENT_LIST_DIR}/source/emulated_descriptor_set.h
+    ${CMAKE_CURRENT_LIST_DIR}/source/emulated_descriptor_set.c)
+
+target_include_directories(nicegraf_emulated_descriptor_set PRIVATE
+  ${NICEGRAF_PUBLIC_INCLUDES}
+  ${NICEGRAF_PRIVATE_INCLUDES})
+
+target_link_libraries(nicegraf_emulated_descriptor_set nicegraf_internal)
 
 if (APPLE)
   set(NICEGRAF_SOURCES
@@ -59,7 +68,7 @@ if (APPLE)
   else()
   find_library(APPLE_KIT AppKit)
   endif()
-  set(NICEGRAF_DEPS ${NICEGRAF_DEPS}
+  set(NICEGRAF_DEPS ${NICEGRAF_DEPS} nicegraf_emulated_descriptor_set
       ${APPLE_METAL} ${APPLE_QUARTZ_CORE} ${APPLE_KIT})
 else()
   set(NGF_PLATFORM "GL")
@@ -69,7 +78,7 @@ else()
       ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
       ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/EGL/EGL)
-    set(NICEGRAF_DEPS
+    set(NICEGRAF_DEPS nicegraf_emulated_descriptor_set
         ${NICEGRAF_DEPS}
         egl)
   elseif("${NGF_PLATFORM}" STREQUAL "VK")
