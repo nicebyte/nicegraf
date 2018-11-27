@@ -1,6 +1,7 @@
 #include "emulated_descriptor_set.h"
 #include "nicegraf_internal.h"
 #include <assert.h>
+#include <string.h>
 
 ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info *info,
                                            ngf_descriptor_set_layout **result) {
