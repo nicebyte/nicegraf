@@ -785,11 +785,6 @@ typedef struct {
 } ngf_pipeline_layout_info;
 
 /**
- * Buffer object
- */
-typedef struct ngf_buffer ngf_buffer;
-
-/**
  * Specifies a buffer bind operation.
  */
 typedef struct {
