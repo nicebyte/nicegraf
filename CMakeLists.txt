@@ -51,7 +51,7 @@ if (APPLE)
   set(NICEGRAF_SOURCES
     ${NICEGRAF_SOURCES}
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm)
-  set(NICEGRAF_COMPILE_OPTS ${NICEGRAF_COMPILE_OPTS} "--std=c++14")
+  set(NICEGRAF_COMPILE_OPTS ${NICEGRAF_COMPILE_OPTS} "--std=c++14" "-fobjc-arc")
   find_library(APPLE_METAL Metal)
   find_library(APPLE_QUARTZ_CORE QuartzCore)
   if(DEFINED IOS_PLATFORM)
