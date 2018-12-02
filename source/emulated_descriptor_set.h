@@ -30,6 +30,6 @@ struct ngf_descriptor_set_layout {
 
 struct ngf_descriptor_set {
   ngf_descriptor_write *bind_ops;
-  uint32_t *bindings;
+  ngf_descriptor_info *descriptors;
   uint32_t nslots;
 };
