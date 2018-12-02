@@ -630,10 +630,11 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result) {
   _NGF_NURSERY(uniform_buffer, buf);
-  buf->mtl_buffer = [CURRENT_CONTEXT->device
-    newBufferWithLength:info->size * 3u
-    options:MTLResourceOptionCPUCacheModeWriteCombined];
   buf->size = info->size;
+  buf->size = buf->size + (buf->size % 256u);
+  buf->mtl_buffer = [CURRENT_CONTEXT->device
+    newBufferWithLength:buf->size * 3u
+    options:MTLResourceOptionCPUCacheModeWriteCombined];
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -646,11 +647,12 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
 }
 
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
-                                   void *data, size_t size) {
-  if (size != buf->size) {
+                                   const void *data, size_t size) {
+  const size_t aligned_size = size + (size % 256u);
+  if (aligned_size != buf->size) {
     return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
   }
-  size_t offset = buf->current_idx * size;
+  const size_t offset = buf->current_idx * buf->size;
   void *target = (uint8_t*)buf->mtl_buffer.contents + offset;
   memcpy(target, data, size);
   buf->current_idx = (buf->current_idx + 1u) % 3u;
