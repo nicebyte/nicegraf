@@ -728,6 +728,14 @@ typedef enum {
 } ngf_descriptor_type;
 
 /**
+ * Descriptor visibility flags.
+ */
+typedef enum ngf_descriptor_stage {
+  NGF_DESCRIPTOR_VERTEX_STAGE_BIT = 0x01,
+  NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT = 0x02,
+} ngf_descriptor_stage_flags;
+
+/**
  * Descriptor configuration.
  * A descriptor is an opaque object through which resources such as buffers and
  * textures can be accessed.
@@ -736,6 +744,12 @@ typedef enum {
 typedef struct {
   ngf_descriptor_type type; /**< Type of the descriptor.*/
   uint32_t id; /**< Associated binding point.*/
+
+  /**
+   * Specifies which stage(s) the descriptor is accessible from.
+   * This needs to be a combination of \ref ngf_descriptor_stage flags.
+   */
+  uint32_t stage_flags; 
 } ngf_descriptor_info;
 
 /**
