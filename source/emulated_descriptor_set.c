@@ -63,15 +63,17 @@ ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout *layout,
     goto ngf_create_descriptor_set_cleanup;
   }
 
-  set->bindings = NGF_ALLOCN(uint32_t, set->nslots);
-  if (set->bindings == NULL) {
+  set->descriptors = NGF_ALLOCN(ngf_descriptor_info, set->nslots);
+  if (set->descriptors == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_descriptor_set_cleanup;
   }
+  memcpy(set->descriptors,
+         layout->info.descriptors,
+         sizeof(ngf_descriptor_info) * set->nslots);
 
   for (size_t s = 0; s < set->nslots; ++s) {
     set->bind_ops[s].type = layout->info.descriptors[s].type;
-    set->bindings[s] = layout->info.descriptors[s].id;
   }
 
 ngf_create_descriptor_set_cleanup:
@@ -87,8 +89,8 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set *set) {
     if (set->nslots > 0 && set->bind_ops) {
       NGF_FREEN(set->bind_ops, set->nslots);
     }
-    if (set->nslots > 0 && set->bindings) {
-      NGF_FREEN(set->bindings, set->nslots);
+    if (set->nslots > 0 && set->descriptors) {
+      NGF_FREEN(set->descriptors, set->nslots);
     }
     NGF_FREE(set);
   }
@@ -102,7 +104,7 @@ ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
     bool found_binding = false;
     for (uint32_t s = 0u; s < set->nslots; ++s) {
       if (set->bind_ops[s].type == write->type &&
-          set->bindings[s] == write->binding) {
+          set->descriptors[s].id == write->binding) {
         set->bind_ops[s] = *write;
         found_binding = true;
         break;
