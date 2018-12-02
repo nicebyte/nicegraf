@@ -89,7 +89,7 @@ struct ngf_index_buffer {
 
 struct ngf_uniform_buffer {
   id<MTLBuffer> mtl_buffer = nil;
-  uint32_t idx = 0u;
+  uint32_t current_idx = 0u;
   size_t size = 0u;
 };
 
@@ -630,7 +630,9 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result) {
   _NGF_NURSERY(uniform_buffer, buf);
-  buf->mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->size * 3u options:MTLResourceOptionCPUCacheModeWriteCombined];
+  buf->mtl_buffer = [CURRENT_CONTEXT->device
+    newBufferWithLength:info->size * 3u
+    options:MTLResourceOptionCPUCacheModeWriteCombined];
   buf->size = info->size;
   *result = buf.release();
   return NGF_ERROR_OK;
@@ -643,14 +645,15 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
   }
 }
 
-ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf, void *data, size_t size) {
+ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
+                                   void *data, size_t size) {
   if (size != buf->size) {
     return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
   }
-  size_t offset = buf->idx * size;
+  size_t offset = buf->current_idx * size;
   void *target = (uint8_t*)buf->mtl_buffer.contents + offset;
   memcpy(target, data, size);
-  buf->idx = (buf->idx + 1u) % 3u;
+  buf->current_idx = (buf->current_idx + 1u) % 3u;
   return NGF_ERROR_OK;
 }
 
@@ -798,17 +801,18 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
+      const ngf_uniform_buffer *buf = buf_bind_op->buffer;
+      size_t offset = buf->current_idx * buf->size;
       if (set->descriptors[ngf_binding].stage_flags &
           NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
-        [cmd_buf->active_rce setVertexBuffer:buf_bind_op->buffer->mtl_buffer
-                                      offset:0u
+        [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
+                                      offset:offset
                                      atIndex:native_binding];
       }
-
       if (set->descriptors[ngf_binding].stage_flags &
           NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
-        [cmd_buf->active_rce setFragmentBuffer:buf_bind_op->buffer->mtl_buffer
-         offset:0u
+        [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
+         offset:offset
          atIndex:native_binding];
       }
       break;}
