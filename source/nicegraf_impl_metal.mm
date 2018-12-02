@@ -3,7 +3,7 @@ Copyright (c) 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights to/Users/nicebyte/Code/nicegraf-samples/02-spec-consts/main.cpp
+in the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
 the Software, and to permit persons to whom the Software is furnished to do so,
 subject to the following conditions:
@@ -790,19 +790,33 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
 void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
                                  const ngf_descriptor_set *set,
                                  uint32_t slot) {
+  // TODO: assert compatibility with pipeline layout?	
   for (uint32_t s = 0u; s < set->nslots; ++s) {
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
-    const uint32_t ngf_binding = set->bindings[s];
+    const uint32_t ngf_binding = set->descriptors[s].id;
     const uint32_t native_binding = ngf_binding; // TODO: fix
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
-      
+      if (set->descriptors[ngf_binding].stage_flags &
+          NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
+        [cmd_buf->active_rce setVertexBuffer:buf_bind_op->buffer->mtl_buffer
+                                      offset:0u
+                                     atIndex:native_binding];
+      }
+
+      if (set->descriptors[ngf_binding].stage_flags &
+          NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
+        [cmd_buf->active_rce setFragmentBuffer:buf_bind_op->buffer->mtl_buffer
+         offset:0u
+         atIndex:native_binding];
+      }
       break;}
-    // TODO: texture
-    // TODO: sampler
-    // TODO: combined texture and sampler
-    // TODO: load/store image
+    case NGF_DESCRIPTOR_TEXTURE:
+    case NGF_DESCRIPTOR_STORAGE_BUFFER:
+    case NGF_DESCRIPTOR_LOADSTORE_IMAGE:
+    case NGF_DESCRIPTOR_SAMPLER:
+    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER:;
     }
   }
 }
@@ -824,7 +838,6 @@ PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
 PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
-PLACEHOLDER_CMD(bind_descriptor_set, const ngf_descriptor_set*, uint32_t)
 
 void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
