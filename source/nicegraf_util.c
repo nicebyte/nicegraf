@@ -120,7 +120,7 @@ void ngf_util_create_default_graphics_pipeline_data(
   result->pipeline_info = gpi;
 }
 
-ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
+ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
                                         uint32_t ndesc,
                                         ngf_pipeline_layout_info *result) {
   assert(desc);
@@ -145,14 +145,14 @@ ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
                                  uint32_t nstages,
                                  ngf_pipeline_layout_info *result) {
   assert(stage_layouts);
-  assert(result);
-  ngf_descriptor_set_layout **dsls = NULL;
+  assert(result && nstages);
+  /*ngf_descriptor_set_layout **dsls = NULL;
   result->descriptors_layouts = NULL;
   result->ndescriptors_layouts = 0u;
   ngf_descriptor_set_layout_info *descriptor_set_layouts = NULL;
-  uint32_t *descriptor_count_estimates = NULL;
+  uint32_t *descriptor_count_estimates = NULL;*/
   ngf_error err = NGF_ERROR_OK;
-  
+  /*
   uint32_t set_count = 0u;
   for (uint32_t i = 0u; i < nstages; ++i)
     set_count = NGF_MAX(set_count, ntohl(stage_layouts[i][0]));
@@ -237,7 +237,7 @@ ngf_util_create_layout_data_cleanup:
               descriptor_count_estimates[i]);
   }
   NGF_FREEN(descriptor_set_layouts, set_count);
-  NGF_FREEN(descriptor_count_estimates, set_count);
+  NGF_FREEN(descriptor_count_estimates, set_count);*/
   return err;
 }
 
