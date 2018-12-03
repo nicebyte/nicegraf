@@ -71,12 +71,17 @@ typedef enum ngf_error {
   NGF_ERROR_END_FRAME_FAILED,
   NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
                                bounds access. */
-  NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING, /**< An attempt was made to start recording a
-                                               command buffer that was already in a
-                                               recording state. */
-  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING, /**< An attempt was made to finish
-                                               recording a cmd buffer that was
-                                               not recording. */
+  /**
+   * An attempt was made to start recording a command buffer that was already
+   * in a recording state.
+   */
+  NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING,
+
+  /**
+   * An attempt was made to finish recording a cmd buffer that was not
+   * recording.
+   */
+  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING,
   NGF_ERROR_CONTEXT_ALREADY_CURRENT,
   NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
 
@@ -196,9 +201,9 @@ typedef struct ngf_shader_stage_info {
  * The detailed information about compile errors is reported via the debug
  * callback mechanism.
  * 
- * On some back-ends, the full compile/link step may be repeated during pipeline
- * creation (if using constant specialization). This does not apply to
- * back-ends that support specialization natively with no extensions (i.e.
+ * On some back-ends, the full compile/link step may be repeated during 
+ * pipeline * creation (if using constant specialization). This does not apply
+ * to back-ends that support specialization natively with no extensions (i.e.
  * Vulkan and Metal).
  *
  * Binary blobs have a notion of format, which is backend-specific. For
@@ -914,15 +919,15 @@ typedef struct ngf_allocation_callbacks {
  * Most operations, with the exception of `ngf_init` and context management
  * functions, require a context to be "current" on the calling thread.
  *
- * Invoking `ngf_set_context` will make a context current on the calling thread.
- * Once a context is made current on a thread, it cannot be migrated to another
- * thread.
+ * Invoking `ngf_set_context` will make a context current on the calling
+ * thread. Once a context is made current on a thread, it cannot be migrated to
+ * another thread.
  *
- * The results of using resources created within one context, in another context
- * are undefined, unless the two contexts are explicitly configured to share
- * data. When contexts are configured as shared, resources created in one can be
- * used in the other, and vice versa. Notably, command buffers created and
- * recorded in one context, can be submitted in another, shared context.
+ * The results of using resources created within one context, in another 
+ * context are undefined, unless the two contexts are explicitly configured to
+ * share data. When contexts are configured as shared, resources created in one
+ * can be used in the other, and vice versa. Notably, command buffers created
+ * and recorded in one context, can be submitted in another, shared context.
  *
  * A context mainatins exclusive ownership of its swapchain (if it has one),
  * and even shared contexts cannot acquire, present or render to images from
@@ -934,14 +939,18 @@ typedef struct ngf_context ngf_context;
  * Configures a Nicegraf context.
  */
 typedef struct ngf_context_info {
-  const ngf_swapchain_info *swapchain_info; /**< Configures the swapchain that the
-                                                 context will be presenting to. This
-                                                 can be NULL if all rendering is done
-                                                 off-screen.*/
-  const ngf_context *shared_context; /**< A reference to another context; the newly
-                                    created context will have access to the
-                                    other one's resources (such as buffers and
-                                    textures) and vice versa. Can be NULL.*/
+  /**
+   * Configures the swapchain that the context will be presenting to. This
+   * can be NULL if all rendering is done off-screen.
+   */
+  const ngf_swapchain_info *swapchain_info;
+
+  /**
+   * A reference to another context; the newly created context will have access
+   * to the other one's resources (such as buffers and textures) and vice versa
+   * Can be NULL.
+   */
+  const ngf_context *shared_context;
   bool debug; /**< Whether to enable debug features. */
 } ngf_context_info;
 
@@ -1047,15 +1056,16 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
 void ngf_destroy_shader_stage(ngf_shader_stage *stage);
 
 /**
- * Creates a new descriptor set layout object that can be used when constructing
- * a pipeline layout.
+ * Creates a new descriptor set layout object that can be used when
+ * constructing a pipeline layout.
  * @param info shall point to a structure specifying the details of descriptor
- *  set layout.
- * @param result shall be initialized to point to a descriptor set layout object
- *  if the function succeeds.
+ *             set layout.
+ * @param result shall be initialized to point to a descriptor set layout 
+ *               object if the function succeeds.
  */
-ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info *info,
-                                           ngf_descriptor_set_layout **result);
+ngf_error ngf_create_descriptor_set_layout(
+    const ngf_descriptor_set_layout_info *info,
+    ngf_descriptor_set_layout **result);
 
 /**
  * Destroy the given descriptor set layout object.
@@ -1077,7 +1087,7 @@ void ngf_destroy_descriptor_set(ngf_descriptor_set *set);
 /**
  * Applies bind operations to a given descriptor set.
  * @param ops shall be a pointer to an array of bind operations.
- * @param nops shall be the number of elements in the array pointed to by `ops'.
+ * @param nops shall be the number of elements in the array pointed to by `ops'
  * @param set shall point to the dscriptor set object to which the bind
  *  operations need to be applied.
  */
@@ -1262,8 +1272,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer);
  * The command buffer must be either "reset", "ready" or "submitted".
  * If the command buffer is either "ready" or "submitted", its state is
  * implicitly transitioned to "reset" before becoming "recording".
- * Note that if the buffer was "ready", the commands previously recorded into it
- * will be lost and never executed.
+ * Note that if the buffer was "ready", the commands previously recorded into
+ * it will be lost and never executed.
  */
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *buf);
 
