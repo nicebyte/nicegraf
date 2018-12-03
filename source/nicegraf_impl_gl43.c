@@ -1651,7 +1651,8 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
 
 ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
-  const ngf_graphics_pipeline *bound_pipeline = &(CURRENT_CONTEXT->cached_state);
+  const ngf_graphics_pipeline *bound_pipeline =
+      &(CURRENT_CONTEXT->cached_state);
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
     for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next;
@@ -1659,8 +1660,10 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
          cmd = cmd->next) {
       switch (cmd->type) {
       case _NGF_CMD_BIND_PIPELINE: {
-        const ngf_graphics_pipeline *cached_state = &CURRENT_CONTEXT->cached_state;
-        const bool force_pipeline_update = CURRENT_CONTEXT->force_pipeline_update;
+        const ngf_graphics_pipeline *cached_state =
+            &CURRENT_CONTEXT->cached_state;
+        const bool force_pipeline_update =
+            CURRENT_CONTEXT->force_pipeline_update;
         const ngf_graphics_pipeline *pipeline = cmd->pipeline;
         if (cached_state->id != pipeline->id || force_pipeline_update) {
           CURRENT_CONTEXT->cached_state.id = pipeline->id;
@@ -1684,7 +1687,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           }
 
           const ngf_rasterization_info *rast = &(pipeline->rasterization);
-          const ngf_rasterization_info *cached_rast = &(cached_state->rasterization);
+          const ngf_rasterization_info *cached_rast =
+              &(cached_state->rasterization);
           if (cached_rast->discard != rast->discard || force_pipeline_update) {
             if (rast->discard) {
               glEnable(GL_RASTERIZER_DISCARD);
@@ -1694,9 +1698,11 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           }
           if (cached_rast->polygon_mode != rast->polygon_mode ||
               force_pipeline_update) {
-            glPolygonMode(GL_FRONT_AND_BACK, get_gl_poly_mode(rast->polygon_mode));
+            glPolygonMode(GL_FRONT_AND_BACK,
+                          get_gl_poly_mode(rast->polygon_mode));
           }
-          if (cached_rast->cull_mode != rast->cull_mode || force_pipeline_update) {
+          if (cached_rast->cull_mode != rast->cull_mode ||
+              force_pipeline_update) {
             if (rast->cull_mode != NGF_CULL_MODE_NONE) {
               glEnable(GL_CULL_FACE);
               glCullFace(get_gl_cull_mode(rast->cull_mode));
@@ -1724,7 +1730,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           }
 
           if (cached_state->multisample.alpha_to_coverage !=
-              pipeline->multisample.alpha_to_coverage || force_pipeline_update) {
+                  pipeline->multisample.alpha_to_coverage ||
+              force_pipeline_update) {
             if (pipeline->multisample.alpha_to_coverage) {
               glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
             } else {
@@ -1732,7 +1739,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             }
           }
 
-          const ngf_depth_stencil_info *depth_stencil = &(pipeline->depth_stencil);
+          const ngf_depth_stencil_info *depth_stencil =
+              &(pipeline->depth_stencil);
           const ngf_depth_stencil_info *cached_depth_stencil =
               &(cached_state->depth_stencil);
           if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
@@ -1744,7 +1752,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               glDisable(GL_DEPTH_TEST);
             }
           }
-          if (cached_depth_stencil->depth_write != depth_stencil->depth_write ||
+          if (cached_depth_stencil->depth_write !=
+                  depth_stencil->depth_write ||
               force_pipeline_update) {
             if (depth_stencil->depth_write) {
               glDepthMask(GL_TRUE);
@@ -1752,7 +1761,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               glDepthMask(GL_FALSE);
             }
           }
-          if (cached_depth_stencil->stencil_test != depth_stencil->stencil_test ||
+          if (cached_depth_stencil->stencil_test !=
+                  depth_stencil->stencil_test ||
               !NGF_STRUCT_EQ(cached_depth_stencil->back_stencil,
                              depth_stencil->back_stencil) ||
               !NGF_STRUCT_EQ(cached_depth_stencil->front_stencil,
@@ -1892,7 +1902,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         const ngf_descriptor_set *set = cmd->descriptor_set_bind_op.set;
         for (size_t j = 0; j < set->nslots; ++j) {
           const ngf_descriptor_write *rbop = &(set->bind_ops[j]);
-          const uint32_t ngf_binding = set->bindings[j];
+          const uint32_t ngf_binding = set->descriptors[j].id;
           const _ngf_native_binding *binding_map = bound_pipeline->binding_map[ngf_set];
           uint32_t b_idx = 0u;
           while (binding_map[b_idx].ngf_binding_id != ngf_binding && 
