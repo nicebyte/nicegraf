@@ -16,13 +16,14 @@ ngf_error ngf_create_descriptor_set_layout(const ngf_descriptor_set_layout_info 
   }
 
   layout->info.ndescriptors = info->ndescriptors;
-  layout->info.descriptors = NGF_ALLOCN(ngf_descriptor_info,
-                                        info->ndescriptors);
+  ngf_descriptor_info *descriptors = NGF_ALLOCN(ngf_descriptor_info,
+                                                info->ndescriptors);
+  layout->info.descriptors = descriptors;
   if (layout->info.descriptors == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_descriptor_set_layout_cleanup;
   }
-  memcpy(layout->info.descriptors,
+  memcpy(descriptors,
          info->descriptors,
          sizeof(ngf_descriptor_info) * info->ndescriptors);
 
