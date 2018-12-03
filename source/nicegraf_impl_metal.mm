@@ -798,7 +798,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
   for (uint32_t s = 0u; s < set->nslots; ++s) {
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
     const uint32_t ngf_binding = set->descriptors[s].id;
-    const uint32_t native_binding = ngf_binding + 1u; // TODO: fix
+    const uint32_t native_binding = ngf_binding; // TODO: fix
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
@@ -808,7 +808,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
           NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                       offset:offset
-                                     atIndex:native_binding];
+                                     atIndex:native_binding + 1u]; // TODO: fix
       }
       if (set->descriptors[ngf_binding].stage_flags &
           NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
