@@ -70,7 +70,7 @@ void ngf_util_create_default_graphics_pipeline_data(
  *               be populated by this function. The descriptor set within it
  *               must be freed by the caller when it is no longer necessary.
  */
-ngf_error ngf_util_create_simple_layout(ngf_descriptor_info *desc,
+ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
                                         uint32_t ndesc,
                                         ngf_pipeline_layout_info *result);
 
