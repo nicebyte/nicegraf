@@ -760,7 +760,7 @@ typedef struct {
  * Think of it as a schema for a descriptor set.
  */
 typedef struct {
-  ngf_descriptor_info *descriptors;
+  const ngf_descriptor_info *descriptors;
   uint32_t ndescriptors;
 } ngf_descriptor_set_layout_info;
 
