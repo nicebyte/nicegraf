@@ -630,8 +630,7 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result) {
   _NGF_NURSERY(uniform_buffer, buf);
-  buf->size = info->size;
-  buf->size = buf->size + (buf->size % 256u);
+  buf->size = info->size + (256u - info->size % 256u);
   buf->mtl_buffer = [CURRENT_CONTEXT->device
     newBufferWithLength:buf->size * 3u
     options:MTLResourceOptionCPUCacheModeWriteCombined];
@@ -648,14 +647,14 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
 
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
                                    const void *data, size_t size) {
-  const size_t aligned_size = size + (size % 256u);
+  const size_t aligned_size = size + (256u - size % 256u);
   if (aligned_size != buf->size) {
     return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
   }
+  buf->current_idx = (buf->current_idx + 1u) % 3u;
   const size_t offset = buf->current_idx * buf->size;
   void *target = (uint8_t*)buf->mtl_buffer.contents + offset;
   memcpy(target, data, size);
-  buf->current_idx = (buf->current_idx + 1u) % 3u;
   return NGF_ERROR_OK;
 }
 
@@ -799,7 +798,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
   for (uint32_t s = 0u; s < set->nslots; ++s) {
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
     const uint32_t ngf_binding = set->descriptors[s].id;
-    const uint32_t native_binding = ngf_binding; // TODO: fix
+    const uint32_t native_binding = ngf_binding + 1u; // TODO: fix
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
