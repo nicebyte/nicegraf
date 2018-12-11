@@ -118,6 +118,14 @@ struct ngf_uniform_buffer {
   size_t size = 0u;
 };
 
+struct ngf_sampler {
+  id<MTLSamplerState> sampler = nil;
+};
+
+struct ngf_image {
+  id<MTLTexture> texture = nil;
+};
+
 #pragma mark ngf_enum_maps
 
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
@@ -288,6 +296,40 @@ static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
     MTLStencilOperationInvert
   };
   return stencil_ops[op];
+}
+
+static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
+  static const MTLTextureType types[NGF_IMAGE_TYPE_COUNT] = {
+    MTLTextureType2D,
+    MTLTextureType3D
+  };
+  return types[type];
+}
+
+static MTLSamplerAddressMode get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
+  static const MTLSamplerAddressMode modes[NGF_WRAP_MODE_COUNT] = {
+    MTLSamplerAddressModeClampToEdge,
+    MTLSamplerAddressModeClampToBorderColor,
+    MTLSamplerAddressModeRepeat,
+    MTLSamplerAddressModeMirrorRepeat
+  };
+  return modes[mode];
+}
+
+static MTLSamplerMinMagFilter get_mtl_minmag_filter(ngf_sampler_filter f) {
+  static MTLSamplerMinMagFilter filters[NGF_FILTER_COUNT] = {
+    MTLSamplerMinMagFilterNearest,
+    MTLSamplerMinMagFilterLinear
+  };
+  return filters[f];
+}
+
+static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
+  static MTLSamplerMipFilter filters[NGF_FILTER_COUNT] = {
+    MTLSamplerMipFilterNearest,
+    MTLSamplerMipFilterLinear
+  };
+  return filters[f];
 }
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
@@ -707,10 +749,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       get_mtl_primitive_topology_class(info->primitive_type);
   
   // TODO: fix (depth and stencil both)
-  mtl_pipe_desc.depthAttachmentPixelFormat =
-      MTLPixelFormatDepth32Float_Stencil8;
-  mtl_pipe_desc.stencilAttachmentPixelFormat =
-      MTLPixelFormatDepth32Float_Stencil8;
+  if (CURRENT_CONTEXT->swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+    mtl_pipe_desc.depthAttachmentPixelFormat =
+        MTLPixelFormatDepth32Float_Stencil8;
+    mtl_pipe_desc.stencilAttachmentPixelFormat =
+        MTLPixelFormatDepth32Float_Stencil8;
+  }
   
   
   _NGF_NURSERY(graphics_pipeline, pipeline);
@@ -721,21 +765,23 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
   
   // Set up depth and stencil state.
-  auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
-  const ngf_depth_stencil_info &depth_stencil_info = *info->depth_stencil;
-  mtl_depth_stencil_desc.depthCompareFunction =
-      get_mtl_compare_function(depth_stencil_info.depth_compare);
-  mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
-  mtl_depth_stencil_desc.backFaceStencil =
-      _ngf_create_stencil_descriptor(depth_stencil_info.back_stencil);
-  mtl_depth_stencil_desc.frontFaceStencil =
-      _ngf_create_stencil_descriptor(depth_stencil_info.front_stencil);
-  pipeline->front_stencil_reference =
-      depth_stencil_info.front_stencil.reference;
-  pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
-  pipeline->depth_stencil =
-      [CURRENT_CONTEXT->device
-       newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
+  if (info->depth_stencil->depth_test) {
+    auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
+    const ngf_depth_stencil_info &depth_stencil_info = *info->depth_stencil;
+    mtl_depth_stencil_desc.depthCompareFunction =
+        get_mtl_compare_function(depth_stencil_info.depth_compare);
+    mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
+    mtl_depth_stencil_desc.backFaceStencil =
+        _ngf_create_stencil_descriptor(depth_stencil_info.back_stencil);
+    mtl_depth_stencil_desc.frontFaceStencil =
+        _ngf_create_stencil_descriptor(depth_stencil_info.front_stencil);
+    pipeline->front_stencil_reference =
+        depth_stencil_info.front_stencil.reference;
+    pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
+    pipeline->depth_stencil =
+        [CURRENT_CONTEXT->device
+         newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
+  }
   
   if (err) {
     NSLog(@"... [%@]\n", err);
@@ -832,10 +878,89 @@ ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_create_sampler(const ngf_sampler_info *info,
+                             ngf_sampler **result) {
+  auto *sampler_desc = [MTLSamplerDescriptor new];
+  sampler_desc.sAddressMode = get_mtl_address_mode(info->wrap_s);
+  sampler_desc.tAddressMode = get_mtl_address_mode(info->wrap_t);
+  sampler_desc.rAddressMode = get_mtl_address_mode(info->wrap_r);
+  sampler_desc.minFilter = get_mtl_minmag_filter(info->min_filter);
+  sampler_desc.magFilter = get_mtl_minmag_filter(info->mag_filter);
+  sampler_desc.mipFilter = get_mtl_mip_filter(info->mip_filter);
+  // TODO unmipped images
+  sampler_desc.lodMinClamp = info->lod_min;
+  sampler_desc.lodMaxClamp = info->lod_max;
+  // TODO max anisotropy
+  // TODO LOD bias not supported?
+  _NGF_NURSERY(sampler, sampler);
+  sampler->sampler =
+      [CURRENT_CONTEXT->device newSamplerStateWithDescriptor:sampler_desc];
+  *result = sampler.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_sampler(ngf_sampler *sampler) {
+  if (sampler) {
+    sampler->~ngf_sampler();
+    NGF_FREE(sampler);
+  }
+}
+
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
                                 ngf_cmd_buffer **result) {
   _NGF_NURSERY(cmd_buffer, cmd_buffer);
   *result = cmd_buffer.release();
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
+  auto *mtl_img_desc = [MTLTextureDescriptor new];
+  mtl_img_desc.textureType = get_mtl_texture_type(info->type);
+  mtl_img_desc.pixelFormat = get_mtl_pixel_format(info->format);
+  mtl_img_desc.width = info->extent.width;
+  mtl_img_desc.height = info->extent.height;
+  mtl_img_desc.depth = info->extent.depth;
+  mtl_img_desc.mipmapLevelCount = info->nmips;
+  // TODO multisampled textures
+  mtl_img_desc.sampleCount = info->nsamples == 0u ? 1u : info->nsamples;
+  mtl_img_desc.arrayLength = 1u; // TODO texture arrays
+  //mtl_img_desc.resourceOptions = MTLResourceOptionCPUCacheModeWriteCombined;
+  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
+    mtl_img_desc.usage |= MTLTextureUsageRenderTarget;
+  }
+  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
+    mtl_img_desc.usage |= MTLTextureUsageShaderRead;
+  }
+  _NGF_NURSERY(image, image);
+  image->texture =
+      [CURRENT_CONTEXT->device newTextureWithDescriptor:mtl_img_desc];
+  *result = image.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_image(ngf_image *image) {
+  if (image != nullptr) {
+    image->~ngf_image();
+    NGF_FREE(image);
+  }
+}
+
+ngf_error ngf_populate_image(ngf_image *image,
+                             uint32_t level,
+                             ngf_offset3d offset,
+                             ngf_extent3d dimensions,
+                             const void *data) {
+  MTLRegion region;
+  region.origin.x = (NSUInteger)offset.x;
+  region.origin.y = (NSUInteger)offset.y;
+  region.origin.z = (NSUInteger)offset.z;
+  region.size.width = dimensions.width;
+  region.size.height = dimensions.height;
+  region.size.depth = dimensions.depth;
+  // TODO blit command encoder
+  uint32_t bpp = 4u; // TODO fix, get_mtl_format_bpp
+  printf("TEX WIDTH %d\n", image->texture.width);
+  [image->texture replaceRegion:region mipmapLevel:level withBytes:data bytesPerRow:image->texture.width * bpp];
   return NGF_ERROR_OK;
 }
 
@@ -910,7 +1035,9 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline) {
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
-  [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
+  if (pipeline->depth_stencil) {
+    [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
+  }
   [buf->active_rce
       setStencilFrontReferenceValue:pipeline->front_stencil_reference
       backReferenceValue:pipeline->back_stencil_reference];
@@ -1003,23 +1130,38 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
          atIndex:native_binding];
       }
       break;}
+      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+        // TODO use texture view
+        const ngf_descriptor_write_image_sampler &img_bind_op =
+            rbop->op.image_sampler_bind;
+        if (set->descriptors[ngf_binding].stage_flags &
+            NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
+          [cmd_buf->active_rce
+           setVertexTexture:img_bind_op.image_subresource.image->texture
+           atIndex:native_binding];
+          [cmd_buf->active_rce
+           setVertexSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        if (set->descriptors[ngf_binding].stage_flags &
+            NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
+          [cmd_buf->active_rce
+               setFragmentTexture:img_bind_op.image_subresource.image->texture
+               atIndex:native_binding];
+          [cmd_buf->active_rce
+           setFragmentSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        
+        break;
+      }
     case NGF_DESCRIPTOR_TEXTURE:
     case NGF_DESCRIPTOR_STORAGE_BUFFER:
     case NGF_DESCRIPTOR_LOADSTORE_IMAGE:
-    case NGF_DESCRIPTOR_SAMPLER:
-    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER:;
+    case NGF_DESCRIPTOR_SAMPLER:;
     }
   }
 }
-
-#define PLACEHOLDER_CREATE_DESTROY(name) \
-ngf_error ngf_create_##name(const ngf_##name##_info*, \
-                              ngf_##name **result) { \
-  *result = nullptr; return NGF_ERROR_OK; } \
-void ngf_destroy_##name(ngf_##name *) {}
-
-PLACEHOLDER_CREATE_DESTROY(image)
-PLACEHOLDER_CREATE_DESTROY(sampler)
 
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
@@ -1032,20 +1174,4 @@ PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 
 void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
-}
-
-ngf_error ngf_populate_image(ngf_image *image,
-                             uint32_t level,
-                             ngf_offset3d offset,
-                             ngf_extent3d dimensions,
-                             const void *data) {
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_populate_buffer(ngf_buffer *buf,
-                              size_t offset,
-                              size_t size,
-                              const void *data) {
-  memcpy((uint8_t*)[buf->mtl_buffer contents] + offset, data, size);
-  return NGF_ERROR_OK;
 }
