@@ -40,9 +40,29 @@ id<MTLDevice> MTL_DEVICE = nil;
 
 #pragma mark ngf_struct_definitions
 
+struct _ngf_swapchain {
+  _ngf_swapchain() = default;
+  _ngf_swapchain(_ngf_swapchain &&other) {
+    *this = std::move(other);
+  }
+  _ngf_swapchain(const _ngf_swapchain&) = delete;
+  _ngf_swapchain& operator=(_ngf_swapchain &&other) {
+    layer = other.layer;
+    other.layer = nil;
+    depth_images = std::move(other.depth_images);
+    return *this;
+  }
+  _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
+  
+  CAMetalLayer *layer = nil;
+  std::unique_ptr<id<MTLTexture>[]> depth_images;
+  uint32_t img_idx = 0u;
+  uint32_t capacity = 0u;
+};
+
 struct ngf_context {
   id<MTLDevice> device = nil;
-  CAMetalLayer *layer = nil;
+  _ngf_swapchain swapchain;
   id<MTLCommandQueue> queue = nil;
   id<CAMetalDrawable> next_drawable = nil;
   bool is_current = false;
@@ -284,7 +304,7 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   assert(ctx && ctx == CURRENT_CONTEXT);
-  CURRENT_CONTEXT->next_drawable = [ctx->layer nextDrawable];
+  CURRENT_CONTEXT->next_drawable = [ctx->swapchain.layer nextDrawable];
   return (!CURRENT_CONTEXT->next_drawable) ?  NGF_ERROR_NO_FRAME : NGF_ERROR_OK;
 }
 
@@ -306,7 +326,7 @@ ngf_error ngf_default_render_target(
   const ngf_clear *clear_depth,
   ngf_render_target **result) {
   assert(result);
-  if (CURRENT_CONTEXT->layer) {
+  if (CURRENT_CONTEXT->swapchain.layer) {
     _NGF_NURSERY(render_target, rt);
     rt->is_default = true;
     rt->pass_descriptor = [MTLRenderPassDescriptor new];
@@ -330,36 +350,37 @@ ngf_error ngf_default_render_target(
   }
 }
 
-CAMetalLayer* _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
+_ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
                                    id<MTLDevice> device) {
-  CAMetalLayer *layer = [CAMetalLayer layer];
-  layer.device = device;
+  _ngf_swapchain swapchain;
+  swapchain.layer = [CAMetalLayer layer];
+  swapchain.layer.device = device;
   CGSize size;
   size.width = swapchain_info.width;
   size.height = swapchain_info.height;
-  layer.drawableSize = size; 
-  layer.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
+  swapchain.layer.drawableSize = size;
+  swapchain.layer.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
 #if TARGET_OS_OSX
   if (@available(macOS 10.13.2, *)) {
-    layer.maximumDrawableCount = swapchain_info.capacity_hint;
+    swapchain.layer.maximumDrawableCount = swapchain_info.capacity_hint;
   }
   if (@available(macOS 10.13, *)) {
-    layer.displaySyncEnabled =
+    swapchain.layer.displaySyncEnabled =
           (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
   }
 #endif
   _NGF_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info.native_handle);
 #if TARGET_OS_OSX
-  [view setLayer:layer];
+  [view setLayer:swapchain.layer];
 #else
-  [view.layer addSublayer:layer];
+  [view.layer addSublayer:swapchain.layer];
   [layer setContentsScale:view.layer.contentsScale];
   [layer setPosition:view.center];
 #endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
-  return layer;
+  return swapchain;
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
@@ -380,7 +401,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
-    ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+    ctx->swapchain = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
     // TODO: depth
   }
  
@@ -401,7 +422,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
-  ctx->layer = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+  ctx->swapchain = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
   return NGF_ERROR_OK;
 }
 
@@ -561,7 +582,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     const ngf_vertex_attrib_desc &attr_info = vertex_input_info.attribs[a];
     attr_desc.offset = vertex_input_info.attribs[a].offset;
     attr_desc.bufferIndex = vertex_input_info.attribs[a].binding;
-    attr_desc.format = get_mtl_attrib_format(attr_info.type, attr_info.size, attr_info.normalized);
+    attr_desc.format = get_mtl_attrib_format(attr_info.type,
+                                             attr_info.size,
+                                             attr_info.normalized);
   }
   for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
     MTLVertexBufferLayoutDescriptor *binding_desc = vert_desc.layouts[b];
@@ -600,7 +623,8 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipe) {
 
 id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
   // TODO: take usage hint into account.
-  id<MTLBuffer> mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info->buffer_size
+  id<MTLBuffer> mtl_buffer =
+      [CURRENT_CONTEXT->device newBufferWithLength:info->buffer_size
                            options:MTLResourceOptionCPUCacheModeWriteCombined];
   if (info->buffer_ptr) {
     memcpy((uint8_t*)[mtl_buffer contents],
