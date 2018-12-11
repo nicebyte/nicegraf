@@ -747,7 +747,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
   if (compile_status != GL_TRUE) {
-    if (true/*NGF_DEBUG_CALLBACK*/) {
+    if (NGF_DEBUG_CALLBACK) {
       // Note: theoretically, the OpenGL debug callback extension should
       // invoke the debug callback on shader compilation failure.
       // In practice, it varies between vendors, so we just force-call the
