@@ -50,6 +50,8 @@ struct _ngf_swapchain {
     layer = other.layer;
     other.layer = nil;
     depth_images = std::move(other.depth_images);
+    capacity = other.capacity;
+    img_idx = other.img_idx;
     return *this;
   }
   _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
@@ -92,6 +94,9 @@ struct ngf_shader_stage {
 
 struct ngf_graphics_pipeline {
   id<MTLRenderPipelineState> pipeline = nil;
+  id<MTLDepthStencilState> depth_stencil = nil;
+  uint32_t front_stencil_reference = 0u;
+  uint32_t back_stencil_reference = 0u;
   MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
 };
 
@@ -257,6 +262,34 @@ static MTLIndexType get_mtl_index_type(ngf_type type) {
   return type == NGF_TYPE_UINT16 ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
 }
 
+static MTLCompareFunction get_mtl_compare_function(ngf_compare_op op) {
+  static const MTLCompareFunction compare_fn[NGF_COMPARE_OP_COUNT] = {
+    MTLCompareFunctionNever,
+    MTLCompareFunctionLess,
+    MTLCompareFunctionLessEqual,
+    MTLCompareFunctionEqual,
+    MTLCompareFunctionGreaterEqual,
+    MTLCompareFunctionGreater,
+    MTLCompareFunctionNotEqual,
+    MTLCompareFunctionAlways
+  };
+  return compare_fn[op];
+}
+
+static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
+  static const MTLStencilOperation stencil_ops[NGF_STENCIL_OP_COUNT] = {
+    MTLStencilOperationKeep,
+    MTLStencilOperationZero,
+    MTLStencilOperationReplace,
+    MTLStencilOperationIncrementClamp,
+    MTLStencilOperationIncrementWrap,
+    MTLStencilOperationDecrementClamp,
+    MTLStencilOperationDecrementWrap,
+    MTLStencilOperationInvert
+  };
+  return stencil_ops[op];
+}
+
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
 class _ngf_object_nursery {
 public:
@@ -305,6 +338,8 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   assert(ctx && ctx == CURRENT_CONTEXT);
   CURRENT_CONTEXT->next_drawable = [ctx->swapchain.layer nextDrawable];
+  _ngf_swapchain &swapchain = CURRENT_CONTEXT->swapchain;
+  swapchain.img_idx = (swapchain.img_idx + 1u) % swapchain.capacity;
   return (!CURRENT_CONTEXT->next_drawable) ?  NGF_ERROR_NO_FRAME : NGF_ERROR_OK;
 }
 
@@ -342,7 +377,26 @@ ngf_error ngf_default_render_target(
                             clear_color->clear_color[2],
                             clear_color->clear_color[3]);
     }
-    // TODO: depth
+    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
+    if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+      rt->pass_descriptor.depthAttachment =
+          [MTLRenderPassDepthAttachmentDescriptor new];
+      rt->pass_descriptor.depthAttachment.loadAction =
+          get_mtl_load_action(depth_load_op);
+      rt->pass_descriptor.depthAttachment.storeAction =
+          MTLStoreActionStore; // TODO store actions
+      if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+        rt->pass_descriptor.stencilAttachment =
+            [MTLRenderPassStencilAttachmentDescriptor new];
+        rt->pass_descriptor.stencilAttachment.loadAction =
+            get_mtl_load_action(depth_load_op);
+        rt->pass_descriptor.stencilAttachment.storeAction =
+            MTLStoreActionStore; // TODO store actions
+      }
+    } else {
+      rt->pass_descriptor.depthAttachment = nil;
+      rt->pass_descriptor.stencilAttachment = nil;
+    }
     *result = rt.release();
     return NGF_ERROR_OK;
   } else {
@@ -353,6 +407,8 @@ ngf_error ngf_default_render_target(
 _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
                                    id<MTLDevice> device) {
   _ngf_swapchain swapchain;
+  
+  // Initialize the Metal layer.
   swapchain.layer = [CAMetalLayer layer];
   swapchain.layer.device = device;
   CGSize size;
@@ -380,6 +436,48 @@ _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
 #endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
+  swapchain.capacity = swapchain_info.capacity_hint;
+  
+  // Initialize depth attachments if necessary.
+  if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+    swapchain.depth_images.reset(
+        new id<MTLTexture>[swapchain_info.capacity_hint]);
+    for (uint32_t i = 0u; i < swapchain.capacity; ++i) {
+      auto *depth_texture_desc = [MTLTextureDescriptor new];
+      depth_texture_desc.textureType = MTLTextureType2D;
+      depth_texture_desc.width = swapchain_info.width;
+      depth_texture_desc.height = swapchain_info.height;
+      depth_texture_desc.depth = 1u;
+      depth_texture_desc.sampleCount = 1u;
+      depth_texture_desc.mipmapLevelCount = 1u;
+      depth_texture_desc.arrayLength = 1u;
+      depth_texture_desc.usage = MTLTextureUsageRenderTarget;
+      if (@available(macOS 10.14, *)) {
+        depth_texture_desc.allowGPUOptimizedContents = true;
+      }
+      depth_texture_desc.storageMode = MTLStorageModePrivate;
+      depth_texture_desc.resourceOptions = MTLResourceStorageModePrivate;
+      MTLPixelFormat depth_format = MTLPixelFormatInvalid;
+      switch(swapchain_info.dfmt) {
+      case NGF_IMAGE_FORMAT_DEPTH24_STENCIL8:
+          // Depth24Stencil8 is weird on metal i guess...
+          depth_format = 	MTLPixelFormatDepth32Float_Stencil8;
+          break;
+      case NGF_IMAGE_FORMAT_DEPTH16:
+          depth_format = MTLPixelFormatDepth16Unorm;
+          break;
+      case NGF_IMAGE_FORMAT_DEPTH32:
+          depth_format = MTLPixelFormatDepth32Float;
+          break;
+      default:;
+      }
+      assert(depth_format != MTLPixelFormatInvalid);
+      depth_texture_desc.pixelFormat = depth_format;
+      swapchain.depth_images[i] =
+        [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
+    }
+  }
+    
   return swapchain;
 }
 
@@ -402,7 +500,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
     ctx->swapchain = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
-    // TODO: depth
   }
  
   *result = ctx.release(); 
@@ -534,6 +631,17 @@ id<MTLFunction> _ngf_get_shader_main(id<MTLLibrary> func_lib,
                                      error:&err];
 }
 
+MTLStencilDescriptor* _ngf_create_stencil_descriptor(const ngf_stencil_info &info) {
+  auto *result = [MTLStencilDescriptor new];
+  result.stencilCompareFunction = get_mtl_compare_function(info.compare_op);
+  result.stencilFailureOperation = get_mtl_stencil_op(info.fail_op);
+  result.depthStencilPassOperation = get_mtl_stencil_op(info.pass_op);
+  result.depthFailureOperation = get_mtl_stencil_op(info.depth_fail_op);
+  result.writeMask = info.write_mask;
+  result.readMask = info.compare_mask;
+  return result;
+}
+
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
@@ -598,12 +706,37 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   mtl_pipe_desc.inputPrimitiveTopology =
       get_mtl_primitive_topology_class(info->primitive_type);
   
+  // TODO: fix (depth and stencil both)
+  mtl_pipe_desc.depthAttachmentPixelFormat =
+      MTLPixelFormatDepth32Float_Stencil8;
+  mtl_pipe_desc.stencilAttachmentPixelFormat =
+      MTLPixelFormatDepth32Float_Stencil8;
+  
+  
   _NGF_NURSERY(graphics_pipeline, pipeline);
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
   pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
+  
+  // Set up depth and stencil state.
+  auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
+  const ngf_depth_stencil_info &depth_stencil_info = *info->depth_stencil;
+  mtl_depth_stencil_desc.depthCompareFunction =
+      get_mtl_compare_function(depth_stencil_info.depth_compare);
+  mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
+  mtl_depth_stencil_desc.backFaceStencil =
+      _ngf_create_stencil_descriptor(depth_stencil_info.back_stencil);
+  mtl_depth_stencil_desc.frontFaceStencil =
+      _ngf_create_stencil_descriptor(depth_stencil_info.front_stencil);
+  pipeline->front_stencil_reference =
+      depth_stencil_info.front_stencil.reference;
+  pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
+  pipeline->depth_stencil =
+      [CURRENT_CONTEXT->device
+       newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
+  
   if (err) {
     NSLog(@"... [%@]\n", err);
     // TODO: invoke debug callback
@@ -753,7 +886,15 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
     assert(CURRENT_CONTEXT->next_drawable);
     rt->pass_descriptor.colorAttachments[0].texture =
       CURRENT_CONTEXT->next_drawable.texture;
-    // TODO: depth
+    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
+    if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+      id<MTLTexture> depth_tex =
+          CURRENT_CONTEXT->swapchain.depth_images[CURRENT_CONTEXT->swapchain.img_idx];
+      rt->pass_descriptor.depthAttachment.texture = depth_tex;
+      if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+        rt->pass_descriptor.stencilAttachment.texture = depth_tex;
+      }
+    }
   }
   cmd_buffer->active_rce =
       [cmd_buffer->mtl_cmd_buffer
@@ -769,6 +910,10 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline) {
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
+  [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
+  [buf->active_rce
+      setStencilFrontReferenceValue:pipeline->front_stencil_reference
+      backReferenceValue:pipeline->back_stencil_reference];
   buf->active_pipe = pipeline;
 }
 
