@@ -153,30 +153,47 @@ static MTLDataType get_mtl_type(ngf_type type) {
   return types[type];
 }
 
-static MTLVertexFormat get_mtl_attrib_format(ngf_type type, uint32_t size) {
-  static const MTLVertexFormat formats[NGF_TYPE_COUNT][4] = {
-    {MTLVertexFormatChar, MTLVertexFormatChar2,
-     MTLVertexFormatChar3, MTLVertexFormatChar4},
-    {MTLVertexFormatUChar, MTLVertexFormatUChar2,
-     MTLVertexFormatUChar3, MTLVertexFormatUChar4},
-    {MTLVertexFormatShort, MTLVertexFormatShort2,
-     MTLVertexFormatShort3, MTLVertexFormatShort4},
-    {MTLVertexFormatUShort, MTLVertexFormatUShort2,
-     MTLVertexFormatUShort3, MTLVertexFormatUShort4},
-    {MTLVertexFormatInt, MTLVertexFormatInt2,
-     MTLVertexFormatInt3, MTLVertexFormatInt4},
-    {MTLVertexFormatUInt, MTLVertexFormatUInt2,
-     MTLVertexFormatUInt3, MTLVertexFormatUInt4},
-    {MTLVertexFormatFloat, MTLVertexFormatFloat2,
-     MTLVertexFormatFloat3, MTLVertexFormatFloat4},
-    {MTLVertexFormatHalf, MTLVertexFormatHalf2,
-     MTLVertexFormatHalf3, MTLVertexFormatHalf4},
-    {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-     MTLVertexFormatInvalid, MTLVertexFormatInvalid}, // Double, Metal does not
-                                                      // support.
+static MTLVertexFormat get_mtl_attrib_format(ngf_type type, uint32_t size, bool normalized) {
+  static const MTLVertexFormat formats[NGF_TYPE_COUNT][2][4] = {
+    { {MTLVertexFormatChar, MTLVertexFormatChar2,
+       MTLVertexFormatChar3, MTLVertexFormatChar4},
+      {MTLVertexFormatCharNormalized, MTLVertexFormatChar2Normalized,
+       MTLVertexFormatChar3Normalized, MTLVertexFormatChar4Normalized} },
+    { {MTLVertexFormatUChar, MTLVertexFormatUChar2,
+       MTLVertexFormatUChar3, MTLVertexFormatUChar4},
+      {MTLVertexFormatUCharNormalized, MTLVertexFormatUChar2Normalized,
+       MTLVertexFormatUChar3Normalized, MTLVertexFormatUChar4Normalized} },
+    { {MTLVertexFormatShort, MTLVertexFormatShort2,
+       MTLVertexFormatShort3, MTLVertexFormatShort4},
+      {MTLVertexFormatShortNormalized, MTLVertexFormatShort2Normalized,
+       MTLVertexFormatShort3Normalized, MTLVertexFormatShort4Normalized} },
+    { {MTLVertexFormatUShort, MTLVertexFormatUShort2,
+       MTLVertexFormatUShort3, MTLVertexFormatUShort4},
+      {MTLVertexFormatUShortNormalized, MTLVertexFormatUShort2Normalized,
+       MTLVertexFormatUShort3Normalized, MTLVertexFormatUShort4Normalized} },
+    { {MTLVertexFormatInt, MTLVertexFormatInt2,
+       MTLVertexFormatInt3, MTLVertexFormatInt4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatUInt, MTLVertexFormatUInt2,
+       MTLVertexFormatUInt3, MTLVertexFormatUInt4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatFloat, MTLVertexFormatFloat2,
+       MTLVertexFormatFloat3, MTLVertexFormatFloat4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid } },
+    { {MTLVertexFormatHalf, MTLVertexFormatHalf2,
+       MTLVertexFormatHalf3, MTLVertexFormatHalf4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatInvalid, MTLVertexFormatInvalid, // Double, Metal does not support.
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+       MTLVertexFormatInvalid, MTLVertexFormatInvalid} }
   };
   assert(size <= 4u && size > 0u);
-  return formats[type][size - 1u];
+  return formats[type][normalized? 1 : 0][size - 1u];
 }
 
 static MTLVertexStepFunction get_mtl_step_function(ngf_input_rate rate) {
@@ -544,7 +561,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     const ngf_vertex_attrib_desc &attr_info = vertex_input_info.attribs[a];
     attr_desc.offset = vertex_input_info.attribs[a].offset;
     attr_desc.bufferIndex = vertex_input_info.attribs[a].binding;
-    attr_desc.format = get_mtl_attrib_format(attr_info.type, attr_info.size);
+    attr_desc.format = get_mtl_attrib_format(attr_info.type, attr_info.size, attr_info.normalized);
   }
   for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
     MTLVertexBufferLayoutDescriptor *binding_desc = vert_desc.layouts[b];
