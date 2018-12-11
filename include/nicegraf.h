@@ -522,7 +522,8 @@ typedef struct ngf_vertex_data_info {
  */
 typedef enum ngf_image_type {
   NGF_IMAGE_TYPE_IMAGE_2D = 0,
-  NGF_IMAGE_TYPE_IMAGE_3D
+  NGF_IMAGE_TYPE_IMAGE_3D,
+  NGF_IMAGE_TYPE_COUNT
 } ngf_image_type;
 
 /**
@@ -683,8 +684,7 @@ typedef struct ngf_swapchain_info {
 typedef enum {
   NGF_FILTER_NEAREST = 0,
   NGF_FILTER_LINEAR,
-  NGF_FILTER_LINEAR_MIPMAP_NEAREST,
-  NGF_FILTER_LINEAR_MIPMAP_LINEAR
+  NGF_FILTER_COUNT
 } ngf_sampler_filter;
 
 /**
@@ -704,6 +704,7 @@ typedef enum {
 typedef struct {
   ngf_sampler_filter min_filter; /**< Minification filter.*/
   ngf_sampler_filter mag_filter; /**< Magnification filter.*/
+  ngf_sampler_filter mip_filter; /**< Mipmap filter. */
   // TODO: anisotropic filtering
   ngf_sampler_wrap_mode wrap_s; /**< Horizontal wrap mode. */
   ngf_sampler_wrap_mode wrap_t;
