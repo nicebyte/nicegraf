@@ -30,10 +30,10 @@ SOFTWARE.
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
-#define _NGF_VIEW_TYPE NSView
+using _NGF_VIEW_TYPE = NSView;
 #else
 #import <UIKit/UIKit.h>
-#define _NGF_VIEW_TYPE UIView
+using _NGF_VIEW_TYPE = UIView;
 #endif
 
 id<MTLDevice> MTL_DEVICE = nil;
@@ -45,7 +45,6 @@ struct _ngf_swapchain {
   _ngf_swapchain(_ngf_swapchain &&other) {
     *this = std::move(other);
   }
-  _ngf_swapchain(const _ngf_swapchain&) = delete;
   _ngf_swapchain& operator=(_ngf_swapchain &&other) {
     layer = other.layer;
     other.layer = nil;
@@ -55,6 +54,7 @@ struct _ngf_swapchain {
     return *this;
   }
   _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
+  _ngf_swapchain(const _ngf_swapchain&) = delete;
   
   CAMetalLayer *layer = nil;
   std::unique_ptr<id<MTLTexture>[]> depth_images;
