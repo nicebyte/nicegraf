@@ -104,7 +104,11 @@ typedef enum ngf_error {
 
   /** There was an attempt to write too little or too much data into a uniform
       buffer. */
-  NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH
+  NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH,
+
+  /** Indicates that the given image format is not supported by the active
+      backend.*/
+  NGF_ERROR_INVALID_IMAGE_FORMAT
   /*..add new errors above this line */
 } ngf_error ;
 
