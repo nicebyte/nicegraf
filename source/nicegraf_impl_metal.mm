@@ -771,6 +771,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     attr_desc.format = get_mtl_attrib_format(attr_info.type,
                                              attr_info.size,
                                              attr_info.normalized);
+    if (attr_desc.format == MTLVertexFormatInvalid) {
+      return NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT;
+    }
   }
   for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
     MTLVertexBufferLayoutDescriptor *binding_desc = vert_desc.layouts[b];
