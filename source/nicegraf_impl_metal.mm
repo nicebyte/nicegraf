@@ -129,7 +129,7 @@ struct ngf_image {
 #pragma mark ngf_enum_maps
 
 static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
-  static const MTLPixelFormat pixel_format[NGF_IMAGE_FORMAT_COUNT] = {
+  static const MTLPixelFormat pixel_formats[NGF_IMAGE_FORMAT_COUNT] = {
     MTLPixelFormatR8Unorm,
     MTLPixelFormatRG8Unorm,
     MTLPixelFormatInvalid, // RGB8, Metal does not support.
@@ -159,7 +159,7 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
   };
   return fmt >= NGF_IMAGE_FORMAT_UNDEFINED
              ? MTLPixelFormatInvalid
-             : pixel_format[fmt];
+             : pixel_formats[fmt];
 }
 
 static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
@@ -186,7 +186,9 @@ static MTLDataType get_mtl_type(ngf_type type) {
   return types[type];
 }
 
-static MTLVertexFormat get_mtl_attrib_format(ngf_type type, uint32_t size, bool normalized) {
+static MTLVertexFormat get_mtl_attrib_format(ngf_type type,
+                                             uint32_t size,
+                                             bool normalized) {
   static const MTLVertexFormat formats[NGF_TYPE_COUNT][2][4] = {
     { {MTLVertexFormatChar, MTLVertexFormatChar2,
        MTLVertexFormatChar3, MTLVertexFormatChar4},
@@ -271,7 +273,7 @@ static MTLIndexType get_mtl_index_type(ngf_type type) {
 }
 
 static MTLCompareFunction get_mtl_compare_function(ngf_compare_op op) {
-  static const MTLCompareFunction compare_fn[NGF_COMPARE_OP_COUNT] = {
+  static const MTLCompareFunction compare_fns[NGF_COMPARE_OP_COUNT] = {
     MTLCompareFunctionNever,
     MTLCompareFunctionLess,
     MTLCompareFunctionLessEqual,
@@ -281,7 +283,7 @@ static MTLCompareFunction get_mtl_compare_function(ngf_compare_op op) {
     MTLCompareFunctionNotEqual,
     MTLCompareFunctionAlways
   };
-  return compare_fn[op];
+  return compare_fns[op];
 }
 
 static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
@@ -397,11 +399,11 @@ ngf_error ngf_end_frame(ngf_context*) {
 }
 
 ngf_error ngf_default_render_target(
-  ngf_attachment_load_op color_load_op,
-  ngf_attachment_load_op depth_load_op,
-  const ngf_clear *clear_color,
-  const ngf_clear *clear_depth,
-  ngf_render_target **result) {
+    ngf_attachment_load_op color_load_op,
+    ngf_attachment_load_op depth_load_op,
+    const ngf_clear *clear_color,
+    const ngf_clear *clear_depth,
+    ngf_render_target **result) {
   assert(result);
   if (CURRENT_CONTEXT->swapchain.layer) {
     _NGF_NURSERY(render_target, rt);
@@ -447,7 +449,7 @@ ngf_error ngf_default_render_target(
 }
 
 _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
-                                   id<MTLDevice> device) {
+                                     id<MTLDevice> device) {
   _ngf_swapchain swapchain;
   
   // Initialize the Metal layer.
