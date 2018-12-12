@@ -48,7 +48,6 @@ public:
   };
   
   _ngf_swapchain() = default;
-  _ngf_swapchain(ngf_swapchain_info &swapchain_info, id<MTLDevice> device);
   _ngf_swapchain(_ngf_swapchain &&other) { *this = std::move(other); }
   _ngf_swapchain& operator=(_ngf_swapchain &&other) {
     layer_ = other.layer_;
@@ -60,6 +59,9 @@ public:
   }
   _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
   _ngf_swapchain(const _ngf_swapchain&) = delete;
+  
+  ngf_error initialize(ngf_swapchain_info &swapchain_info,
+                       id<MTLDevice> device);
   
   frame next_frame() {
     img_idx_ = (img_idx_ + 1u) % capacity_;
@@ -467,8 +469,8 @@ ngf_error ngf_default_render_target(
   }
 }
 
-_ngf_swapchain::_ngf_swapchain(ngf_swapchain_info &swapchain_info,
-                               id<MTLDevice> device) {
+ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
+                                     id<MTLDevice> device) {
   // Initialize the Metal layer.
   layer_ = [CAMetalLayer layer];
   layer_.device = device;
@@ -476,7 +478,11 @@ _ngf_swapchain::_ngf_swapchain(ngf_swapchain_info &swapchain_info,
   size.width = swapchain_info.width;
   size.height = swapchain_info.height;
   layer_.drawableSize = size;
-  layer_.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
+  MTLPixelFormat pixel_format = get_mtl_pixel_format(swapchain_info.cfmt);
+  if (pixel_format == MTLPixelFormatInvalid) {
+    return NGF_ERROR_INVALID_SURFACE_FORMAT;
+  }
+  layer_.pixelFormat = pixel_format;
 #if TARGET_OS_OSX
   if (@available(macOS 10.13.2, *)) {
     layer_.maximumDrawableCount = swapchain_info.capacity_hint;
@@ -543,6 +549,7 @@ _ngf_swapchain::_ngf_swapchain(ngf_swapchain_info &swapchain_info,
         [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
     }
   }
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
@@ -563,7 +570,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
-    ctx->swapchain = _ngf_swapchain(ctx->swapchain_info, ctx->device);
+    ngf_error err = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device);
+    if (err != NGF_ERROR_OK) return err;
   }
  
   *result = ctx.release(); 
@@ -583,8 +591,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
-  ctx->swapchain = _ngf_swapchain(ctx->swapchain_info, ctx->device);
-  return NGF_ERROR_OK;
+  return ctx->swapchain.initialize(ctx->swapchain_info, ctx->device);
 }
 
 ngf_error ngf_set_context(ngf_context *ctx) {
