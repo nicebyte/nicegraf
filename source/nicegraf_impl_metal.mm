@@ -311,7 +311,12 @@ static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
 static MTLSamplerAddressMode get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
   static const MTLSamplerAddressMode modes[NGF_WRAP_MODE_COUNT] = {
     MTLSamplerAddressModeClampToEdge,
+#if TARGET_OS_OSX
     MTLSamplerAddressModeClampToBorderColor,
+#else
+    //ClampToBorderColor is unsupported on iOS, temp solution:
+    MTLSamplerAddressModeClampToEdge,
+#endif
     MTLSamplerAddressModeRepeat,
     MTLSamplerAddressModeMirrorRepeat
   };
@@ -475,8 +480,8 @@ _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
   [view setLayer:swapchain.layer];
 #else
   [view.layer addSublayer:swapchain.layer];
-  [layer setContentsScale:view.layer.contentsScale];
-  [layer setPosition:view.center];
+  [swapchain.layer setContentsScale:view.layer.contentsScale];
+  [swapchain.layer setPosition:view.center];
 #endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
@@ -508,7 +513,12 @@ _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
           depth_format = 	MTLPixelFormatDepth32Float_Stencil8;
           break;
       case NGF_IMAGE_FORMAT_DEPTH16:
+#if TARGET_OS_OSX
           depth_format = MTLPixelFormatDepth16Unorm;
+#else
+          //Depth16Unorm is unsupported on iOS
+          depth_format = MTLPixelFormatInvalid;
+#endif
           break;
       case NGF_IMAGE_FORMAT_DEPTH32:
           depth_format = MTLPixelFormatDepth32Float;
