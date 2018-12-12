@@ -480,7 +480,7 @@ ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
   layer_.drawableSize = size;
   MTLPixelFormat pixel_format = get_mtl_pixel_format(swapchain_info.cfmt);
   if (pixel_format == MTLPixelFormatInvalid) {
-    return NGF_ERROR_INVALID_SURFACE_FORMAT;
+    return NGF_ERROR_INVALID_IMAGE_FORMAT;
   }
   layer_.pixelFormat = pixel_format;
 #if TARGET_OS_OSX
@@ -952,6 +952,9 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   auto *mtl_img_desc = [MTLTextureDescriptor new];
   mtl_img_desc.textureType = get_mtl_texture_type(info->type);
   mtl_img_desc.pixelFormat = get_mtl_pixel_format(info->format);
+  if (mtl_img_desc.pixelFormat == MTLPixelFormatInvalid) {
+    return NGF_ERROR_INVALID_IMAGE_FORMAT;
+  }
   mtl_img_desc.width = info->extent.width;
   mtl_img_desc.height = info->extent.height;
   mtl_img_desc.depth = info->extent.depth;
