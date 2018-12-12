@@ -541,7 +541,7 @@ ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
       case NGF_IMAGE_FORMAT_DEPTH32:
           depth_format = MTLPixelFormatDepth32Float;
           break;
-      default:;
+      default: return NGF_ERROR_INVALID_DEPTH_FORMAT;
       }
       assert(depth_format != MTLPixelFormatInvalid);
       depth_texture_desc.pixelFormat = depth_format;

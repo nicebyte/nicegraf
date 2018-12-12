@@ -108,7 +108,11 @@ typedef enum ngf_error {
 
   /** Indicates that the given image format is not supported by the active
       backend.*/
-  NGF_ERROR_INVALID_IMAGE_FORMAT
+  NGF_ERROR_INVALID_IMAGE_FORMAT,
+
+  /** Indicates that the given image format is not a valid depth format for
+      the active backend.*/
+  NGF_ERROR_INVALID_DEPTH_FORMAT,
   /*..add new errors above this line */
 } ngf_error ;
 
