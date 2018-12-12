@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "nicegraf.h"
 
+#include <assert.h>
 #if defined(_WIN32) || defined(_WIN64)
 #define NGF_THREADLOCAL __declspec(thread)
 #define WIN32_LEAN_AND_MEAN
@@ -100,7 +101,7 @@ typedef enum {
 _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 // For fixing unreferenced parameter warnings.
-#define _NGF_FAKE_USE(...) if(0){(__VA_ARGS__);}
+#define _NGF_FAKE_USE(x, ...) {(void)x;}
 
 // MSVC warnings that are safe to ignore.
 #pragma warning(disable:4201)
