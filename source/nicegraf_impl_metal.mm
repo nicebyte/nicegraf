@@ -1193,8 +1193,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
          atIndex:native_binding];
       }
       break; }
-    case NGF_DESCRIPTOR_STORAGE_BUFFER:
-    case NGF_DESCRIPTOR_LOADSTORE_IMAGE:;
+    case NGF_DESCRIPTOR_TYPE_COUNT: assert(false);
     }
   }
 }
