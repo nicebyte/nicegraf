@@ -1114,53 +1114,78 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
     const uint32_t ngf_binding = set->descriptors[s].id;
     const uint32_t native_binding = ngf_binding; // TODO: fix
+    const uint32_t set_stage_flags = set->descriptors[ngf_binding].stage_flags;
+    const bool frag_stage_visible = set_stage_flags &
+                                    NGF_DESCRIPTOR_VERTEX_STAGE_BIT,
+               vert_stage_visible = set_stage_flags &
+                                    NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT;
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
       const ngf_uniform_buffer *buf = buf_bind_op->buffer;
       size_t offset = buf->current_idx * buf->size;
-      if (set->descriptors[ngf_binding].stage_flags &
-          NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
+      if (vert_stage_visible) {
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                       offset:offset
                                      atIndex:native_binding + 1u]; // TODO: fix
       }
-      if (set->descriptors[ngf_binding].stage_flags &
-          NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
+      if (frag_stage_visible) {
         [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
          offset:offset
          atIndex:native_binding];
       }
       break;}
-      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
-        // TODO use texture view
-        const ngf_descriptor_write_image_sampler &img_bind_op =
-            rbop->op.image_sampler_bind;
-        if (set->descriptors[ngf_binding].stage_flags &
-            NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
-          [cmd_buf->active_rce
-           setVertexTexture:img_bind_op.image_subresource.image->texture
-           atIndex:native_binding];
-          [cmd_buf->active_rce
-           setVertexSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
-        if (set->descriptors[ngf_binding].stage_flags &
-            NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) {
-          [cmd_buf->active_rce
-               setFragmentTexture:img_bind_op.image_subresource.image->texture
-               atIndex:native_binding];
-          [cmd_buf->active_rce
-           setFragmentSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
-        
-        break;
+    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: { // TODO maybe remove
+      // TODO use texture view
+      const ngf_descriptor_write_image_sampler &img_bind_op =
+          rbop->op.image_sampler_bind;
+      if (vert_stage_visible) {
+        [cmd_buf->active_rce
+         setVertexTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setVertexSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
       }
-    case NGF_DESCRIPTOR_TEXTURE:
+      if (frag_stage_visible) {
+        [cmd_buf->active_rce
+             setFragmentTexture:img_bind_op.image_subresource.image->texture
+             atIndex:native_binding];
+        [cmd_buf->active_rce
+         setFragmentSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
+      }
+      break; }
+    case NGF_DESCRIPTOR_TEXTURE: {// TODO use texture view
+      const ngf_descriptor_write_image_sampler &img_bind_op =
+      rbop->op.image_sampler_bind;
+      if (vert_stage_visible) {
+        [cmd_buf->active_rce
+         setVertexTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+      }
+      if (frag_stage_visible) {
+        [cmd_buf->active_rce
+         setFragmentTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+      }
+      break; }
+    case NGF_DESCRIPTOR_SAMPLER: {
+      const ngf_descriptor_write_image_sampler &img_bind_op =
+      rbop->op.image_sampler_bind;
+      if (vert_stage_visible) {
+        [cmd_buf->active_rce
+         setVertexSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
+      }
+      if (frag_stage_visible) {
+        [cmd_buf->active_rce
+         setFragmentSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
+      }
+      break; }
     case NGF_DESCRIPTOR_STORAGE_BUFFER:
-    case NGF_DESCRIPTOR_LOADSTORE_IMAGE:
-    case NGF_DESCRIPTOR_SAMPLER:;
+    case NGF_DESCRIPTOR_LOADSTORE_IMAGE:;
     }
   }
 }
