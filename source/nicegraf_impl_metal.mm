@@ -1116,7 +1116,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
       const ngf_uniform_buffer *buf = buf_bind_op->buffer;
-      size_t offset = buf->current_idx * buf->size;
+      size_t offset = buf->current_idx * buf->size + buf_bind_op->offset;
       if (set->descriptors[ngf_binding].stage_flags &
           NGF_DESCRIPTOR_VERTEX_STAGE_BIT) {
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
