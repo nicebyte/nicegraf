@@ -40,33 +40,46 @@ id<MTLDevice> MTL_DEVICE = nil;
 
 #pragma mark ngf_struct_definitions
 
-struct _ngf_swapchain {
+class _ngf_swapchain {
+public:
+  struct frame {
+    id<CAMetalDrawable> color_drawable = nil;
+    id<MTLTexture> depth_texture = nil;
+  };
+  
   _ngf_swapchain() = default;
-  _ngf_swapchain(_ngf_swapchain &&other) {
-    *this = std::move(other);
-  }
+  _ngf_swapchain(ngf_swapchain_info &swapchain_info, id<MTLDevice> device);
+  _ngf_swapchain(_ngf_swapchain &&other) { *this = std::move(other); }
   _ngf_swapchain& operator=(_ngf_swapchain &&other) {
-    layer = other.layer;
-    other.layer = nil;
-    depth_images = std::move(other.depth_images);
-    capacity = other.capacity;
-    img_idx = other.img_idx;
+    layer_ = other.layer_;
+    other.layer_ = nil;
+    depth_images_ = std::move(other.depth_images_);
+    capacity_ = other.capacity_;
+    img_idx_ = other.img_idx_;
     return *this;
   }
   _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
   _ngf_swapchain(const _ngf_swapchain&) = delete;
   
-  CAMetalLayer *layer = nil;
-  std::unique_ptr<id<MTLTexture>[]> depth_images;
-  uint32_t img_idx = 0u;
-  uint32_t capacity = 0u;
+  frame next_frame() {
+    img_idx_ = (img_idx_ + 1u) % capacity_;
+    return { [layer_ nextDrawable],
+             depth_images_.get() ? depth_images_[img_idx_] : nil };
+  }
+  operator bool() { return layer_; }
+  
+private:
+  CAMetalLayer *layer_ = nil;
+  std::unique_ptr<id<MTLTexture>[]> depth_images_;
+  uint32_t img_idx_ = 0u;
+  uint32_t capacity_ = 0u;
 };
 
 struct ngf_context {
   id<MTLDevice> device = nil;
   _ngf_swapchain swapchain;
+  _ngf_swapchain::frame frame;
   id<MTLCommandQueue> queue = nil;
-  id<CAMetalDrawable> next_drawable = nil;
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
   id<MTLCommandBuffer> pending_cmd_buffer = nil;
@@ -386,18 +399,19 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   assert(ctx && ctx == CURRENT_CONTEXT);
-  CURRENT_CONTEXT->next_drawable = [ctx->swapchain.layer nextDrawable];
-  _ngf_swapchain &swapchain = CURRENT_CONTEXT->swapchain;
-  swapchain.img_idx = (swapchain.img_idx + 1u) % swapchain.capacity;
-  return (!CURRENT_CONTEXT->next_drawable) ?  NGF_ERROR_NO_FRAME : NGF_ERROR_OK;
+  CURRENT_CONTEXT->frame = ctx->swapchain.next_frame();
+  return (!CURRENT_CONTEXT->frame.color_drawable)
+           ?  NGF_ERROR_NO_FRAME
+           : NGF_ERROR_OK;
 }
 
 ngf_error ngf_end_frame(ngf_context*) {
-  if(CURRENT_CONTEXT->next_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
+  if(CURRENT_CONTEXT->frame.color_drawable &&
+     CURRENT_CONTEXT->pending_cmd_buffer) {
     [CURRENT_CONTEXT->pending_cmd_buffer
-       presentDrawable:CURRENT_CONTEXT->next_drawable];
+       presentDrawable:CURRENT_CONTEXT->frame.color_drawable];
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
-    CURRENT_CONTEXT->next_drawable = nil;
+    CURRENT_CONTEXT->frame = _ngf_swapchain::frame{};
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
   }
   return NGF_ERROR_OK;
@@ -410,7 +424,7 @@ ngf_error ngf_default_render_target(
     const ngf_clear *clear_depth,
     ngf_render_target **result) {
   assert(result);
-  if (CURRENT_CONTEXT->swapchain.layer) {
+  if (CURRENT_CONTEXT->swapchain) {
     _NGF_NURSERY(render_target, rt);
     rt->is_default = true;
     rt->pass_descriptor = [MTLRenderPassDescriptor new];
@@ -453,31 +467,29 @@ ngf_error ngf_default_render_target(
   }
 }
 
-_ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
-                                     id<MTLDevice> device) {
-  _ngf_swapchain swapchain;
-  
+_ngf_swapchain::_ngf_swapchain(ngf_swapchain_info &swapchain_info,
+                               id<MTLDevice> device) {
   // Initialize the Metal layer.
-  swapchain.layer = [CAMetalLayer layer];
-  swapchain.layer.device = device;
+  layer_ = [CAMetalLayer layer];
+  layer_.device = device;
   CGSize size;
   size.width = swapchain_info.width;
   size.height = swapchain_info.height;
-  swapchain.layer.drawableSize = size;
-  swapchain.layer.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
+  layer_.drawableSize = size;
+  layer_.pixelFormat = get_mtl_pixel_format(swapchain_info.cfmt);
 #if TARGET_OS_OSX
   if (@available(macOS 10.13.2, *)) {
-    swapchain.layer.maximumDrawableCount = swapchain_info.capacity_hint;
+    layer_.maximumDrawableCount = swapchain_info.capacity_hint;
   }
   if (@available(macOS 10.13, *)) {
-    swapchain.layer.displaySyncEnabled =
+    layer_.displaySyncEnabled =
           (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
   }
 #endif
   _NGF_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info.native_handle);
 #if TARGET_OS_OSX
-  [view setLayer:swapchain.layer];
+  [view setLayer:layer_];
 #else
   [view.layer addSublayer:swapchain.layer];
   [swapchain.layer setContentsScale:view.layer.contentsScale];
@@ -485,13 +497,13 @@ _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
 #endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
-  swapchain.capacity = swapchain_info.capacity_hint;
+  capacity_ = swapchain_info.capacity_hint;
   
   // Initialize depth attachments if necessary.
   if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-    swapchain.depth_images.reset(
+    depth_images_.reset(
         new id<MTLTexture>[swapchain_info.capacity_hint]);
-    for (uint32_t i = 0u; i < swapchain.capacity; ++i) {
+    for (uint32_t i = 0u; i < capacity_; ++i) {
       auto *depth_texture_desc = [MTLTextureDescriptor new];
       depth_texture_desc.textureType = MTLTextureType2D;
       depth_texture_desc.width = swapchain_info.width;
@@ -527,12 +539,10 @@ _ngf_swapchain _ngf_create_swapchain(ngf_swapchain_info &swapchain_info,
       }
       assert(depth_format != MTLPixelFormatInvalid);
       depth_texture_desc.pixelFormat = depth_format;
-      swapchain.depth_images[i] =
+      depth_images_[i] =
         [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
     }
   }
-    
-  return swapchain;
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
@@ -553,7 +563,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
-    ctx->swapchain = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+    ctx->swapchain = _ngf_swapchain(ctx->swapchain_info, ctx->device);
   }
  
   *result = ctx.release(); 
@@ -573,7 +583,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
-  ctx->swapchain = _ngf_create_swapchain(ctx->swapchain_info, ctx->device);
+  ctx->swapchain = _ngf_swapchain(ctx->swapchain_info, ctx->device);
   return NGF_ERROR_OK;
 }
 
@@ -1029,13 +1039,12 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
     [cmd_buffer->active_rce endEncoding];
   }
   if (rt->is_default) {
-    assert(CURRENT_CONTEXT->next_drawable);
+    assert(CURRENT_CONTEXT->frame.color_drawable);
     rt->pass_descriptor.colorAttachments[0].texture =
-      CURRENT_CONTEXT->next_drawable.texture;
+      CURRENT_CONTEXT->frame.color_drawable.texture;
     ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
     if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-      id<MTLTexture> depth_tex =
-          CURRENT_CONTEXT->swapchain.depth_images[CURRENT_CONTEXT->swapchain.img_idx];
+      id<MTLTexture> depth_tex = CURRENT_CONTEXT->frame.depth_texture;
       rt->pass_descriptor.depthAttachment.texture = depth_tex;
       if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
         rt->pass_descriptor.stencilAttachment.texture = depth_tex;
