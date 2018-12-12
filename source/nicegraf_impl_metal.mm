@@ -893,7 +893,6 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   sampler_desc.lodMinClamp = info->lod_min;
   sampler_desc.lodMaxClamp = info->lod_max;
   // TODO max anisotropy
-  // TODO LOD bias not supported?
   _NGF_NURSERY(sampler, sampler);
   sampler->sampler =
       [CURRENT_CONTEXT->device newSamplerStateWithDescriptor:sampler_desc];
@@ -961,8 +960,11 @@ ngf_error ngf_populate_image(ngf_image *image,
   region.size.depth = dimensions.depth;
   // TODO blit command encoder
   uint32_t bpp = 4u; // TODO fix, get_mtl_format_bpp
-  printf("TEX WIDTH %d\n", image->texture.width);
-  [image->texture replaceRegion:region mipmapLevel:level withBytes:data bytesPerRow:image->texture.width * bpp];
+  [image->texture
+   replaceRegion:region
+   mipmapLevel:level
+   withBytes:data
+   bytesPerRow:image->texture.width * bpp];
   return NGF_ERROR_OK;
 }
 
@@ -1116,9 +1118,9 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
     const uint32_t native_binding = ngf_binding; // TODO: fix
     const uint32_t set_stage_flags = set->descriptors[ngf_binding].stage_flags;
     const bool frag_stage_visible = set_stage_flags &
-                                    NGF_DESCRIPTOR_VERTEX_STAGE_BIT,
+                                    NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
                vert_stage_visible = set_stage_flags &
-                                    NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT;
+                                    NGF_DESCRIPTOR_VERTEX_STAGE_BIT;
     switch(rbop->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const  ngf_descriptor_write_buffer *buf_bind_op = &(rbop->op.buffer_bind);
