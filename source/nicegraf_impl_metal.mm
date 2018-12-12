@@ -741,7 +741,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       void *write_ptr =
           ((uint8_t*)info->spec_info->value_buffer + spec->offset);
       [spec_consts setConstantValue:write_ptr
-                               type:get_mtl_type(spec->type)
+                               type:type
                             atIndex:spec->constant_id];
     }
   }
