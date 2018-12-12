@@ -692,6 +692,13 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   assert(result);
   auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
   mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm; // TODO: fix
+  // TODO set up blending correctly
+  // TODO multiple color attachments
+  mtl_pipe_desc.colorAttachments[0].blendingEnabled = YES;
+  mtl_pipe_desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+  mtl_pipe_desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+  mtl_pipe_desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+  mtl_pipe_desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
   
   // Populate specialization constant values.
   MTLFunctionConstantValues *spec_consts = nil;
