@@ -101,7 +101,7 @@ typedef enum {
 _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 // For fixing unreferenced parameter warnings.
-#define _NGF_FAKE_USE(x, ...) {(void)x;}
+#define _NGF_FAKE_USE(...) {(__VA_ARGS__);}
 
 // MSVC warnings that are safe to ignore.
 #pragma warning(disable:4201)
