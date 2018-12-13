@@ -99,6 +99,7 @@ struct ngf_cmd_buffer {
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
   const ngf_graphics_pipeline *active_pipe = nullptr;
+  const ngf_render_target *active_rt = nullptr;
   id<MTLBuffer> bound_index_buffer = nil;
   MTLIndexType bound_index_buffer_type;
 };
@@ -750,7 +751,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
       mtl_pipe_desc.vertexFunction =
-          _ngf_get_shader_main(stage->func_lib, spec_consts);
+          _ngf_get_shader_main(stage->func_lib  , spec_consts);
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc.fragmentFunction);
       mtl_pipe_desc.fragmentFunction =
@@ -1080,6 +1081,7 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
   cmd_buffer->active_rce =
       [cmd_buffer->mtl_cmd_buffer
        renderCommandEncoderWithDescriptor:rt->pass_descriptor];
+  cmd_buffer->active_rt = rt;
 }
 
 void ngf_cmd_end_pass(ngf_cmd_buffer *cmd_buffer) {
@@ -1103,7 +1105,9 @@ void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   MTLViewport viewport;
   viewport.originX = r->x;
-  viewport.originY = r->y;
+  int32_t top = r->y + (int32_t)r->height;
+  // TODO use rendertarget height
+  viewport.originY = (int32_t)CURRENT_CONTEXT->swapchain_info.height - top;
   viewport.width = r->width;
   viewport.height = r->height;
 
@@ -1117,7 +1121,10 @@ void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   MTLScissorRect scissor;
   scissor.x = (NSUInteger)r->x;
-  scissor.y = (NSUInteger)r->y;
+  int32_t top = r->y + (int32_t)r->height;
+  // TODO use rendertarget height
+  scissor.y =
+      (NSUInteger)((int32_t)CURRENT_CONTEXT->swapchain_info.height - top);
   scissor.width = r->width;
   scissor.height = r->height;
   [buf->active_rce setScissorRect:scissor];
