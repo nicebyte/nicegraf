@@ -115,7 +115,10 @@ typedef enum ngf_error {
   NGF_ERROR_INVALID_DEPTH_FORMAT,
 
   /** Given vertex attribute format is not supported by the active backend.*/
-  NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT
+  NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT,
+  
+  /** Give sampler address mode is not supported by the active backend. */
+  NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE
   /*..add new errors above this line */
 } ngf_error ;
 

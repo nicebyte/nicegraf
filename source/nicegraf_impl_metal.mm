@@ -25,6 +25,7 @@ SOFTWARE.
 #include "nicegraf_internal.h"
 #include "emulated_descriptor_set.h"
 #include <new>
+#include <optional>
 #include <memory>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
@@ -264,20 +265,18 @@ get_mtl_primitive_topology_class(ngf_primitive_type type) {
                                           // support.
     MTLPrimitiveTopologyClassLine,
     MTLPrimitiveTopologyClassLine,
-    MTLPrimitiveTopologyClassUnspecified, // Patch list, tessellation not
-                                          // implemented yet.
   };
   return topo_class[type];
 }
 
-static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_type type) {
-  static const MTLPrimitiveType types[NGF_PRIMITIVE_TYPE_COUNT] = {
+static std::optional<MTLPrimitiveType> get_mtl_primitive_type(ngf_primitive_type type) {
+  static const std::optional<MTLPrimitiveType>
+      types[NGF_PRIMITIVE_TYPE_COUNT] = {
     MTLPrimitiveTypeTriangle,
     MTLPrimitiveTypeTriangleStrip,
-    MTLPrimitiveTypePoint, // Incorrect
+    std::nullopt, // Triangle Fan not supported.
     MTLPrimitiveTypeLine,
-    MTLPrimitiveTypeLineStrip,
-    MTLPrimitiveTypePoint // Incorrect;
+    MTLPrimitiveTypeLineStrip
   };
   return types[type];
 }
@@ -323,14 +322,15 @@ static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
   return types[type];
 }
 
-static MTLSamplerAddressMode get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
-  static const MTLSamplerAddressMode modes[NGF_WRAP_MODE_COUNT] = {
+static std::optional<MTLSamplerAddressMode>
+    get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
+  static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] = {
     MTLSamplerAddressModeClampToEdge,
 #if TARGET_OS_OSX
     MTLSamplerAddressModeClampToBorderColor,
 #else
     //ClampToBorderColor is unsupported on iOS, temp solution:
-    MTLSamplerAddressModeClampToEdge,
+    std::nullopt,
 #endif
     MTLSamplerAddressModeRepeat,
     MTLSamplerAddressModeMirrorRepeat
@@ -786,8 +786,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Set primitive topology.
   mtl_pipe_desc.inputPrimitiveTopology =
       get_mtl_primitive_topology_class(info->primitive_type);
+  if (mtl_pipe_desc.inputPrimitiveTopology ==
+      MTLPrimitiveTopologyClassUnspecified) {
+    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+  }
   
-  // TODO: fix (depth and stencil both)
+  // TODO: fix (depth and stencil both) - set appropriate formats
   if (CURRENT_CONTEXT->swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
     mtl_pipe_desc.depthAttachmentPixelFormat =
         MTLPixelFormatDepth32Float_Stencil8;
@@ -801,7 +805,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
-  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
+  std::optional<MTLPrimitiveType> prim_type =
+      get_mtl_primitive_type(info->primitive_type);
+  if (!prim_type.has_value()) {
+    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+  }
+  pipeline->primitive_type = *prim_type;
   
   // Set up depth and stencil state.
   if (info->depth_stencil->depth_test) {
@@ -920,9 +929,15 @@ ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler **result) {
   auto *sampler_desc = [MTLSamplerDescriptor new];
-  sampler_desc.sAddressMode = get_mtl_address_mode(info->wrap_s);
-  sampler_desc.tAddressMode = get_mtl_address_mode(info->wrap_t);
-  sampler_desc.rAddressMode = get_mtl_address_mode(info->wrap_r);
+  std::optional<MTLSamplerAddressMode> s = get_mtl_address_mode(info->wrap_s),
+                                       t = get_mtl_address_mode(info->wrap_t),
+                                       r = get_mtl_address_mode(info->wrap_r);
+  if (!(s && t && r)) {
+    return NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE;
+  }
+  sampler_desc.sAddressMode = *s;
+  sampler_desc.tAddressMode = *t;
+  sampler_desc.rAddressMode = *r;
   sampler_desc.minFilter = get_mtl_minmag_filter(info->min_filter);
   sampler_desc.magFilter = get_mtl_minmag_filter(info->mag_filter);
   sampler_desc.mipFilter = get_mtl_mip_filter(info->mip_filter);
