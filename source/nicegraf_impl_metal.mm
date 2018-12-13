@@ -173,9 +173,7 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
     MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
 #endif
   };
-  return fmt >= NGF_IMAGE_FORMAT_UNDEFINED
-             ? MTLPixelFormatInvalid
-             : pixel_formats[fmt];
+  return pixel_formats[fmt];
 }
 
 static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
