@@ -170,9 +170,6 @@ typedef struct ngf_offset3d {
  */
 typedef enum ngf_stage_type {
   NGF_STAGE_VERTEX = 0,
-  NGF_STAGE_TESSELLATION_CONTROL,
-  NGF_STAGE_TESSELLATION_EVALUATION,
-  NGF_STAGE_GEOMETRY,
   NGF_STAGE_FRAGMENT,
   // TODO: compute pipelines
   NGF_STAGE_COUNT
@@ -433,13 +430,6 @@ typedef struct ngf_multisample_info {
   bool multisample; /**< Whether to enable multisampling.*/
   bool alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
 } ngf_multisample_info;
-
-/** Specifies tessellation-related state.
- * Only has meaning for back-ends that support tessellation.
- */
-typedef struct ngf_tessellation_info {
-  uint32_t patch_vertices; /**< Number of verts per tessellation patch.*/
-} ngf_tessellation_info;
 
 /**
  * Vertex data usage hints.
@@ -861,7 +851,6 @@ typedef enum ngf_primitive_type {
   NGF_PRIMITIVE_TYPE_TRIANGLE_FAN,
   NGF_PRIMITIVE_TYPE_LINE_LIST,
   NGF_PRIMITIVE_TYPE_LINE_STRIP,
-  NGF_PRIMITIVE_TYPE_PATCH_LIST,
   NGF_PRIMITIVE_TYPE_COUNT
 } ngf_primitive_type;
 
@@ -901,7 +890,6 @@ typedef struct ngf_graphics_pipeline_info {
   const ngf_depth_stencil_info *depth_stencil;
   const ngf_blend_info *blend;
   uint32_t dynamic_state_mask;
-  const ngf_tessellation_info *tessellation;
   const ngf_vertex_input_info *input_info;
   ngf_primitive_type primitive_type;
   const ngf_pipeline_layout_info *layout;

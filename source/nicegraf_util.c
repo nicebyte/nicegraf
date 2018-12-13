@@ -80,10 +80,6 @@ void ngf_util_create_default_graphics_pipeline_data(
     .polygon_mode = NGF_POLYGON_MODE_FILL
   };
   result->rasterization_info = ri;
-  ngf_tessellation_info ti = {
-    .patch_vertices = 1u
-  };
-  result->tessellation_info = ti;
   uint32_t dynamic_state_mask = 0u;
   if (window_size != NULL) {
     result->scissor = result->viewport = *window_size;
@@ -114,7 +110,6 @@ void ngf_util_create_default_graphics_pipeline_data(
     .layout = &result->layout_info,
     .scissor = &result->scissor,
     .viewport = &result->viewport,
-    .tessellation = &result->tessellation_info,
     .spec_info = &result->spec_info
   };
   result->pipeline_info = gpi;
