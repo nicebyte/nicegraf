@@ -67,7 +67,6 @@ struct ngf_graphics_pipeline {
   ngf_depth_stencil_info depth_stencil;
   ngf_blend_info blend;
   uint32_t dynamic_state_mask;
-  ngf_tessellation_info tessellation;
   const ngf_vertex_buf_binding_desc *vert_buf_bindings;
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
@@ -223,9 +222,6 @@ struct ngf_cmd_buffer {
 static GLenum gl_shader_stage(ngf_stage_type stage) {
   static const GLenum stages[NGF_STAGE_COUNT] = {
     GL_VERTEX_SHADER,
-    GL_TESS_CONTROL_SHADER,
-    GL_TESS_EVALUATION_SHADER,
-    GL_GEOMETRY_SHADER,
     GL_FRAGMENT_SHADER
   };
   return stages[stage];
@@ -234,9 +230,6 @@ static GLenum gl_shader_stage(ngf_stage_type stage) {
 static GLenum get_gl_shader_stage_bit(ngf_stage_type stage) {
   static const GLenum stages[NGF_STAGE_COUNT] = {
     GL_VERTEX_SHADER_BIT,
-    GL_TESS_CONTROL_SHADER_BIT,
-    GL_TESS_EVALUATION_SHADER_BIT,
-    GL_GEOMETRY_SHADER_BIT,
     GL_FRAGMENT_SHADER_BIT
   };
   return stages[stage];
@@ -343,8 +336,7 @@ static GLenum get_gl_primitive_type(ngf_primitive_type p) {
     GL_TRIANGLE_STRIP,
     GL_TRIANGLE_FAN,
     GL_LINES,
-    GL_LINE_STRIP,
-    GL_PATCHES
+    GL_LINE_STRIP
   };
   return primitives[p];
 }
@@ -887,7 +879,6 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->multisample = *(info->multisample);
   pipeline->depth_stencil = *(info->depth_stencil);
   pipeline->blend = *(info->blend);
-  pipeline->tessellation = *(info->tessellation);
   
   const ngf_vertex_input_info *input = info->input_info;
 
@@ -1817,12 +1808,6 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               glDisable(GL_BLEND);
             }
           }
-
-          if (cached_state->tessellation.patch_vertices !=
-              pipeline->tessellation.patch_vertices || force_pipeline_update) {
-            glPatchParameteri(GL_PATCH_VERTICES,
-                              pipeline->tessellation.patch_vertices);
-          }
           glBindVertexArray(pipeline->vao);
           CURRENT_CONTEXT->cached_state = *pipeline;
         }
@@ -1923,18 +1908,6 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
               buf_bind_op->buffer->glbuffer,
               buf_bind_op->offset,
               buf_bind_op->range);
-            break;
-            }
-          case NGF_DESCRIPTOR_LOADSTORE_IMAGE: {
-            const ngf_descriptor_write_image_sampler *img_bind_op =
-                &(rbop->op.image_sampler_bind);
-            glBindImageTexture(native_binding,
-                               img_bind_op->image_subresource.image->glimage,
-                               img_bind_op->image_subresource.mip_level,
-                               img_bind_op->image_subresource.layered,
-                               img_bind_op->image_subresource.layer,
-                               GL_READ_ONLY, // TODO: fix
-                               GL_RGB8); // TODO: fix
             break;
             }
           case NGF_DESCRIPTOR_TEXTURE: {
