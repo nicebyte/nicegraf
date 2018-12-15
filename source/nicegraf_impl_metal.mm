@@ -482,6 +482,7 @@ ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
     return NGF_ERROR_INVALID_IMAGE_FORMAT;
   }
   layer_.pixelFormat = pixel_format;
+  layer_.framebufferOnly = YES;
 #if TARGET_OS_OSX
   if (@available(macOS 10.13.2, *)) {
     layer_.maximumDrawableCount = swapchain_info.capacity_hint;
@@ -496,9 +497,10 @@ ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
 #if TARGET_OS_OSX
   [view setLayer:layer_];
 #else
-  [view.layer addSublayer:swapchain.layer];
-  [swapchain.layer setContentsScale:view.layer.contentsScale];
-  [swapchain.layer setPosition:view.center];
+  [view.layer addSublayer:layer_];
+  [layer_ setContentsScale:view.layer.contentsScale];
+  [layer_ setContentsGravity:kCAGravityCenter];
+  [layer_ setPosition:view.center];
 #endif
   swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
 
