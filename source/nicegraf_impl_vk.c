@@ -132,7 +132,7 @@ static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
 }
 
 static VkImageType get_vk_image_type(ngf_image_type t) {
-  static const VkImageType types[] = {
+  static const VkImageType types[NGF_IMAGE_TYPE_COUNT] = {
     VK_IMAGE_TYPE_2D,
     VK_IMAGE_TYPE_3D
   };
@@ -140,7 +140,7 @@ static VkImageType get_vk_image_type(ngf_image_type t) {
 }
 
 static VkCompareOp get_vk_compare_op(ngf_compare_op op) {
-  static const VkCompareOp ops[] = {
+  static const VkCompareOp ops[NGF_COMPARE_OP_COUNT] = {
     VK_COMPARE_OP_NEVER,
     VK_COMPARE_OP_LESS,
     VK_COMPARE_OP_LESS_OR_EQUAL,
@@ -154,7 +154,7 @@ static VkCompareOp get_vk_compare_op(ngf_compare_op op) {
 }
 
 static VkStencilOp get_vk_stencil_op(ngf_stencil_op op) {
-  static const VkStencilOp ops[] = {
+  static const VkStencilOp ops[NGF_STENCIL_OP_COUNT] = {
     VK_STENCIL_OP_KEEP,
     VK_STENCIL_OP_ZERO,
     VK_STENCIL_OP_REPLACE,
@@ -168,7 +168,7 @@ static VkStencilOp get_vk_stencil_op(ngf_stencil_op op) {
 }
 
 static VkBlendFactor get_vk_blend_factor(ngf_blend_factor f) {
-  VkBlendFactor factors[] = {
+  VkBlendFactor factors[NGF_BLEND_FACTOR_COUNT] = {
     VK_BLEND_FACTOR_ZERO,
     VK_BLEND_FACTOR_ONE,
     VK_BLEND_FACTOR_SRC_COLOR,
@@ -188,13 +188,11 @@ static VkBlendFactor get_vk_blend_factor(ngf_blend_factor f) {
 }
 
 static VkFormat get_vk_image_format(ngf_image_format f) {
-  VkFormat formats[] = {
+  static VkFormat formats[NGF_IMAGE_FORMAT_COUNT] = {
     VK_FORMAT_R8_UNORM,
     VK_FORMAT_R8G8_UNORM,
     VK_FORMAT_R8G8B8_UNORM,
     VK_FORMAT_R8G8B8A8_UNORM,
-    VK_FORMAT_R8_SRGB,
-    VK_FORMAT_R8G8_SRGB,
     VK_FORMAT_R8G8B8_SRGB,
     VK_FORMAT_R8G8B8A8_SRGB,
     VK_FORMAT_B8G8R8_UNORM,
@@ -218,7 +216,7 @@ static VkFormat get_vk_image_format(ngf_image_format f) {
 }
 
 static VkPolygonMode get_vk_polygon_mode(ngf_polygon_mode m) {
-  static const VkPolygonMode modes[] = {
+  static const VkPolygonMode modes[NGF_POLYGON_MODE_COUNT] = {
     VK_POLYGON_MODE_FILL,
     VK_POLYGON_MODE_LINE,
     VK_POLYGON_MODE_POINT
@@ -245,7 +243,7 @@ static VkDynamicState get_vk_dynamic_state(ngf_dynamic_state_flags s) {
 }
 
 static VkCullModeFlagBits get_vk_cull_mode(ngf_cull_mode m) {
-  static const VkCullModeFlagBits modes[] = {
+  static const VkCullModeFlagBits modes[NGF_CULL_MODE_COUNT] = {
     VK_CULL_MODE_BACK_BIT,
     VK_CULL_MODE_FRONT_BIT,
     VK_CULL_MODE_FRONT_AND_BACK
@@ -254,7 +252,7 @@ static VkCullModeFlagBits get_vk_cull_mode(ngf_cull_mode m) {
 }
 
 static VkFrontFace get_vk_front_face(ngf_front_face_mode f) {
-  static const VkFrontFace modes[] = {
+  static const VkFrontFace modes[NGF_FRONT_FACE_COUNT] = {
     VK_FRONT_FACE_COUNTER_CLOCKWISE,
     VK_FRONT_FACE_CLOCKWISE
   };
@@ -262,13 +260,12 @@ static VkFrontFace get_vk_front_face(ngf_front_face_mode f) {
 }
 
 static VkPrimitiveTopology get_vk_primitive_type(ngf_primitive_type p) {
-  static const VkPrimitiveTopology topos[] = {
+  static const VkPrimitiveTopology topos[NGF_PRIMITIVE_TYPE_COUNT] = {
     VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
     VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
     VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
     VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
-    VK_PRIMITIVE_TOPOLOGY_LINE_STRIP,
-    VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+    VK_PRIMITIVE_TOPOLOGY_LINE_STRIP
   };
   return topos[p];
 }
@@ -341,7 +338,7 @@ static VkFormat get_vk_vertex_format(ngf_type type, uint32_t size, bool norm) {
 }
 
 static VkVertexInputRate get_vk_input_rate(ngf_input_rate r) {
-  static const VkVertexInputRate rates[] = {
+  static const VkVertexInputRate rates[NGF_INPUT_RATE_COUNT] = {
     VK_VERTEX_INPUT_RATE_VERTEX,
     VK_VERTEX_INPUT_RATE_INSTANCE
   };
@@ -349,41 +346,11 @@ static VkVertexInputRate get_vk_input_rate(ngf_input_rate r) {
 }
 
 static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
-  static const VkShaderStageFlagBits stages[] = {
+  static const VkShaderStageFlagBits stages[NGF_STAGE_COUNT] = {
     VK_SHADER_STAGE_VERTEX_BIT,
-    VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
-    VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-    VK_SHADER_STAGE_GEOMETRY_BIT,
     VK_SHADER_STAGE_FRAGMENT_BIT
   };
   return stages[s];
-}
-
-static VkFormat get_vk_format(ngf_image_format f) {
-  static VkFormat formats[] = {
-    VK_FORMAT_R8_UNORM,
-    VK_FORMAT_R8G8_UNORM,
-    VK_FORMAT_R8G8B8_UNORM,
-    VK_FORMAT_R8G8B8A8_UNORM,
-    VK_FORMAT_R8G8B8_SRGB,
-    VK_FORMAT_R8G8B8A8_SRGB,
-    VK_FORMAT_B8G8R8_UNORM,
-    VK_FORMAT_B8G8R8A8_UNORM,
-    VK_FORMAT_B8G8R8_SRGB,
-    VK_FORMAT_B8G8R8A8_SRGB,
-    VK_FORMAT_R32_SFLOAT,
-    VK_FORMAT_R32G32_SFLOAT,
-    VK_FORMAT_R32G32B32_SFLOAT,
-    VK_FORMAT_R32G32B32A32_SFLOAT,
-    VK_FORMAT_R16_SFLOAT,
-    VK_FORMAT_R16G16_SFLOAT,
-    VK_FORMAT_R16G16B16_SFLOAT,
-    VK_FORMAT_D32_SFLOAT,
-    VK_FORMAT_D16_UNORM,
-    VK_FORMAT_D24_UNORM_S8_UINT,
-    VK_FORMAT_UNDEFINED
-  };
-  return formats[f];
 }
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
@@ -505,7 +472,7 @@ static ngf_error _ngf_create_swapchain(
   VkSurfaceFormatKHR *formats = alloca(sizeof(VkSurfaceFormatKHR) * nformats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats,
                                         formats);
-  const VkFormat requested_format = get_vk_format(swapchain_info->cfmt);
+  const VkFormat requested_format = get_vk_image_format(swapchain_info->cfmt);
   const VkColorSpaceKHR color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
   if (!(nformats == 1 && formats[0].format == VK_FORMAT_UNDEFINED)) {
     bool found = false;
