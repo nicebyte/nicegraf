@@ -390,12 +390,12 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
   if (!_vk.initialized) { // Vulkan not initialized yet.
     // Initialize Volk.
     volkInitialize();
-    const char *ext_names[] = {
+    const char * const ext_names[] = {
       "VK_KHR_surface",
       VK_SURFACE_EXT
     };
 
-    const char *debug_layers[] = {
+    const char * const debug_layers[] = {
       "VK_LAYER_LUNARG_standard_validation"
     };
 
@@ -596,8 +596,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   assert(result);
   ngf_error err = NGF_ERROR_OK;
   VkResult vk_err = VK_SUCCESS;
-  ngf_swapchain_info *swapchain_info = info->swapchain_info;
-  ngf_context *shared = info->shared_context;
+  const ngf_swapchain_info *swapchain_info = info->swapchain_info;
+  const ngf_context *shared = info->shared_context;
 
   if (swapchain_info != NULL &&
       shared != NULL &&
@@ -904,6 +904,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   ngf_shader_stage **result) {
   assert(info);
   assert(result);
+
   *result = NGF_ALLOC(ngf_shader_stage);
   ngf_shader_stage *stage = *result;
   if (stage == NULL) {
@@ -931,6 +932,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
   assert(result);
+  VkVertexInputBindingDescription *vk_binding_descs = NULL;
+  VkVertexInputAttributeDescription *vk_attrib_descs = NULL;
   ngf_error err = NGF_ERROR_OK;
   *result = NGF_ALLOC(ngf_graphics_pipeline);
   ngf_graphics_pipeline *pipeline = *result;
@@ -958,12 +961,10 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
 
   // Prepare vertex input.
-  VkVertexInputBindingDescription *vk_binding_descs =
-      NGF_ALLOCN(VkVertexInputBindingDescription,
-                 info->input_info->nvert_buf_bindings);
-  VkVertexInputAttributeDescription *vk_attrib_descs =
-      NGF_ALLOCN(VkVertexInputAttributeDescription,
-                 info->input_info->nattribs);
+  vk_binding_descs = NGF_ALLOCN(VkVertexInputBindingDescription,
+                                info->input_info->nvert_buf_bindings);
+  vk_attrib_descs = NGF_ALLOCN(VkVertexInputAttributeDescription,
+                               info->input_info->nattribs);
 
   if (vk_binding_descs == NULL || vk_attrib_descs == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -1013,7 +1014,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     .sType = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
     .pNext = NULL,
     .flags = 0u,
-    .patchControlPoints = info->tessellation->patch_vertices
+    .patchControlPoints = 1u
   };
 
   // Prepare viewport/scissor state.
@@ -1174,7 +1175,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     .pDepthStencilState = &depth_stencil,
     .pColorBlendState = &color_blend,
     .pDynamicState = &dynamic_state,
-    .layout = info->layout->vklayout,
+    .layout = VK_NULL_HANDLE, // TODO set layout
     .renderPass = VK_NULL_HANDLE,
     .subpass = 0u,
     .basePipelineHandle = VK_NULL_HANDLE,

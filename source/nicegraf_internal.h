@@ -107,6 +107,7 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 #pragma warning(disable:4201)
 #pragma warning(disable:4200)
 #pragma warning(disable:4204)
+#pragma warning(disable:4221)
 
 #ifdef __cplusplus
 }
