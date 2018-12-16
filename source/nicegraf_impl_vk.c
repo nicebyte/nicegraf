@@ -114,6 +114,10 @@ struct ngf_image {
   VmaAllocation alloc;
 };
 
+struct ngf_cmd_buffer {
+  VkCommandBuffer vkcmdbuf;
+};
+
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
 #define CURRENT_SHARED_STATE (*(CURRENT_CONTEXT->shared_state))
 
@@ -772,7 +776,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = NULL,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = shared_state->gfx_queue
+      .queueFamilyIndex = shared_state->gfx_family_idx
     };
     vk_err = vkCreateCommandPool(shared_state->device, &cmd_pool_info, NULL,
                                  &shared_state->cmd_pool);
@@ -838,6 +842,25 @@ void ngf_destroy_context(ngf_context *ctx) {
 
 ngf_error ngf_set_context(ngf_context *ctx) {
   CURRENT_CONTEXT = ctx;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
+                                ngf_cmd_buffer **result) {
+  assert(info);
+  assert(result);
+  _NGF_FAKE_USE(info);
+  ngf_cmd_buffer *cmd_buf = NGF_ALLOC(ngf_cmd_buffer);
+  *result = cmd_buf;
+  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
+    .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .pNext = NULL,
+    .commandPool = CURRENT_SHARED_STATE->cmd_pool,
+    .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1u
+  };
+  vkAllocateCommandBuffers(CURRENT_SHARED_STATE->device,
+                           &vk_cmdbuf_info, &cmd_buf->vkcmdbuf);
   return NGF_ERROR_OK;
 }
 
