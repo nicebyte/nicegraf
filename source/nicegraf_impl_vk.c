@@ -75,6 +75,7 @@ typedef struct {
   VmaAllocator allocator;
   VkQueue gfx_queue;
   VkQueue present_queue;
+  VkCommandPool cmd_pool;
   uint32_t refcount;
   int gfx_family_idx;
   int present_family_idx;
@@ -762,6 +763,19 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .pRecordSettings = NULL
     };
     vk_err = vmaCreateAllocator(&vma_info, &shared_state->allocator);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+      goto ngf_create_context_cleanup;
+    }
+    // Create a command pool.
+    VkCommandPoolCreateInfo cmd_pool_info = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .pNext = NULL,
+      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+      .queueFamilyIndex = shared_state->gfx_queue
+    };
+    vk_err = vkCreateCommandPool(shared_state->device, &cmd_pool_info, NULL,
+                                 &shared_state->cmd_pool);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
