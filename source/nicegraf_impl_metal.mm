@@ -92,6 +92,7 @@ NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = nullptr;
 
 struct ngf_render_target {
   mutable MTLRenderPassDescriptor *pass_descriptor = nil;
+  uint32_t ncolor_attachments = 0u;
   bool is_default = false;
 };
 
@@ -178,7 +179,7 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
 }
 
 static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
-  static const MTLLoadAction action[] = {
+  static const MTLLoadAction action[NGF_LOAD_OP_COUNT] = {
     MTLLoadActionDontCare,
     MTLLoadActionLoad,
     MTLLoadActionClear
@@ -428,6 +429,7 @@ ngf_error ngf_default_render_target(
   if (CURRENT_CONTEXT->swapchain) {
     _NGF_NURSERY(render_target, rt);
     rt->is_default = true;
+    rt->ncolor_attachments = 1u;
     rt->pass_descriptor = [MTLRenderPassDescriptor new];
     rt->pass_descriptor.colorAttachments[0].texture = nil;
     rt->pass_descriptor.colorAttachments[0].loadAction =
@@ -681,8 +683,54 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
   return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
 }
 
+void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
+                                const ngf_attachment &info) {
+  attachment.texture = info.image_ref.image->texture;
+  attachment.level = info.image_ref.mip_level;
+  attachment.slice = info.image_ref.layer; // ?
+
+  attachment.loadAction = get_mtl_load_action(info.load_op);
+  attachment.storeAction = MTLStoreActionStore; // TODO store actions
+}
+
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
                                    ngf_render_target **result) {
+  assert(info);
+  assert(result);
+  _NGF_NURSERY(render_target, rt);
+  rt->pass_descriptor = [MTLRenderPassDescriptor new];
+  rt->is_default = false;
+  uint32_t color_attachment_idx = 0u;
+  for (uint32_t a = 0u; a < info->nattachments; ++a) {
+    const ngf_attachment &attachment = info->attachments[a];
+    switch(attachment.type) {
+    case NGF_ATTACHMENT_COLOR: {
+      auto desc = [MTLRenderPassColorAttachmentDescriptor new];
+      _ngf_attachment_set_common(desc, attachment);
+      desc.clearColor = MTLClearColorMake(attachment.clear.clear_color[0],
+                                          attachment.clear.clear_color[1],
+                                          attachment.clear.clear_color[2],
+                                          attachment.clear.clear_color[3]);
+      rt->pass_descriptor.colorAttachments[color_attachment_idx++] =
+          desc;
+      break;
+    }
+    case NGF_ATTACHMENT_DEPTH: {
+      assert(false);
+      break;
+    }
+    case NGF_ATTACHMENT_STENCIL: {
+      assert(false);
+      break;
+    }
+    case NGF_ATTACHMENT_DEPTH_STENCIL: {
+      assert(false);
+      break;
+    }
+    }
+  }
+  rt->ncolor_attachments = color_attachment_idx;
+  *result = rt.release();
   return NGF_ERROR_OK;
 }
 
@@ -719,14 +767,38 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   assert(info);
   assert(result);
   auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
-  mtl_pipe_desc.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm; // TODO: fix
-  // TODO set up blending correctly
-  // TODO multiple color attachments
-  mtl_pipe_desc.colorAttachments[0].blendingEnabled = YES;
-  mtl_pipe_desc.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-  mtl_pipe_desc.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-  mtl_pipe_desc.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-  mtl_pipe_desc.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+  const ngf_render_target &compatible_rt = *info->compatible_render_target;
+  for (uint32_t ca = 0u; ca < compatible_rt.ncolor_attachments; ++ca) {
+    if (compatible_rt.is_default) {
+      mtl_pipe_desc.colorAttachments[ca].pixelFormat =
+          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.cfmt);
+    }
+    else {
+      mtl_pipe_desc.colorAttachments[ca].pixelFormat =
+        compatible_rt.pass_descriptor.colorAttachments[ca].texture.pixelFormat;
+    }
+    // TODO set up blending correctly
+    mtl_pipe_desc.colorAttachments[ca].blendingEnabled = YES;
+    mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
+    mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
+    mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+  }
+  if (compatible_rt.pass_descriptor.depthAttachment) {
+    mtl_pipe_desc.depthAttachmentPixelFormat =
+        compatible_rt.pass_descriptor.depthAttachment.texture.pixelFormat;
+  } else if (compatible_rt.is_default &&
+             CURRENT_CONTEXT->swapchain_info.dfmt !=
+                 NGF_IMAGE_FORMAT_UNDEFINED) {
+    mtl_pipe_desc.depthAttachmentPixelFormat =
+        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt);
+  }
+  if (mtl_pipe_desc.depthAttachmentPixelFormat ==
+          MTLPixelFormatDepth32Float_Stencil8) {
+    // TODO support other stencil formats
+    mtl_pipe_desc.stencilAttachmentPixelFormat =
+        MTLPixelFormatDepth32Float_Stencil8;
+  }
   
   // Populate specialization constant values.
   MTLFunctionConstantValues *spec_consts = nil;
@@ -981,7 +1053,6 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   // TODO multisampled textures
   mtl_img_desc.sampleCount = info->nsamples == 0u ? 1u : info->nsamples;
   mtl_img_desc.arrayLength = 1u; // TODO texture arrays
-  //mtl_img_desc.resourceOptions = MTLResourceOptionCPUCacheModeWriteCombined;
   if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc.usage |= MTLTextureUsageRenderTarget;
   }

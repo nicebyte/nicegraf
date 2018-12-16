@@ -620,7 +620,8 @@ typedef enum ngf_attachment_type {
 typedef enum ngf_attachment_load_op {
   NGF_LOAD_OP_DONTCARE = 0,
   NGF_LOAD_OP_KEEP,
-  NGF_LOAD_OP_CLEAR
+  NGF_LOAD_OP_CLEAR,
+  NGF_LOAD_OP_COUNT
 } ngf_attachment_load_op;
 
 /**
@@ -897,6 +898,7 @@ typedef struct ngf_graphics_pipeline_info {
   ngf_primitive_type primitive_type;
   const ngf_pipeline_layout_info *layout;
   const ngf_specialization_info *spec_info;
+  const ngf_render_target *compatible_render_target;
 } ngf_graphics_pipeline_info;
 
 /**
