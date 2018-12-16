@@ -895,6 +895,13 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   return NGF_ERROR_OK;
 }
 
+void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
+  if (stage) {
+    vkDestroyShaderModule(CURRENT_SHARED_STATE->device, stage->vkmodule, NULL);
+    NGF_FREE(stage);
+  }
+}
+
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
