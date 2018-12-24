@@ -192,6 +192,12 @@ typedef struct ngf_shader_stage_info {
                        Vulkan) ignore this flag. */
 
   /** 
+   * Entry point name for this shader stage. On platforms that have fixed
+   * entry point names (GL), this field gets ignored.
+   */
+  const char *entry_point_name;
+
+  /** 
    * Indicates the binary format.The value is backend-specific:
    *   - On Vulkan, it should always be 0;
    *   - On Metal, 0 indicates a macOS binary, 1 indicates an iOS binary;
