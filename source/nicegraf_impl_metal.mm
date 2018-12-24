@@ -27,6 +27,7 @@ SOFTWARE.
 #include <new>
 #include <optional>
 #include <memory>
+#include <string>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
@@ -108,6 +109,7 @@ struct ngf_cmd_buffer {
 struct ngf_shader_stage {
   id<MTLLibrary> func_lib = nil;
   ngf_stage_type type;
+  std::string entry_point_name;
 };
 
 struct ngf_graphics_pipeline {
@@ -661,6 +663,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     stage->func_lib.label = [[NSString alloc]
                                initWithUTF8String:info->debug_name];
   }
+  stage->entry_point_name = info->entry_point_name;
 
   *result = stage.release();
   return NGF_ERROR_OK;
@@ -742,11 +745,14 @@ void ngf_destroy_render_target(ngf_render_target *rt) {
 }
 
 id<MTLFunction> _ngf_get_shader_main(id<MTLLibrary> func_lib,
+                                     const char *entry_point_name,
                                      MTLFunctionConstantValues *spec_consts) {
   NSError *err = nil;
+  NSString *ns_entry_point_name =
+      [NSString stringWithUTF8String:entry_point_name]; 
   return spec_consts == nil
-           ? [func_lib newFunctionWithName:@"main0"]
-           : [func_lib newFunctionWithName:@"main0"
+           ? [func_lib newFunctionWithName:ns_entry_point_name]
+           : [func_lib newFunctionWithName:ns_entry_point_name
                             constantValues:spec_consts
                                      error:&err];
 }
@@ -825,11 +831,13 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
       mtl_pipe_desc.vertexFunction =
-          _ngf_get_shader_main(stage->func_lib  , spec_consts);
+          _ngf_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
+                               spec_consts);
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc.fragmentFunction);
       mtl_pipe_desc.fragmentFunction =
-          _ngf_get_shader_main(stage->func_lib, spec_consts);
+          _ngf_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
+                               spec_consts);
     }
   }
   
