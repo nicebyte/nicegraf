@@ -663,7 +663,9 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     stage->func_lib.label = [[NSString alloc]
                                initWithUTF8String:info->debug_name];
   }
-  stage->entry_point_name = info->entry_point_name;
+  stage->entry_point_name = info->entry_point_name ?
+    info->entry_point_name :
+    [[stage->func_lib functionNames].firstObject UTF8String];
 
   *result = stage.release();
   return NGF_ERROR_OK;
