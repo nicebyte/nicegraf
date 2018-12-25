@@ -38,6 +38,8 @@ using _NGF_VIEW_TYPE = NSView;
 using _NGF_VIEW_TYPE = UIView;
 #endif
 
+static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
+
 id<MTLDevice> MTL_DEVICE = nil;
 
 #pragma mark ngf_struct_definitions
@@ -850,7 +852,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     MTLVertexAttributeDescriptor *attr_desc = vert_desc.attributes[a];
     const ngf_vertex_attrib_desc &attr_info = vertex_input_info.attribs[a];
     attr_desc.offset = vertex_input_info.attribs[a].offset;
-    attr_desc.bufferIndex = vertex_input_info.attribs[a].binding;
+    attr_desc.bufferIndex =
+        MAX_BUFFER_BINDINGS - vertex_input_info.attribs[a].binding;
     attr_desc.format = get_mtl_attrib_format(attr_info.type,
                                              attr_info.size,
                                              attr_info.normalized);
@@ -859,7 +862,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     }
   }
   for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
-    MTLVertexBufferLayoutDescriptor *binding_desc = vert_desc.layouts[b];
+    MTLVertexBufferLayoutDescriptor *binding_desc =
+        vert_desc.layouts[MAX_BUFFER_BINDINGS - b];
     const ngf_vertex_buf_binding_desc &binding_info =
         vertex_input_info.vert_buf_bindings[b];
     binding_desc.stride = binding_info.stride;
@@ -1240,7 +1244,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *cmd_buf,
                                 uint32_t offset) {
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                 offset:offset
-                               atIndex:binding];
+                               atIndex:MAX_BUFFER_BINDINGS - binding];
 }
 
 void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
@@ -1257,7 +1261,8 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
   for (uint32_t s = 0u; s < set->nslots; ++s) {
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
     const uint32_t ngf_binding = set->descriptors[s].id;
-    const uint32_t native_binding = ngf_binding; // TODO: fix
+    const uint32_t native_binding = ngf_binding; // TODO: fix (map set,binding
+                                                 // to binding).
     const uint32_t set_stage_flags = set->descriptors[ngf_binding].stage_flags;
     const bool frag_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
@@ -1271,7 +1276,7 @@ void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
       if (vert_stage_visible) {
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                       offset:offset
-                                     atIndex:native_binding + 1u]; // TODO: fix
+                                     atIndex:native_binding];
       }
       if (frag_stage_visible) {
         [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
