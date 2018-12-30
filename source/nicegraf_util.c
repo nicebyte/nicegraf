@@ -141,6 +141,7 @@ ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
                                  ngf_pipeline_layout_info *result) {
   assert(stage_layouts);
   assert(result && nstages);
+  if( !stage_layouts || !nstages || !result ) abort();
   /*ngf_descriptor_set_layout **dsls = NULL;
   result->descriptors_layouts = NULL;
   result->ndescriptors_layouts = 0u;
