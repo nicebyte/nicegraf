@@ -54,6 +54,8 @@ SOFTWARE.
 typedef struct {
   uint32_t ngf_binding_id;
   uint32_t native_binding_id;
+  uint32_t ncombineds;
+  uint32_t *combined_image_sampler_binding_ids;
 } _ngf_native_binding;
 
 struct ngf_graphics_pipeline {
@@ -860,6 +862,17 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   }
 }
 
+const ngf_plmd_cis_map_entry * _lookup_cis_map(uint32_t set, uint32_t binding,
+                                         const ngf_plmd_cis_map *map) {
+  for (uint32_t i = 0u; i < map->nentries; ++i) {
+    if (set == map->entries[i]->separate_set_id &&
+        binding == map->entries[i]->separate_binding_id) {
+      return (map->entries[i]);
+    }
+  }
+  return NULL;
+}
+
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   static uint32_t global_id = 0;
@@ -900,7 +913,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     pipeline->vert_buf_bindings = NULL;
   }
 
-  // Create a map of NGF -> OpenGL bindings.
+  // Create a map of NGF -> OpenGL resource bindings.
   const ngf_pipeline_layout_info *pipeline_layout = info->layout;
   pipeline->ndescriptors_layouts = pipeline_layout->ndescriptors_layouts;
   _ngf_native_binding **binding_map =
@@ -918,18 +931,41 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     const ngf_descriptor_set_layout_info *set_layout =
         &pipeline_layout->descriptors_layouts[set]->info;
     binding_map[set] = NGF_ALLOCN(_ngf_native_binding,
-                                  set_layout->ndescriptors + 1);
+                                  set_layout->ndescriptors + 1u);
     if (binding_map[set] == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto ngf_create_pipeline_cleanup;
     }
     binding_map[set][set_layout->ndescriptors].ngf_binding_id = (uint32_t)(-1);
     for (uint32_t b = 0u; b < set_layout->ndescriptors; ++b) {
-      _ngf_native_binding *mapping = &binding_map[set][b];
       const ngf_descriptor_info *desc_info = &set_layout->descriptors[b];
       const ngf_descriptor_type desc_type = desc_info->type;
+      _ngf_native_binding *mapping = &binding_map[set][b];
       mapping->ngf_binding_id = desc_info->id;
       mapping->native_binding_id = total_c[desc_type] + (set_c[desc_type]++);
+      if (desc_info->type == NGF_DESCRIPTOR_SAMPLER ||
+          desc_info->type == NGF_DESCRIPTOR_TEXTURE) {
+        const ngf_plmd_cis_map *cis_map =
+            desc_info->type == NGF_DESCRIPTOR_SAMPLER
+                ? info->sampler_to_combined_map
+                : info->image_to_combined_map;
+        assert(cis_map); // TODO: report error
+        const ngf_plmd_cis_map_entry *combined_list =
+            _lookup_cis_map(set, desc_info->id, cis_map);
+        assert(combined_list); // TODO: report error
+        mapping->combined_image_sampler_binding_ids =
+            NGF_ALLOCN(uint32_t, combined_list->ncombined_ids);
+        if (mapping->combined_image_sampler_binding_ids == NULL) {
+          err = NGF_ERROR_OUTOFMEM;
+          goto ngf_create_pipeline_cleanup;
+        }
+        memcpy(mapping->combined_image_sampler_binding_ids,
+               combined_list->combined_ids,
+               sizeof(uint32_t) * combined_list->ncombined_ids);
+        mapping->ncombineds = combined_list->ncombined_ids;
+      } else {
+        mapping->combined_image_sampler_binding_ids = NULL;
+      }
     }
     for (uint32_t i = 0u; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
       total_c[i] += set_c[i];
@@ -1013,6 +1049,9 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
     if (pipeline->binding_map) {
       for (uint32_t set = 0u; set < pipeline->ndescriptors_layouts; ++set) {
         if (pipeline->binding_map[set]) {
+          NGF_FREEN(
+              pipeline->binding_map[set]->combined_image_sampler_binding_ids,
+              pipeline->binding_map[set]->ncombineds);
           NGF_FREE(pipeline->binding_map[set]);
         }
       }
@@ -1895,8 +1934,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           if (binding_map[b_idx].native_binding_id == (uint32_t)(-1)) {
             return NGF_ERROR_INVALID_BINDING;
           }
-          uint32_t native_binding = binding_map[b_idx].ngf_binding_id;
-
+          const _ngf_native_binding *native_binding = &binding_map[b_idx];
           // TODO: assert compatibility w/ descriptor set layout?
           switch (rbop->type) {
           case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
@@ -1904,7 +1942,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                 &(rbop->op.buffer_bind);
             glBindBufferRange(
               GL_UNIFORM_BUFFER,
-              native_binding,
+              native_binding->native_binding_id,
               buf_bind_op->buffer->glbuffer,
               buf_bind_op->offset,
               buf_bind_op->range);
@@ -1913,24 +1951,32 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           case NGF_DESCRIPTOR_TEXTURE: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glActiveTexture(native_binding);
-            glBindTexture(img_bind_op->image_subresource.image->bind_point,
-                          img_bind_op->image_subresource.image->glimage);
+            for (uint32_t c = 0u; c < native_binding->ncombineds; ++c) {
+              glActiveTexture(
+                  native_binding->combined_image_sampler_binding_ids[c]);
+              glBindTexture(img_bind_op->image_subresource.image->bind_point,
+                            img_bind_op->image_subresource.image->glimage);
+            }
             break;
             }
           case NGF_DESCRIPTOR_SAMPLER: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glBindSampler(native_binding, img_bind_op->sampler->glsampler);
+            for (uint32_t c = 0u; c < native_binding->ncombineds; ++c) {
+              glBindSampler(
+                  native_binding->combined_image_sampler_binding_ids[c],
+                  img_bind_op->sampler->glsampler);
+            }
             break;
             }
           case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
             const ngf_descriptor_write_image_sampler *img_bind_op =
                 &(rbop->op.image_sampler_bind);
-            glActiveTexture(GL_TEXTURE0 + native_binding);
+            glActiveTexture(GL_TEXTURE0 + native_binding->native_binding_id);
             glBindTexture(img_bind_op->image_subresource.image->bind_point,
                           img_bind_op->image_subresource.image->glimage);
-            glBindSampler(native_binding, img_bind_op->sampler->glsampler); 
+            glBindSampler(native_binding->native_binding_id,
+                          img_bind_op->sampler->glsampler); 
             break;
             }
           default:
