@@ -26,6 +26,7 @@ SOFTWARE.
  */
 #pragma once
 
+#include "metadata_parser.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -905,6 +906,8 @@ typedef struct ngf_graphics_pipeline_info {
   const ngf_pipeline_layout_info *layout;
   const ngf_specialization_info *spec_info;
   const ngf_render_target *compatible_render_target;
+  const ngf_plmd_cis_map *image_to_combined_map;
+  const ngf_plmd_cis_map *sampler_to_combined_map;
 } ngf_graphics_pipeline_info;
 
 /**
