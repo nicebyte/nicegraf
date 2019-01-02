@@ -35,6 +35,12 @@ else()
 endif()
 set(NICEGRAF_COMPILE_OPTS ${COMMON_COMPILE_OPTS})
 
+add_library(ngf_metadata_parser
+    ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
+    ${CMAKE_CURRENT_LIST_DIR}/source/metadata_parser.c)
+target_include_directories(ngf_metadata_parser PUBLIC
+    ${CMAKE_CURRENT_LIST_DIR}/include)
+
 add_library(nicegraf_internal
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
@@ -44,7 +50,7 @@ target_include_directories(nicegraf_internal PRIVATE
     ${NICEGRAF_PUBLIC_INCLUDES}
     ${NICEGRAF_PRIVATE_INCLUDES})
     
-set(NICEGRAF_DEPS nicegraf_internal)
+set(NICEGRAF_DEPS nicegraf_internal ngf_metadata_parser)
 
 add_library(nicegraf_emulated_descriptor_set
     ${CMAKE_CURRENT_LIST_DIR}/source/emulated_descriptor_set.h
