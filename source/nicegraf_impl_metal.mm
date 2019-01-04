@@ -1257,13 +1257,13 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
 void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
                                  const ngf_descriptor_set *set,
                                  uint32_t slot) {
-  // TODO: assert compatibility with pipeline layout?	
+  // TODO: assert compatibility with pipeline layout?
   for (uint32_t s = 0u; s < set->nslots; ++s) {
     const ngf_descriptor_write *rbop = &set->bind_ops[s];
     const uint32_t ngf_binding = set->descriptors[s].id;
     const uint32_t native_binding = ngf_binding; // TODO: fix (map set,binding
                                                  // to binding).
-    const uint32_t set_stage_flags = set->descriptors[ngf_binding].stage_flags;
+    const uint32_t set_stage_flags = set->descriptors[s].stage_flags;
     const bool frag_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
                vert_stage_visible = set_stage_flags &
