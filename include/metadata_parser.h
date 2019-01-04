@@ -21,6 +21,7 @@ SOFTWARE.
 #pragma warning(push)
 #pragma warning(disable:4200)
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__cplusplus)
