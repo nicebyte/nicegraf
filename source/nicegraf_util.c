@@ -136,104 +136,86 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
   return err;
 }
 
-ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
-                                 uint32_t nstages,
-                                 ngf_pipeline_layout_info *result) {
-  assert(stage_layouts);
-  assert(result && nstages);
-  if( !stage_layouts || !nstages || !result ) abort();
-  /*ngf_descriptor_set_layout **dsls = NULL;
-  result->descriptors_layouts = NULL;
-  result->ndescriptors_layouts = 0u;
-  ngf_descriptor_set_layout_info *descriptor_set_layouts = NULL;
-  uint32_t *descriptor_count_estimates = NULL;*/
+ngf_descriptor_type _plmd_desc_to_ngf(uint32_t plmd_desc_type) {
+  switch (plmd_desc_type) {
+  case NGF_PLMD_DESC_UNIFORM_BUFFER:
+    return NGF_DESCRIPTOR_UNIFORM_BUFFER;
+  case NGF_PLMD_DESC_IMAGE:
+    return NGF_DESCRIPTOR_TEXTURE;
+  case NGF_PLMD_DESC_SAMPLER:
+    return NGF_DESCRIPTOR_SAMPLER;
+  case NGF_PLMD_DESC_COMBINED_IMAGE_SAMPLER:
+    return NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
+  default:
+    assert(false);
+    return 0u;
+  }
+}
+
+uint32_t _plmd_stage_flags_to_ngf(uint32_t plmd_stage_flags) {
+  uint32_t result = 0u;
+  if (plmd_stage_flags & NGF_PLMD_STAGE_VISIBILITY_VERTEX_BIT) 
+    result |= NGF_DESCRIPTOR_VERTEX_STAGE_BIT;
+  if (plmd_stage_flags & NGF_PLMD_STAGE_VISIBILITY_FRAGMENT_BIT)
+    result |= NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT;
+  return result;
+}
+
+ngf_error ngf_util_create_pipeline_layout_from_metadata(
+    const ngf_plmd_layout *layout_metadata,
+    ngf_pipeline_layout_info *result) {
+  assert(layout_metadata);
+  assert(result);
+
   ngf_error err = NGF_ERROR_OK;
-  /*
-  uint32_t set_count = 0u;
-  for (uint32_t i = 0u; i < nstages; ++i)
-    set_count = NGF_MAX(set_count, ntohl(stage_layouts[i][0]));
-
-  descriptor_set_layouts = NGF_ALLOCN(ngf_descriptor_set_layout_info, set_count);
-  descriptor_count_estimates = NGF_ALLOCN(uint32_t, set_count);
-  if (descriptor_set_layouts == NULL || descriptor_count_estimates == NULL) {
+  ngf_descriptor_set_layout_info *descriptor_set_layout_infos = NULL;
+  descriptor_set_layout_infos = NGF_ALLOCN(ngf_descriptor_set_layout_info,
+                                           layout_metadata->ndescriptor_sets);
+  if (descriptor_set_layout_infos == NULL) {
     err = NGF_ERROR_OUTOFMEM;
-    goto ngf_util_create_layout_data_cleanup;
+    goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
   }
-  memset(descriptor_count_estimates, 0, sizeof(uint32_t) * set_count);
-  memset(descriptor_set_layouts, 0,
-         sizeof(ngf_descriptor_set_layout_info) * set_count);
+  memset(descriptor_set_layout_infos, 0,
+         sizeof(ngf_descriptor_set_layout_info) *
+           layout_metadata->ndescriptor_sets);
 
-  for (uint32_t i = 0u; i < nstages; ++i) {
-    uint32_t nres = ntohl(stage_layouts[i][1]);
-    for (uint32_t r = 0u; r < nres; ++r) {
-      uint32_t set = ntohl(stage_layouts[i][2 + 3 * r]);
-      descriptor_count_estimates[set]++;
-    }
+  result->ndescriptors_layouts = layout_metadata->ndescriptor_sets;
+  result->descriptors_layouts = NGF_ALLOCN(ngf_descriptor_set_layout*,
+                                           layout_metadata->ndescriptor_sets);
+  if (descriptor_set_layout_infos == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
   }
 
-  for (uint32_t s = 0u; s < set_count; ++s) {
-    descriptor_set_layouts[s].descriptors =
-      NGF_ALLOCN(ngf_descriptor_info, descriptor_count_estimates[s]);
-    if (descriptor_set_layouts[s].descriptors == NULL) {
+  for (uint32_t set = 0u; set < layout_metadata->ndescriptor_sets; ++set) {
+    ngf_descriptor_set_layout_info set_layout_info;
+    set_layout_info.ndescriptors =
+        layout_metadata->set_layouts[set]->ndescriptors;
+    ngf_descriptor_info *descriptors = NGF_ALLOCN(ngf_descriptor_info,
+                                                  set_layout_info.ndescriptors);
+    set_layout_info.descriptors =  descriptors;
+    if (set_layout_info.descriptors == NULL) {
       err = NGF_ERROR_OUTOFMEM;
-      goto ngf_util_create_layout_data_cleanup;
+      goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
+    }
+    const ngf_plmd_descriptor_set_layout *descriptor_set_metadata =
+        layout_metadata->set_layouts[set];
+    for (uint32_t d = 0u; d < set_layout_info.ndescriptors; ++d) {
+      const ngf_plmd_descriptor *descriptor_metadata =
+          &descriptor_set_metadata->descriptors[d];
+      descriptors[d].id = descriptor_metadata->binding;
+      descriptors[d].type = _plmd_desc_to_ngf(descriptor_metadata->type);
+      descriptors[d].stage_flags =
+          _plmd_stage_flags_to_ngf(descriptor_metadata->stage_visibility_mask);
+    }
+    err = ngf_create_descriptor_set_layout(&set_layout_info,
+                                           &result->descriptors_layouts[set]);
+    NGF_FREEN(set_layout_info.descriptors, set_layout_info.ndescriptors);
+    if (err != NGF_ERROR_OK) {
+      goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
     }
   }
-
-  for (uint32_t i = 0u; i < nstages; ++i) {
-    uint32_t nres = ntohl(stage_layouts[i][1]);
-    for (uint32_t r = 0u; r < nres; ++r) {
-      uint32_t set = ntohl(stage_layouts[i][2 + 3 * r + 0u]);
-      uint32_t type = ntohl(stage_layouts[i][2 + 3 * r + 1u]);
-      uint32_t binding = ntohl(stage_layouts[i][2 + 3 * r + 2u]);
-      ngf_descriptor_set_layout_info *set_layout = &descriptor_set_layouts[set];
-      bool found = false;
-      for (uint32_t d = 0u; !found && d < set_layout->ndescriptors; ++d) {
-        if (set_layout->descriptors[d].type == (ngf_descriptor_type)type &&
-            set_layout->descriptors[d].id == binding) {
-          found = true; 
-        }
-      }
-      if (!found) {
-        assert(set_layout->ndescriptors < descriptor_count_estimates[set]);
-        uint32_t d = set_layout->ndescriptors++;
-        set_layout->descriptors[d].type = type;
-        set_layout->descriptors[d].id = binding;
-      }
-    }
-  }
-
-  result->ndescriptors_layouts = set_count;
-  dsls = NGF_ALLOCN(ngf_descriptor_set_layout*, set_count);
-  memset(dsls, 0, sizeof(void*) * set_count);
-  result->descriptors_layouts = dsls;
-  if (result->descriptors_layouts == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_util_create_layout_data_cleanup;
-  }
-
-  for (uint32_t s = 0u; s < set_count; ++s) {
-    err = ngf_create_descriptor_set_layout(&descriptor_set_layouts[s],
-                                           &dsls[s]);
-    if (err != NGF_ERROR_OK) goto ngf_util_create_layout_data_cleanup;
-  }
-
-ngf_util_create_layout_data_cleanup:
-  if (err != NGF_ERROR_OK) {
-    for (uint32_t i = 0u; dsls && i < result->ndescriptors_layouts; ++i) {
-      if(dsls[i] != NULL) ngf_destroy_descriptor_set_layout(dsls[i]);
-    }
-  }
-  for (uint32_t i = 0u;
-      descriptor_count_estimates != NULL &&
-        descriptor_set_layouts != NULL &&
-        i < set_count;
-       ++i) {
-    NGF_FREEN(descriptor_set_layouts->descriptors,
-              descriptor_count_estimates[i]);
-  }
-  NGF_FREEN(descriptor_set_layouts, set_count);
-  NGF_FREEN(descriptor_count_estimates, set_count);*/
+ngf_util_create_pipeline_layout_from_metadata_cleanup:
   return err;
 }
 
