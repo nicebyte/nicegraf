@@ -62,6 +62,8 @@ target_include_directories(nicegraf_emulated_descriptor_set PRIVATE
 
 target_link_libraries(nicegraf_emulated_descriptor_set nicegraf_internal)
 
+set(NICEGRAF_SOURCES ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h)
+
 if (APPLE)
   set(NICEGRAF_SOURCES
     ${NICEGRAF_SOURCES}
