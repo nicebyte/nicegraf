@@ -75,16 +75,15 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
 
 /**
  * Creates a pipeline layout from shader metadata produced by ngf_shaderc.
- * @param stage_layouts pointer to an array of pointers to buffers containing
- *  shader metadata
- * @param nstages number of elements in the array pointed to bt `stage_layouts`
+ * @param layout_metadata pointer to pipeline layout metadata obtained from an
+ *                        ngf_plmd object.
  * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
  *               be populated by this function. The descriptor sets within it
  *               must be freed by the caller when it is no longer necessary.
  */
-ngf_error ngf_util_create_layout(uint32_t **stage_layouts,
-                                 uint32_t nstages,
-                                 ngf_pipeline_layout_info *result);
+ngf_error ngf_util_create_pipeline_layout_from_metadata(
+    const ngf_plmd_layout *layout_metadata,
+    ngf_pipeline_layout_info *result);
 #ifdef __cplusplus
 }
 #endif
