@@ -220,3 +220,14 @@ const ngf_plmd_user* ngf_plmd_get_user(const plmd *m) {
 const ngf_plmd_header* ngf_plmd_get_header(const plmd *m) {
   return m->header;
 }
+
+const char* ngf_plmd_get_error_name(const ngf_plmd_error err) {
+  static const char* ngf_plmd_error_names[] = {
+    "OK",
+    "OUTOFMEM",
+    "MAGIC_NUMBER_MISMATCH",
+    "BUFFER_TOO_SMALL",
+    "WEIRD_BUFFER_SIZE",
+  };
+  return ngf_plmd_error_names[err];
+}
