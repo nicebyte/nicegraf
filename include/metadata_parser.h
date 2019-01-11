@@ -179,6 +179,8 @@ const ngf_plmd_cis_map* ngf_plmd_get_sampler_to_cis_map(const plmd *m);
 const ngf_plmd_user* ngf_plmd_get_user(const plmd *m);
 const ngf_plmd_header* ngf_plmd_get_header(const plmd *m);
 
+const char* ngf_plmd_get_error_name(const ngf_plmd_error err);
+
 #if defined(__cplusplus)
 }
 #endif

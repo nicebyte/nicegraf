@@ -84,6 +84,9 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
 ngf_error ngf_util_create_pipeline_layout_from_metadata(
     const ngf_plmd_layout *layout_metadata,
     ngf_pipeline_layout_info *result);
+
+const char* ngf_util_get_error_name(const ngf_error err);
+
 #ifdef __cplusplus
 }
 #endif
