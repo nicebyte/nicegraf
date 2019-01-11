@@ -91,7 +91,6 @@ private:
   using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
 NGF_DEFINE_WRAPPER_TYPE(shader_stage);
-NGF_DEFINE_WRAPPER_TYPE(descriptor_set_layout);
 NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
 NGF_DEFINE_WRAPPER_TYPE(image);
 NGF_DEFINE_WRAPPER_TYPE(sampler);
@@ -102,16 +101,4 @@ NGF_DEFINE_WRAPPER_TYPE(uniform_buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
-// special case for descriptor sets
-struct ngf_descriptor_set_ManagementFuncs {
-  using InitType = ngf_descriptor_set_layout;
-  static ngf_error create(const InitType *layout, ngf_descriptor_set **set) {
-    return ngf_create_descriptor_set(layout, set);
-  }
-  static void destroy(ngf_descriptor_set *handle) {
-    ngf_destroy_descriptor_set(handle);
-  }
-};
-using descriptor_set = ngf_handle<ngf_descriptor_set,
-                                  ngf_descriptor_set_ManagementFuncs>;
 }  // namespace ngf
