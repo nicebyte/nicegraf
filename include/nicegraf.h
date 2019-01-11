@@ -781,23 +781,13 @@ typedef struct {
 } ngf_descriptor_set_layout_info;
 
 /**
- * Descriptor layout object.
- */
-typedef struct ngf_descriptor_set_layout ngf_descriptor_set_layout;
-
-/**
- * Descriptor set object.
- */
-typedef struct ngf_descriptor_set ngf_descriptor_set;
-
-/**
  * Pipeline layout description.
  * Specifies layouts for descriptor sets that are required to be bound by a
  * pipeline.
  */
 typedef struct {
-  uint32_t ndescriptors_layouts;
-  ngf_descriptor_set_layout **descriptors_layouts;
+  uint32_t ndescriptor_set_layouts;
+  ngf_descriptor_set_layout_info *descriptor_set_layouts;
 } ngf_pipeline_layout_info;
 
 /**
@@ -807,7 +797,7 @@ typedef struct {
   const ngf_uniform_buffer *buffer; /**< Which buffer to bind.*/
   size_t offset; /**< Offset at which to bind the buffer.*/
   size_t range;  /**< Bound range.*/
-} ngf_descriptor_write_buffer;
+} ngf_uniform_buffer_bind_info;
 
 /**
  * Specifies an image bind operation.
@@ -815,21 +805,17 @@ typedef struct {
 typedef struct {
   ngf_image_ref image_subresource; /**< Image portion to bind.*/
   const ngf_sampler *sampler; /**< Sampler to use.*/
-} ngf_descriptor_write_image_sampler;
+} ngf_image_sampler_bind_info;
 
-/**
- * Specifies a write to a descriptor set.
- */
 typedef struct {
-  uint32_t binding; /**< Number of the binding being changed.*/
-  ngf_descriptor_type type; /**< Type of the descriptor being written.*/
-
-  /* Resource-specific information.*/
+  uint32_t target_set;
+  uint32_t target_binding;
+  ngf_descriptor_type type;
   union {
-    ngf_descriptor_write_buffer buffer_bind;
-    ngf_descriptor_write_image_sampler image_sampler_bind;
-  } op;
-} ngf_descriptor_write;
+    ngf_uniform_buffer_bind_info uniform_buffer;
+    ngf_image_sampler_bind_info image_sampler;
+  } info;
+} ngf_resource_bind_op;
 
 /**
  * Graphics pipeline object.
@@ -1068,46 +1054,6 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
 void ngf_destroy_shader_stage(ngf_shader_stage *stage);
 
 /**
- * Creates a new descriptor set layout object that can be used when
- * constructing a pipeline layout.
- * @param info shall point to a structure specifying the details of descriptor
- *             set layout.
- * @param result shall be initialized to point to a descriptor set layout 
- *               object if the function succeeds.
- */
-ngf_error ngf_create_descriptor_set_layout(
-    const ngf_descriptor_set_layout_info *info,
-    ngf_descriptor_set_layout **result);
-
-/**
- * Destroy the given descriptor set layout object.
- */
-void ngf_destroy_descriptor_set_layout(ngf_descriptor_set_layout *layout);
-
-/**
- * Create a new descriptor set conforming to the given layout.
- */
-ngf_error ngf_create_descriptor_set(const ngf_descriptor_set_layout *layout,
-                                    ngf_descriptor_set **set);
-
-/**
- * Destroy the given descriptor set.
- * @param set The descriptor set object to destroy.
- */
-void ngf_destroy_descriptor_set(ngf_descriptor_set *set);
-
-/**
- * Applies bind operations to a given descriptor set.
- * @param ops shall be a pointer to an array of bind operations.
- * @param nops shall be the number of elements in the array pointed to by `ops'
- * @param set shall point to the dscriptor set object to which the bind
- *  operations need to be applied.
- */
-ngf_error ngf_apply_descriptor_writes(const ngf_descriptor_write *writes,
-                                      const uint32_t nwrites,
-                                      ngf_descriptor_set *set);
-
-/**
  * Creates a graphics pipeline object.
  * @param info Configuration for the graphics pipeline.
  */
@@ -1317,9 +1263,9 @@ void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width);
 void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor);
-void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *buf,
-                                 const ngf_descriptor_set *set,
-                                 uint32_t slot);
+void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
+                            const ngf_resource_bind_op *bind_operations,
+                            uint32_t nbind_operations);
 void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
                                 const ngf_attrib_buffer *vbuf,
                                 uint32_t binding, uint32_t offset);
