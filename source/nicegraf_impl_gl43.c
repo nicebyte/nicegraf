@@ -53,8 +53,8 @@ SOFTWARE.
 typedef struct {
   uint32_t ngf_binding_id;
   uint32_t native_binding_id;
-  uint32_t ncombineds;
-  uint32_t *combined_image_sampler_binding_ids;
+  uint32_t ncis_bindings;
+  uint32_t *cis_bindings;
 } _ngf_native_binding;
 
 struct ngf_graphics_pipeline {
@@ -875,7 +875,7 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
 }
 
 const ngf_plmd_cis_map_entry * _lookup_cis_map(uint32_t set, uint32_t binding,
-                                         const ngf_plmd_cis_map *map) {
+                                               const ngf_plmd_cis_map *map) {
   for (uint32_t i = 0u; i < map->nentries; ++i) {
     if (set == map->entries[i]->separate_set_id &&
         binding == map->entries[i]->separate_binding_id) {
@@ -968,18 +968,17 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         const ngf_plmd_cis_map_entry *combined_list =
             _lookup_cis_map(set, desc_info->id, cis_map);
         assert(combined_list); // TODO: report error
-        mapping->combined_image_sampler_binding_ids =
+        mapping->cis_bindings =
             NGF_ALLOCN(uint32_t, combined_list->ncombined_ids);
-        if (mapping->combined_image_sampler_binding_ids == NULL) {
+        if (mapping->cis_bindings == NULL) {
           err = NGF_ERROR_OUTOFMEM;
           goto ngf_create_pipeline_cleanup;
         }
-        memcpy(mapping->combined_image_sampler_binding_ids,
-               combined_list->combined_ids,
+        memcpy(mapping->cis_bindings, combined_list->combined_ids,
                sizeof(uint32_t) * combined_list->ncombined_ids);
-        mapping->ncombineds = combined_list->ncombined_ids;
+        mapping->ncis_bindings = combined_list->ncombined_ids;
       } else {
-        mapping->combined_image_sampler_binding_ids = NULL;
+        mapping->cis_bindings = NULL;
       }
     }
     for (uint32_t i = 0u; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
@@ -1065,8 +1064,8 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
       for (uint32_t set = 0u; set < pipeline->ndescriptors_layouts; ++set) {
         if (pipeline->binding_map[set]) {
           NGF_FREEN(
-              pipeline->binding_map[set]->combined_image_sampler_binding_ids,
-              pipeline->binding_map[set]->ncombineds);
+              pipeline->binding_map[set]->cis_bindings,
+              pipeline->binding_map[set]->ncis_bindings);
           NGF_FREE(pipeline->binding_map[set]);
         }
       }
@@ -1672,27 +1671,27 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
       break;
     }
     case NGF_DESCRIPTOR_TEXTURE: {
-      for (uint32_t c = 0u; c < native_binding->ncombineds; ++c) {
+      for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
         _ngf_emulated_cmd *texture_bind_cmd =
             _ngf_blkalloc_alloc(COMMAND_POOL);
         texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
         texture_bind_cmd->texture_bind_op.texture =
             bind_op->info.image_sampler.image_subresource.image;
         texture_bind_cmd->texture_bind_op.unit =
-            native_binding->combined_image_sampler_binding_ids[c];
+            native_binding->cis_bindings[c];
         _NGF_APPENDCMD(buf, texture_bind_cmd);
       }
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
-      for (uint32_t c = 0u; c < native_binding->ncombineds; ++c) {
+      for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
         _ngf_emulated_cmd *sampler_bind_cmd =
             _ngf_blkalloc_alloc(COMMAND_POOL);
         sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
         sampler_bind_cmd->sampler_bind_op.sampler =
             bind_op->info.image_sampler.sampler;
         sampler_bind_cmd->sampler_bind_op.unit =
-            native_binding->combined_image_sampler_binding_ids[c];
+            native_binding->cis_bindings[c];
         _NGF_APPENDCMD(buf, sampler_bind_cmd);
       }
       break;
