@@ -49,7 +49,7 @@ typedef struct ngf_util_graphics_pipeline_data {
 } ngf_util_graphics_pipeline_data;
 
 /**
- * Creates configuration data for a graphics pipeline with a given layout.
+ * Creates configuration data for a graphics pipeline.
  * The state is set to match OpenGL defaults and can be adjusted later.
  * @param viewport If not NULL, the pipeline's viewport and scissor regions
                    will be configured to this area. If NULL, the viewport and
@@ -62,6 +62,8 @@ void ngf_util_create_default_graphics_pipeline_data(
 
 /**
  * Creates a simple pipeline layout with just a single descriptor set.
+ * This function allocates memory for the descriptor_set_layout_info and
+ * descriptor_info objects, and it is up to the caller to free that memory.
  * @param desc pointer to an array of descriptor configurations. All of these
  *  descriptors will be added to the set.
  * @param ndesc number of descriptors in the array.
@@ -75,6 +77,8 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
 
 /**
  * Creates a pipeline layout from shader metadata produced by ngf_shaderc.
+ * This function allocates memory for the descriptor_set_layout_info and
+ * descriptor_info objects, and it is up to the caller to free that memory.
  * @param layout_metadata pointer to pipeline layout metadata obtained from an
  *                        ngf_plmd object.
  * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
