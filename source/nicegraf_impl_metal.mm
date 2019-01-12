@@ -23,7 +23,6 @@ SOFTWARE.
 #include "nicegraf.h"
 #include "nicegraf_wrappers.h"
 #include "nicegraf_internal.h"
-#include "emulated_descriptor_set.h"
 #include <new>
 #include <optional>
 #include <memory>
@@ -120,6 +119,18 @@ struct ngf_graphics_pipeline {
   uint32_t front_stencil_reference = 0u;
   uint32_t back_stencil_reference = 0u;
   MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
+  ngf_pipeline_layout_info layout;
+  ~ngf_graphics_pipeline() {
+    for (uint32_t s = 0u;
+         layout.descriptor_set_layouts != nullptr &&
+         s < layout.ndescriptor_set_layouts;
+         ++s) {
+      if (layout.descriptor_set_layouts[s].descriptors != nullptr) {
+        NGF_FREEN(layout.descriptor_set_layouts[s].descriptors,
+                  layout.descriptor_set_layouts[s].ndescriptors);
+      }
+    }
+  }
 };
 
 struct ngf_buffer {
@@ -776,6 +787,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                        ngf_graphics_pipeline **result) {
   assert(info);
   assert(result);
+  
   auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
   const ngf_render_target &compatible_rt = *info->compatible_render_target;
   for (uint32_t ca = 0u; ca < compatible_rt.ncolor_attachments; ++ca) {
@@ -888,6 +900,30 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   
   
   _NGF_NURSERY(graphics_pipeline, pipeline);
+  pipeline->layout.ndescriptor_set_layouts =
+      info->layout->ndescriptor_set_layouts;
+  ngf_descriptor_set_layout_info *descriptor_set_layouts =
+      NGF_ALLOCN(ngf_descriptor_set_layout_info,
+                 info->layout->ndescriptor_set_layouts);
+  pipeline->layout.descriptor_set_layouts = descriptor_set_layouts;
+  if (pipeline->layout.descriptor_set_layouts == nullptr) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  memset(pipeline->layout.descriptor_set_layouts, 0,
+         sizeof(ngf_descriptor_set_layout_info));
+  for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
+    descriptor_set_layouts[s].ndescriptors =
+        info->layout->descriptor_set_layouts[s].ndescriptors;
+    ngf_descriptor_info *descriptors  =
+        NGF_ALLOCN(ngf_descriptor_info, descriptor_set_layouts->ndescriptors);
+    descriptor_set_layouts[s].descriptors = descriptors;
+    if (descriptors == nullptr) return NGF_ERROR_OUTOFMEM;
+    memcpy(descriptors,
+           info->layout->descriptor_set_layouts[s].descriptors,
+           sizeof(ngf_descriptor_info) *
+           descriptor_set_layouts[s].ndescriptors);
+  }
+
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
@@ -1254,86 +1290,101 @@ void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *cmd_buf,
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
-void ngf_cmd_bind_descriptor_set(ngf_cmd_buffer *cmd_buf,
-                                 const ngf_descriptor_set *set,
-                                 uint32_t slot) {
-  // TODO: assert compatibility with pipeline layout?
-  for (uint32_t s = 0u; s < set->nslots; ++s) {
-    const ngf_descriptor_write *rbop = &set->bind_ops[s];
-    const uint32_t ngf_binding = set->descriptors[s].id;
-    const uint32_t native_binding = ngf_binding; // TODO: fix (map set,binding
-                                                 // to binding).
-    const uint32_t set_stage_flags = set->descriptors[s].stage_flags;
+void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
+                            const ngf_resource_bind_op *bind_ops,
+                            uint32_t nbind_ops) {
+  for (uint32_t o = 0u; o < nbind_ops; ++o) {
+    const ngf_resource_bind_op &bind_op = bind_ops[o];
+    const uint32_t ngf_binding = bind_op.target_binding;
+    const uint32_t native_binding = ngf_binding; // TODO: fix (map {set,binding} to binding).
+    const ngf_pipeline_layout_info &layout = cmd_buf->active_pipe->layout;
+    const ngf_descriptor_set_layout_info &set_layout =
+        layout.descriptor_set_layouts[bind_op.target_set];
+    const auto descriptor_it =
+        std::find_if(set_layout.descriptors,
+                     set_layout.descriptors + set_layout.ndescriptors,
+                     [ngf_binding](const ngf_descriptor_info &d){
+                       return d.id == ngf_binding;
+                     });
+    assert(descriptor_it != set_layout.descriptors + set_layout.ndescriptors);
+    const uint32_t set_stage_flags = descriptor_it->stage_flags;
+    
+    printf("STAGE FLAGS %d\n", set_stage_flags);
     const bool frag_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
                vert_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_VERTEX_STAGE_BIT;
-    switch(rbop->type) {
-    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-      const  ngf_descriptor_write_buffer &buf_bind_op = rbop->op.buffer_bind;
-      const ngf_uniform_buffer *buf = buf_bind_op.buffer;
-      size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
-      if (vert_stage_visible) {
-        [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
-                                      offset:offset
-                                     atIndex:native_binding];
-      }
-      if (frag_stage_visible) {
-        [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
-         offset:offset
-         atIndex:native_binding];
-      }
-      break;}
-    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: { // TODO maybe remove
-      // TODO use texture view
-      const ngf_descriptor_write_image_sampler &img_bind_op =
-          rbop->op.image_sampler_bind;
-      if (vert_stage_visible) {
-        [cmd_buf->active_rce
-         setVertexTexture:img_bind_op.image_subresource.image->texture
-         atIndex:native_binding];
-        [cmd_buf->active_rce
-         setVertexSamplerState:img_bind_op.sampler->sampler
-         atIndex:native_binding];
-      }
-      if (frag_stage_visible) {
-        [cmd_buf->active_rce
-             setFragmentTexture:img_bind_op.image_subresource.image->texture
-             atIndex:native_binding];
-        [cmd_buf->active_rce
-         setFragmentSamplerState:img_bind_op.sampler->sampler
-         atIndex:native_binding];
-      }
-      break; }
-    case NGF_DESCRIPTOR_TEXTURE: {// TODO use texture view
-      const ngf_descriptor_write_image_sampler &img_bind_op =
-      rbop->op.image_sampler_bind;
-      if (vert_stage_visible) {
-        [cmd_buf->active_rce
-         setVertexTexture:img_bind_op.image_subresource.image->texture
-         atIndex:native_binding];
-      }
-      if (frag_stage_visible) {
-        [cmd_buf->active_rce
-         setFragmentTexture:img_bind_op.image_subresource.image->texture
-         atIndex:native_binding];
-      }
-      break; }
-    case NGF_DESCRIPTOR_SAMPLER: {
-      const ngf_descriptor_write_image_sampler &img_bind_op =
-      rbop->op.image_sampler_bind;
-      if (vert_stage_visible) {
-        [cmd_buf->active_rce
-         setVertexSamplerState:img_bind_op.sampler->sampler
-         atIndex:native_binding];
-      }
-      if (frag_stage_visible) {
-        [cmd_buf->active_rce
-         setFragmentSamplerState:img_bind_op.sampler->sampler
-         atIndex:native_binding];
-      }
-      break; }
-    case NGF_DESCRIPTOR_TYPE_COUNT: assert(false);
+    printf("  VERT %d FRAG %d\n", vert_stage_visible, frag_stage_visible);
+    switch(bind_op.type) {
+      case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+        printf("  BINDING UBO\n");
+        const  ngf_uniform_buffer_bind_info &buf_bind_op =
+            bind_op.info.uniform_buffer;
+        const ngf_uniform_buffer *buf = buf_bind_op.buffer;
+        size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
+        if (vert_stage_visible) {
+          printf("  Set Vertex UBO at %d\n", native_binding);
+          [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
+                                        offset:offset
+                                       atIndex:native_binding];
+        }
+        if (frag_stage_visible) {
+          printf("  Set Frag UBO at %d\n", native_binding);
+          [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
+                                          offset:offset
+                                         atIndex:native_binding];
+        }
+        break;}
+      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+        // TODO use texture view
+        const ngf_image_sampler_bind_info &img_bind_op =
+            bind_op.info.image_sampler;
+        if (vert_stage_visible) {
+          [cmd_buf->active_rce
+           setVertexTexture:img_bind_op.image_subresource.image->texture
+           atIndex:native_binding];
+          [cmd_buf->active_rce
+           setVertexSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        if (frag_stage_visible) {
+          [cmd_buf->active_rce
+           setFragmentTexture:img_bind_op.image_subresource.image->texture
+           atIndex:native_binding];
+          [cmd_buf->active_rce
+           setFragmentSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        break; }
+      case NGF_DESCRIPTOR_TEXTURE: {// TODO use texture view
+        const ngf_image_sampler_bind_info &img_bind_op =
+            bind_op.info.image_sampler;
+        if (vert_stage_visible) {
+          [cmd_buf->active_rce
+           setVertexTexture:img_bind_op.image_subresource.image->texture
+           atIndex:native_binding];
+        }
+        if (frag_stage_visible) {
+          [cmd_buf->active_rce
+           setFragmentTexture:img_bind_op.image_subresource.image->texture
+           atIndex:native_binding];
+        }
+        break; }
+      case NGF_DESCRIPTOR_SAMPLER: {
+        const ngf_image_sampler_bind_info &img_bind_op =
+            bind_op.info.image_sampler;
+        if (vert_stage_visible) {
+          [cmd_buf->active_rce
+           setVertexSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        if (frag_stage_visible) {
+          [cmd_buf->active_rce
+           setFragmentSamplerState:img_bind_op.sampler->sampler
+           atIndex:native_binding];
+        }
+        break; }
+      case NGF_DESCRIPTOR_TYPE_COUNT: assert(false);
     }
   }
 }
