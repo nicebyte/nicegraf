@@ -1309,27 +1309,22 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
     assert(descriptor_it != set_layout.descriptors + set_layout.ndescriptors);
     const uint32_t set_stage_flags = descriptor_it->stage_flags;
     
-    printf("STAGE FLAGS %d\n", set_stage_flags);
     const bool frag_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
                vert_stage_visible = set_stage_flags &
                                     NGF_DESCRIPTOR_VERTEX_STAGE_BIT;
-    printf("  VERT %d FRAG %d\n", vert_stage_visible, frag_stage_visible);
     switch(bind_op.type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-        printf("  BINDING UBO\n");
         const  ngf_uniform_buffer_bind_info &buf_bind_op =
             bind_op.info.uniform_buffer;
         const ngf_uniform_buffer *buf = buf_bind_op.buffer;
         size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
         if (vert_stage_visible) {
-          printf("  Set Vertex UBO at %d\n", native_binding);
           [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                         offset:offset
                                        atIndex:native_binding];
         }
         if (frag_stage_visible) {
-          printf("  Set Frag UBO at %d\n", native_binding);
           [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
                                           offset:offset
                                          atIndex:native_binding];
