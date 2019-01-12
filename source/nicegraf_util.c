@@ -93,8 +93,8 @@ void ngf_util_create_default_graphics_pipeline_data(
   };
   result->spec_info = spi;
   ngf_pipeline_layout_info pli = {
-    .ndescriptors_layouts = 0u,
-    .descriptors_layouts = NULL
+    .ndescriptor_set_layouts = 0u,
+    .descriptor_set_layouts = NULL
   };
   result->layout_info  = pli;
   ngf_graphics_pipeline_info gpi = {
@@ -121,18 +121,14 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
   assert(desc);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
-  ngf_descriptor_set_layout_info ds_layout_info = {
-    .descriptors = desc,
-    .ndescriptors = ndesc
-  };
-  result->ndescriptors_layouts = 1u;
-  ngf_descriptor_set_layout **dsl = NGF_ALLOC(ngf_descriptor_set_layout*);
-  result->descriptors_layouts = dsl;
-  err = ngf_create_descriptor_set_layout(&ds_layout_info, dsl);
-  if (err != NGF_ERROR_OK) {
-    NGF_FREE(result->descriptors_layouts);
-    return err;
-  }
+  result->ndescriptor_set_layouts = 1u;
+  ngf_descriptor_set_layout_info *dsl =
+      NGF_ALLOC(ngf_descriptor_set_layout_info);
+  ngf_descriptor_info *desc_copy = NGF_ALLOCN(ngf_descriptor_info, ndesc);
+  memcpy(desc_copy, desc, ndesc * sizeof(ngf_descriptor_info));
+  dsl->descriptors = desc_copy;
+  dsl->ndescriptors = ndesc;
+  result->descriptor_set_layouts = dsl;
   return err;
 }
 
@@ -179,28 +175,29 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
          sizeof(ngf_descriptor_set_layout_info) *
            layout_metadata->ndescriptor_sets);
 
-  result->ndescriptors_layouts = layout_metadata->ndescriptor_sets;
-  result->descriptors_layouts = NGF_ALLOCN(ngf_descriptor_set_layout*,
-                                           layout_metadata->ndescriptor_sets);
+  result->ndescriptor_set_layouts = layout_metadata->ndescriptor_sets;
+  result->descriptor_set_layouts = descriptor_set_layout_infos;
+  
   if (descriptor_set_layout_infos == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
   }
 
   for (uint32_t set = 0u; set < layout_metadata->ndescriptor_sets; ++set) {
-    ngf_descriptor_set_layout_info set_layout_info;
-    set_layout_info.ndescriptors =
+    ngf_descriptor_set_layout_info *set_layout_info =
+       &descriptor_set_layout_infos[set];
+    set_layout_info->ndescriptors =
         layout_metadata->set_layouts[set]->ndescriptors;
-    ngf_descriptor_info *descriptors = NGF_ALLOCN(ngf_descriptor_info,
-                                                  set_layout_info.ndescriptors);
-    set_layout_info.descriptors =  descriptors;
-    if (set_layout_info.descriptors == NULL) {
+    ngf_descriptor_info *descriptors =
+        NGF_ALLOCN(ngf_descriptor_info, set_layout_info->ndescriptors);
+    set_layout_info->descriptors = descriptors;
+    if (set_layout_info->descriptors == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
     }
     const ngf_plmd_descriptor_set_layout *descriptor_set_metadata =
         layout_metadata->set_layouts[set];
-    for (uint32_t d = 0u; d < set_layout_info.ndescriptors; ++d) {
+    for (uint32_t d = 0u; d < set_layout_info->ndescriptors; ++d) {
       const ngf_plmd_descriptor *descriptor_metadata =
           &descriptor_set_metadata->descriptors[d];
       descriptors[d].id = descriptor_metadata->binding;
@@ -208,14 +205,49 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
       descriptors[d].stage_flags =
           _plmd_stage_flags_to_ngf(descriptor_metadata->stage_visibility_mask);
     }
-    err = ngf_create_descriptor_set_layout(&set_layout_info,
-                                           &result->descriptors_layouts[set]);
-    NGF_FREEN(set_layout_info.descriptors, set_layout_info.ndescriptors);
-    if (err != NGF_ERROR_OK) {
-      goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
-    }
   }
 ngf_util_create_pipeline_layout_from_metadata_cleanup:
   return err;
 }
 
+const char* ngf_util_get_error_name(const ngf_error err) {
+  static const char* ngf_error_names[] = {
+    "OK",
+    "OUTOFMEM",
+    "FAILED_TO_CREATE_PIPELINE",
+    "INCOMPLETE_PIPELINE",
+    "CANT_POPULATE_IMAGE",
+    "IMAGE_CREATION_FAILED",
+    "CREATE_SHADER_STAGE_FAILED"
+    "INVALID_BINDING",
+    "INVALID_INDEX_BUFFER_BINDING",
+    "INVALID_VERTEX_BUFFER_BINDING",
+    "INCOMPLETE_RENDER_TARGET",
+    "INVALID_RESOURCE_SET_BINDING",
+    "CONTEXT_CREATION_FAILED",
+    "INVALID_CONTEXT",
+    "SWAPCHAIN_CREATION_FAILED",
+    "INVALID_SURFACE_FORMAT",
+    "INITIALIZATION_FAILED",
+    "SURFACE_CREATION_FAILED",
+    "CANT_SHARE_CONTEXT",
+    "BEGIN_FRAME_FAILED",
+    "END_FRAME_FAILED",
+    "OUT_OF_BOUNDS",
+    "CMD_BUFFER_ALREADY_RECORDING",
+    "CMD_BUFFER_WAS_NOT_RECORDING",
+    "CONTEXT_ALREADY_CURRENT",
+    "CALLER_HAS_CURRENT_CONTEXT",
+    "CANNOT_SPECIALIZE_SHADER_STAGE_BINARY",
+    "SHADER_STAGE_INVALID_BINARY_FORMAT",
+    "CANNOT_READ_BACK_SHADER_STAGE_BINARY",
+    "NO_DEFAULT_RENDER_TARGET",
+    "NO_FRAME",
+    "UNIFORM_BUFFER_SIZE_MISMATCH",
+    "INVALID_IMAGE_FORMAT",
+    "INVALID_DEPTH_FORMAT",
+    "INVALID_VERTEX_ATTRIB_FORMAT",
+    "INVALID_SAMPLER_ADDRESS_MODE",
+  };
+  return ngf_error_names[err];
+}
