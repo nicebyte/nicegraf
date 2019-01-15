@@ -402,7 +402,7 @@ static glformat get_gl_format(ngf_image_format f) {
 static GLenum get_gl_filter(ngf_sampler_filter f) {
   static const GLenum filters[] = {
     GL_NEAREST,
-    GL_LINEAR,
+    GL_LINEAR_MIPMAP_LINEAR,
     GL_LINEAR_MIPMAP_NEAREST,
     GL_LINEAR_MIPMAP_LINEAR
   };
