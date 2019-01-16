@@ -1226,17 +1226,25 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   }
   
   glGenSamplers(1, &(sampler->glsampler));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER, get_gl_filter(info->min_filter));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER, get_gl_filter(info->mag_filter));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S, get_gl_wrap(info->wrap_s));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_T, get_gl_wrap(info->wrap_t));
-  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_R, get_gl_wrap(info->wrap_r));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER,
+                      get_gl_filter(info->min_filter));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER,
+                      get_gl_filter(info->mag_filter));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S,
+                      get_gl_wrap(info->wrap_s));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_T,
+                      get_gl_wrap(info->wrap_t));
+  glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_R,
+                      get_gl_wrap(info->wrap_r));
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MIN_LOD, info->lod_min);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MAX_LOD, info->lod_max);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_LOD_BIAS, info->lod_bias);
-  glSamplerParameterfv(sampler->glsampler, GL_TEXTURE_BORDER_COLOR, info->border_color);
-  // TODO: anisotropic filtering
-
+  glSamplerParameterfv(sampler->glsampler, GL_TEXTURE_BORDER_COLOR,
+                       info->border_color);
+  if (info->enable_anisotropy) {
+    glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MAX_ANISOTROPY,
+                        info->max_anisotropy);
+  }
   return NGF_ERROR_OK;
 }
 
