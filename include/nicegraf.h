@@ -717,7 +717,6 @@ typedef struct {
   ngf_sampler_filter min_filter; /**< Minification filter.*/
   ngf_sampler_filter mag_filter; /**< Magnification filter.*/
   ngf_sampler_filter mip_filter; /**< Mipmap filter. */
-  // TODO: anisotropic filtering
   ngf_sampler_wrap_mode wrap_s; /**< Horizontal wrap mode. */
   ngf_sampler_wrap_mode wrap_t;
   ngf_sampler_wrap_mode wrap_r;
@@ -725,6 +724,9 @@ typedef struct {
   float lod_min; /**< Min mip level.*/
   float lod_bias; /**< Level bias.*/
   float border_color[4]; /**< Border color.*/
+  /** Max number of samples allowed for anisotropic filtering.*/
+  float max_anisotropy;
+  bool enable_anisotropy; /**< Whether to allow anisotropic filtering. */
 } ngf_sampler_info;
 
 /**
