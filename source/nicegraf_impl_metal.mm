@@ -1064,10 +1064,10 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   sampler_desc.minFilter = get_mtl_minmag_filter(info->min_filter);
   sampler_desc.magFilter = get_mtl_minmag_filter(info->mag_filter);
   sampler_desc.mipFilter = get_mtl_mip_filter(info->mip_filter);
+  sampler_desc.maxAnisotropy = (NSUInteger)info->max_anisotropy;
   // TODO unmipped images
   sampler_desc.lodMinClamp = info->lod_min;
   sampler_desc.lodMaxClamp = info->lod_max;
-  // TODO max anisotropy
   _NGF_NURSERY(sampler, sampler);
   sampler->sampler =
       [CURRENT_CONTEXT->device newSamplerStateWithDescriptor:sampler_desc];
@@ -1141,7 +1141,7 @@ ngf_error ngf_populate_image(ngf_image *image,
    replaceRegion:region
    mipmapLevel:level
    withBytes:data
-   bytesPerRow:image->texture.width * bpp];
+   bytesPerRow:dimensions.width * bpp];
   return NGF_ERROR_OK;
 }
 
