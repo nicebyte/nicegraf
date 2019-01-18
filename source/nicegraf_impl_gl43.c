@@ -400,14 +400,25 @@ static glformat get_gl_format(ngf_image_format f) {
 }
 
 static GLenum get_gl_filter(ngf_sampler_filter f) {
-  static const GLenum filters[] = {
+  static const GLenum filters[NGF_FILTER_COUNT] = {
     GL_NEAREST,
-    GL_LINEAR_MIPMAP_LINEAR,
-    GL_LINEAR_MIPMAP_NEAREST,
-    GL_LINEAR_MIPMAP_LINEAR
+    GL_LINEAR,
   };
 
   return filters[f];
+}
+
+static GLenum get_min_mip_filter(GLenum min_filter,
+                                 GLenum mip_filter) {
+  if (min_filter == GL_LINEAR && mip_filter == GL_NEAREST) {
+    return GL_LINEAR_MIPMAP_NEAREST;
+  } else if (min_filter == GL_LINEAR && mip_filter == GL_LINEAR) {
+    return GL_LINEAR_MIPMAP_LINEAR;
+  } else if (min_filter == GL_NEAREST && mip_filter == GL_LINEAR) {
+    return GL_NEAREST_MIPMAP_LINEAR;
+  } else {
+    return GL_NEAREST_MIPMAP_NEAREST;
+  }
 }
 
 static GLenum get_gl_wrap(ngf_sampler_wrap_mode e) {
@@ -1226,8 +1237,11 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   }
   
   glGenSamplers(1, &(sampler->glsampler));
+  const GLenum min_filter = get_gl_filter(info->min_filter);
+  const GLenum mip_filter = get_gl_filter(info->mip_filter);
+  const GLenum min_mip_filter = get_min_mip_filter(min_filter, mip_filter);
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER,
-                      get_gl_filter(info->min_filter));
+                      min_mip_filter);
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER,
                       get_gl_filter(info->mag_filter));
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S,
