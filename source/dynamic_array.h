@@ -53,4 +53,3 @@ SOFTWARE.
 #define _NGF_DARRAY_CLEAR(a) (a.endptr = a.data)
 #define _NGF_DARRAY_SIZE(a) (a.endptr - a.data)
 #define _NGF_DARRAY_AT(a, i) (a.data[i])
-
