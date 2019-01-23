@@ -85,8 +85,8 @@ typedef struct {
 
 typedef struct {
   VkSwapchainKHR vk_swapchain;
-  VkSemaphore image_semaphore;
   VkImage *images;
+  VkSemaphore *image_semaphores;
   uint32_t num_images;
   uint32_t image_idx;
 } _ngf_swapchain;
@@ -95,6 +95,7 @@ struct ngf_context {
   ngf_swapchain_info swapchain_info;
   _ngf_context_shared_state **shared_state;
   VkSurfaceKHR surface;
+  uint32_t frame_number;
   _ngf_swapchain swapchain;
 };
 
@@ -443,8 +444,11 @@ static void _ngf_destroy_swapchain(
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(shared_state->device, swapchain->vk_swapchain, NULL);
   }
-  if (swapchain->image_semaphore != VK_NULL_HANDLE) {
-    vkDestroySemaphore(shared_state->device, swapchain->image_semaphore, NULL);
+  for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
+    if (swapchain->image_semaphores[s] != VK_NULL_HANDLE) {
+      vkDestroySemaphore(shared_state->device, swapchain->image_semaphores[s],
+                         NULL);
+    }
   }
 }
 
@@ -542,18 +546,20 @@ static ngf_error _ngf_create_swapchain(
     goto _ngf_create_swapchain_cleanup;
   }
 
-  // Create image semaphore.
-  const VkSemaphoreCreateInfo sem_info = {
-    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    .pNext = NULL,
-    .flags = 0
-  };
-  vk_err =
-      vkCreateSemaphore(shared_state->device, &sem_info, NULL,
-                        &swapchain->image_semaphore);
-  if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
-    goto _ngf_create_swapchain_cleanup;
+  // Create semaphores to be signaled when a swapchain image becomes available.
+  for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
+    const VkSemaphoreCreateInfo sem_info = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0
+    };
+    vk_err =
+        vkCreateSemaphore(shared_state->device, &sem_info, NULL,
+                          &swapchain->image_semaphores[s]);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      goto _ngf_create_swapchain_cleanup;
+    }
   }
   swapchain->image_idx = 0U;
 
@@ -795,6 +801,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
     ctx->swapchain_info = *swapchain_info;
   }
+  ctx->frame_number = 0u;
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -869,12 +876,13 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
 
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   ngf_error err = NGF_ERROR_OK;
+  uint32_t image_sem_idx = ctx->frame_number % ctx->swapchain.num_images;
   if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     const VkResult vk_err =
         vkAcquireNextImageKHR((*(ctx->shared_state))->device,
                               ctx->swapchain.vk_swapchain,
                               UINT64_MAX,
-                              ctx->swapchain.image_semaphore,
+                              ctx->swapchain.image_semaphores[image_sem_idx],
                               VK_NULL_HANDLE,
                               &ctx->swapchain.image_idx);
     if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
@@ -891,8 +899,8 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
     VkPresentInfoKHR present_info = {
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
       .pNext = NULL,
-      .waitSemaphoreCount = 1u,
-      .pWaitSemaphores = &ctx->swapchain.image_semaphore, // TODO: image_semaphore should be waited on by the main cmd buffer?
+      .waitSemaphoreCount = 0u,
+      .pWaitSemaphores = VK_NULL_HANDLE, // TODO: wait on cmd buf semaphores
       .swapchainCount = 1,
       .pSwapchains = &ctx->swapchain.vk_swapchain,
       .pImageIndices = &ctx->swapchain.image_idx,
@@ -904,6 +912,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
   } else {
     err = NGF_ERROR_END_FRAME_FAILED;
   }
+  ctx->frame_number++;
   return err;
 }
 
