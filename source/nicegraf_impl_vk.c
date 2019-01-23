@@ -87,6 +87,7 @@ typedef struct {
   VkSwapchainKHR vk_swapchain;
   VkImage *images;
   VkSemaphore *image_semaphores;
+  VkFence *frame_fences;
   uint32_t num_images;
   uint32_t image_idx;
 } _ngf_swapchain;
@@ -565,6 +566,26 @@ static ngf_error _ngf_create_swapchain(
     vk_err =
         vkCreateSemaphore(shared_state->device, &sem_info, NULL,
                           &swapchain->image_semaphores[s]);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      goto _ngf_create_swapchain_cleanup;
+    }
+  }
+
+  // Create fences to signal when a frame is done rendering.
+  swapchain->frame_fences = NGF_ALLOCN(VkFence, swapchain->num_images);
+  if (swapchain->frame_fences == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto _ngf_create_swapchain_cleanup;
+  }
+  for (uint32_t f = 0u; f < swapchain->num_images; ++f) {
+    const VkFenceCreateInfo fence_info = {
+      .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0u
+    };
+    vk_err = vkCreateFence(shared_state->device, &fence_info, NULL,
+                           &swapchain->frame_fences[f]);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
