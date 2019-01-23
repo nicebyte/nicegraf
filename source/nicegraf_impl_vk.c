@@ -441,14 +441,18 @@ static void _ngf_destroy_swapchain(
     const _ngf_context_shared_state *shared_state,
     _ngf_swapchain *swapchain) {
   assert(swapchain);
-  if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(shared_state->device, swapchain->vk_swapchain, NULL);
-  }
-  for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
+  for (uint32_t s = 0u;
+       swapchain->image_semaphores != NULL && s < swapchain->num_images; ++s) {
     if (swapchain->image_semaphores[s] != VK_NULL_HANDLE) {
       vkDestroySemaphore(shared_state->device, swapchain->image_semaphores[s],
                          NULL);
     }
+  }
+  if (swapchain->image_semaphores != NULL) {
+    NGF_FREEN(swapchain->image_semaphores, swapchain->num_images);
+  }
+  if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
+    vkDestroySwapchainKHR(shared_state->device, swapchain->vk_swapchain, NULL);
   }
 }
 
@@ -547,6 +551,11 @@ static ngf_error _ngf_create_swapchain(
   }
 
   // Create semaphores to be signaled when a swapchain image becomes available.
+  swapchain->image_semaphores = NGF_ALLOCN(VkSemaphore, swapchain->num_images);
+  if (swapchain->image_semaphores == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto _ngf_create_swapchain_cleanup;
+  }
   for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
     const VkSemaphoreCreateInfo sem_info = {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -673,7 +682,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                               queue_families);
     for (uint32_t q = 0; q < num_queue_families; ++q) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
-      if (shared_state->gfx_family_idx < 0 && (flags & VK_QUEUE_GRAPHICS_BIT)) {
+      if (shared_state->gfx_family_idx == _NGF_INVALID_IDX &&
+          (flags & VK_QUEUE_GRAPHICS_BIT)) {
         shared_state->gfx_family_idx = q;
       }
       VkBool32 present_supported = VK_FALSE;
@@ -681,7 +691,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                             q,
                                             ctx->surface,
                                             &present_supported);
-      if (shared_state->present_family_idx < 0 &&
+      if (shared_state->present_family_idx == _NGF_INVALID_IDX &&
           present_supported == VK_TRUE) {
         shared_state->present_family_idx = q;
       }
