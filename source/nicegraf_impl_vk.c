@@ -1317,3 +1317,36 @@ void ngf_destroy_image(ngf_image *img) {
     }
   }
 }
+
+void ngf_destroy_render_target(ngf_render_target *target) {
+  _NGF_FAKE_USE(target);
+  // TODO: implement
+}
+
+ngf_error ngf_default_render_target(
+  ngf_attachment_load_op color_load_op,
+  ngf_attachment_load_op depth_load_op,
+  const ngf_clear *clear_color,
+  const ngf_clear *clear_depth,
+  ngf_render_target **result) {
+  _NGF_FAKE_USE(color_load_op);
+  _NGF_FAKE_USE(depth_load_op);
+  _NGF_FAKE_USE(clear_color);
+  _NGF_FAKE_USE(clear_depth);
+  _NGF_FAKE_USE(result);
+  // TODO: implement
+  return NGF_ERROR_OK;
+}
+
+
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
+  // TODO:implement
+  _NGF_FAKE_USE(buffer);
+}
+
+void ngf_debug_message_callback(void *userdata,
+                                void(*callback)(const char*, const void*)) {
+  // TODO: implement
+  _NGF_FAKE_USE(userdata);
+  _NGF_FAKE_USE(callback);
+}
