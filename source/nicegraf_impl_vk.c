@@ -63,6 +63,8 @@ SOFTWARE.
 #define freea _freea
 #endif
 
+#define _NGF_INVALID_IDX (~0u)
+
 struct {
   VkInstance instance;
   VkPhysicalDevice phys_dev;
@@ -77,8 +79,8 @@ typedef struct {
   VkQueue present_queue;
   VkCommandPool cmd_pool;
   uint32_t refcount;
-  int gfx_family_idx;
-  int present_family_idx;
+  uint32_t gfx_family_idx;
+  uint32_t present_family_idx;
 } _ngf_context_shared_state;
 
 typedef struct {
@@ -394,8 +396,8 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     VkPhysicalDevice *physdevs = alloca(nphysdev * sizeof(VkPhysicalDevice));
     vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
     uint32_t best_device_score = 0U;
-    int best_device_idx = -1;
-    for (size_t i = 0; i < nphysdev; ++i) {
+    uint32_t best_device_idx = _NGF_INVALID_IDX;
+    for (uint32_t i = 0; i < nphysdev; ++i) {
       VkPhysicalDeviceProperties dev_props;
       vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
       uint32_t score = 0U;
@@ -420,7 +422,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
         best_device_idx = i;
       }
     }
-    if (best_device_idx == -1) {
+    if (best_device_idx == _NGF_INVALID_IDX) {
       return NGF_ERROR_INITIALIZATION_FAILED;
     }
     _vk.phys_dev = physdevs[best_device_idx];
@@ -459,7 +461,7 @@ static ngf_error _ngf_create_swapchain(
   VkResult vk_err = VK_SUCCESS;
 
   // Create swapchain.
-  assert(shared_state->present_family_idx != -1);
+  assert(shared_state->present_family_idx != _NGF_INVALID_IDX);
   const bool single_queue =
     (shared_state->gfx_family_idx == shared_state->present_family_idx);
   const VkSharingMode sharing_mode =
@@ -658,12 +660,12 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                              NULL);
     VkQueueFamilyProperties *queue_families =
         alloca(num_queue_families * sizeof(VkQueueFamilyProperties));
-    shared_state->gfx_family_idx = -1;
-    shared_state->present_family_idx = -1;
+    shared_state->gfx_family_idx = _NGF_INVALID_IDX;
+    shared_state->present_family_idx = _NGF_INVALID_IDX;
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
                                              &num_queue_families,
                                               queue_families);
-    for (size_t q = 0; q < num_queue_families; ++q) {
+    for (uint32_t q = 0; q < num_queue_families; ++q) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
       if (shared_state->gfx_family_idx < 0 && (flags & VK_QUEUE_GRAPHICS_BIT)) {
         shared_state->gfx_family_idx = q;
@@ -678,8 +680,9 @@ ngf_error ngf_create_context(const ngf_context_info *info,
         shared_state->present_family_idx = q;
       }
     }
-    if (shared_state->gfx_family_idx == -1 ||
-        (swapchain_info != NULL && shared_state->present_family_idx == -1)) {
+    if (shared_state->gfx_family_idx == _NGF_INVALID_IDX ||
+        (swapchain_info != NULL &&
+         shared_state->present_family_idx == _NGF_INVALID_IDX)) {
       err = NGF_ERROR_INITIALIZATION_FAILED;
       goto ngf_create_context_cleanup;
     }
@@ -801,8 +804,8 @@ ngf_create_context_cleanup:
 }
 
 ngf_error ngf_resize_context(ngf_context *ctx,
-                             size_t new_width,
-                             size_t new_height) {
+                             uint32_t new_width,
+                             uint32_t new_height) {
   assert(ctx);
   ngf_error err = NGF_ERROR_OK;
   _ngf_destroy_swapchain(*(ctx->shared_state), &ctx->swapchain);
