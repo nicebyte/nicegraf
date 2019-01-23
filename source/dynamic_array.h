@@ -18,13 +18,14 @@ SOFTWARE.
 */
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #define _NGF_DARRAY_OF(type) struct  { \
-  type *data = NULL; \
-  type *endptr = NULL; \
-  uint32_t capacity = 0u; \
+  type *data; \
+  type *endptr; \
+  uint32_t capacity; \
 }
 
 #if !defined(__cplusplus)
