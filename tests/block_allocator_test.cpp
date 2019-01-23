@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 #include "nicegraf_internal.h"
 #include <random>

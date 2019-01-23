@@ -27,7 +27,10 @@ set (PROJECT_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 
 set (TEST_SOURCES
   "${PROJECT_ROOT}/source/nicegraf_internal.c"
-  "${PROJECT_ROOT}/tests/block_allocator_test.cpp")
+  "${PROJECT_ROOT}/source/dynamic_array.h"
+  "${PROJECT_ROOT}/tests/block_allocator_test.cpp"
+  "${PROJECT_ROOT}/tests/dynamic_array_test.cpp"
+  "${PROJECT_ROOT}/tests/main.cpp")
   
 set (TEST_INCLUDE_PATHS
   "${PROJECT_ROOT}/include"
