@@ -879,18 +879,56 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   return err;
 }
 
+void _ngf_retire_resources(ngf_context *ctx,
+                           uint32_t next_fi,
+                          _ngf_frame_sync_data *next_frame_sync) {
+  if (next_frame_sync->active) {
+    vkWaitForFences(CURRENT_SHARED_STATE->device, 1u,
+                    &ctx->frame_fences[next_fi], true, 1000000u);
+    vkResetFences(CURRENT_SHARED_STATE->device, 1u,
+                  &ctx->frame_fences[next_fi]);
+  }
+  next_frame_sync->active = false;
+  vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+                       CURRENT_SHARED_STATE->cmd_pool,
+                       _NGF_DARRAY_SIZE(next_frame_sync->retire_vkcmdbuffers),
+                       next_frame_sync->retire_vkcmdbuffers.data);
+  _NGF_DARRAY_CLEAR(next_frame_sync->retire_vkcmdbuffers);
+
+  for (uint32_t s = 0u;
+       s < _NGF_DARRAY_SIZE(next_frame_sync->wait_vksemaphores);
+       ++s) {
+    vkDestroySemaphore(CURRENT_SHARED_STATE->device,
+                       _NGF_DARRAY_AT(next_frame_sync->wait_vksemaphores, s),
+                       NULL);
+  }
+  _NGF_DARRAY_CLEAR(next_frame_sync->wait_vksemaphores);
+}
+
 void ngf_destroy_context(ngf_context *ctx) {
   if (ctx != NULL) {
-    // TODO: wait till device idle
-
-    if (ctx->surface != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
-    }
-
 	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     _ngf_context_shared_state *shared_state = *(ctx->shared_state);
     if (shared_state != NULL) {
+      vkDeviceWaitIdle(shared_state->device);
+      for (uint32_t f = 0u; f < ctx->max_inflight_frames; ++f) {
+        if (ctx->frame_sync[f].active) {
+          _ngf_retire_resources(ctx, f, &ctx->frame_sync[f]);
+        }
+        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].retire_vkcmdbuffers);
+        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].wait_vksemaphores);
+        if (ctx->frame_fences != NULL) {
+          vkDestroyFence(shared_state->device, ctx->frame_fences[f], NULL);
+        }
+      }
+      if (ctx->frame_fences != NULL) {
+        NGF_FREEN(ctx->frame_fences, ctx->max_inflight_frames);
+      }
+      vkDestroyCommandPool(shared_state->device, shared_state->cmd_pool, NULL);
       _ngf_destroy_swapchain(*(ctx->shared_state), &ctx->swapchain);
+      if (ctx->surface != VK_NULL_HANDLE) {
+        vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
+      }
       shared_state->refcount--;
       if (shared_state->refcount == 0) {
         if (shared_state->device != VK_NULL_HANDLE) {
@@ -903,19 +941,8 @@ void ngf_destroy_context(ngf_context *ctx) {
         *(ctx->shared_state) = NULL;
       } 
     }
-    for (uint32_t f = 0u; f < ctx->max_inflight_frames; ++f) {
-      _NGF_DARRAY_DESTROY(ctx->frame_sync[f].retire_vkcmdbuffers);
-      _NGF_DARRAY_DESTROY(ctx->frame_sync[f].wait_vksemaphores);
-      if (ctx->frame_fences != NULL) {
-        vkDestroyFence(shared_state->device, ctx->frame_fences[f], NULL);
-      }
-
-    }
-    if (ctx->frame_fences != NULL) {
-      NGF_FREEN(ctx->frame_fences, ctx->max_inflight_frames);
-    }
-    NGF_FREEN(ctx->frame_sync, ctx->max_inflight_frames);
     pthread_mutex_unlock(&_vk.ctx_refcount_mut);
+    NGF_FREEN(ctx->frame_sync, ctx->max_inflight_frames);
     if (CURRENT_CONTEXT == ctx) CURRENT_CONTEXT = NULL;
     NGF_FREE(ctx);
   }
@@ -1090,27 +1117,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
   // Retire resources
   uint32_t next_fi = (fi + 1u) % ctx->max_inflight_frames;
   _ngf_frame_sync_data *next_frame_sync = &ctx->frame_sync[next_fi];
-  if (next_frame_sync->active) {
-    vkWaitForFences(CURRENT_SHARED_STATE->device, 1u,
-                    &ctx->frame_fences[next_fi], true, 1000000u);
-    vkResetFences(CURRENT_SHARED_STATE->device, 1u,
-                  &ctx->frame_fences[next_fi]);
-  }
-  next_frame_sync->active = false;
-  vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                       CURRENT_SHARED_STATE->cmd_pool,
-                       _NGF_DARRAY_SIZE(next_frame_sync->retire_vkcmdbuffers),
-                       next_frame_sync->retire_vkcmdbuffers.data);
-  _NGF_DARRAY_CLEAR(next_frame_sync->retire_vkcmdbuffers);
-
-  for (uint32_t s = 0u;
-       s < _NGF_DARRAY_SIZE(next_frame_sync->wait_vksemaphores);
-       ++s) {
-    vkDestroySemaphore(CURRENT_SHARED_STATE->device,
-                       _NGF_DARRAY_AT(next_frame_sync->wait_vksemaphores, s),
-                       NULL);
-  }
-  _NGF_DARRAY_CLEAR(next_frame_sync->wait_vksemaphores);
+  _ngf_retire_resources(ctx, next_fi, next_frame_sync);
 
   ctx->frame_number++;
   return err;
@@ -1540,8 +1547,16 @@ ngf_error ngf_default_render_target(
 
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
-  // TODO:implement
-  _NGF_FAKE_USE(buffer);
+  if (buffer != NULL) {
+    if (buffer->vkcmdbuf != VK_NULL_HANDLE) {
+      vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+                           CURRENT_SHARED_STATE->cmd_pool, 1u,
+                           &buffer->vkcmdbuf);
+    }
+    if (buffer->vksem != VK_NULL_HANDLE) {
+      vkDestroySemaphore(CURRENT_SHARED_STATE->device, buffer->vksem, NULL);
+    }
+  }
 }
 
 void ngf_debug_message_callback(void *userdata,
