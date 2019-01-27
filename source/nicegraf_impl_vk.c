@@ -80,7 +80,6 @@ typedef struct {
   VmaAllocator allocator;
   VkQueue gfx_queue;
   VkQueue present_queue;
-  VkCommandPool cmd_pool;
   uint32_t refcount;
   uint32_t gfx_family_idx;
   uint32_t present_family_idx;
@@ -105,6 +104,7 @@ struct ngf_context {
   _ngf_frame_sync_data *frame_sync;
   ngf_swapchain_info swapchain_info;
   _ngf_context_shared_state **shared_state;
+  VkCommandPool cmd_pool;
   VkSurfaceKHR surface;
   VkFence *frame_fences;
   uint32_t frame_number;
@@ -809,7 +809,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .queueFamilyIndex = shared_state->gfx_family_idx
     };
     vk_err = vkCreateCommandPool(shared_state->device, &cmd_pool_info, NULL,
-                                 &shared_state->cmd_pool);
+                                 &ctx->cmd_pool);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
@@ -890,7 +890,7 @@ void _ngf_retire_resources(ngf_context *ctx,
   }
   next_frame_sync->active = false;
   vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                       CURRENT_SHARED_STATE->cmd_pool,
+                       CURRENT_CONTEXT->cmd_pool,
                        _NGF_DARRAY_SIZE(next_frame_sync->retire_vkcmdbuffers),
                        next_frame_sync->retire_vkcmdbuffers.data);
   _NGF_DARRAY_CLEAR(next_frame_sync->retire_vkcmdbuffers);
@@ -924,7 +924,7 @@ void ngf_destroy_context(ngf_context *ctx) {
       if (ctx->frame_fences != NULL) {
         NGF_FREEN(ctx->frame_fences, ctx->max_inflight_frames);
       }
-      vkDestroyCommandPool(shared_state->device, shared_state->cmd_pool, NULL);
+      vkDestroyCommandPool(shared_state->device, ctx->cmd_pool, NULL);
       _ngf_destroy_swapchain(*(ctx->shared_state), &ctx->swapchain);
       if (ctx->surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
@@ -978,7 +978,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
     VkCommandBufferAllocateInfo vk_cmdbuf_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
       .pNext = NULL,
-      .commandPool = CURRENT_SHARED_STATE->cmd_pool,
+      .commandPool = CURRENT_CONTEXT->cmd_pool,
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1u
     };
@@ -1550,8 +1550,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
   if (buffer != NULL) {
     if (buffer->vkcmdbuf != VK_NULL_HANDLE) {
       vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                           CURRENT_SHARED_STATE->cmd_pool, 1u,
-                           &buffer->vkcmdbuf);
+                           CURRENT_CONTEXT->cmd_pool, 1u, &buffer->vkcmdbuf);
     }
     if (buffer->vksem != VK_NULL_HANDLE) {
       vkDestroySemaphore(CURRENT_SHARED_STATE->device, buffer->vksem, NULL);
