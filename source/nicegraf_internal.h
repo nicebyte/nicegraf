@@ -37,7 +37,7 @@ typedef CONDITION_VARIABLE pthread_cond_t;
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m),0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m),0)
 #define pthread_cond_init(c) (InitializeConditionVariable(c))
-#define pthread_cond_wait(c, m) (SleepConditionVariableCS(c, m))
+#define pthread_cond_wait(c, m) (SleepConditionVariableCS(c, m, INFINITE))
 #define pthread_cond_signal(c) (WakeConditionVariable(c))
 #define pthread_cond_destroy(c)
 #define _ngf_cur_thread_id() (GetCurrentThreadId())
