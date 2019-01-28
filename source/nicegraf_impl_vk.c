@@ -80,6 +80,10 @@ typedef struct {
   VmaAllocator allocator;
   VkQueue gfx_queue;
   VkQueue present_queue;
+  pthread_mutex_t cmd_pool_mut;
+  pthread_mutex_t record_counter_mut;
+  pthread_cond_t recording_inactive_cond;
+  uint32_t record_counter;
   uint32_t refcount;
   uint32_t gfx_family_idx;
   uint32_t present_family_idx;
@@ -800,6 +804,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+
     // Create a command pool.
     VkCommandPoolCreateInfo cmd_pool_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -813,6 +818,12 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+
+    // Create objects for cmd pool synchronization.
+    pthread_mutex_init(&shared_state->cmd_pool_mut, NULL);
+    pthread_mutex_init(&shared_state->record_counter_mut, NULL);
+    pthread_cond_init(&shared_state->recording_inactive_cond);
+    shared_state->record_counter = 0u;
   }
 
   if (swapchain_info != NULL) {
@@ -923,6 +934,9 @@ void ngf_destroy_context(ngf_context *ctx) {
         if (shared_state->allocator != VK_NULL_HANDLE) {
           vmaDestroyAllocator(shared_state->allocator);
         }
+        pthread_mutex_destroy(&shared_state->cmd_pool_mut);
+        pthread_mutex_destroy(&shared_state->record_counter_mut);
+        pthread_cond_destroy(&shared_state->recording_inactive_cond);
         NGF_FREE(shared_state);
         *(ctx->shared_state) = NULL;
       } 
@@ -954,6 +968,34 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   return NGF_ERROR_OK;
 }
 
+void _ngf_inc_recorder_count() {
+  pthread_mutex_lock(&CURRENT_SHARED_STATE->cmd_pool_mut);
+  CURRENT_SHARED_STATE->record_counter++;
+  pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
+}
+
+void _ngf_dec_recorder_count() {
+  pthread_mutex_lock(&CURRENT_SHARED_STATE->record_counter_mut);
+  assert(CURRENT_SHARED_STATE->record_counter > 0u);
+  if (--(CURRENT_SHARED_STATE->record_counter) == 0u) {
+    pthread_cond_signal(&CURRENT_SHARED_STATE->recording_inactive_cond);
+  }
+  pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
+}
+
+void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
+  if (cmd_buf  != NULL) {
+    if (cmd_buf->vkcmdbuf != VK_NULL_HANDLE) {
+      vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+                           CURRENT_CONTEXT->cmd_pool, 1u, &cmd_buf->vkcmdbuf);
+      if (cmd_buf->recording) _ngf_dec_recorder_count();
+    }
+    if (cmd_buf->vksem != VK_NULL_HANDLE) {
+      vkDestroySemaphore(CURRENT_SHARED_STATE->device, cmd_buf->vksem, NULL);
+    }
+  }
+}
+
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   assert(cmd_buf);
   ngf_error err = NGF_ERROR_OK;
@@ -962,6 +1004,8 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
     err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
     goto ngf_start_cmd_buffer_cleanup;
   }
+  _ngf_inc_recorder_count();
+  cmd_buf->recording = true;
   if (cmd_buf->vkcmdbuf == VK_NULL_HANDLE) {
     VkCommandBufferAllocateInfo vk_cmdbuf_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1000,8 +1044,12 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
       goto ngf_start_cmd_buffer_cleanup;
     }
   }
-  cmd_buf->recording = true;
+
 ngf_start_cmd_buffer_cleanup:
+  if (err != NGF_ERROR_OK) {
+    _ngf_cleanup_cmd_buffer(cmd_buf);
+  }
+
   return err;
 }
 
@@ -1011,8 +1059,13 @@ ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
     return NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
   }
   vkEndCommandBuffer(cmd_buf->vkcmdbuf);
+  _ngf_dec_recorder_count();
   cmd_buf->recording = false;
   return NGF_ERROR_OK;
+}
+
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
+  _ngf_cleanup_cmd_buffer(buffer);
 }
 
 ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
@@ -1103,10 +1156,17 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
   } 
 
   // Retire resources
+  pthread_mutex_lock(&CURRENT_SHARED_STATE->cmd_pool_mut);
+  pthread_mutex_lock(&CURRENT_SHARED_STATE->record_counter_mut);
+  while (CURRENT_SHARED_STATE->record_counter > 0u) {
+    pthread_cond_wait(&CURRENT_SHARED_STATE->recording_inactive_cond,
+                      &CURRENT_SHARED_STATE->record_counter_mut);
+  }
   uint32_t next_fi = (fi + 1u) % ctx->max_inflight_frames;
   _ngf_frame_sync_data *next_frame_sync = &ctx->frame_sync[next_fi];
   _ngf_retire_resources(next_frame_sync);
-
+  pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
+  pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
   ctx->frame_number++;
   return err;
 }
@@ -1531,19 +1591,6 @@ ngf_error ngf_default_render_target(
   _NGF_FAKE_USE(result);
   // TODO: implement
   return NGF_ERROR_OK;
-}
-
-
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
-  if (buffer != NULL) {
-    if (buffer->vkcmdbuf != VK_NULL_HANDLE) {
-      vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                           CURRENT_CONTEXT->cmd_pool, 1u, &buffer->vkcmdbuf);
-    }
-    if (buffer->vksem != VK_NULL_HANDLE) {
-      vkDestroySemaphore(CURRENT_SHARED_STATE->device, buffer->vksem, NULL);
-    }
-  }
 }
 
 void ngf_debug_message_callback(void *userdata,
