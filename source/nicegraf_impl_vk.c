@@ -418,12 +418,15 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     if (vk_err != VK_SUCCESS) {
       return NGF_ERROR_CONTEXT_CREATION_FAILED;
     }
+
+    // Load instance-level Vulkan functions.
     volkLoadInstance(_vk.instance);
 
-    // Pick a suitable physical device.
+    // Pick a suitable physical device based on user's preference.
     uint32_t nphysdev;
     vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, NULL);
     VkPhysicalDevice *physdevs = alloca(nphysdev * sizeof(VkPhysicalDevice));
+    assert(physdevs != NULL);
     vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
     uint32_t best_device_score = 0U;
     uint32_t best_device_idx = _NGF_INVALID_IDX;
@@ -450,6 +453,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       }
       if (score > best_device_score) {
         best_device_idx = i;
+        best_device_score = score;
       }
     }
     if (best_device_idx == _NGF_INVALID_IDX) {
