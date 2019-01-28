@@ -68,11 +68,12 @@ SOFTWARE.
 
 #define _NGF_INVALID_IDX (~0u)
 
+// Singleton for holding vulkan instance and physical device handles.
 struct {
   VkInstance instance;
   VkPhysicalDevice phys_dev;
-  pthread_mutex_t ctx_refcount_mut;
-  bool initialized;
+  pthread_mutex_t ctx_refcount_mut; // syncs access to contexts' shared data
+                                    // reference counter.
 } _vk;
 
 typedef struct {
@@ -381,21 +382,34 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
 }
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
-  if (!_vk.initialized) { // Vulkan not initialized yet.
+  if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
     // Initialize Volk.
     volkInitialize();
+
+    // Names for instance-level extensions to enable.
     const char * const ext_names[] = {
       "VK_KHR_surface",
       VK_SURFACE_EXT
+    };
+
+    // Application information.
+    VkApplicationInfo app_info = {
+      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+      .pNext = NULL,
+      .pApplicationName = NULL, // TODO: allow specifying app name.
+      .pEngineName = "nicegraf",
+      .engineVersion = VK_MAKE_VERSION(NGF_VERSION_MAJOR,
+                                       NGF_VERSION_MINOR, 0),
+      .apiVersion = VK_MAKE_VERSION(1, 0, 9)
     };
 
     // Create a Vulkan instance.
     VkInstanceCreateInfo inst_info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = NULL,
-      .flags = 0,
-      .pApplicationInfo = NULL, //TODO: app info
-      .enabledLayerCount = 0,
+      .flags = 0u,
+      .pApplicationInfo = &app_info,
+      .enabledLayerCount = 0u,
       .ppEnabledLayerNames = NULL, //TODO: validation layers
       .enabledExtensionCount = NGF_ARRAYSIZE(ext_names),
       .ppEnabledExtensionNames = ext_names 
@@ -447,7 +461,6 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
 		pthread_mutex_init(&_vk.ctx_refcount_mut, NULL);
 
     // Done!
-    _vk.initialized = true;
   }
   return NGF_ERROR_OK;
 }
