@@ -76,8 +76,8 @@ struct {
 } _vk;
 
 typedef struct {
-  VkDevice device;
   VmaAllocator allocator;
+  VkDevice device;
   VkQueue gfx_queue;
   VkQueue present_queue;
   pthread_mutex_t cmd_pool_mut;
@@ -97,9 +97,16 @@ typedef struct {
   uint32_t image_idx;
 } _ngf_swapchain;
 
+struct ngf_cmd_buffer {
+  VkCommandBuffer vkcmdbuf;
+  VkSemaphore vksem;
+  VkCommandPool vkpool;
+  bool recording;
+};
+
 typedef struct _ngf_frame_sync_data {
   _NGF_DARRAY_OF(VkSemaphore) wait_vksemaphores;
-  _NGF_DARRAY_OF(VkCommandBuffer) retire_vkcmdbuffers;
+  _NGF_DARRAY_OF(ngf_cmd_buffer) submitted_cmdbuffers;
   VkFence fence;
   bool active;
 } _ngf_frame_sync_data;
@@ -131,12 +138,6 @@ struct ngf_pipeline_layout {
 struct ngf_image {
   VkImage vkimg;
   VmaAllocation alloc;
-};
-
-struct ngf_cmd_buffer {
-  VkCommandBuffer vkcmdbuf;
-  VkSemaphore vksem;
-  bool recording;
 };
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
@@ -845,7 +846,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
     _NGF_DARRAY_RESET(ctx->frame_sync[f].wait_vksemaphores,
                       max_inflight_frames);
-    _NGF_DARRAY_RESET(ctx->frame_sync[f].retire_vkcmdbuffers,
+    _NGF_DARRAY_RESET(ctx->frame_sync[f].submitted_cmdbuffers,
                       max_inflight_frames);
     ctx->frame_sync[f].active = false;
     const VkFenceCreateInfo fence_info = {
@@ -889,19 +890,18 @@ void _ngf_retire_resources(_ngf_frame_sync_data *next_frame_sync) {
                   &next_frame_sync->fence);
   }
   next_frame_sync->active = false;
-  vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                       CURRENT_CONTEXT->cmd_pool,
-                       _NGF_DARRAY_SIZE(next_frame_sync->retire_vkcmdbuffers),
-                       next_frame_sync->retire_vkcmdbuffers.data);
-  _NGF_DARRAY_CLEAR(next_frame_sync->retire_vkcmdbuffers);
-
   for (uint32_t s = 0u;
        s < _NGF_DARRAY_SIZE(next_frame_sync->wait_vksemaphores);
        ++s) {
+    ngf_cmd_buffer cmd_buffer =
+        _NGF_DARRAY_AT(next_frame_sync->submitted_cmdbuffers, s);
+    vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+                         cmd_buffer.vkpool, 1u, &cmd_buffer.vkcmdbuf);
     vkDestroySemaphore(CURRENT_SHARED_STATE->device,
                        _NGF_DARRAY_AT(next_frame_sync->wait_vksemaphores, s),
                        NULL);
   }
+  _NGF_DARRAY_CLEAR(next_frame_sync->submitted_cmdbuffers);
   _NGF_DARRAY_CLEAR(next_frame_sync->wait_vksemaphores);
 }
 
@@ -917,7 +917,7 @@ void ngf_destroy_context(ngf_context *ctx) {
         if (ctx->frame_sync[f].active) {
           _ngf_retire_resources(&ctx->frame_sync[f]);
         }
-        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].retire_vkcmdbuffers);
+        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].submitted_cmdbuffers);
         _NGF_DARRAY_DESTROY(ctx->frame_sync[f].wait_vksemaphores);
         vkDestroyFence(shared_state->device, ctx->frame_sync[f].fence, NULL);
       }
@@ -964,6 +964,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   *result = cmd_buf;
   cmd_buf->vkcmdbuf = VK_NULL_HANDLE;
   cmd_buf->vksem = VK_NULL_HANDLE;
+  cmd_buf->vkpool = VK_NULL_HANDLE;
   cmd_buf->recording = false;
   return NGF_ERROR_OK;
 }
@@ -987,7 +988,7 @@ void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   if (cmd_buf  != NULL) {
     if (cmd_buf->vkcmdbuf != VK_NULL_HANDLE) {
       vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
-                           CURRENT_CONTEXT->cmd_pool, 1u, &cmd_buf->vkcmdbuf);
+                           cmd_buf->vkpool, 1u, &cmd_buf->vkcmdbuf);
       if (cmd_buf->recording) _ngf_dec_recorder_count();
     }
     if (cmd_buf->vksem != VK_NULL_HANDLE) {
@@ -1020,6 +1021,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
       err = NGF_ERROR_OUTOFMEM; // TODO: return appropriate error.
       goto ngf_start_cmd_buffer_cleanup;
     }
+    cmd_buf->vkpool = CURRENT_CONTEXT->cmd_pool;
     VkCommandBufferBeginInfo cmd_buf_begin = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
       .pNext = NULL,
@@ -1078,10 +1080,11 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
       return NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING; // TODO: return appropriate error code
     }
     _NGF_DARRAY_APPEND(frame_sync_data->wait_vksemaphores, bufs[i]->vksem);
-    _NGF_DARRAY_APPEND(frame_sync_data->retire_vkcmdbuffers,
-                       bufs[i]->vkcmdbuf);
+    _NGF_DARRAY_APPEND(frame_sync_data->submitted_cmdbuffers,
+                       *bufs[i]);
     bufs[i]->vkcmdbuf = VK_NULL_HANDLE;
     bufs[i]->vksem = VK_NULL_HANDLE;
+    bufs[i]->vkpool = VK_NULL_HANDLE;
   }
   return NGF_ERROR_OK;
 }
@@ -1099,7 +1102,7 @@ ngf_error ngf_begin_frame(ngf_context *ctx) {
     if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
   }
   CURRENT_CONTEXT->frame_sync[fi].active = true;
-  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_sync[fi].retire_vkcmdbuffers);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_sync[fi].submitted_cmdbuffers);
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_sync[fi].wait_vksemaphores);
   return err;
 }
@@ -1123,14 +1126,23 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
       &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
     wait_stage_masks = &color_attachment_stage; 
   }
+  const uint32_t nsubmitted_cmdbuffers =
+      _NGF_DARRAY_SIZE(frame_sync->submitted_cmdbuffers);
+  VkCommandBuffer *submitted_vkcmdbuffers =
+      (VkCommandBuffer*)alloca(sizeof(VkCommandBuffer) * nsubmitted_cmdbuffers);
+  for (uint32_t c = 0u; c < nsubmitted_cmdbuffers; ++c) {
+    submitted_vkcmdbuffers[c] =
+        _NGF_DARRAY_AT(frame_sync->submitted_cmdbuffers, c).vkcmdbuf;
+  }
+
   VkSubmitInfo submit_info = {
     .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
     .pNext = NULL,
     .waitSemaphoreCount = wait_sem_count,
     .pWaitSemaphores = wait_sems,
     .pWaitDstStageMask = wait_stage_masks,
-    .commandBufferCount = _NGF_DARRAY_SIZE(frame_sync->retire_vkcmdbuffers),
-    .pCommandBuffers = frame_sync->retire_vkcmdbuffers.data,
+    .commandBufferCount = nsubmitted_cmdbuffers,
+    .pCommandBuffers = submitted_vkcmdbuffers,
     .signalSemaphoreCount = _NGF_DARRAY_SIZE(frame_sync->wait_vksemaphores),
     .pSignalSemaphores = frame_sync->wait_vksemaphores.data
   };
