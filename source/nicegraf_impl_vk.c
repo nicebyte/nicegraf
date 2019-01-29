@@ -566,6 +566,9 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     vkGetDeviceQueue(_vk.device, gfx_family_idx, 0, &_vk.gfx_queue);
     vkGetDeviceQueue(_vk.device, present_family_idx, 0, &_vk.present_queue);
 
+    // Load device entry points.
+    volkLoadDevice(_vk.device);
+
     // Done!
   }
   return NGF_ERROR_OK;
