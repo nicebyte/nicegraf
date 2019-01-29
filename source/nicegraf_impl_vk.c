@@ -381,6 +381,31 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
   return stages[s];
 }
 
+bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
+                                     uint32_t queue_family_index) {
+#if defined(_WIN32) || defined(_WIN64)
+  return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
+                                                        queue_family_index);
+#elif defined(__ANDROID__)
+  return true;
+#else
+//TODO: implement
+  if (XCB_CONNECTION == NULL) {
+    xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
+    if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
+      void *libxcb = dlopen("libX11-xcb.so.1", RTLD_LAZY);
+      GetXCBConnection = dlsym(libxcb, "XGetXCBConnection");
+    }
+    XCB_CONNECTION = GetXCBConnection(XOpenDisplay(NULL));
+  }
+
+  return vkGetPhysicalDeviceXcbPresentationSupportKHR(phys_dev, 
+                                                      queue_family_index,
+                                                      XCB_CONNECTION,
+                                                      visual);
+#endif
+}
+
 ngf_error ngf_initialize(ngf_device_preference pref) {
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
     // Initialize Volk.
