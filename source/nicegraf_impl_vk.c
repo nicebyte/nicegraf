@@ -650,7 +650,7 @@ static ngf_error _ngf_create_swapchain(
     .queueFamilyIndexCount = num_sharing_queue_families,
     .pQueueFamilyIndices = sharing_queue_families,
     .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-    .compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
+    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
     .presentMode = vk_present_modes[swapchain_info->present_mode]
   };
   vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL,
@@ -779,6 +779,12 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       err = NGF_ERROR_SURFACE_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+    uint32_t pmc;
+    vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
+                                              NULL);
+    VkPresentModeKHR *pm = alloca(sizeof(VkPresentModeKHR) * pmc);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
+                                              pm);
   }
 
   if (shared != NULL) {
