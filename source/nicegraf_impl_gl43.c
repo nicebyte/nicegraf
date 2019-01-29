@@ -1734,6 +1734,8 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
           native_binding->native_binding_id;
       _NGF_APPENDCMD(buf, sampler_bind_cmd);
       break;
+    default:
+      break;
     }
     }
   }
@@ -2086,6 +2088,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
             case NGF_ATTACHMENT_STENCIL: {
               GLint v = clear->clear_stencil;
               glClearBufferiv(GL_STENCIL, 0, &v);
+              break;
+            case NGF_ATTACHMENT_DEPTH_STENCIL:
               break;
             }
             }
