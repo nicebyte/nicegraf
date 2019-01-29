@@ -72,22 +72,23 @@ SOFTWARE.
 struct {
   VkInstance instance;
   VkPhysicalDevice phys_dev;
+  VkDevice device;
+  VkQueue gfx_queue;
+  VkQueue present_queue;
   pthread_mutex_t ctx_refcount_mut; // syncs access to contexts' shared data
                                     // reference counter.
+  bool single_queue;
+  uint32_t gfx_family_idx;
+  uint32_t present_family_idx;
 } _vk;
 
 typedef struct {
   VmaAllocator allocator;
-  VkDevice device;
-  VkQueue gfx_queue;
-  VkQueue present_queue;
   pthread_mutex_t cmd_pool_mut;
   pthread_mutex_t record_counter_mut;
   pthread_cond_t recording_inactive_cond;
   uint32_t record_counter;
   uint32_t refcount;
-  uint32_t gfx_family_idx;
-  uint32_t present_family_idx;
 } _ngf_context_shared_state;
 
 typedef struct {
@@ -488,20 +489,94 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
 
 		// Initialize context refcount mutex.
 		pthread_mutex_init(&_vk.ctx_refcount_mut, NULL);
+     
+    // Pick suitable queue families for graphics and present.
+    uint32_t num_queue_families = 0U;
+    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
+                                             &num_queue_families,
+                                             NULL);
+    VkQueueFamilyProperties *queue_families =
+        alloca(num_queue_families * sizeof(VkQueueFamilyProperties));
+    uint32_t gfx_family_idx = _NGF_INVALID_IDX;
+    uint32_t present_family_idx = _NGF_INVALID_IDX;
+    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
+                                             &num_queue_families,
+                                              queue_families);
+    for (uint32_t q = 0; q < num_queue_families; ++q) {
+      const VkQueueFlags flags = queue_families[q].queueFlags;
+      if (gfx_family_idx == _NGF_INVALID_IDX &&
+          (flags & VK_QUEUE_GRAPHICS_BIT)) {
+        gfx_family_idx = q;
+      }
+      VkBool32 present_supported = VK_FALSE;
+      present_supported = _ngf_query_presentation_support(_vk.phys_dev, q);
+      if (present_family_idx == _NGF_INVALID_IDX &&
+          present_supported == VK_TRUE) {
+        present_family_idx = q;
+      }
+    }
+    if (gfx_family_idx == _NGF_INVALID_IDX ||
+        present_family_idx == _NGF_INVALID_IDX) {
+      return NGF_ERROR_INITIALIZATION_FAILED;
+    }
+    _vk.single_queue = (gfx_family_idx == present_family_idx);
+    _vk.gfx_family_idx = gfx_family_idx;
+    _vk.present_family_idx = present_family_idx;
+
+    // Create logical device.
+    const float queue_prio = 1.0f;
+    const VkDeviceQueueCreateInfo gfx_queue_info = {
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0,
+      .queueFamilyIndex = gfx_family_idx,
+      .queueCount = 1,
+      .pQueuePriorities = &queue_prio
+    };
+    const VkDeviceQueueCreateInfo present_queue_info = {
+      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0,
+      .queueFamilyIndex = present_family_idx,
+      .queueCount = 1,
+      .pQueuePriorities = &queue_prio
+    };
+    const VkDeviceQueueCreateInfo queue_infos[] =
+        { gfx_queue_info, present_queue_info };
+    const bool single_queue_family = (gfx_family_idx == present_family_idx);
+    const uint32_t num_queue_infos = single_queue_family ? 1 : 2;
+    const char *device_exts[] = { "VK_KHR_swapchain" };
+    const VkDeviceCreateInfo dev_info = {
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0,
+      .queueCreateInfoCount = num_queue_infos,
+      .pQueueCreateInfos = queue_infos,
+      .enabledLayerCount = 0,
+      .ppEnabledLayerNames = NULL, // TODO: validation layers
+      .enabledExtensionCount = present_family_idx == -1 ? 0 : 1,
+      .ppEnabledExtensionNames = device_exts
+    };
+    vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
+    if (vk_err != VK_SUCCESS) {
+      return NGF_ERROR_INITIALIZATION_FAILED;
+    }
+
+    // Obtain queue handles.
+    vkGetDeviceQueue(_vk.device, gfx_family_idx, 0, &_vk.gfx_queue);
+    vkGetDeviceQueue(_vk.device, present_family_idx, 0, &_vk.present_queue);
 
     // Done!
   }
   return NGF_ERROR_OK;
 }
 
-static void _ngf_destroy_swapchain(
-    const _ngf_context_shared_state *shared_state,
-    _ngf_swapchain *swapchain) {
+static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   assert(swapchain);
   for (uint32_t s = 0u;
        swapchain->image_semaphores != NULL && s < swapchain->num_images; ++s) {
     if (swapchain->image_semaphores[s] != VK_NULL_HANDLE) {
-      vkDestroySemaphore(shared_state->device, swapchain->image_semaphores[s],
+      vkDestroySemaphore(_vk.device, swapchain->image_semaphores[s],
                          NULL);
     }
   }
@@ -509,7 +584,7 @@ static void _ngf_destroy_swapchain(
     NGF_FREEN(swapchain->image_semaphores, swapchain->num_images);
   }
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
-    vkDestroySwapchainKHR(shared_state->device, swapchain->vk_swapchain, NULL);
+    vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
 }
 
@@ -526,15 +601,11 @@ static ngf_error _ngf_create_swapchain(
   VkResult vk_err = VK_SUCCESS;
 
   // Create swapchain.
-  assert(shared_state->present_family_idx != _NGF_INVALID_IDX);
-  const bool single_queue =
-    (shared_state->gfx_family_idx == shared_state->present_family_idx);
   const VkSharingMode sharing_mode =
-    single_queue ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
-  const uint32_t num_sharing_queue_families = single_queue ? 0 : 2;
-  const uint32_t sharing_queue_families[] = {
-    shared_state->gfx_family_idx,
-    shared_state->present_family_idx };
+    _vk.single_queue ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+  const uint32_t num_sharing_queue_families = _vk.single_queue ? 0 : 2;
+  const uint32_t sharing_queue_families[] = { _vk.gfx_family_idx,
+      _vk.present_family_idx };
   static const VkPresentModeKHR vk_present_modes[] = {
     VK_PRESENT_MODE_FIFO_KHR,
     VK_PRESENT_MODE_IMMEDIATE_KHR
@@ -579,7 +650,7 @@ static ngf_error _ngf_create_swapchain(
     .compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
     .presentMode = vk_present_modes[swapchain_info->present_mode]
   };
-  vk_err = vkCreateSwapchainKHR(shared_state->device, &vk_sc_info, NULL,
+  vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL,
                                 &swapchain->vk_swapchain);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
@@ -588,7 +659,7 @@ static ngf_error _ngf_create_swapchain(
 
   // Obtain swapchain images.
   vk_err =
-      vkGetSwapchainImagesKHR(shared_state->device, swapchain->vk_swapchain,
+      vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
                               &swapchain->num_images, NULL);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
@@ -600,7 +671,7 @@ static ngf_error _ngf_create_swapchain(
     goto _ngf_create_swapchain_cleanup;
   }
   vk_err =
-      vkGetSwapchainImagesKHR(shared_state->device, swapchain->vk_swapchain,
+      vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
                               &swapchain->num_images, swapchain->images);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
@@ -620,7 +691,7 @@ static ngf_error _ngf_create_swapchain(
       .flags = 0
     };
     vk_err =
-        vkCreateSemaphore(shared_state->device, &sem_info, NULL,
+        vkCreateSemaphore(_vk.device, &sem_info, NULL,
                           &swapchain->image_semaphores[s]);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
@@ -631,7 +702,7 @@ static ngf_error _ngf_create_swapchain(
 
 _ngf_create_swapchain_cleanup:
   if (err != NGF_ERROR_OK) {
-    _ngf_destroy_swapchain(shared_state, swapchain);
+    _ngf_destroy_swapchain(swapchain);
   }
   return err;
 }
@@ -647,7 +718,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   if (swapchain_info != NULL &&
       shared != NULL &&
-      (*(shared->shared_state))->present_queue == VK_NULL_HANDLE) {
+      shared->swapchain.vk_swapchain == VK_NULL_HANDLE) {
     return NGF_ERROR_CANT_SHARE_CONTEXT;
   }
 
@@ -691,8 +762,17 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     };
 #endif
     vk_err =
-      VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
+      VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);\
     if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_SURFACE_CREATION_FAILED;
+      goto ngf_create_context_cleanup;
+    }
+    VkBool32 surface_supported = false;
+    vkGetPhysicalDeviceSurfaceSupportKHR(_vk.phys_dev,
+                                         _vk.present_family_idx,
+                                         ctx->surface,
+                                         &surface_supported);
+    if (!surface_supported) {
       err = NGF_ERROR_SURFACE_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
@@ -725,92 +805,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     memset(shared_state, 0, sizeof(_ngf_context_shared_state));
     shared_state->refcount = 1;
 
-    // Pick suitable queue families for graphics and present.
-    uint32_t num_queue_families = 0U;
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
-                                             &num_queue_families,
-                                             NULL);
-    VkQueueFamilyProperties *queue_families =
-        alloca(num_queue_families * sizeof(VkQueueFamilyProperties));
-    shared_state->gfx_family_idx = _NGF_INVALID_IDX;
-    shared_state->present_family_idx = _NGF_INVALID_IDX;
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
-                                             &num_queue_families,
-                                              queue_families);
-    for (uint32_t q = 0; q < num_queue_families; ++q) {
-      const VkQueueFlags flags = queue_families[q].queueFlags;
-      if (shared_state->gfx_family_idx == _NGF_INVALID_IDX &&
-          (flags & VK_QUEUE_GRAPHICS_BIT)) {
-        shared_state->gfx_family_idx = q;
-      }
-      VkBool32 present_supported = VK_FALSE;
-      vkGetPhysicalDeviceSurfaceSupportKHR(_vk.phys_dev,
-                                            q,
-                                            ctx->surface,
-                                            &present_supported);
-      if (shared_state->present_family_idx == _NGF_INVALID_IDX &&
-          present_supported == VK_TRUE) {
-        shared_state->present_family_idx = q;
-      }
-    }
-    if (shared_state->gfx_family_idx == _NGF_INVALID_IDX ||
-        (swapchain_info != NULL &&
-         shared_state->present_family_idx == _NGF_INVALID_IDX)) {
-      err = NGF_ERROR_INITIALIZATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
-    // Create logical device.
-    const float queue_prio = 1.0f;
-    const VkDeviceQueueCreateInfo gfx_queue_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
-      .queueFamilyIndex = shared_state->gfx_family_idx,
-      .queueCount = 1,
-      .pQueuePriorities = &queue_prio
-    };
-    const VkDeviceQueueCreateInfo present_queue_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
-      .queueFamilyIndex = shared_state->present_family_idx,
-      .queueCount = 1,
-      .pQueuePriorities = &queue_prio
-    };
-    const VkDeviceQueueCreateInfo queue_infos[] =
-        { gfx_queue_info, present_queue_info };
-    const bool single_queue_family =
-      shared_state->gfx_family_idx == shared_state->present_family_idx ||
-      shared_state->present_family_idx == -1;
-    const uint32_t num_queue_infos = single_queue_family ? 1 : 2;
-    const char *device_exts[] = { "VK_KHR_swapchain" };
-    const VkDeviceCreateInfo dev_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
-      .queueCreateInfoCount = num_queue_infos,
-      .pQueueCreateInfos = queue_infos,
-      .enabledLayerCount = 0,
-      .ppEnabledLayerNames = NULL, // TODO: validation layers
-      .enabledExtensionCount = shared_state->present_family_idx == -1 ? 0 : 1,
-      .ppEnabledExtensionNames = device_exts
-    };
-    vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL,
-                             &shared_state->device);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
-    // Obtain queue handles.
-    vkGetDeviceQueue(shared_state->device,
-                     shared_state->gfx_family_idx, 0,
-                     &shared_state->gfx_queue);
-    vkGetDeviceQueue(shared_state->device,
-                     shared_state->present_family_idx, 0,
-                     &shared_state->present_queue);
-
     // Set up VMA.
     VmaVulkanFunctions vma_vk_fns = {
       .vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
@@ -833,7 +827,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     VmaAllocatorCreateInfo vma_info = {
       .flags = 0u,
       .physicalDevice = _vk.phys_dev,
-      .device = shared_state->device,
+      .device = _vk.device,
       .preferredLargeHeapBlockSize = 0u,
       .pAllocationCallbacks = NULL,
       .pDeviceMemoryCallbacks = NULL,
@@ -853,9 +847,9 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = NULL,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = shared_state->gfx_family_idx
+      .queueFamilyIndex = _vk.gfx_family_idx
     };
-    vk_err = vkCreateCommandPool(shared_state->device, &cmd_pool_info, NULL,
+    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
                                  &ctx->cmd_pool);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
@@ -896,7 +890,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .pNext = NULL,
       .flags = 0u
     };
-    vk_err = vkCreateFence((*ctx->shared_state)->device, &fence_info, NULL,
+    vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
                            &ctx->frame_sync[f].fence);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
@@ -916,7 +910,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
                              uint32_t new_height) {
   assert(ctx);
   ngf_error err = NGF_ERROR_OK;
-  _ngf_destroy_swapchain(*(ctx->shared_state), &ctx->swapchain);
+  _ngf_destroy_swapchain(&ctx->swapchain);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
   err = _ngf_create_swapchain(&ctx->swapchain_info, ctx->surface,
@@ -926,9 +920,8 @@ ngf_error ngf_resize_context(ngf_context *ctx,
 
 void _ngf_retire_resources(_ngf_frame_sync_data *next_frame_sync) {
   if (next_frame_sync->active) {
-    vkWaitForFences(CURRENT_SHARED_STATE->device, 1u,
-                    &next_frame_sync->fence, true, 1000000u);
-    vkResetFences(CURRENT_SHARED_STATE->device, 1u,
+    vkWaitForFences(_vk.device, 1u, &next_frame_sync->fence, true, 1000000u);
+    vkResetFences(_vk.device, 1u,
                   &next_frame_sync->fence);
   }
   next_frame_sync->active = false;
@@ -937,9 +930,9 @@ void _ngf_retire_resources(_ngf_frame_sync_data *next_frame_sync) {
        ++s) {
     ngf_cmd_buffer cmd_buffer =
         _NGF_DARRAY_AT(next_frame_sync->submitted_cmdbuffers, s);
-    vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+    vkFreeCommandBuffers(_vk.device,
                          cmd_buffer.vkpool, 1u, &cmd_buffer.vkcmdbuf);
-    vkDestroySemaphore(CURRENT_SHARED_STATE->device,
+    vkDestroySemaphore(_vk.device,
                        _NGF_DARRAY_AT(next_frame_sync->wait_vksemaphores, s),
                        NULL);
   }
@@ -952,7 +945,7 @@ void ngf_destroy_context(ngf_context *ctx) {
 	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     _ngf_context_shared_state *shared_state = *(ctx->shared_state);
     if (shared_state != NULL) {
-      vkDeviceWaitIdle(shared_state->device);
+      vkDeviceWaitIdle(_vk.device);
       for (uint32_t f = 0u;
            ctx->frame_sync != NULL && f < ctx->max_inflight_frames;
            ++f) {
@@ -961,18 +954,15 @@ void ngf_destroy_context(ngf_context *ctx) {
         }
         _NGF_DARRAY_DESTROY(ctx->frame_sync[f].submitted_cmdbuffers);
         _NGF_DARRAY_DESTROY(ctx->frame_sync[f].wait_vksemaphores);
-        vkDestroyFence(shared_state->device, ctx->frame_sync[f].fence, NULL);
+        vkDestroyFence(_vk.device, ctx->frame_sync[f].fence, NULL);
       }
-      vkDestroyCommandPool(shared_state->device, ctx->cmd_pool, NULL);
-      _ngf_destroy_swapchain(*(ctx->shared_state), &ctx->swapchain);
+      vkDestroyCommandPool(_vk.device, ctx->cmd_pool, NULL);
+      _ngf_destroy_swapchain(&ctx->swapchain);
       if (ctx->surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
       }
       shared_state->refcount--;
       if (shared_state->refcount == 0) {
-        if (shared_state->device != VK_NULL_HANDLE) {
-          vkDestroyDevice(shared_state->device, NULL);
-        }
         if (shared_state->allocator != VK_NULL_HANDLE) {
           vmaDestroyAllocator(shared_state->allocator);
         }
@@ -1029,12 +1019,12 @@ void _ngf_dec_recorder_count() {
 void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   if (cmd_buf  != NULL) {
     if (cmd_buf->vkcmdbuf != VK_NULL_HANDLE) {
-      vkFreeCommandBuffers(CURRENT_SHARED_STATE->device,
+      vkFreeCommandBuffers(_vk.device,
                            cmd_buf->vkpool, 1u, &cmd_buf->vkcmdbuf);
       if (cmd_buf->recording) _ngf_dec_recorder_count();
     }
     if (cmd_buf->vksem != VK_NULL_HANDLE) {
-      vkDestroySemaphore(CURRENT_SHARED_STATE->device, cmd_buf->vksem, NULL);
+      vkDestroySemaphore(_vk.device, cmd_buf->vksem, NULL);
     }
   }
 }
@@ -1057,8 +1047,8 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
       .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1u
     };
-    vk_err = vkAllocateCommandBuffers(CURRENT_SHARED_STATE->device,
-                                      &vk_cmdbuf_info, &cmd_buf->vkcmdbuf);
+    vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info,
+                                      &cmd_buf->vkcmdbuf);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OUTOFMEM; // TODO: return appropriate error.
       goto ngf_start_cmd_buffer_cleanup;
@@ -1081,7 +1071,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
       .pNext = NULL,
       .flags = 0u
     };
-    vk_err = vkCreateSemaphore(CURRENT_SHARED_STATE->device, &vk_sem_info, NULL,
+    vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL,
                                &cmd_buf->vksem);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OUTOFMEM; // TODO: return appropriate error code
@@ -1135,7 +1125,7 @@ ngf_error ngf_begin_frame(ngf_context *ctx) {
   uint32_t fi = ctx->frame_number % ctx->swapchain.num_images;
   if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     const VkResult vk_err =
-        vkAcquireNextImageKHR((*(ctx->shared_state))->device,
+        vkAcquireNextImageKHR(_vk.device,
                               ctx->swapchain.vk_swapchain,
                               UINT64_MAX,
                               ctx->swapchain.image_semaphores[fi],
@@ -1188,8 +1178,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
     .signalSemaphoreCount = _NGF_DARRAY_SIZE(frame_sync->wait_vksemaphores),
     .pSignalSemaphores = frame_sync->wait_vksemaphores.data
   };
-  vkQueueSubmit(CURRENT_SHARED_STATE->gfx_queue, 1u, &submit_info,
-                frame_sync->fence);
+  vkQueueSubmit(_vk.gfx_queue, 1u, &submit_info, frame_sync->fence);
 
   if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     VkResult present_result = VK_SUCCESS;
@@ -1204,7 +1193,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
       .pImageIndices = &ctx->swapchain.image_idx,
       .pResults = &present_result
     };
-    vkQueuePresentKHR((*(ctx->shared_state))->present_queue, &present_info);
+    vkQueuePresentKHR(_vk.present_queue, &present_info);
     if (present_result != VK_SUCCESS) 
       err = NGF_ERROR_END_FRAME_FAILED;
   } 
@@ -1243,8 +1232,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     .codeSize = (info->content_length << 2)
   };
   VkResult vkerr =
-    vkCreateShaderModule((*(CURRENT_CONTEXT->shared_state))->device,
-                         &vk_sm_info, NULL, &stage->vkmodule);
+    vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vkmodule);
   if (vkerr != VK_SUCCESS) {
     NGF_FREE(stage);
     return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
@@ -1255,7 +1243,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 
 void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   if (stage) {
-    vkDestroyShaderModule(CURRENT_SHARED_STATE->device, stage->vkmodule, NULL);
+    vkDestroyShaderModule(_vk.device, stage->vkmodule, NULL);
     NGF_FREE(stage);
   }
 }
@@ -1515,7 +1503,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
 
   VkResult vkerr =
-      vkCreateGraphicsPipelines((*(CURRENT_CONTEXT->shared_state))->device,
+      vkCreateGraphicsPipelines(_vk.device,
                                 VK_NULL_HANDLE,
                                 1u,
                                 &vk_pipeline_info,
@@ -1538,8 +1526,7 @@ ngf_create_graphics_pipeline_cleanup:
 }
 
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {
-  vkDestroyPipeline((*(CURRENT_CONTEXT->shared_state))->device,
-                     p->vkpipeline, NULL);
+  vkDestroyPipeline(_vk.device, p->vkpipeline, NULL);
 }
 
 
