@@ -357,7 +357,7 @@ static VkFormat get_vk_vertex_format(ngf_type type, uint32_t size, bool norm) {
     }
   };
 
-  if ((size < 1 || size > 4) || norm && type > NGF_TYPE_UINT16) {
+  if ((size < 1 || size > 4) || (norm && type > NGF_TYPE_UINT16)) {
    return VK_FORMAT_UNDEFINED;
   } else if (norm) {
     return normalized_formats[type][size];
@@ -382,29 +382,46 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
   return stages[s];
 }
 
+#if defined(XCB_NONE)
+xcb_connection_t *XCB_CONNECTION = NULL;
+xcb_visualid_t XCB_VISUALID;
+xcb_screen_t *screen_of_display (xcb_connection_t *c, int screen) {
+  xcb_screen_iterator_t iter;
+  iter = xcb_setup_roots_iterator (xcb_get_setup (c));
+  for (; iter.rem; --screen, xcb_screen_next (&iter))
+    if (screen == 0)
+      return iter.data;
+
+  return NULL;
+}
+#endif
 bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
                                      uint32_t queue_family_index) {
-#if defined(_WIN32) || defined(_WIN64)
+/*#if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
                                                         queue_family_index);
 #elif defined(__ANDROID__)
   return true;
 #else
+#error XXX*/
 //TODO: implement
   if (XCB_CONNECTION == NULL) {
-    xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
-    if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
+    /*xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
+      if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
       void *libxcb = dlopen("libX11-xcb.so.1", RTLD_LAZY);
       GetXCBConnection = dlsym(libxcb, "XGetXCBConnection");
-    }
-    XCB_CONNECTION = GetXCBConnection(XOpenDisplay(NULL));
+    }*/
+    int screen_nbr;
+    XCB_CONNECTION = xcb_connect(NULL, &screen_nbr);//GetXCBConnection(XOpenDisplay(NULL));
+    xcb_screen_t *screen = screen_of_display(XCB_CONNECTION, screen_nbr);
+    assert(screen);
+    XCB_VISUALID = screen->root_visual;
   }
-
   return vkGetPhysicalDeviceXcbPresentationSupportKHR(phys_dev, 
                                                       queue_family_index,
                                                       XCB_CONNECTION,
-                                                      visual);
-#endif
+                                                      XCB_VISUALID);
+//#endif
 }
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
@@ -751,17 +768,17 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .window = swapchain_info->native_handle
     };
 #else
-    static xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
+    /*static xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
     if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
       void *libxcb = dlopen("libX11-xcb.so.1", RTLD_LAZY);
       GetXCBConnection = dlsym(libxcb, "XGetXCBConnection");
-    }
+    }*/
     const VkXcbSurfaceCreateInfoKHR surface_info = {
       .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
       .pNext = NULL,
       .flags = 0,
-      .window = swapchain_info->native_handle,
-      .connection = GetXCBConnection(XOpenDisplay(NULL))
+      .window = (xcb_window_t)swapchain_info->native_handle,
+      .connection = XCB_CONNECTION//GetXCBConnection(XOpenDisplay(NULL))
     };
 #endif
     vk_err =
@@ -868,7 +885,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     // Create objects for cmd pool synchronization.
     pthread_mutex_init(&shared_state->cmd_pool_mut, NULL);
     pthread_mutex_init(&shared_state->record_counter_mut, NULL);
-    pthread_cond_init(&shared_state->recording_inactive_cond);
+    pthread_cond_init(&shared_state->recording_inactive_cond, NULL);
     shared_state->record_counter = 0u;
   }
 
