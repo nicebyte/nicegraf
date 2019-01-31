@@ -393,16 +393,16 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 #elif defined(__ANDROID__)
   return true;
 #else
-#error
+
   if (XCB_CONNECTION == NULL) {
-    int               screen_idx = 0;
-    xcb_screen_t     *screen     = NULL;
-    xcb_connection_t *connection = xcb_connect(NULL, &screen_idx);
-    xcb_setup_t      *setup      = xcb_get_setup(connection);
+    int                screen_idx = 0;
+    xcb_screen_t      *screen     = NULL;
+    xcb_connection_t  *connection = xcb_connect(NULL, &screen_idx);
+    const xcb_setup_t *setup      = xcb_get_setup(connection);
     for(xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup);
-        screen >=0 && iter.rem;
-        xcb_screen_next (&iter)) {
-      if (screen_idx-- == 0) { screen = iter.data; }
+        screen >=0 && it.rem;
+        xcb_screen_next (&it)) {
+      if (screen_idx-- == 0) { screen = it.data; }
     }
     assert(screen);
     XCB_CONNECTION = connection;
