@@ -79,7 +79,6 @@ struct {
 
 // State that is common among "shared" contexts (TODO: remove this?)
 typedef struct _ngf_context_shared_state {
-  VmaAllocator    allocator;
   pthread_mutex_t cmd_pool_mut;
   pthread_mutex_t record_counter_mut;
   pthread_cond_t  recording_inactive_cond;
@@ -116,6 +115,7 @@ struct ngf_context {
   _ngf_context_shared_state **shared_state;
   _ngf_swapchain              swapchain;
   ngf_swapchain_info          swapchain_info;
+  VmaAllocator                allocator;
   VkCommandPool               cmd_pool;
   VkSurfaceKHR                surface;
   uint32_t                    frame_number;
@@ -813,39 +813,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     }
     memset(shared_state, 0, sizeof(_ngf_context_shared_state));
     shared_state->refcount = 1;
-
-    // Set up VMA.
-    VmaVulkanFunctions vma_vk_fns = {
-      .vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties,
-      .vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
-      .vkAllocateMemory = vkAllocateMemory,
-      .vkFreeMemory = vkFreeMemory,
-      .vkMapMemory = vkMapMemory,
-      .vkUnmapMemory = vkUnmapMemory,
-      .vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges,
-      .vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges,
-      .vkBindBufferMemory = vkBindBufferMemory,
-      .vkBindImageMemory = vkBindImageMemory,
-      .vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements,
-      .vkGetImageMemoryRequirements = vkGetImageMemoryRequirements,
-      .vkCreateBuffer = vkCreateBuffer,
-      .vkDestroyBuffer = vkDestroyBuffer,
-      .vkCreateImage = vkCreateImage,
-      .vkDestroyImage = vkDestroyImage
-    };
-    VmaAllocatorCreateInfo vma_info = {
-      .flags = 0u,
-      .physicalDevice = _vk.phys_dev,
-      .device = _vk.device,
-      .preferredLargeHeapBlockSize = 0u,
-      .pAllocationCallbacks = NULL,
-      .pDeviceMemoryCallbacks = NULL,
-      .frameInUseCount = 0u,
-      .pHeapSizeLimit = NULL,
-      .pVulkanFunctions = &vma_vk_fns,
-      .pRecordSettings = NULL
-    };
-    vk_err = vmaCreateAllocator(&vma_info, &shared_state->allocator);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
@@ -871,6 +838,39 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     err = NGF_ERROR_CONTEXT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
+
+  // Set up VMA.
+  VmaVulkanFunctions vma_vk_fns = {
+    .vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties,
+    .vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
+    .vkAllocateMemory                    = vkAllocateMemory,
+    .vkFreeMemory                        = vkFreeMemory,
+    .vkMapMemory                         = vkMapMemory,
+    .vkUnmapMemory                       = vkUnmapMemory,
+    .vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges,
+    .vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges,
+    .vkBindBufferMemory                  = vkBindBufferMemory,
+    .vkBindImageMemory                   = vkBindImageMemory,
+    .vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements,
+    .vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements,
+    .vkCreateBuffer                      = vkCreateBuffer,
+    .vkDestroyBuffer                     = vkDestroyBuffer,
+    .vkCreateImage                       = vkCreateImage,
+    .vkDestroyImage                      = vkDestroyImage
+  };
+  VmaAllocatorCreateInfo vma_info = {
+    .flags                       = 0u,
+    .physicalDevice              = _vk.phys_dev,
+    .device                      = _vk.device,
+    .preferredLargeHeapBlockSize = 0u,
+    .pAllocationCallbacks        = NULL,
+    .pDeviceMemoryCallbacks      = NULL,
+    .frameInUseCount             = 0u,
+    .pHeapSizeLimit              = NULL,
+    .pVulkanFunctions            = &vma_vk_fns,
+    .pRecordSettings             = NULL
+  };
+  vk_err = vmaCreateAllocator(&vma_info, &ctx->allocator);
 
   // Create frame resource holders.
   const uint32_t max_inflight_frames =
@@ -964,11 +964,11 @@ void ngf_destroy_context(ngf_context *ctx) {
       if (ctx->surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
       }
+      if (ctx->allocator != VK_NULL_HANDLE) {
+        vmaDestroyAllocator(ctx->allocator);
+      }
       shared_state->refcount--;
       if (shared_state->refcount == 0) {
-        if (shared_state->allocator != VK_NULL_HANDLE) {
-          vmaDestroyAllocator(shared_state->allocator);
-        }
         pthread_mutex_destroy(&shared_state->cmd_pool_mut);
         pthread_mutex_destroy(&shared_state->record_counter_mut);
         pthread_cond_destroy(&shared_state->recording_inactive_cond);
@@ -1593,7 +1593,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   };
 
   VkResult vkerr;
-  vkerr = vmaCreateImage(CURRENT_SHARED_STATE->allocator, &vk_image_info,
+  vkerr = vmaCreateImage(CURRENT_CONTEXT->allocator, &vk_image_info,
                          &vma_alloc_info,
                          &img->vkimg, &img->alloc, NULL);
   if (vkerr != VK_SUCCESS) {
@@ -1611,7 +1611,7 @@ ngf_create_image_cleanup:
 void ngf_destroy_image(ngf_image *img) {
   if (img != NULL) {
     if (img->vkimg != VK_NULL_HANDLE) {
-      vmaDestroyImage(CURRENT_SHARED_STATE->allocator,
+      vmaDestroyImage(CURRENT_CONTEXT->allocator,
                       img->vkimg, img->alloc);
     }
   }
