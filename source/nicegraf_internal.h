@@ -36,7 +36,7 @@ typedef CONDITION_VARIABLE pthread_cond_t;
 #define pthread_mutex_unlock(m) (LeaveCriticalSection(m),0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m),0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m),0)
-#define pthread_cond_init(c) (InitializeConditionVariable(c))
+#define pthread_cond_init(c, a) (InitializeConditionVariable(c))
 #define pthread_cond_wait(c, m) (SleepConditionVariableCS(c, m, INFINITE))
 #define pthread_cond_signal(c) (WakeConditionVariable(c))
 #define pthread_cond_destroy(c)
@@ -106,7 +106,8 @@ typedef enum {
 _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 // For fixing unreferenced parameter warnings.
-#define _NGF_FAKE_USE(...) do{}while(sizeof(__VA_ARGS__) < 0);
+static void _NGF_FAKE_USE_HELPER(int _, ...) { _ <<= 0u; }
+#define _NGF_FAKE_USE(...) _NGF_FAKE_USE_HELPER(0u, __VA_ARGS__)
 
 // MSVC warnings that are safe to ignore.
 #pragma warning(disable:4201)
