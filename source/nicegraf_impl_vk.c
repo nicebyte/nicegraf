@@ -68,7 +68,7 @@ SOFTWARE.
 
 #define _NGF_INVALID_IDX (~0u)
 
-// Singleton for holding vulkan instance and physical device handles.
+// Singleton for holding vulkan instance and device handles.
 struct {
   VkInstance instance;
   VkPhysicalDevice phys_dev;
@@ -77,9 +77,9 @@ struct {
   VkQueue present_queue;
   pthread_mutex_t ctx_refcount_mut; // syncs access to contexts' shared data
                                     // reference counter.
-  bool single_queue;
   uint32_t gfx_family_idx;
   uint32_t present_family_idx;
+  bool single_queue;
 } _vk;
 
 typedef struct {
