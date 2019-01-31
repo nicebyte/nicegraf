@@ -35,8 +35,8 @@ SOFTWARE.
 extern "C" {
 #endif
 
-#define NGF_VERSION_MAJOR 0
-#define NGF_VERSION_MINOR 0
+#define NGF_VER_MAJ 0
+#define NGF_VER_MIN 0
 
 #pragma region ngf_type_declarations
 
