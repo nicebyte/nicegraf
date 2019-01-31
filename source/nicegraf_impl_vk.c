@@ -596,10 +596,8 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
 static ngf_error _ngf_create_swapchain(
     const ngf_swapchain_info *swapchain_info,
     VkSurfaceKHR surface,
-    const _ngf_context_shared_state *shared_state,
     _ngf_swapchain *swapchain) {
   assert(swapchain_info);
-  assert(shared_state);
   assert(swapchain);
 
   ngf_error err = NGF_ERROR_OK;
@@ -717,17 +715,13 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context **result) {
   assert(info);
   assert(result);
-  ngf_error err = NGF_ERROR_OK;
-  VkResult vk_err = VK_SUCCESS;
+
+  ngf_error                 err            = NGF_ERROR_OK;
+  VkResult                  vk_err         = VK_SUCCESS;
   const ngf_swapchain_info *swapchain_info = info->swapchain_info;
-  const ngf_context *shared = info->shared_context;
+  const ngf_context        *shared         = info->shared_context;
 
-  if (swapchain_info != NULL &&
-      shared != NULL &&
-      shared->swapchain.vk_swapchain == VK_NULL_HANDLE) {
-    return NGF_ERROR_CANT_SHARE_CONTEXT;
-  }
-
+  // Allocate space for context data.
   *result = NGF_ALLOC(ngf_context);
   ngf_context *ctx = *result;
   if (ctx == NULL) {
@@ -736,34 +730,35 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   }
   memset(ctx, 0, sizeof(ngf_context));
 
-  // If a swapchain was requested, create the window surface.
+  // Create swapchain if necessary.
   if (swapchain_info != NULL) {
+    // Begin by creating the window surface.
 #if defined(_WIN32) || defined(_WIN64)
     const VkWin32SurfaceCreateInfoKHR surface_info = {
-      .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-      .pNext = NULL,
-      .flags = 0,
+      .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+      .pNext     = NULL,
+      .flags     = 0,
       .hinstance = GetModuleHandle(NULL),
-      .hwnd = (HWND)swapchain_info->native_handle
+      .hwnd      = (HWND)swapchain_info->native_handle
     };
 #elif defined(__ANDROID__)
     const VkAndroidSuraceCreateInfoKHR surface_info = {
-      .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
-      .pNext = NULL,
-      .flags = 0,
+      .sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+      .pNext  = NULL,
+      .flags  = 0,
       .window = swapchain_info->native_handle
     };
 #else
     const VkXcbSurfaceCreateInfoKHR surface_info = {
-      .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-      .pNext = NULL,
-      .flags = 0,
-      .window = (xcb_window_t)swapchain_info->native_handle,
+      .sType     = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+      .pNext     = NULL,
+      .flags     = 0,
+      .window    = (xcb_window_t)swapchain_info->native_handle,
       .connection = XCB_CONNECTION
     };
 #endif
     vk_err =
-      VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);\
+      VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_SURFACE_CREATION_FAILED;
       goto ngf_create_context_cleanup;
@@ -771,18 +766,25 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     VkBool32 surface_supported = false;
     vkGetPhysicalDeviceSurfaceSupportKHR(_vk.phys_dev,
                                          _vk.present_family_idx,
-                                         ctx->surface,
+                                          ctx->surface,
                                          &surface_supported);
     if (!surface_supported) {
       err = NGF_ERROR_SURFACE_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+
+    // TODO: check if present mode is available, use FIFO if not.
     uint32_t pmc;
     vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
                                               NULL);
     VkPresentModeKHR *pm = alloca(sizeof(VkPresentModeKHR) * pmc);
     vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
                                               pm);
+
+    // Create the swapchain itself.
+    err = _ngf_create_swapchain(swapchain_info, ctx->surface, &ctx->swapchain);
+    if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
+    ctx->swapchain_info = *swapchain_info;
   }
 
   if (shared != NULL) {
@@ -849,20 +851,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       goto ngf_create_context_cleanup;
     }
 
-    // Create a command pool.
-    VkCommandPoolCreateInfo cmd_pool_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .pNext = NULL,
-      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = _vk.gfx_family_idx
-    };
-    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
-                                 &ctx->cmd_pool);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
     // Create objects for cmd pool synchronization.
     pthread_mutex_init(&shared_state->cmd_pool_mut, NULL);
     pthread_mutex_init(&shared_state->record_counter_mut, NULL);
@@ -870,14 +858,21 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     shared_state->record_counter = 0u;
   }
 
-  if (swapchain_info != NULL) {
-    err = _ngf_create_swapchain(swapchain_info, ctx->surface,
-                                *(ctx->shared_state), &ctx->swapchain);
-    if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
-    ctx->swapchain_info = *swapchain_info;
+  // Create a command pool.
+  VkCommandPoolCreateInfo cmd_pool_info = {
+    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .pNext            = NULL,
+    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = _vk.gfx_family_idx
+  };
+  vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
+                               &ctx->cmd_pool);
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+    goto ngf_create_context_cleanup;
   }
-  ctx->frame_number = 0u;
 
+  // Create frame resource holders.
   const uint32_t max_inflight_frames =
       swapchain_info ? ctx->swapchain.num_images : 3u;
   ctx->max_inflight_frames = max_inflight_frames;
@@ -904,6 +899,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       goto ngf_create_context_cleanup;
     }
   }
+  ctx->frame_number = 0u;
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -921,7 +917,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
   err = _ngf_create_swapchain(&ctx->swapchain_info, ctx->surface,
-                              *(ctx->shared_state), &ctx->swapchain);
+                              &ctx->swapchain);
   return err;
 }
 
