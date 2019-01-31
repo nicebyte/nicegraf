@@ -1,127 +1,125 @@
 /**
-Copyright (c) 2019 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 #include "nicegraf.h"
 
 #include "dynamic_array.h"
 #include "nicegraf_internal.h"
 
-#if defined(_WIN32)||defined(_WIN64)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#define VK_SURFACE_EXT "VK_KHR_win32_surface"
-#define VK_CREATE_SURFACE_FN vkCreateWin32SurfaceKHR
-#define VK_CREATE_SURFACE_FN_TYPE PFN_vkCreateWin32SurfaceKHR
-#define VK_USE_PLATFORM_WIN32_KHR
-#elif defined(__ANDROID__)
-#define VK_SURFACE_EXT "VK_KHR_android_surface"
-#define VK_CREATE_SURFACE_FN vkCreateAndroidSurfaceKHR
-#define VK_CREATE_SURFACE_FN_TYPE PFN_vkCreateAndroidSurfaceKHR
-#define VK_USE_PLATFORM_ANDROID_KHR
-#else
-#include <xcb/xcb.h>
-#include <dlfcn.h>
-#include <X11/Xlib-xcb.h>
-#define VK_SURFACE_EXT "VK_KHR_xcb_surface"
-#define VK_CREATE_SURFACE_FN vkCreateXcbSurfaceKHR
-#define VK_CREATE_SURFACE_FN_TYPE PFN_vkCreateXcbSurfaceKHR
-#define VK_USE_PLATFORM_XCB_KHR
-#endif
-
-#include "volk.h"
-#include <vk_mem_alloc.h>
-
 #include <assert.h>
 #include <string.h>
 #if defined(WIN32)
-#include <malloc.h>
+  #include <malloc.h>
+  #undef    alloca
+  #define   alloca _malloca
+  #define   freea  _freea
 #else
-#include <alloca.h>
+  #include <alloca.h>
 #endif
 
-#if defined(WIN32)
-#if defined(alloca)
-#undef alloca
+// Determine the correct WSI extension to use for VkSurface creation.
+// Do not change the relative order of this block, the Volk header include
+// directive and the VMA header include directive.
+#if defined(_WIN32)||defined(_WIN64)
+  #define   WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+  #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateWin32SurfaceKHR
+  #define   VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__ANDROID__)
+  #define   VK_SURFACE_EXT             "VK_KHR_android_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateAndroidSurfaceKHR
+  #define   VK_USE_PLATFORM_ANDROID_KHR
+#else
+  #include <xcb/xcb.h>
+  #include <dlfcn.h>
+  #include <X11/Xlib-xcb.h>
+  #define   VK_SURFACE_EXT             "VK_KHR_xcb_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateXcbSurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateXcbSurfaceKHR
+  #define   VK_USE_PLATFORM_XCB_KHR
 #endif
-#define alloca _malloca
-#define freea _freea
-#endif
+#include "volk.h"
+#include <vk_mem_alloc.h>
 
 #define _NGF_INVALID_IDX (~0u)
 
 // Singleton for holding vulkan instance and device handles.
 struct {
-  VkInstance instance;
+  VkInstance       instance;
   VkPhysicalDevice phys_dev;
-  VkDevice device;
-  VkQueue gfx_queue;
-  VkQueue present_queue;
-  pthread_mutex_t ctx_refcount_mut; // syncs access to contexts' shared data
-                                    // reference counter.
-  uint32_t gfx_family_idx;
-  uint32_t present_family_idx;
-  bool single_queue;
+  VkDevice         device;
+  VkQueue          gfx_queue;
+  VkQueue          present_queue;
+  pthread_mutex_t  ctx_refcount_mut;
+  uint32_t         gfx_family_idx;
+  uint32_t         present_family_idx;
 } _vk;
 
-typedef struct {
-  VmaAllocator allocator;
+// State that is common among "shared" contexts (TODO: remove this?)
+typedef struct _ngf_context_shared_state {
+  VmaAllocator    allocator;
   pthread_mutex_t cmd_pool_mut;
   pthread_mutex_t record_counter_mut;
-  pthread_cond_t recording_inactive_cond;
-  uint32_t record_counter;
-  uint32_t refcount;
+  pthread_cond_t  recording_inactive_cond;
+  uint32_t        record_counter;
+  uint32_t        refcount;
 } _ngf_context_shared_state;
 
-typedef struct {
+// Swapchain state.
+typedef struct _ngf_swapchain {
   VkSwapchainKHR vk_swapchain;
-  VkImage *images;
-  VkSemaphore *image_semaphores;
-  uint32_t num_images;
-  uint32_t image_idx;
+  VkImage       *images;
+  VkSemaphore   *image_semaphores;
+  uint32_t       num_images; // total number of images in the swapchain.
+  uint32_t       image_idx;  // index of currently acquired image.
 } _ngf_swapchain;
 
 struct ngf_cmd_buffer {
   VkCommandBuffer vkcmdbuf;
-  VkSemaphore vksem;
-  VkCommandPool vkpool;
+  VkSemaphore     vksem;
+  VkCommandPool   vkpool;
   bool recording;
 };
 
-typedef struct _ngf_frame_sync_data {
-  _NGF_DARRAY_OF(VkSemaphore) wait_vksemaphores;
+// Vulkan resources associated with a given frame.
+typedef struct _ngf_frame_resources {
   _NGF_DARRAY_OF(ngf_cmd_buffer) submitted_cmdbuffers;
-  VkFence fence;
-  bool active;
-} _ngf_frame_sync_data;
+  _NGF_DARRAY_OF(VkSemaphore)    wait_vksemaphores; // 1 per submitted cmdbuf.
+  VkFence                        fence; // signaled when frame is done.
+  bool                           active;
+} _ngf_frame_resources;
 
 struct ngf_context {
-  _ngf_frame_sync_data *frame_sync;
-  ngf_swapchain_info swapchain_info;
+  _ngf_frame_resources       *frame_sync;
   _ngf_context_shared_state **shared_state;
-  VkCommandPool cmd_pool;
-  VkSurfaceKHR surface;
-  uint32_t frame_number;
-  uint32_t max_inflight_frames;
-  _ngf_swapchain swapchain;
+  _ngf_swapchain              swapchain;
+  ngf_swapchain_info          swapchain_info;
+  VkCommandPool               cmd_pool;
+  VkSurfaceKHR                surface;
+  uint32_t                    frame_number;
+  uint32_t                    max_inflight_frames;
 };
 
 struct ngf_shader_stage {
@@ -384,44 +382,36 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
 
 #if defined(XCB_NONE)
 xcb_connection_t *XCB_CONNECTION = NULL;
-xcb_visualid_t XCB_VISUALID;
-xcb_screen_t *screen_of_display (xcb_connection_t *c, int screen) {
-  xcb_screen_iterator_t iter;
-  iter = xcb_setup_roots_iterator (xcb_get_setup (c));
-  for (; iter.rem; --screen, xcb_screen_next (&iter))
-    if (screen == 0)
-      return iter.data;
+xcb_visualid_t    XCB_VISUALID   = { 0 };
 
-  return NULL;
-}
 #endif
 bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
                                      uint32_t queue_family_index) {
-/*#if defined(_WIN32) || defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
                                                         queue_family_index);
 #elif defined(__ANDROID__)
   return true;
 #else
-#error XXX*/
-//TODO: implement
   if (XCB_CONNECTION == NULL) {
-    /*xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
-      if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
-      void *libxcb = dlopen("libX11-xcb.so.1", RTLD_LAZY);
-      GetXCBConnection = dlsym(libxcb, "XGetXCBConnection");
-    }*/
-    int screen_nbr;
-    XCB_CONNECTION = xcb_connect(NULL, &screen_nbr);//GetXCBConnection(XOpenDisplay(NULL));
-    xcb_screen_t *screen = screen_of_display(XCB_CONNECTION, screen_nbr);
+    int                screen_idx = 0;
+    xcb_screen_t      *screen     = NULL;
+    xcb_connection_t  *connection = xcb_connect(NULL, &screen_idx);
+    const xcb_setup_t *setup      = xcb_get_setup(connection);
+    for(xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup);
+        screen >=0 && it.rem;
+        xcb_screen_next (&it)) {
+      if (screen_idx-- == 0) { screen = it.data; }
+    }
     assert(screen);
-    XCB_VISUALID = screen->root_visual;
+    XCB_CONNECTION = connection;
+    XCB_VISUALID   = screen->root_visual;
   }
   return vkGetPhysicalDeviceXcbPresentationSupportKHR(phys_dev, 
                                                       queue_family_index,
                                                       XCB_CONNECTION,
                                                       XCB_VISUALID);
-//#endif
+#endif
 }
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
@@ -536,7 +526,6 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
         present_family_idx == _NGF_INVALID_IDX) {
       return NGF_ERROR_INITIALIZATION_FAILED;
     }
-    _vk.single_queue = (gfx_family_idx == present_family_idx);
     _vk.gfx_family_idx = gfx_family_idx;
     _vk.present_family_idx = present_family_idx;
 
@@ -558,10 +547,10 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       .queueCount = 1,
       .pQueuePriorities = &queue_prio
     };
-    const VkDeviceQueueCreateInfo queue_infos[] =
-        { gfx_queue_info, present_queue_info };
-    const bool single_queue_family = (gfx_family_idx == present_family_idx);
-    const uint32_t num_queue_infos = single_queue_family ? 1 : 2;
+    const VkDeviceQueueCreateInfo queue_infos[] = { gfx_queue_info,
+                                                    present_queue_info };
+    const uint32_t num_queue_infos =
+        (gfx_family_idx == present_family_idx) ? 1 : 2;
     const char *device_exts[] = { "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
       .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -621,9 +610,10 @@ static ngf_error _ngf_create_swapchain(
   VkResult vk_err = VK_SUCCESS;
 
   // Create swapchain.
+  const bool exclusive_sharing = _vk.gfx_family_idx == _vk.present_family_idx;
   const VkSharingMode sharing_mode =
-    _vk.single_queue ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
-  const uint32_t num_sharing_queue_families = _vk.single_queue ? 0 : 2;
+    exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+  const uint32_t num_sharing_queue_families = exclusive_sharing ? 0 : 2;
   const uint32_t sharing_queue_families[] = { _vk.gfx_family_idx,
       _vk.present_family_idx };
   static const VkPresentModeKHR vk_present_modes[] = {
@@ -900,7 +890,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   const uint32_t max_inflight_frames =
       swapchain_info ? ctx->swapchain.num_images : 3u;
   ctx->max_inflight_frames = max_inflight_frames;
-  ctx->frame_sync = NGF_ALLOCN(_ngf_frame_sync_data, max_inflight_frames);
+  ctx->frame_sync = NGF_ALLOCN(_ngf_frame_resources, max_inflight_frames);
   if (ctx->frame_sync == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_context_cleanup;
@@ -944,7 +934,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   return err;
 }
 
-void _ngf_retire_resources(_ngf_frame_sync_data *next_frame_sync) {
+void _ngf_retire_resources(_ngf_frame_resources *next_frame_sync) {
   if (next_frame_sync->active) {
     vkWaitForFences(_vk.device, 1u, &next_frame_sync->fence, true, 1000000u);
     vkResetFences(_vk.device, 1u,
@@ -1132,7 +1122,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
   uint32_t fi =
       CURRENT_CONTEXT->frame_number % CURRENT_CONTEXT->max_inflight_frames;
-  _ngf_frame_sync_data *frame_sync_data = &CURRENT_CONTEXT->frame_sync[fi];
+  _ngf_frame_resources *frame_sync_data = &CURRENT_CONTEXT->frame_sync[fi];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
     if (bufs[i]->recording) {
       return NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING; // TODO: return appropriate error code
@@ -1170,7 +1160,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
 
   const uint32_t fi =
       CURRENT_CONTEXT->frame_number % CURRENT_CONTEXT->max_inflight_frames;
-  const _ngf_frame_sync_data *frame_sync = &CURRENT_CONTEXT->frame_sync[fi];
+  const _ngf_frame_resources *frame_sync = &CURRENT_CONTEXT->frame_sync[fi];
 
   // Submit the pending command buffers.
   const VkPipelineStageFlags color_attachment_stage =
@@ -1232,7 +1222,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
                       &CURRENT_SHARED_STATE->record_counter_mut);
   }
   uint32_t next_fi = (fi + 1u) % ctx->max_inflight_frames;
-  _ngf_frame_sync_data *next_frame_sync = &ctx->frame_sync[next_fi];
+  _ngf_frame_resources *next_frame_sync = &ctx->frame_sync[next_fi];
   _ngf_retire_resources(next_frame_sync);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
