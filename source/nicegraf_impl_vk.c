@@ -754,17 +754,12 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .window = swapchain_info->native_handle
     };
 #else
-    /*static xcb_connection_t* (*GetXCBConnection)(Display*) = NULL;
-    if (GetXCBConnection == NULL) { // dynamically load XGetXCBConnection
-      void *libxcb = dlopen("libX11-xcb.so.1", RTLD_LAZY);
-      GetXCBConnection = dlsym(libxcb, "XGetXCBConnection");
-    }*/
     const VkXcbSurfaceCreateInfoKHR surface_info = {
       .sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
       .pNext = NULL,
       .flags = 0,
       .window = (xcb_window_t)swapchain_info->native_handle,
-      .connection = XCB_CONNECTION//GetXCBConnection(XOpenDisplay(NULL))
+      .connection = XCB_CONNECTION
     };
 #endif
     vk_err =
