@@ -417,53 +417,47 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
-    // Initialize Volk.
-    volkInitialize();
+    volkInitialize(); // Initialize Volk.
 
-    // Names for instance-level extensions to enable.
-    const char * const ext_names[] = {
-      "VK_KHR_surface",
-      VK_SURFACE_EXT
+    const char * const ext_names[] = { // Names of instance-level extensions.
+      "VK_KHR_surface", VK_SURFACE_EXT
     };
 
-    // Application information.
-    VkApplicationInfo app_info = {
-      .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-      .pNext = NULL,
+    VkApplicationInfo app_info = { // Application information.
+      .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+      .pNext            = NULL,
       .pApplicationName = NULL, // TODO: allow specifying app name.
-      .pEngineName = "nicegraf",
-      .engineVersion = VK_MAKE_VERSION(NGF_VERSION_MAJOR,
-                                       NGF_VERSION_MINOR, 0),
-      .apiVersion = VK_MAKE_VERSION(1, 0, 9)
+      .pEngineName      = "nicegraf",
+      .engineVersion    = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
+      .apiVersion       = VK_MAKE_VERSION(1, 0, 9)
     };
 
     // Create a Vulkan instance.
     VkInstanceCreateInfo inst_info = {
-      .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0u,
-      .pApplicationInfo = &app_info,
-      .enabledLayerCount = 0u,
-      .ppEnabledLayerNames = NULL, //TODO: validation layers
-      .enabledExtensionCount = NGF_ARRAYSIZE(ext_names),
+      .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+      .pNext                   = NULL,
+      .flags                   = 0u,
+      .pApplicationInfo        = &app_info,
+      .enabledLayerCount       = 0u,
+      .ppEnabledLayerNames     = NULL,
+      .enabledExtensionCount   = NGF_ARRAYSIZE(ext_names),
       .ppEnabledExtensionNames = ext_names 
     };
     VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
-    if (vk_err != VK_SUCCESS) {
-      return NGF_ERROR_CONTEXT_CREATION_FAILED;
-    }
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
 
-    // Load instance-level Vulkan functions.
-    volkLoadInstance(_vk.instance);
+    volkLoadInstance(_vk.instance); // load instance-level Vulkan functions.
 
-    // Pick a suitable physical device based on user's preference.
-    uint32_t nphysdev;
+    // Obtain a list of available physical devices.
+    uint32_t nphysdev = 0u;
     vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, NULL);
     VkPhysicalDevice *physdevs = alloca(nphysdev * sizeof(VkPhysicalDevice));
     assert(physdevs != NULL);
     vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+
+    // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
-    uint32_t best_device_idx = _NGF_INVALID_IDX;
+    uint32_t best_device_index = _NGF_INVALID_IDX;
     for (uint32_t i = 0; i < nphysdev; ++i) {
       VkPhysicalDeviceProperties dev_props;
       vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
@@ -471,11 +465,11 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       switch(dev_props.deviceType) {
       case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
         score += 100U;
-        if (pref == NGF_DEVICE_PREFERENCE_DISCRETE) score += 1000U;
+        if (pref == NGF_DEVICE_PREFERENCE_DISCRETE) { score += 1000U; }
         break;
       case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
         score += 90U;
-        if (pref == NGF_DEVICE_PREFERENCE_INTEGRATED) score += 1000U;
+        if (pref == NGF_DEVICE_PREFERENCE_INTEGRATED) { score += 1000U; }
         break;
       case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
         score += 80U;
@@ -486,40 +480,41 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       default: score += 10U;
       }
       if (score > best_device_score) {
-        best_device_idx = i;
+        best_device_index = i;
         best_device_score = score;
       }
     }
-    if (best_device_idx == _NGF_INVALID_IDX) {
+    if (best_device_index == _NGF_INVALID_IDX) {
       return NGF_ERROR_INITIALIZATION_FAILED;
     }
-    _vk.phys_dev = physdevs[best_device_idx];
+    _vk.phys_dev = physdevs[best_device_index];
 
-		// Initialize context refcount mutex.
-		pthread_mutex_init(&_vk.ctx_refcount_mut, NULL);
-     
-    // Pick suitable queue families for graphics and present.
+    // Initialize context refcount mutex.
+    pthread_mutex_init(&_vk.ctx_refcount_mut, NULL);
+   
+    // Obtain a list of queue family properties from the device.
     uint32_t num_queue_families = 0U;
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
                                              &num_queue_families,
                                              NULL);
     VkQueueFamilyProperties *queue_families =
         alloca(num_queue_families * sizeof(VkQueueFamilyProperties));
-    uint32_t gfx_family_idx = _NGF_INVALID_IDX;
-    uint32_t present_family_idx = _NGF_INVALID_IDX;
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
                                              &num_queue_families,
                                               queue_families);
+
+    // Pick suitable queue families for graphics and present.
+    uint32_t gfx_family_idx     = _NGF_INVALID_IDX;
+    uint32_t present_family_idx = _NGF_INVALID_IDX;
     for (uint32_t q = 0; q < num_queue_families; ++q) {
-      const VkQueueFlags flags = queue_families[q].queueFlags;
-      if (gfx_family_idx == _NGF_INVALID_IDX &&
-          (flags & VK_QUEUE_GRAPHICS_BIT)) {
+      const VkQueueFlags flags      = queue_families[q].queueFlags;
+      const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+      const VkBool32     is_present = _ngf_query_presentation_support(
+                                          _vk.phys_dev, q);
+      if (gfx_family_idx == _NGF_INVALID_IDX && is_gfx) {
         gfx_family_idx = q;
       }
-      VkBool32 present_supported = VK_FALSE;
-      present_supported = _ngf_query_presentation_support(_vk.phys_dev, q);
-      if (present_family_idx == _NGF_INVALID_IDX &&
-          present_supported == VK_TRUE) {
+      if (present_family_idx == _NGF_INVALID_IDX && is_present == VK_TRUE) {
         present_family_idx = q;
       }
     }
@@ -533,19 +528,19 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     // Create logical device.
     const float queue_prio = 1.0f;
     const VkDeviceQueueCreateInfo gfx_queue_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
+      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
       .queueFamilyIndex = gfx_family_idx,
-      .queueCount = 1,
+      .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
     const VkDeviceQueueCreateInfo present_queue_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
+      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
       .queueFamilyIndex = present_family_idx,
-      .queueCount = 1,
+      .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
     const VkDeviceQueueCreateInfo queue_infos[] = { gfx_queue_info,
@@ -554,14 +549,14 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
         (gfx_family_idx == present_family_idx) ? 1 : 2;
     const char *device_exts[] = { "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
-      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0,
-      .queueCreateInfoCount = num_queue_infos,
-      .pQueueCreateInfos = queue_infos,
-      .enabledLayerCount = 0,
-      .ppEnabledLayerNames = NULL, // TODO: validation layers
-      .enabledExtensionCount = present_family_idx == -1 ? 0 : 1,
+      .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext                   = NULL,
+      .flags                   = 0,
+      .queueCreateInfoCount    = num_queue_infos,
+      .pQueueCreateInfos       = queue_infos,
+      .enabledLayerCount       = 0,
+      .ppEnabledLayerNames     = NULL,
+      .enabledExtensionCount   = 1u,
       .ppEnabledExtensionNames = device_exts
     };
     vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
@@ -573,7 +568,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     vkGetDeviceQueue(_vk.device, gfx_family_idx, 0, &_vk.gfx_queue);
     vkGetDeviceQueue(_vk.device, present_family_idx, 0, &_vk.present_queue);
 
-    // Load device entry points.
+    // Load device-level entry points.
     volkLoadDevice(_vk.device);
 
     // Done!
