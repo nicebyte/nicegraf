@@ -88,11 +88,12 @@ typedef struct _ngf_context_shared_state {
 
 // Swapchain state.
 typedef struct _ngf_swapchain {
-  VkSwapchainKHR vk_swapchain;
-  VkImage       *images;
-  VkSemaphore   *image_semaphores;
-  uint32_t       num_images; // total number of images in the swapchain.
-  uint32_t       image_idx;  // index of currently acquired image.
+  VkSwapchainKHR   vk_swapchain;
+  VkImage         *images;
+  VkSemaphore     *image_semaphores;
+  VkPresentModeKHR present_mode;
+  uint32_t         num_images; // total number of images in the swapchain.
+  uint32_t         image_idx;  // index of currently acquired image.
 } _ngf_swapchain;
 
 struct ngf_cmd_buffer {
@@ -253,9 +254,12 @@ static VkPolygonMode get_vk_polygon_mode(ngf_polygon_mode m) {
 
 static VkDynamicState get_vk_dynamic_state(ngf_dynamic_state_flags s) {
   switch(s) {
-  case NGF_DYNAMIC_STATE_VIEWPORT: return VK_DYNAMIC_STATE_VIEWPORT;
-  case NGF_DYNAMIC_STATE_SCISSOR: return VK_DYNAMIC_STATE_SCISSOR;
-  case NGF_DYNAMIC_STATE_LINE_WIDTH: return VK_DYNAMIC_STATE_LINE_WIDTH;
+  case NGF_DYNAMIC_STATE_VIEWPORT:
+    return VK_DYNAMIC_STATE_VIEWPORT;
+  case NGF_DYNAMIC_STATE_SCISSOR:
+    return VK_DYNAMIC_STATE_SCISSOR;
+  case NGF_DYNAMIC_STATE_LINE_WIDTH:
+    return VK_DYNAMIC_STATE_LINE_WIDTH;
   case NGF_DYNAMIC_STATE_BLEND_CONSTANTS:
     return VK_DYNAMIC_STATE_BLEND_CONSTANTS;
   case NGF_DYNAMIC_STATE_STENCIL_REFERENCE:
@@ -600,31 +604,46 @@ static ngf_error _ngf_create_swapchain(
   assert(swapchain_info);
   assert(swapchain);
 
-  ngf_error err = NGF_ERROR_OK;
-  VkResult vk_err = VK_SUCCESS;
-
-  // Create swapchain.
-  const bool exclusive_sharing = _vk.gfx_family_idx == _vk.present_family_idx;
-  const VkSharingMode sharing_mode =
-    exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
-  const uint32_t num_sharing_queue_families = exclusive_sharing ? 0 : 2;
-  const uint32_t sharing_queue_families[] = { _vk.gfx_family_idx,
-      _vk.present_family_idx };
-  static const VkPresentModeKHR vk_present_modes[] = {
+  ngf_error       err           = NGF_ERROR_OK;
+  VkResult        vk_err        = VK_SUCCESS;
+  VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+ 
+  // Check available present modes and fall back on FIFO if the requested
+  // present mode is not supported.
+  uint32_t npresent_modes = 0u;;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, surface,
+                                            &npresent_modes, NULL);
+  VkPresentModeKHR *present_modes =
+      alloca(sizeof(VkPresentModeKHR) * npresent_modes);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, surface,
+                                            &npresent_modes, present_modes);
+  static const VkPresentModeKHR modes[] = {
     VK_PRESENT_MODE_FIFO_KHR,
     VK_PRESENT_MODE_IMMEDIATE_KHR
   };
-  uint32_t nformats;
+  const VkPresentModeKHR requested_present_mode =
+      modes[swapchain_info->present_mode];
+  for (uint32_t p = 0u; p < npresent_modes; ++p) {
+    if (present_modes[p] == requested_present_mode) {
+      present_mode = present_modes[p];
+      break;
+    }
+  }
+
+  // Check if the requested surface format is valid.
+  uint32_t nformats = 0u;
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, NULL);
   VkSurfaceFormatKHR *formats = alloca(sizeof(VkSurfaceFormatKHR) * nformats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats,
                                         formats);
-  const VkFormat requested_format = get_vk_image_format(swapchain_info->cfmt);
-  const VkColorSpaceKHR color_space = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  const VkColorSpaceKHR color_space      = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; // TODO: use correct colorspace here.
+  const VkFormat        requested_format =
+      get_vk_image_format(swapchain_info->cfmt);
   if (!(nformats == 1 && formats[0].format == VK_FORMAT_UNDEFINED)) {
     bool found = false;
-    for (size_t f = 0; !found && f < nformats; ++f)
+    for (size_t f = 0; !found && f < nformats; ++f) {
       found = formats[f].format == requested_format;
+    }
     if (!found) {
       err = NGF_ERROR_INVALID_SURFACE_FORMAT;
       goto _ngf_create_swapchain_cleanup;
@@ -633,26 +652,38 @@ static ngf_error _ngf_create_swapchain(
   VkSurfaceCapabilitiesKHR surface_caps;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vk.phys_dev, surface,
                                             &surface_caps);
+
+  // Determine if we should use exclusive or concurrent sharing mode for
+  // swapchain images.
+  const bool exclusive_sharing =
+      _vk.gfx_family_idx == _vk.present_family_idx;
+  const VkSharingMode sharing_mode =
+    exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
+  const uint32_t num_sharing_queue_families = exclusive_sharing ? 0 : 2;
+  const uint32_t sharing_queue_families[] = { _vk.gfx_family_idx,
+                                              _vk.present_family_idx };
+;
+  // Create swapchain.
   const VkSwapchainCreateInfoKHR vk_sc_info = {
-    .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-    .pNext = NULL,
-    .flags = 0,
-    .surface = surface,
-    .minImageCount = swapchain_info->capacity_hint,
-    .imageFormat = requested_format,
+    .sType           = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+    .pNext           = NULL,
+    .flags           = 0,
+    .surface         = surface,
+    .minImageCount   = swapchain_info->capacity_hint,
+    .imageFormat     = requested_format,
     .imageColorSpace = color_space,
-    .imageExtent = {
-      .width = swapchain_info->width,
-      .height = swapchain_info->height
-    },
-    .imageArrayLayers = 1,
-    .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-    .imageSharingMode = sharing_mode,
+    .imageExtent     = {
+       .width  = swapchain_info->width,
+       .height = swapchain_info->height
+     },
+    .imageArrayLayers      = 1,
+    .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+    .imageSharingMode      = sharing_mode,
     .queueFamilyIndexCount = num_sharing_queue_families,
-    .pQueueFamilyIndices = sharing_queue_families,
-    .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-    .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-    .presentMode = vk_present_modes[swapchain_info->present_mode]
+    .pQueueFamilyIndices   = sharing_queue_families,
+    .preTransform          = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
+    .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+    .presentMode           = present_mode
   };
   vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL,
                                 &swapchain->vk_swapchain);
@@ -662,9 +693,8 @@ static ngf_error _ngf_create_swapchain(
   }
 
   // Obtain swapchain images.
-  vk_err =
-      vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
-                              &swapchain->num_images, NULL);
+  vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
+                                   &swapchain->num_images, NULL);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
@@ -674,9 +704,8 @@ static ngf_error _ngf_create_swapchain(
     err = NGF_ERROR_OUTOFMEM;
     goto _ngf_create_swapchain_cleanup;
   }
-  vk_err =
-      vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
-                              &swapchain->num_images, swapchain->images);
+  vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
+                                   &swapchain->num_images, swapchain->images);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
@@ -694,9 +723,8 @@ static ngf_error _ngf_create_swapchain(
       .pNext = NULL,
       .flags = 0
     };
-    vk_err =
-        vkCreateSemaphore(_vk.device, &sem_info, NULL,
-                          &swapchain->image_semaphores[s]);
+    vk_err = vkCreateSemaphore(_vk.device, &sem_info, NULL,
+                               &swapchain->image_semaphores[s]);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
@@ -772,14 +800,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       err = NGF_ERROR_SURFACE_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
-
-    // TODO: check if present mode is available, use FIFO if not.
-    uint32_t pmc;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
-                                              NULL);
-    VkPresentModeKHR *pm = alloca(sizeof(VkPresentModeKHR) * pmc);
-    vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, ctx->surface, &pmc,
-                                              pm);
 
     // Create the swapchain itself.
     err = _ngf_create_swapchain(swapchain_info, ctx->surface, &ctx->swapchain);
