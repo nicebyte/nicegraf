@@ -933,8 +933,9 @@ ngf_error ngf_resize_context(ngf_context *ctx,
                              uint32_t new_height) {
   assert(ctx);
   ngf_error err = NGF_ERROR_OK;
+
   _ngf_destroy_swapchain(&ctx->swapchain);
-  ctx->swapchain_info.width = new_width;
+  ctx->swapchain_info.width  = new_width;
   ctx->swapchain_info.height = new_height;
   err = _ngf_create_swapchain(&ctx->swapchain_info, ctx->surface,
                               &ctx->swapchain);
@@ -1015,12 +1016,18 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   assert(info);
   assert(result);
   _NGF_FAKE_USE(info);
+
   ngf_cmd_buffer *cmd_buf = NGF_ALLOC(ngf_cmd_buffer);
   *result = cmd_buf;
-  cmd_buf->vkcmdbuf = VK_NULL_HANDLE;
-  cmd_buf->vksem = VK_NULL_HANDLE;
-  cmd_buf->vkpool = VK_NULL_HANDLE;
+  if (cmd_buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+
+  cmd_buf->vkcmdbuf  = VK_NULL_HANDLE;
+  cmd_buf->vksem     = VK_NULL_HANDLE;
+  cmd_buf->vkpool    = VK_NULL_HANDLE;
   cmd_buf->recording = false;
+
   return NGF_ERROR_OK;
 }
 
