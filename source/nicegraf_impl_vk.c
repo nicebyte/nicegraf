@@ -93,10 +93,15 @@ typedef struct _ngf_swapchain {
   VkImageView     *image_views;
   VkSemaphore     *image_semaphores;
   VkFramebuffer   *framebuffers;
-  VkRenderPass     compatible_renderpass;
   VkPresentModeKHR present_mode;
   uint32_t         num_images; // total number of images in the swapchain.
   uint32_t         image_idx;  // index of currently acquired image.
+  struct {
+    VkAttachmentDescription attachment_descs[2];
+    VkAttachmentReference   attachment_refs[2];
+    VkSubpassDescription    subpass_desc;
+    VkRenderPass            vk_pass;
+  } renderpass;
 } _ngf_swapchain;
 
 struct ngf_cmd_buffer {
@@ -142,6 +147,12 @@ struct ngf_pipeline_layout {
 struct ngf_image {
   VkImage vkimg;
   VmaAllocation alloc;
+};
+
+struct ngf_render_target {
+  VkRenderPass  render_pass;
+  bool          is_default;
+  // TODO: non-default render target
 };
 
 NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
@@ -606,8 +617,8 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_views) {
     NGF_FREEN(swapchain->image_views, swapchain->num_images);
   }
-  if (swapchain->compatible_renderpass != VK_NULL_HANDLE) {
-    vkDestroyRenderPass(_vk.device, swapchain->compatible_renderpass, NULL);
+  if (swapchain->renderpass.vk_pass != VK_NULL_HANDLE) {
+    vkDestroyRenderPass(_vk.device, swapchain->renderpass.vk_pass, NULL);
   }
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
@@ -773,10 +784,12 @@ static ngf_error _ngf_create_swapchain(
     .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
     .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
   };
+  swapchain->renderpass.attachment_descs[0] = color_attachment_desc;
   const VkAttachmentReference color_attachment_ref = {
     .attachment = 0u,
     .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
   };
+  swapchain->renderpass.attachment_refs[0] = color_attachment_ref;
   const VkSubpassDescription subpass_desc = {
     .flags = 0u,
     .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -789,6 +802,7 @@ static ngf_error _ngf_create_swapchain(
     .preserveAttachmentCount = 0u,
     .pPreserveAttachments    = NULL
   };
+  swapchain->renderpass.subpass_desc = subpass_desc;
   const VkRenderPassCreateInfo renderpass_info = {
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
     .pNext = NULL,
@@ -801,7 +815,7 @@ static ngf_error _ngf_create_swapchain(
     .pDependencies = NULL
   };
   vk_err = vkCreateRenderPass(_vk.device, &renderpass_info, NULL,
-                              &swapchain->compatible_renderpass);
+                              &swapchain->renderpass.vk_pass);
   // TODO: check vk_err
 
   // Create framebuffers for swapchain images.
@@ -814,7 +828,7 @@ static ngf_error _ngf_create_swapchain(
     .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
     .pNext           = NULL,
     .flags           = 0u,
-    .renderPass      = swapchain->compatible_renderpass,
+    .renderPass      = swapchain->renderpass.vk_pass,
     .attachmentCount = 1u, // TODO: handle depth
     .pAttachments    = swapchain->image_views,
     .width           = swapchain_info->width,
@@ -1775,13 +1789,23 @@ ngf_error ngf_default_render_target(
   const ngf_clear *clear_color,
   const ngf_clear *clear_depth,
   ngf_render_target **result) {
+  assert(result);
+  ngf_error err = NGF_ERROR_OK;
   _NGF_FAKE_USE(color_load_op);
   _NGF_FAKE_USE(depth_load_op);
   _NGF_FAKE_USE(clear_color);
   _NGF_FAKE_USE(clear_depth);
-  _NGF_FAKE_USE(result);
-  // TODO: implement
-  return NGF_ERROR_OK;
+  
+  ngf_render_target *rt = NGF_ALLOC(ngf_render_target);
+  *result = rt;
+  if (rt == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_default_render_target_cleanup;
+  }
+  rt->is_default = true;
+
+ngf_default_render_target_cleanup:
+  return err;
 }
 
 void ngf_debug_message_callback(void *userdata,
