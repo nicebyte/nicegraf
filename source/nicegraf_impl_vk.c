@@ -1061,20 +1061,24 @@ void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   assert(cmd_buf);
-  ngf_error err = NGF_ERROR_OK;
+  ngf_error err   = NGF_ERROR_OK;
   VkResult vk_err = VK_SUCCESS;
+
+  // Verify we're not recording.
   if (cmd_buf->recording) {
     err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
     goto ngf_start_cmd_buffer_cleanup;
   }
+
+  // Create command buffer of reset existing one.
   _ngf_inc_recorder_count();
   cmd_buf->recording = true;
-  if (cmd_buf->vkcmdbuf == VK_NULL_HANDLE) {
+  if (cmd_buf->vkcmdbuf == VK_NULL_HANDLE) { // no handle, create new cmdbuf.
     VkCommandBufferAllocateInfo vk_cmdbuf_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .pNext = NULL,
-      .commandPool = CURRENT_CONTEXT->cmd_pool,
-      .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext              = NULL,
+      .commandPool        = CURRENT_CONTEXT->cmd_pool,
+      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
       .commandBufferCount = 1u
     };
     vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info,
@@ -1085,16 +1089,17 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
     }
     cmd_buf->vkpool = CURRENT_CONTEXT->cmd_pool;
     VkCommandBufferBeginInfo cmd_buf_begin = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .pNext = NULL,
-      .flags = 0,
+      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
       .pInheritanceInfo = NULL
     };
     vkBeginCommandBuffer(cmd_buf->vkcmdbuf, &cmd_buf_begin);
-  } else {
-    vkResetCommandBuffer(cmd_buf->vkcmdbuf,
-                         VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT);
+  } else { // have handle, reuse resources
+    vkResetCommandBuffer(cmd_buf->vkcmdbuf, 0);
   }
+  
+  // Create semaphore.
   if (cmd_buf->vksem == VK_NULL_HANDLE) {
     VkSemaphoreCreateInfo vk_sem_info = {
       .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
