@@ -93,6 +93,7 @@ typedef struct _ngf_swapchain {
   VkImageView     *image_views;
   VkSemaphore     *image_semaphores;
   VkFramebuffer   *framebuffers;
+  VkRenderPass     compatible_renderpass;
   VkPresentModeKHR present_mode;
   uint32_t         num_images; // total number of images in the swapchain.
   uint32_t         image_idx;  // index of currently acquired image.
@@ -605,7 +606,9 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_views) {
     NGF_FREEN(swapchain->image_views, swapchain->num_images);
   }
-
+  if (swapchain->compatible_renderpass != VK_NULL_HANDLE) {
+    vkDestroyRenderPass(_vk.device, swapchain->compatible_renderpass, NULL);
+  }
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
@@ -757,6 +760,49 @@ static ngf_error _ngf_create_swapchain(
                                &swapchain->image_views[i]);
     // TODO: check vk_err
   }
+
+  // Create a renderpass to use for framebuffer initialization.
+  const VkAttachmentDescription color_attachment_desc = {
+    .flags          = 0u,
+    .format         = requested_format,
+    .samples        = VK_SAMPLE_COUNT_1_BIT, // TODO: multisampling
+    .loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+    .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+    .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+    .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+  };
+  const VkAttachmentReference color_attachment_ref = {
+    .attachment = 0u,
+    .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+  };
+  const VkSubpassDescription subpass_desc = {
+    .flags = 0u,
+    .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    .inputAttachmentCount    = 0u,
+    .pInputAttachments       = NULL,
+    .colorAttachmentCount    = 1u,
+    .pColorAttachments       = &color_attachment_ref,
+    .pResolveAttachments     = NULL, // TODO: multisampling
+    .pDepthStencilAttachment = NULL, // TODO: depth,
+    .preserveAttachmentCount = 0u,
+    .pPreserveAttachments    = NULL
+  };
+  const VkRenderPassCreateInfo renderpass_info = {
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u,
+    .attachmentCount = 1u, // TODO: depth
+    .pAttachments = &color_attachment_desc,
+    .subpassCount = 1u,
+    .pSubpasses = &subpass_desc,
+    .dependencyCount = 0u,
+    .pDependencies = NULL
+  };
+  vk_err = vkCreateRenderPass(_vk.device, &renderpass_info, NULL,
+                              &swapchain->compatible_renderpass);
+  // TODO: check vk_err
 
   // Create framebuffers for swapchain images.
   swapchain->framebuffers = NGF_ALLOCN(VkFramebuffer, swapchain->num_images);
