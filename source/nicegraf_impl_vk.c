@@ -810,21 +810,21 @@ static ngf_error _ngf_create_swapchain(
     err = NGF_ERROR_OUTOFMEM;
     goto _ngf_create_swapchain_cleanup;
   }
-  /*VkFramebufferCreateInfo fb_info = {
+  VkFramebufferCreateInfo fb_info = {
     .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
     .pNext           = NULL,
     .flags           = 0u,
-    .renderPass      = compatible_renderpass,
+    .renderPass      = swapchain->compatible_renderpass,
     .attachmentCount = 1u, // TODO: handle depth
     .pAttachments    = swapchain->image_views,
-    .width           = swapchain->width,
-    .height          = swapchain->height
+    .width           = swapchain_info->width,
+    .height          = swapchain_info->height
   };
   for (uint32_t f = 0u; f < swapchain->num_images; ++f) {
     vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL,
                                  &swapchain->framebuffers[f]);
     // TODO: check vk_err
-  }*/
+  }
 
   // Create semaphores to be signaled when a swapchain image becomes available.
   swapchain->image_semaphores = NGF_ALLOCN(VkSemaphore, swapchain->num_images);
