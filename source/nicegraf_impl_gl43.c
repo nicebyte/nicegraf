@@ -1307,7 +1307,7 @@ ngf_error ngf_default_render_target(
     default_render_target->framebuffer = 0;
     *result = default_render_target;
   } else {
-    *result = NULL;
+    return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;
   }
   return NGF_ERROR_OK;
 }
