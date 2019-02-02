@@ -90,7 +90,9 @@ typedef struct _ngf_context_shared_state {
 typedef struct _ngf_swapchain {
   VkSwapchainKHR   vk_swapchain;
   VkImage         *images;
+  VkImageView     *image_views;
   VkSemaphore     *image_semaphores;
+  VkFramebuffer   *framebuffers;
   VkPresentModeKHR present_mode;
   uint32_t         num_images; // total number of images in the swapchain.
   uint32_t         image_idx;  // index of currently acquired image.
@@ -592,6 +594,18 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_semaphores != NULL) {
     NGF_FREEN(swapchain->image_semaphores, swapchain->num_images);
   }
+  // TODO: call vkDestroyFramebuffer
+  if (swapchain->framebuffers != NULL) {
+    NGF_FREEN(swapchain->framebuffers, swapchain->num_images);
+  }
+  for (uint32_t v = 0u;
+       swapchain->image_views != NULL && v < swapchain->num_images; ++v) {
+    vkDestroyImageView(_vk.device, swapchain->image_views[v], NULL);
+  }
+  if (swapchain->image_views) {
+    NGF_FREEN(swapchain->image_views, swapchain->num_images);
+  }
+
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
@@ -710,6 +724,61 @@ static ngf_error _ngf_create_swapchain(
     err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
   }
+
+  // Create image views for swapchain images.
+  swapchain->image_views =  NGF_ALLOCN(VkImageView, swapchain->num_images);
+  if (swapchain->image_views == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto _ngf_create_swapchain_cleanup;
+  }
+  for (uint32_t i = 0u; i < swapchain->num_images; ++i) {
+    const VkImageViewCreateInfo image_view_info = {
+      .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .pNext      = NULL,
+      .flags      = 0u,
+      .image      = swapchain->images[i],
+      .viewType   = VK_IMAGE_VIEW_TYPE_2D,
+      .format     = requested_format,
+      .components = {
+        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .a =VK_COMPONENT_SWIZZLE_IDENTITY
+      },
+      .subresourceRange = {
+        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel   = 0u,
+        .levelCount     = 1u,
+        .baseArrayLayer = 0u,
+        .layerCount     = 1u
+      }
+    };
+    vk_err = vkCreateImageView(_vk.device, &image_view_info, NULL,
+                               &swapchain->image_views[i]);
+    // TODO: check vk_err
+  }
+
+  // Create framebuffers for swapchain images.
+  swapchain->framebuffers = NGF_ALLOCN(VkFramebuffer, swapchain->num_images);
+  if (swapchain->framebuffers == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto _ngf_create_swapchain_cleanup;
+  }
+  /*VkFramebufferCreateInfo fb_info = {
+    .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+    .pNext           = NULL,
+    .flags           = 0u,
+    .renderPass      = compatible_renderpass,
+    .attachmentCount = 1u, // TODO: handle depth
+    .pAttachments    = swapchain->image_views,
+    .width           = swapchain->width,
+    .height          = swapchain->height
+  };
+  for (uint32_t f = 0u; f < swapchain->num_images; ++f) {
+    vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL,
+                                 &swapchain->framebuffers[f]);
+    // TODO: check vk_err
+  }*/
 
   // Create semaphores to be signaled when a swapchain image becomes available.
   swapchain->image_semaphores = NGF_ALLOCN(VkSemaphore, swapchain->num_images);
