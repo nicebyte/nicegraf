@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 
+#define _CRT_SECURE_NO_WARNINGS
 #include "nicegraf.h"
 
 #include "dynamic_array.h"
@@ -133,8 +134,9 @@ struct ngf_context {
 };
 
 struct ngf_shader_stage {
-  VkShaderModule vkmodule;
-  VkShaderStageFlagBits vkstage;
+  VkShaderModule         vk_module;
+  VkShaderStageFlagBits  vk_stage_bits;
+  char                  *entry_point_name;
 };
 
 struct ngf_graphics_pipeline {
@@ -1446,19 +1448,24 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     .codeSize = (info->content_length)
   };
   VkResult vkerr =
-    vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vkmodule);
+    vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vk_module);
   if (vkerr != VK_SUCCESS) {
     NGF_FREE(stage);
     return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
   }
-  stage->vkstage = get_vk_shader_stage(info->type);
+  stage->vk_stage_bits           = get_vk_shader_stage(info->type);
+  size_t entry_point_name_length = strlen(info->entry_point_name) + 1u;
+  stage->entry_point_name        = NGF_ALLOCN(char, entry_point_name_length);
+  strncpy(stage->entry_point_name,
+          info->entry_point_name, entry_point_name_length);
 
   return NGF_ERROR_OK;
 }
 
 void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
   if (stage) {
-    vkDestroyShaderModule(_vk.device, stage->vkmodule, NULL);
+    vkDestroyShaderModule(_vk.device, stage->vk_module, NULL);
+    NGF_FREEN(stage->entry_point_name, strlen(stage->entry_point_name) + 1u);
     NGF_FREE(stage);
   }
 }
@@ -1493,9 +1500,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vk_shader_stages[s].pNext               = NULL;
     vk_shader_stages[s].flags               = 0u;
-    vk_shader_stages[s].stage               = info->shader_stages[s]->vkstage;
-    vk_shader_stages[s].module              = info->shader_stages[s]->vkmodule;
-    vk_shader_stages[s].pName               = "";
+    vk_shader_stages[s].stage               = info->shader_stages[s]->vk_stage_bits;
+    vk_shader_stages[s].module              = info->shader_stages[s]->vk_module;
+    vk_shader_stages[s].pName               = info->shader_stages[s]->entry_point_name,
     vk_shader_stages[s].pSpecializationInfo = NULL;
   }
 
