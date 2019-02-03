@@ -1422,11 +1422,12 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   if (stage == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
+
   VkShaderModuleCreateInfo vk_sm_info = {
-    .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-    .pNext = NULL,
-    .flags = 0u,
-    .pCode = (uint32_t*) info->content,
+    .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+    .pNext    = NULL,
+    .flags    = 0u,
+    .pCode    = (uint32_t*) info->content,
     .codeSize = (info->content_length << 2)
   };
   VkResult vkerr =
@@ -1436,6 +1437,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
   }
   stage->vkstage = get_vk_shader_stage(info->type);
+
   return NGF_ERROR_OK;
 }
 
@@ -1453,6 +1455,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   VkVertexInputBindingDescription *vk_binding_descs = NULL;
   VkVertexInputAttributeDescription *vk_attrib_descs = NULL;
   ngf_error err = NGF_ERROR_OK;
+
+  // Allocate space for the pipeline object.
   *result = NGF_ALLOC(ngf_graphics_pipeline);
   ngf_graphics_pipeline *pipeline = *result;
   if (pipeline == NULL) {
@@ -1462,7 +1466,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
 
   // Prepare shader stages.
   VkPipelineShaderStageCreateInfo vk_shader_stages[5];
-  assert(NGF_ARRAYSIZE(vk_shader_stages) == NGF_ARRAYSIZE(info->shader_stages));
+  assert(NGF_ARRAYSIZE(vk_shader_stages) ==
+         NGF_ARRAYSIZE(info->shader_stages));
   if (info->nshader_stages >= NGF_ARRAYSIZE(vk_shader_stages)) {
     err = NGF_ERROR_OUT_OF_BOUNDS;
     goto ngf_create_graphics_pipeline_cleanup;
@@ -1470,11 +1475,11 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
     vk_shader_stages[s].sType =
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vk_shader_stages[s].pNext = NULL;
-    vk_shader_stages[s].flags = 0u;
-    vk_shader_stages[s].stage = info->shader_stages[s]->vkstage;
-    vk_shader_stages[s].module = info->shader_stages[s]->vkmodule;
-    vk_shader_stages[s].pName = NULL;
+    vk_shader_stages[s].pNext               = NULL;
+    vk_shader_stages[s].flags               = 0u;
+    vk_shader_stages[s].stage               = info->shader_stages[s]->vkstage;
+    vk_shader_stages[s].module              = info->shader_stages[s]->vkmodule;
+    vk_shader_stages[s].pName               = NULL;
     vk_shader_stages[s].pSpecializationInfo = NULL;
   }
 
@@ -1490,22 +1495,24 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
 
   for (uint32_t i = 0u; i < info->input_info->nvert_buf_bindings; ++i) {
-    vk_binding_descs[i].binding =
-        info->input_info->vert_buf_bindings[i].binding;
-    vk_binding_descs[i].stride =
-        info->input_info->vert_buf_bindings[i].stride;
-    vk_binding_descs[i].inputRate = get_vk_input_rate(
-        info->input_info->vert_buf_bindings[i].input_rate);
+    VkVertexInputBindingDescription   *vk_binding_desc = &vk_binding_descs[i];
+    const ngf_vertex_buf_binding_desc *binding_desc =
+        &info->input_info->vert_buf_bindings[i];
+    vk_binding_desc->binding    = binding_desc->binding;
+    vk_binding_descs->stride    = binding_desc->stride;
+    vk_binding_descs->inputRate = get_vk_input_rate(binding_desc->input_rate);
   }
 
   for (uint32_t i = 0u; i < info->input_info->nattribs; ++i) {
-    vk_attrib_descs[i].location = info->input_info->attribs[i].location;
-    vk_attrib_descs[i].binding = info->input_info->attribs[i].binding;
-    vk_attrib_descs[i].offset = info->input_info->attribs[i].offset;
-    vk_attrib_descs[i].format = get_vk_vertex_format(
-        info->input_info->attribs[i].type,
-        info->input_info->attribs[i].size,
-        info->input_info->attribs[i].normalized);
+    VkVertexInputAttributeDescription *vk_attrib_desc = &vk_attrib_descs[i];
+    const ngf_vertex_attrib_desc      *attrib_desc =
+        &info->input_info->attribs[i];
+    vk_attrib_desc->location = attrib_desc->location;
+    vk_attrib_desc->binding  = attrib_desc->binding;
+    vk_attrib_desc->offset   = attrib_desc->offset;
+    vk_attrib_desc->format   = get_vk_vertex_format(attrib_desc->type,
+                                                    attrib_desc->size,
+                                                    attrib_desc->normalized);
   }
 
   VkPipelineVertexInputStateCreateInfo vertex_input = {
@@ -1694,7 +1701,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     .pColorBlendState = &color_blend,
     .pDynamicState = &dynamic_state,
     .layout = VK_NULL_HANDLE, // TODO set layout
-    .renderPass = VK_NULL_HANDLE,
+    .renderPass = info->compatible_render_target->render_pass,
     .subpass = 0u,
     .basePipelineHandle = VK_NULL_HANDLE,
     .basePipelineIndex = -1

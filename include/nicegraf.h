@@ -124,7 +124,7 @@ typedef enum ngf_error {
   /** Give sampler address mode is not supported by the active backend. */
   NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE,
 
-  NGF_ERROR_RENDER_TARGET_CREATION_FAILED,
+  NGF_ERROR_RENDER_TARGET_CREATION_FAILED
   /*..add new errors above this line */
 } ngf_error ;
 
