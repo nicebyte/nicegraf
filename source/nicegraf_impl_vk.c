@@ -1987,3 +1987,9 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
     vkCmdDraw(buf->vkcmdbuf, nelements, ninstances, first_element, 0u);
   }
 }
+
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
+                           const ngf_graphics_pipeline *pipeline) {
+  vkCmdBindPipeline(buf->vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipeline->vk_pipeline);
+}
