@@ -97,6 +97,8 @@ typedef struct _ngf_swapchain {
   VkPresentModeKHR present_mode;
   uint32_t         num_images; // total number of images in the swapchain.
   uint32_t         image_idx;  // index of currently acquired image.
+  uint32_t         width;
+  uint32_t         height;
   struct {
     VkAttachmentDescription attachment_descs[2];
     VkAttachmentReference   attachment_refs[2];
@@ -155,6 +157,8 @@ struct ngf_render_target {
  _NGF_DARRAY_OF(VkClearValue) clear_values;
   uint32_t                    nclear_values;
   bool                        is_default;
+  uint32_t                    width;
+  uint32_t                    height;
   // TODO: non-default render target
 };
 
@@ -911,6 +915,8 @@ static ngf_error _ngf_create_swapchain(
     }
   }
   swapchain->image_idx = 0U;
+  swapchain->width     = swapchain_info->width;
+  swapchain->height    = swapchain_info->height;
 
 _ngf_create_swapchain_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -1943,6 +1949,8 @@ ngf_error ngf_default_render_target(
       vk_clear_color->color.float32[2] = clear_color->clear_color[2];
       vk_clear_color->color.float32[3] = clear_color->clear_color[3];
     }
+    rt->width  = swapchain->width;
+    rt->height = swapchain->height;
     // TODO: depth clear
   } else {
     err = NGF_ERROR_NO_DEFAULT_RENDER_TARGET;
@@ -1975,7 +1983,11 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
     .framebuffer     = fb,
     .clearValueCount = 1u, // TODO: depth
     .pClearValues    = target->clear_values.data,
-    .renderPass      = target->render_pass
+    .renderPass      = target->render_pass,
+    .renderArea = {
+      .offset = {0u, 0u},
+      .extent = {target->width, target->height}
+     }
   };
   vkCmdBeginRenderPass(buf->vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -2007,7 +2019,7 @@ void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
     .width    = (float)r->width,
     .height   = (float)r->height,
     .minDepth = 0.0f,  // TODO: add depth parameter
-    .maxDepth = 100.0f // TODO: add max depth parameter
+    .maxDepth = 1.0f   // TODO: add max depth parameter
   };
   vkCmdSetViewport(buf->vkcmdbuf, 0u, 1u, &viewport);
 }
