@@ -1443,7 +1443,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     .pNext    = NULL,
     .flags    = 0u,
     .pCode    = (uint32_t*) info->content,
-    .codeSize = (info->content_length << 2)
+    .codeSize = (info->content_length)
   };
   VkResult vkerr =
     vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vkmodule);
@@ -1495,7 +1495,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     vk_shader_stages[s].flags               = 0u;
     vk_shader_stages[s].stage               = info->shader_stages[s]->vkstage;
     vk_shader_stages[s].module              = info->shader_stages[s]->vkmodule;
-    vk_shader_stages[s].pName               = NULL;
+    vk_shader_stages[s].pName               = "";
     vk_shader_stages[s].pSpecializationInfo = NULL;
   }
 
