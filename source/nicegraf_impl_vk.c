@@ -2000,3 +2000,22 @@ void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
   vkCmdBindPipeline(buf->vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
+void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+  const VkViewport viewport = {
+    .x        = (float)r->x,
+    .y        = (float)r->y,
+    .width    = (float)r->width,
+    .height   = (float)r->height,
+    .minDepth = 0.0f,  // TODO: add depth parameter
+    .maxDepth = 100.0f // TODO: add max depth parameter
+  };
+  vkCmdSetViewport(buf->vkcmdbuf, 0u, 1u, &viewport);
+}
+
+void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+  const VkRect2D scissor_rect = {
+    .offset = {r->x, r->y},
+    .extent = {r->width, r->height}
+  };
+  vkCmdSetScissor(buf->vkcmdbuf, 0u, 1u, &scissor_rect);
+}
