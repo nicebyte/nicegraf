@@ -114,19 +114,19 @@ struct ngf_cmd_buffer {
 
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
-  _NGF_DARRAY_OF(ngf_cmd_buffer) submitted_cmdbuffers;
-  _NGF_DARRAY_OF(VkSemaphore)    wait_vksemaphores; // 1 per submitted cmdbuf.
-  VkFence                        fence; // signaled when frame is done.
-  bool                           active;
+ _NGF_DARRAY_OF(ngf_cmd_buffer) submitted_cmdbuffers;
+ _NGF_DARRAY_OF(VkSemaphore)    wait_vksemaphores; // 1 per submitted cmdbuf.
+  VkFence                       fence; // signaled when frame is done.
+  bool                          active;
 } _ngf_frame_resources;
 
 struct ngf_context {
-  _ngf_frame_resources       *frame_sync;
-  _ngf_context_shared_state **shared_state;
-  _ngf_swapchain              swapchain;
-  ngf_swapchain_info          swapchain_info;
-  VmaAllocator                allocator;
-  VkCommandPool               cmd_pool;
+ _ngf_frame_resources       *frame_sync;
+ _ngf_context_shared_state **shared_state;
+ _ngf_swapchain              swapchain;
+  ngf_swapchain_info         swapchain_info;
+  VmaAllocator               allocator;
+  VkCommandPool              cmd_pool;
   VkSurfaceKHR                surface;
   uint32_t                    frame_number;
   uint32_t                    max_inflight_frames;
@@ -151,8 +151,10 @@ struct ngf_image {
 };
 
 struct ngf_render_target {
-  VkRenderPass  render_pass;
-  bool          is_default;
+  VkRenderPass                render_pass;
+ _NGF_DARRAY_OF(VkClearValue) clear_values;
+  uint32_t                    nclear_values;
+  bool                        is_default;
   // TODO: non-default render target
 };
 
@@ -162,14 +164,14 @@ NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
 static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
   switch(sample_count) {
   case 0u:
-  case 1u: return VK_SAMPLE_COUNT_1_BIT;
-  case 2u: return VK_SAMPLE_COUNT_2_BIT;
-  case 4u: return VK_SAMPLE_COUNT_4_BIT;
-  case 8u: return VK_SAMPLE_COUNT_8_BIT;
+  case 1u:  return VK_SAMPLE_COUNT_1_BIT;
+  case 2u:  return VK_SAMPLE_COUNT_2_BIT;
+  case 4u:  return VK_SAMPLE_COUNT_4_BIT;
+  case 8u:  return VK_SAMPLE_COUNT_8_BIT;
   case 16u: return VK_SAMPLE_COUNT_16_BIT;
   case 32u: return VK_SAMPLE_COUNT_32_BIT;
   case 64u: return VK_SAMPLE_COUNT_64_BIT;
-  default: assert(false); // TODO: return error?
+  default:  assert(false); // TODO: return error?
   }
   return VK_SAMPLE_COUNT_1_BIT;
 }
@@ -210,7 +212,7 @@ static VkStencilOp get_vk_stencil_op(ngf_stencil_op op) {
   return ops[op];
 }
 
-static VkAttachmentLoadOp get_ck_load_op(ngf_attachment_load_op op) {
+static VkAttachmentLoadOp get_vk_load_op(ngf_attachment_load_op op) {
   static const VkAttachmentLoadOp ops[NGF_LOAD_OP_COUNT] = {
     VK_ATTACHMENT_LOAD_OP_DONT_CARE,
     VK_ATTACHMENT_LOAD_OP_LOAD,
@@ -616,7 +618,10 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_semaphores != NULL) {
     NGF_FREEN(swapchain->image_semaphores, swapchain->num_images);
   }
-  // TODO: call vkDestroyFramebuffer
+  for (uint32_t f = 0u; swapchain->framebuffers && f < swapchain->num_images;
+       ++f) {
+    vkDestroyFramebuffer(_vk.device, swapchain->framebuffers[f], NULL);
+  }
   if (swapchain->framebuffers != NULL) {
     NGF_FREEN(swapchain->framebuffers, swapchain->num_images);
   }
@@ -779,7 +784,10 @@ static ngf_error _ngf_create_swapchain(
     };
     vk_err = vkCreateImageView(_vk.device, &image_view_info, NULL,
                                &swapchain->image_views[i]);
-    // TODO: check vk_err
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      goto _ngf_create_swapchain_cleanup;
+    }
   }
 
   // Create a renderpass to use for framebuffer initialization.
@@ -835,7 +843,10 @@ static ngf_error _ngf_create_swapchain(
   }
   vk_err = vkCreateRenderPass(_vk.device, &swapchain->renderpass.info, NULL,
                               &swapchain->renderpass.vk_handle);
-  // TODO: check vk_err
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+    goto _ngf_create_swapchain_cleanup;
+  }
 
   // Create framebuffers for swapchain images.
   swapchain->framebuffers = NGF_ALLOCN(VkFramebuffer, swapchain->num_images);
@@ -843,20 +854,24 @@ static ngf_error _ngf_create_swapchain(
     err = NGF_ERROR_OUTOFMEM;
     goto _ngf_create_swapchain_cleanup;
   }
-  VkFramebufferCreateInfo fb_info = {
-    .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-    .pNext           = NULL,
-    .flags           = 0u,
-    .renderPass      = swapchain->renderpass.vk_handle,
-    .attachmentCount = 1u, // TODO: handle depth
-    .pAttachments    = swapchain->image_views,
-    .width           = swapchain_info->width,
-    .height          = swapchain_info->height
-  };
   for (uint32_t f = 0u; f < swapchain->num_images; ++f) {
+    VkFramebufferCreateInfo fb_info = {
+      .sType           =  VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .pNext           =  NULL,
+      .flags           =  0u,
+      .renderPass      =  swapchain->renderpass.vk_handle,
+      .attachmentCount =  1u, // TODO: handle depth
+      .pAttachments    = &swapchain->image_views[f],
+      .width           =  swapchain_info->width,
+      .height          =  swapchain_info->height,
+      .layers          =  1u
+    };
     vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL,
                                  &swapchain->framebuffers[f]);
-    // TODO: check vk_err
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      goto _ngf_create_swapchain_cleanup;
+    }
   }
 
   // Create semaphores to be signaled when a swapchain image becomes available.
@@ -1809,29 +1824,29 @@ ngf_error ngf_default_render_target(
   const ngf_clear *clear_depth,
   ngf_render_target **result) {
   assert(result);
+  ngf_render_target *rt = NULL;
   ngf_error err = NGF_ERROR_OK;
   _NGF_FAKE_USE(depth_load_op);
-  _NGF_FAKE_USE(clear_color);
   _NGF_FAKE_USE(clear_depth);
   
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    ngf_render_target *rt = NGF_ALLOC(ngf_render_target);
+    rt = NGF_ALLOC(ngf_render_target);
     *result = rt;
     if (rt == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto ngf_default_render_target_cleanup;
     }
     rt->is_default = true;
-    VkAttachmentLoadOp color_load_op = get_ck_load_op(color_load_op);
+    VkAttachmentLoadOp vk_color_load_op = get_vk_load_op(color_load_op);
     // TODO: depth load op
     const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
-    VkAttachmentStoreOp color_store_op = VK_ATTACHMENT_STORE_OP_STORE;
+    VkAttachmentStoreOp vk_color_store_op = VK_ATTACHMENT_STORE_OP_STORE;
     VkAttachmentDescription attachment_descs[2] = {
       swapchain->renderpass.attachment_descs[0],
       swapchain->renderpass.attachment_descs[1]
     };
-    attachment_descs[0].loadOp  = color_load_op;
-    attachment_descs[0].storeOp = color_store_op;
+    attachment_descs[0].loadOp  = vk_color_load_op;
+    attachment_descs[0].storeOp = vk_color_store_op;
     attachment_descs[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment_descs[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     // TODO: depth load/store ops and initial/final layouts.
@@ -1839,12 +1854,27 @@ ngf_error ngf_default_render_target(
     renderpass_info.pAttachments = attachment_descs;
     VkResult vk_err = vkCreateRenderPass(_vk.device, &renderpass_info, NULL,
                                          &rt->render_pass);
-    // TODO: store clear values for later.
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_RENDER_TARGET_CREATION_FAILED;
+      goto ngf_default_render_target_cleanup;
+    }
+    if (clear_color) {
+      _NGF_DARRAY_RESET(rt->clear_values, 2);
+      VkClearValue *vk_clear_color = &_NGF_DARRAY_AT(rt->clear_values, 0);
+      vk_clear_color->color.float32[0] = clear_color->clear_color[0];
+      vk_clear_color->color.float32[1] = clear_color->clear_color[1];
+      vk_clear_color->color.float32[2] = clear_color->clear_color[2];
+      vk_clear_color->color.float32[3] = clear_color->clear_color[3];
+    }
+    // TODO: depth clear
   } else {
     err = NGF_ERROR_NO_DEFAULT_RENDER_TARGET;
   }
 
 ngf_default_render_target_cleanup:
+  if (err != NGF_ERROR_OK) {
+    ngf_destroy_render_target(rt);
+  }
   return err;
 }
 
@@ -1853,4 +1883,26 @@ void ngf_debug_message_callback(void *userdata,
   // TODO: implement
   _NGF_FAKE_USE(userdata);
   _NGF_FAKE_USE(callback);
+}
+
+
+void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
+  const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
+  const VkFramebuffer fb =
+      target->is_default
+          ? swapchain->framebuffers[swapchain->image_idx]
+          : VK_NULL_HANDLE; // TODO: non-default render targets.
+  const VkRenderPassBeginInfo begin_info = {
+    .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+    .pNext           = NULL,
+    .framebuffer     = fb,
+    .clearValueCount = 1u, // TODO: depth
+    .pClearValues    = target->clear_values.data,
+    .renderPass      = target->render_pass
+  };
+  vkCmdBeginRenderPass(buf->vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
+  vkCmdEndRenderPass(buf->vkcmdbuf);
 }
