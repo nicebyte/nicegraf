@@ -1906,3 +1906,14 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
 void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
   vkCmdEndRenderPass(buf->vkcmdbuf);
 }
+
+void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+                  uint32_t first_element, uint32_t nelements,
+                  uint32_t ninstances) {
+  if (indexed) {
+    vkCmdDrawIndexed(buf->vkcmdbuf, nelements, ninstances, first_element,
+                     0u, 0u);
+  } else {
+    vkCmdDraw(buf->vkcmdbuf, nelements, ninstances, first_element, 0u);
+  }
+}
