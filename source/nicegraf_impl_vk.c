@@ -117,14 +117,17 @@ struct ngf_cmd_buffer {
 
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
- _NGF_DARRAY_OF(ngf_cmd_buffer) submitted_cmdbuffers;
- _NGF_DARRAY_OF(VkSemaphore)    wait_vksemaphores; // 1 per submitted cmdbuf.
-  VkFence                       fence; // signaled when frame is done.
-  bool                          active;
+ _NGF_DARRAY_OF(ngf_cmd_buffer)        submitted_cmdbuffers;
+ _NGF_DARRAY_OF(VkSemaphore)           wait_vksemaphores; // 1 per cmdbuf.
+ _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
+ _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
+ _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
+  VkFence                              fence; // signaled when frame is done.
+  bool                                 active;
 } _ngf_frame_resources;
 
 struct ngf_context {
- _ngf_frame_resources       *frame_sync;
+ _ngf_frame_resources       *frame_res;
  _ngf_context_shared_state **shared_state;
  _ngf_swapchain              swapchain;
   ngf_swapchain_info         swapchain_info;
@@ -629,6 +632,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
 
 static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   assert(swapchain);
+  vkDeviceWaitIdle(_vk.device);
   for (uint32_t s = 0u;
        swapchain->image_semaphores != NULL && s < swapchain->num_images; ++s) {
     if (swapchain->image_semaphores[s] != VK_NULL_HANDLE) {
@@ -1082,24 +1086,27 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   const uint32_t max_inflight_frames =
       swapchain_info ? ctx->swapchain.num_images : 3u;
   ctx->max_inflight_frames = max_inflight_frames;
-  ctx->frame_sync = NGF_ALLOCN(_ngf_frame_resources, max_inflight_frames);
-  if (ctx->frame_sync == NULL) {
+  ctx->frame_res = NGF_ALLOCN(_ngf_frame_resources, max_inflight_frames);
+  if (ctx->frame_res == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_context_cleanup;
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    _NGF_DARRAY_RESET(ctx->frame_sync[f].wait_vksemaphores,
+    _NGF_DARRAY_RESET(ctx->frame_res[f].wait_vksemaphores,
                       max_inflight_frames);
-    _NGF_DARRAY_RESET(ctx->frame_sync[f].submitted_cmdbuffers,
+    _NGF_DARRAY_RESET(ctx->frame_res[f].submitted_cmdbuffers,
                       max_inflight_frames);
-    ctx->frame_sync[f].active = false;
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
+    ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
       .pNext = NULL,
       .flags = 0u
     };
     vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
-                           &ctx->frame_sync[f].fence);
+                           &ctx->frame_res[f].fence);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
@@ -1128,26 +1135,54 @@ ngf_error ngf_resize_context(ngf_context *ctx,
   return err;
 }
 
-void _ngf_retire_resources(_ngf_frame_resources *next_frame_sync) {
-  if (next_frame_sync->active) {
-    vkWaitForFences(_vk.device, 1u, &next_frame_sync->fence, true, 1000000u);
+void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
+  if (frame_res->active) {
+    vkWaitForFences(_vk.device, 1u, &frame_res->fence, true, 1000000u);
     vkResetFences(_vk.device, 1u,
-                  &next_frame_sync->fence);
+                  &frame_res->fence);
   }
-  next_frame_sync->active = false;
+  frame_res->active = false;
   for (uint32_t s = 0u;
-       s < _NGF_DARRAY_SIZE(next_frame_sync->wait_vksemaphores);
+       s < _NGF_DARRAY_SIZE(frame_res->wait_vksemaphores);
        ++s) {
     ngf_cmd_buffer cmd_buffer =
-        _NGF_DARRAY_AT(next_frame_sync->submitted_cmdbuffers, s);
+        _NGF_DARRAY_AT(frame_res->submitted_cmdbuffers, s);
     vkFreeCommandBuffers(_vk.device,
                          cmd_buffer.vkpool, 1u, &cmd_buffer.vkcmdbuf);
     vkDestroySemaphore(_vk.device,
-                       _NGF_DARRAY_AT(next_frame_sync->wait_vksemaphores, s),
+                       _NGF_DARRAY_AT(frame_res->wait_vksemaphores, s),
                        NULL);
   }
-  _NGF_DARRAY_CLEAR(next_frame_sync->submitted_cmdbuffers);
-  _NGF_DARRAY_CLEAR(next_frame_sync->wait_vksemaphores);
+  for (uint32_t p = 0u;
+       p < _NGF_DARRAY_SIZE(frame_res->retire_pipelines);
+       ++p) {
+    vkDestroyPipeline(_vk.device,
+                      _NGF_DARRAY_AT(frame_res->retire_pipelines, p),
+                       NULL);
+  }
+  for (uint32_t p = 0u;
+       p < _NGF_DARRAY_SIZE(frame_res->retire_pipeline_layouts);
+       ++p) {
+    vkDestroyPipelineLayout(_vk.device,
+                            _NGF_DARRAY_AT(
+                                 frame_res->retire_pipeline_layouts,
+                                 p),
+                             NULL);
+  }
+  for (uint32_t p = 0u;
+       p < _NGF_DARRAY_SIZE(frame_res->retire_dset_layouts);
+       ++p) {
+    vkDestroyDescriptorSetLayout(_vk.device,
+                                 _NGF_DARRAY_AT(
+                                      frame_res->retire_dset_layouts,
+                                      p),
+                                  NULL);
+  }
+  _NGF_DARRAY_CLEAR(frame_res->submitted_cmdbuffers);
+  _NGF_DARRAY_CLEAR(frame_res->wait_vksemaphores);
+  _NGF_DARRAY_CLEAR(frame_res->retire_pipelines);
+  _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
+  _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
 }
 
 void ngf_destroy_context(ngf_context *ctx) {
@@ -1157,14 +1192,17 @@ void ngf_destroy_context(ngf_context *ctx) {
     if (shared_state != NULL) {
       vkDeviceWaitIdle(_vk.device);
       for (uint32_t f = 0u;
-           ctx->frame_sync != NULL && f < ctx->max_inflight_frames;
+           ctx->frame_res != NULL && f < ctx->max_inflight_frames;
            ++f) {
-        if (ctx->frame_sync[f].active) {
-          _ngf_retire_resources(&ctx->frame_sync[f]);
+        if (ctx->frame_res[f].active) {
+          _ngf_retire_resources(&ctx->frame_res[f]);
         }
-        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].submitted_cmdbuffers);
-        _NGF_DARRAY_DESTROY(ctx->frame_sync[f].wait_vksemaphores);
-        vkDestroyFence(_vk.device, ctx->frame_sync[f].fence, NULL);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_cmdbuffers);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].wait_vksemaphores);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
+        vkDestroyFence(_vk.device, ctx->frame_res[f].fence, NULL);
       }
       vkDestroyCommandPool(_vk.device, ctx->cmd_pool, NULL);
       _ngf_destroy_swapchain(&ctx->swapchain);
@@ -1184,8 +1222,8 @@ void ngf_destroy_context(ngf_context *ctx) {
       } 
     }
     pthread_mutex_unlock(&_vk.ctx_refcount_mut);
-    if (ctx->frame_sync != NULL) {
-      NGF_FREEN(ctx->frame_sync, ctx->max_inflight_frames);
+    if (ctx->frame_res != NULL) {
+      NGF_FREEN(ctx->frame_res, ctx->max_inflight_frames);
     }
     if (CURRENT_CONTEXT == ctx) CURRENT_CONTEXT = NULL;
     NGF_FREE(ctx);
@@ -1325,9 +1363,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
 
 ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
-  uint32_t fi =
-      CURRENT_CONTEXT->frame_number % CURRENT_CONTEXT->max_inflight_frames;
-  _ngf_frame_resources *frame_sync_data = &CURRENT_CONTEXT->frame_sync[fi];
+  uint32_t fi = CURRENT_CONTEXT->frame_number;
+  _ngf_frame_resources *frame_sync_data = &CURRENT_CONTEXT->frame_res[fi];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
     if (bufs[i]->recording) {
       return NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING; // TODO: return appropriate error code
@@ -1343,7 +1380,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
 }
 ngf_error ngf_begin_frame(ngf_context *ctx) {
   ngf_error err = NGF_ERROR_OK;
-  uint32_t fi = ctx->frame_number % ctx->swapchain.num_images;
+  uint32_t fi = ctx->frame_number;
   if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     const VkResult vk_err =
         vkAcquireNextImageKHR(_vk.device,
@@ -1354,18 +1391,17 @@ ngf_error ngf_begin_frame(ngf_context *ctx) {
                               &ctx->swapchain.image_idx);
     if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
   }
-  CURRENT_CONTEXT->frame_sync[fi].active = true;
-  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_sync[fi].submitted_cmdbuffers);
-  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_sync[fi].wait_vksemaphores);
+  CURRENT_CONTEXT->frame_res[fi].active = true;
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_cmdbuffers);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].wait_vksemaphores);
   return err;
 }
 
 ngf_error ngf_end_frame(ngf_context *ctx) {
   ngf_error err = NGF_ERROR_OK;
 
-  const uint32_t fi =
-      CURRENT_CONTEXT->frame_number % CURRENT_CONTEXT->max_inflight_frames;
-  const _ngf_frame_resources *frame_sync = &CURRENT_CONTEXT->frame_sync[fi];
+  const uint32_t fi = CURRENT_CONTEXT->frame_number;
+  const _ngf_frame_resources *frame_sync = &CURRENT_CONTEXT->frame_res[fi];
 
   // Submit the pending command buffers.
   const VkPipelineStageFlags color_attachment_stage =
@@ -1427,11 +1463,11 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
                       &CURRENT_SHARED_STATE->record_counter_mut);
   }
   uint32_t next_fi = (fi + 1u) % ctx->max_inflight_frames;
-  _ngf_frame_resources *next_frame_sync = &ctx->frame_sync[next_fi];
+  _ngf_frame_resources *next_frame_sync = &ctx->frame_res[next_fi];
   _ngf_retire_resources(next_frame_sync);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
-  ctx->frame_number++;
+  ctx->frame_number = (ctx->frame_number + 1u) % ctx->max_inflight_frames;
   return err;
 }
 
@@ -1807,7 +1843,26 @@ ngf_create_graphics_pipeline_cleanup:
 }
 
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {
-  vkDestroyPipeline(_vk.device, p->vk_pipeline, NULL);
+  if (p != NULL) {
+    _ngf_frame_resources *res =
+        &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_number];
+    if (p->vk_pipeline != VK_NULL_HANDLE) {
+      _NGF_DARRAY_APPEND(res->retire_pipelines, p->vk_pipeline);
+    }
+    if (p->vk_pipeline_layout != VK_NULL_HANDLE) {
+      _NGF_DARRAY_APPEND(res->retire_pipeline_layouts, p->vk_pipeline_layout);
+    }
+    for (uint32_t l = 0u; l < _NGF_DARRAY_SIZE(p->vk_descriptor_set_layouts);
+         ++l) {
+      VkDescriptorSetLayout set_layout =
+          _NGF_DARRAY_AT(p->vk_descriptor_set_layouts, l);
+      if (set_layout != VK_NULL_HANDLE) {
+        _NGF_DARRAY_APPEND(res->retire_dset_layouts, set_layout);
+      }
+    }
+    _NGF_DARRAY_DESTROY(p->vk_descriptor_set_layouts);
+    NGF_FREE(p);
+  }
 }
 
 
