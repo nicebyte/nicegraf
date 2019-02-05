@@ -73,9 +73,11 @@ struct {
   VkDevice         device;
   VkQueue          gfx_queue;
   VkQueue          present_queue;
+  VkQueue          xfer_queue;
   pthread_mutex_t  ctx_refcount_mut;
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
+  uint32_t         xfer_family_idx;
 } _vk;
 
 // State that is common among "shared" contexts (TODO: remove this?)
@@ -560,23 +562,32 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     // Pick suitable queue families for graphics and present.
     uint32_t gfx_family_idx     = _NGF_INVALID_IDX;
     uint32_t present_family_idx = _NGF_INVALID_IDX;
+    uint32_t xfer_family_idx    = _NGF_INVALID_IDX;
     for (uint32_t q = 0; q < num_queue_families; ++q) {
       const VkQueueFlags flags      = queue_families[q].queueFlags;
       const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+      const VkBool32     is_xfer    = (flags & VK_QUEUE_TRANSFER_BIT) != 0;
       const VkBool32     is_present = _ngf_query_presentation_support(
                                           _vk.phys_dev, q);
       if (gfx_family_idx == _NGF_INVALID_IDX && is_gfx) {
         gfx_family_idx = q;
+      }
+      if ((xfer_family_idx == _NGF_INVALID_IDX ||
+           xfer_family_idx == gfx_family_idx) && is_xfer) {
+        // Prefer to use different queues for graphics and transfer.
+        xfer_family_idx = q;
       }
       if (present_family_idx == _NGF_INVALID_IDX && is_present == VK_TRUE) {
         present_family_idx = q;
       }
     }
     if (gfx_family_idx == _NGF_INVALID_IDX ||
+        xfer_family_idx == _NGF_INVALID_IDX ||
         present_family_idx == _NGF_INVALID_IDX) {
       return NGF_ERROR_INITIALIZATION_FAILED;
     }
-    _vk.gfx_family_idx = gfx_family_idx;
+    _vk.gfx_family_idx     = gfx_family_idx;
+    _vk.xfer_family_idx    = xfer_family_idx;
     _vk.present_family_idx = present_family_idx;
 
     // Create logical device.
@@ -589,6 +600,14 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
+    const VkDeviceQueueCreateInfo xfer_queue_info = {
+      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
+      .queueFamilyIndex = xfer_family_idx,
+      .queueCount       = 1,
+      .pQueuePriorities = &queue_prio
+    };
     const VkDeviceQueueCreateInfo present_queue_info = {
       .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
       .pNext            = NULL,
@@ -597,10 +616,15 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
-    const VkDeviceQueueCreateInfo queue_infos[] = { gfx_queue_info,
-                                                    present_queue_info };
+    const bool same_gfx_and_xfer    = gfx_family_idx == xfer_family_idx;
+    const bool same_gfx_and_present = gfx_family_idx == present_family_idx;
+    const VkDeviceQueueCreateInfo queue_infos[] = {
+        gfx_queue_info,
+        !same_gfx_and_xfer ? xfer_queue_info : present_queue_info,
+        present_queue_info
+    };
     const uint32_t num_queue_infos =
-        (gfx_family_idx == present_family_idx) ? 1 : 2;
+        1u + (same_gfx_and_present ? 1u : 0u) + (same_gfx_and_xfer ? 1u : 0u);
     const char *device_exts[] = { "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -620,6 +644,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
 
     // Obtain queue handles.
     vkGetDeviceQueue(_vk.device, gfx_family_idx, 0, &_vk.gfx_queue);
+    vkGetDeviceQueue(_vk.device, xfer_family_idx, 0, &_vk.xfer_queue);
     vkGetDeviceQueue(_vk.device, present_family_idx, 0, &_vk.present_queue);
 
     // Load device-level entry points.
