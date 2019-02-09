@@ -1,25 +1,24 @@
 ﻿/**
-Copyright © 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 #define _CRT_SECURE_NO_WARNINGS
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
@@ -165,7 +164,6 @@ typedef enum {
 } _ngf_emulated_cmd_type;
 
 typedef struct _ngf_emulated_cmd {
-  struct _ngf_emulated_cmd *next;
   _ngf_emulated_cmd_type type;
   union {
     const ngf_graphics_pipeline *pipeline;
@@ -223,10 +221,18 @@ typedef struct _ngf_emulated_cmd {
   };
 } _ngf_emulated_cmd;
 
+#define _NGF_CMDS_PER_CMD_BLOCK 8u
+
+typedef struct _ngf_cmd_block {
+   struct _ngf_cmd_block *next;
+  _ngf_emulated_cmd       cmds[_NGF_CMDS_PER_CMD_BLOCK];
+   uint32_t               next_cmd_idx;
+} _ngf_cmd_block;
+
 struct ngf_cmd_buffer {
   const ngf_graphics_pipeline *bound_pipeline;
-  _ngf_emulated_cmd *first_cmd;
-  _ngf_emulated_cmd *last_cmd;
+  _ngf_cmd_block *first_cmd_block;
+  _ngf_cmd_block *last_cmd_block;
   bool recording;
   bool renderpass_active;
 };
@@ -1526,7 +1532,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   _NGF_FAKE_USE(info);
   assert(result);
   if (COMMAND_POOL == NULL) {
-    COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_emulated_cmd), 65000u);
+    COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_cmd_block), 100);
   }
   ngf_error err = NGF_ERROR_OK;
   *result = NGF_ALLOC(ngf_cmd_buffer);
@@ -1534,21 +1540,21 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   if (buf == NULL) {
     err = NGF_ERROR_OUTOFMEM;
   }
-  buf->first_cmd = buf->last_cmd = NULL;
+  buf->first_cmd_block = buf->last_cmd_block = NULL;
   buf->recording = buf->renderpass_active = false;
   return err;
 }
 
 void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer *buf) {
-  bool has_first_cmd = buf->first_cmd != NULL;
-  bool has_last_cmd = buf->last_cmd != NULL;
+  bool has_first_cmd = buf->first_cmd_block != NULL;
+  bool has_last_cmd = buf->last_cmd_block != NULL;
   assert(!(has_first_cmd ^ has_last_cmd));
   if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
-    for (_ngf_emulated_cmd *c = buf->first_cmd; c != NULL; c = c->next) {
+    for (_ngf_cmd_block *c = buf->first_cmd_block; c != NULL; c = c->next) {
       _ngf_blkalloc_free(COMMAND_POOL, c);
     }
   }
-  buf->first_cmd = buf->last_cmd = NULL;
+  buf->first_cmd_block = buf->last_cmd_block = NULL;
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buf) {
@@ -1565,14 +1571,17 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *buf) {
     err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
   } else {
     buf->recording = true;
-    assert(buf->first_cmd == NULL && buf->last_cmd == NULL);
-    buf->first_cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
-    if (buf->first_cmd == NULL) {
+    if (buf->first_cmd_block != NULL) {
+      _ngf_cmd_buffer_free_cmds(buf);
+    }
+    buf->first_cmd_block = _ngf_blkalloc_alloc(COMMAND_POOL);
+    if (buf->first_cmd_block == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       NGF_FREE(buf);
     } else {
-      buf->first_cmd->type = _NGF_CMD_NONE;
-      buf->last_cmd = buf->first_cmd;
+      buf->first_cmd_block->next_cmd_idx = 0u;
+      buf->first_cmd_block->next = NULL;
+      buf->last_cmd_block = buf->first_cmd_block;
     }
   }
   buf->bound_pipeline = NULL;
@@ -1594,72 +1603,83 @@ ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *buf) {
     buf->last_cmd->next = cmd; \
     buf->last_cmd = cmd; }
 
+#define _NGF_NEWCMD(buf, cmd) {\
+  if (buf->last_cmd_block->next_cmd_idx == _NGF_CMDS_PER_CMD_BLOCK) { \
+    buf->last_cmd_block->next = _ngf_blkalloc_alloc(COMMAND_POOL); \
+    buf->last_cmd_block = buf->last_cmd_block->next; \
+    buf->last_cmd_block->next = NULL; \
+    buf->last_cmd_block->next_cmd_idx = 0u; \
+  } \
+  cmd = &buf->last_cmd_block->cmds[buf->last_cmd_block->next_cmd_idx++]; \
+}
+
 
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
                            const ngf_graphics_pipeline *pipeline) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_BIND_PIPELINE;
   cmd->pipeline = pipeline;
-  _NGF_APPENDCMD(buf, cmd);
   buf->bound_pipeline = pipeline;
 }
 
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *viewport) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_VIEWPORT;
   cmd->viewport = *viewport;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *scissor) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_SCISSOR;
   cmd->viewport = *scissor;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
                                uint32_t back) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_STENCIL_REFERENCE;
   cmd->stencil_reference.front = front;
   cmd->stencil_reference.back = back;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front,
                                   uint32_t back) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_STENCIL_COMPARE_MASK;
   cmd->stencil_compare_mask.front = front;
   cmd->stencil_compare_mask.back = back;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_stencil_write_mask(ngf_cmd_buffer *buf, uint32_t front,
                                 uint32_t back) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_STENCIL_WRITE_MASK;
   cmd->stencil_write_mask.front = front;
   cmd->stencil_write_mask.back = back;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_LINE_WIDTH;
   cmd->line_width = line_width;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_BLEND_CONSTANTS;
   cmd->blend_factors.sfactor = sfactor;
   cmd->blend_factors.dfactor = dfactor;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
@@ -1678,8 +1698,8 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
     const _ngf_native_binding *native_binding = &binding_map[b_idx];
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-      _ngf_emulated_cmd *uniform_buffer_bind_cmd =
-          _ngf_blkalloc_alloc(COMMAND_POOL);
+      _ngf_emulated_cmd *uniform_buffer_bind_cmd = NULL;
+      _NGF_NEWCMD(buf, uniform_buffer_bind_cmd);
       uniform_buffer_bind_cmd->type = _NGF_CMD_BIND_UNIFORM_BUFFER;
       uniform_buffer_bind_cmd->uniform_buffer_bind_op.buffer =
           bind_op->info.uniform_buffer.buffer->glbuffer;
@@ -1689,50 +1709,47 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
           (GLsizei)bind_op->info.uniform_buffer.offset;
       uniform_buffer_bind_cmd->uniform_buffer_bind_op.range =
           (GLsizei)bind_op->info.uniform_buffer.range;
-      _NGF_APPENDCMD(buf, uniform_buffer_bind_cmd);
       break;
     }
     case NGF_DESCRIPTOR_TEXTURE: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
-        _ngf_emulated_cmd *texture_bind_cmd =
-            _ngf_blkalloc_alloc(COMMAND_POOL);
+        _ngf_emulated_cmd *texture_bind_cmd = NULL;
+        _NGF_NEWCMD(buf, texture_bind_cmd);
         texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
         texture_bind_cmd->texture_bind_op.texture =
             bind_op->info.image_sampler.image_subresource.image;
         texture_bind_cmd->texture_bind_op.unit =
             native_binding->cis_bindings[c];
-        _NGF_APPENDCMD(buf, texture_bind_cmd);
       }
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
-        _ngf_emulated_cmd *sampler_bind_cmd =
-            _ngf_blkalloc_alloc(COMMAND_POOL);
+        _ngf_emulated_cmd *sampler_bind_cmd = NULL;
+        _NGF_NEWCMD(buf, sampler_bind_cmd);
         sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
         sampler_bind_cmd->sampler_bind_op.sampler =
             bind_op->info.image_sampler.sampler;
         sampler_bind_cmd->sampler_bind_op.unit =
             native_binding->cis_bindings[c];
-        _NGF_APPENDCMD(buf, sampler_bind_cmd);
       }
       break;
     }
     case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
-      _ngf_emulated_cmd *texture_bind_cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+      _ngf_emulated_cmd *texture_bind_cmd = NULL;
+      _NGF_NEWCMD(buf, texture_bind_cmd);
       texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
       texture_bind_cmd->texture_bind_op.texture =
         bind_op->info.image_sampler.image_subresource.image;
       texture_bind_cmd->texture_bind_op.unit =
         native_binding->native_binding_id;
-      _NGF_APPENDCMD(buf, texture_bind_cmd);
-      _ngf_emulated_cmd *sampler_bind_cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+      _ngf_emulated_cmd *sampler_bind_cmd = NULL;
+      _NGF_NEWCMD(buf, sampler_bind_cmd);
       sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
       sampler_bind_cmd->sampler_bind_op.sampler =
           bind_op->info.image_sampler.sampler;
       sampler_bind_cmd->sampler_bind_op.unit =
           native_binding->native_binding_id;
-      _NGF_APPENDCMD(buf, sampler_bind_cmd);
       break;
     default:
       break;
@@ -1744,29 +1761,29 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
 void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
                                 const ngf_attrib_buffer *vbuf,
                                 uint32_t binding, uint32_t offset) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_BIND_ATTRIB_BUFFER;
   cmd->attrib_buffer_bind_op.binding = binding;
   cmd->attrib_buffer_bind_op.buf = vbuf;
   cmd->attrib_buffer_bind_op.offset = offset;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf,
                                const ngf_index_buffer *idxbuf,
                                ngf_type index_type) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
   cmd->index_buffer_bind.index_buffer = idxbuf;
   cmd->index_buffer_bind.type = index_type;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_BEGIN_PASS;
   cmd->begin_pass.target = target;
-  _NGF_APPENDCMD(buf, cmd);
   buf->renderpass_active = true;
 }
 
@@ -1777,13 +1794,13 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
-  _ngf_emulated_cmd *cmd = _ngf_blkalloc_alloc(COMMAND_POOL);
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_DRAW;
   cmd->draw.first_element = first_element;
   cmd->draw.nelements = nelements;
   cmd->draw.ninstances = ninstances;
   cmd->draw.indexed = indexed;
-  _NGF_APPENDCMD(buf, cmd);
 }
 
 ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
@@ -1792,349 +1809,352 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
       &(CURRENT_CONTEXT->cached_state);
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
-    for (const _ngf_emulated_cmd *cmd = buf->first_cmd->next;
-         cmd != NULL;
-         cmd = cmd->next) {
-      switch (cmd->type) {
-      case _NGF_CMD_BIND_PIPELINE: {
-        const ngf_graphics_pipeline *cached_state =
-            &CURRENT_CONTEXT->cached_state;
-        const bool force_pipeline_update =
-            CURRENT_CONTEXT->force_pipeline_update;
-        const ngf_graphics_pipeline *pipeline = cmd->pipeline;
-        if (cached_state->id != pipeline->id || force_pipeline_update) {
-          CURRENT_CONTEXT->cached_state.id = pipeline->id;
-          glBindProgramPipeline(pipeline->program_pipeline);
-          if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
-              (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
-               force_pipeline_update)) {
-            glViewport(pipeline->viewport.x,
-                       pipeline->viewport.y,
-                       pipeline->viewport.width,
-                       pipeline->viewport.height);
-          }
+    for (const _ngf_cmd_block *block = buf->first_cmd_block; block!= NULL;
+         block= block->next) {
+      for (uint32_t i = 0; i < block->next_cmd_idx; ++i) {
+        const _ngf_emulated_cmd *cmd = &block->cmds[i];
+        switch (cmd->type) {
+        case _NGF_CMD_BIND_PIPELINE: {
+          const ngf_graphics_pipeline *cached_state =
+              &CURRENT_CONTEXT->cached_state;
+          const bool force_pipeline_update =
+              CURRENT_CONTEXT->force_pipeline_update;
+          const ngf_graphics_pipeline *pipeline = cmd->pipeline;
+          if (cached_state->id != pipeline->id || force_pipeline_update) {
+            CURRENT_CONTEXT->cached_state.id = pipeline->id;
+            glBindProgramPipeline(pipeline->program_pipeline);
+            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
+                (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
+                 force_pipeline_update)) {
+              glViewport(pipeline->viewport.x,
+                         pipeline->viewport.y,
+                         pipeline->viewport.width,
+                         pipeline->viewport.height);
+            }
 
-          if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
-               (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
-                force_pipeline_update)) {
-            glScissor(pipeline->scissor.x,
-                      pipeline->scissor.y,
-                      pipeline->scissor.width,
-                      pipeline->scissor.height);
-          }
+            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
+                 (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
+                  force_pipeline_update)) {
+              glScissor(pipeline->scissor.x,
+                        pipeline->scissor.y,
+                        pipeline->scissor.width,
+                        pipeline->scissor.height);
+            }
 
-          const ngf_rasterization_info *rast = &(pipeline->rasterization);
-          const ngf_rasterization_info *cached_rast =
-              &(cached_state->rasterization);
-          if (cached_rast->discard != rast->discard || force_pipeline_update) {
-            if (rast->discard) {
-              glEnable(GL_RASTERIZER_DISCARD);
-            } else {
-              glDisable(GL_RASTERIZER_DISCARD);
+            const ngf_rasterization_info *rast = &(pipeline->rasterization);
+            const ngf_rasterization_info *cached_rast =
+                &(cached_state->rasterization);
+            if (cached_rast->discard != rast->discard ||
+                force_pipeline_update) {
+              if (rast->discard) {
+                glEnable(GL_RASTERIZER_DISCARD);
+              } else {
+                glDisable(GL_RASTERIZER_DISCARD);
+              }
             }
-          }
-          if (cached_rast->polygon_mode != rast->polygon_mode ||
-              force_pipeline_update) {
-            glPolygonMode(GL_FRONT_AND_BACK,
-                          get_gl_poly_mode(rast->polygon_mode));
-          }
-          if (cached_rast->cull_mode != rast->cull_mode ||
-              force_pipeline_update) {
-            if (rast->cull_mode != NGF_CULL_MODE_NONE) {
-              glEnable(GL_CULL_FACE);
-              glCullFace(get_gl_cull_mode(rast->cull_mode));
-            } else {
-              glDisable(GL_CULL_FACE);
+            if (cached_rast->polygon_mode != rast->polygon_mode ||
+                force_pipeline_update) {
+              glPolygonMode(GL_FRONT_AND_BACK,
+                            get_gl_poly_mode(rast->polygon_mode));
             }
-          }
-          if (cached_rast->front_face != rast->front_face ||
-              force_pipeline_update) {
-            glFrontFace(get_gl_face(rast->front_face));
-          }
-          if (cached_rast->line_width != rast->line_width ||
-              force_pipeline_update) {
-            glLineWidth(rast->line_width);
-          }
+            if (cached_rast->cull_mode != rast->cull_mode ||
+                force_pipeline_update) {
+              if (rast->cull_mode != NGF_CULL_MODE_NONE) {
+                glEnable(GL_CULL_FACE);
+                glCullFace(get_gl_cull_mode(rast->cull_mode));
+              } else {
+                glDisable(GL_CULL_FACE);
+              }
+            }
+            if (cached_rast->front_face != rast->front_face ||
+                force_pipeline_update) {
+              glFrontFace(get_gl_face(rast->front_face));
+            }
+            if (cached_rast->line_width != rast->line_width ||
+                force_pipeline_update) {
+              glLineWidth(rast->line_width);
+            }
 
-          if (cached_state->multisample.multisample !=
-              pipeline->multisample.multisample ||
-              force_pipeline_update) {
-            if (pipeline->multisample.multisample) {
-              glEnable(GL_MULTISAMPLE);
-            } else {
-              glDisable(GL_MULTISAMPLE);
+            if (cached_state->multisample.multisample !=
+                pipeline->multisample.multisample ||
+                force_pipeline_update) {
+              if (pipeline->multisample.multisample) {
+                glEnable(GL_MULTISAMPLE);
+              } else {
+                glDisable(GL_MULTISAMPLE);
+              }
             }
-          }
 
-          if (cached_state->multisample.alpha_to_coverage !=
-                  pipeline->multisample.alpha_to_coverage ||
-              force_pipeline_update) {
-            if (pipeline->multisample.alpha_to_coverage) {
-              glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
-            } else {
-              glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+            if (cached_state->multisample.alpha_to_coverage !=
+                    pipeline->multisample.alpha_to_coverage ||
+                force_pipeline_update) {
+              if (pipeline->multisample.alpha_to_coverage) {
+                glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+              } else {
+                glDisable(GL_SAMPLE_ALPHA_TO_COVERAGE);
+              }
             }
-          }
 
-          const ngf_depth_stencil_info *depth_stencil =
-              &(pipeline->depth_stencil);
-          const ngf_depth_stencil_info *cached_depth_stencil =
-              &(cached_state->depth_stencil);
-          if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
-              force_pipeline_update) {
-            if (depth_stencil->depth_test) {
-              glEnable(GL_DEPTH_TEST);
-              glDepthFunc(get_gl_compare(depth_stencil->depth_compare));
-            } else {
-              glDisable(GL_DEPTH_TEST);
+            const ngf_depth_stencil_info *depth_stencil =
+                &(pipeline->depth_stencil);
+            const ngf_depth_stencil_info *cached_depth_stencil =
+                &(cached_state->depth_stencil);
+            if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
+                force_pipeline_update) {
+              if (depth_stencil->depth_test) {
+                glEnable(GL_DEPTH_TEST);
+                glDepthFunc(get_gl_compare(depth_stencil->depth_compare));
+              } else {
+                glDisable(GL_DEPTH_TEST);
+              }
             }
-          }
-          if (cached_depth_stencil->depth_write !=
-                  depth_stencil->depth_write ||
-              force_pipeline_update) {
-            if (depth_stencil->depth_write) {
-              glDepthMask(GL_TRUE);
-            } else {
-              glDepthMask(GL_FALSE);
+            if (cached_depth_stencil->depth_write !=
+                    depth_stencil->depth_write ||
+                force_pipeline_update) {
+              if (depth_stencil->depth_write) {
+                glDepthMask(GL_TRUE);
+              } else {
+                glDepthMask(GL_FALSE);
+              }
             }
-          }
-          if (cached_depth_stencil->stencil_test !=
-                  depth_stencil->stencil_test ||
-              !NGF_STRUCT_EQ(cached_depth_stencil->back_stencil,
-                             depth_stencil->back_stencil) ||
-              !NGF_STRUCT_EQ(cached_depth_stencil->front_stencil,
-                             depth_stencil->front_stencil) ||
-              force_pipeline_update) {
-            if (depth_stencil->stencil_test) {
-              glEnable(GL_STENCIL_TEST);
-              glStencilFuncSeparate(
-                GL_FRONT,
-                get_gl_compare(depth_stencil->front_stencil.compare_op),
-                depth_stencil->front_stencil.reference,
-                depth_stencil->front_stencil.compare_mask);
-              glStencilOpSeparate(
-                GL_FRONT,
-                get_gl_stencil_op(depth_stencil->front_stencil.fail_op),
-                get_gl_stencil_op(depth_stencil->front_stencil.depth_fail_op),
-                get_gl_stencil_op(depth_stencil->front_stencil.pass_op));
-              glStencilMaskSeparate(GL_FRONT,
-                                    depth_stencil->front_stencil.write_mask);
-              glStencilFuncSeparate(
-                GL_BACK,
-                get_gl_compare(depth_stencil->back_stencil.compare_op),
-                depth_stencil->back_stencil.reference,
-                depth_stencil->back_stencil.compare_mask);
-              glStencilOpSeparate(
-                GL_BACK,
-                get_gl_stencil_op(depth_stencil->back_stencil.fail_op),
-                get_gl_stencil_op(depth_stencil->back_stencil.depth_fail_op),
-                get_gl_stencil_op(depth_stencil->back_stencil.pass_op));
-              glStencilMaskSeparate(GL_BACK,
-                                    depth_stencil->back_stencil.write_mask);
-            } else { 
-              glDisable(GL_STENCIL_TEST);
+            if (cached_depth_stencil->stencil_test !=
+                    depth_stencil->stencil_test ||
+                !NGF_STRUCT_EQ(cached_depth_stencil->back_stencil,
+                               depth_stencil->back_stencil) ||
+                !NGF_STRUCT_EQ(cached_depth_stencil->front_stencil,
+                               depth_stencil->front_stencil) ||
+                force_pipeline_update) {
+              if (depth_stencil->stencil_test) {
+                glEnable(GL_STENCIL_TEST);
+                glStencilFuncSeparate(
+                  GL_FRONT,
+                  get_gl_compare(depth_stencil->front_stencil.compare_op),
+                  depth_stencil->front_stencil.reference,
+                  depth_stencil->front_stencil.compare_mask);
+                glStencilOpSeparate(
+                  GL_FRONT,
+                  get_gl_stencil_op(depth_stencil->front_stencil.fail_op),
+                  get_gl_stencil_op(depth_stencil->front_stencil.depth_fail_op),
+                  get_gl_stencil_op(depth_stencil->front_stencil.pass_op));
+                glStencilMaskSeparate(GL_FRONT,
+                                      depth_stencil->front_stencil.write_mask);
+                glStencilFuncSeparate(
+                  GL_BACK,
+                  get_gl_compare(depth_stencil->back_stencil.compare_op),
+                  depth_stencil->back_stencil.reference,
+                  depth_stencil->back_stencil.compare_mask);
+                glStencilOpSeparate(
+                  GL_BACK,
+                  get_gl_stencil_op(depth_stencil->back_stencil.fail_op),
+                  get_gl_stencil_op(depth_stencil->back_stencil.depth_fail_op),
+                  get_gl_stencil_op(depth_stencil->back_stencil.pass_op));
+                glStencilMaskSeparate(GL_BACK,
+                                      depth_stencil->back_stencil.write_mask);
+              } else { 
+                glDisable(GL_STENCIL_TEST);
+              }
             }
-          }
-          if (cached_depth_stencil->min_depth != depth_stencil->min_depth ||
-              cached_depth_stencil->max_depth != depth_stencil->max_depth ||
-              force_pipeline_update) {
-            glDepthRangef(depth_stencil->min_depth, depth_stencil->max_depth);
-          }
+            if (cached_depth_stencil->min_depth != depth_stencil->min_depth ||
+                cached_depth_stencil->max_depth != depth_stencil->max_depth ||
+                force_pipeline_update) {
+              glDepthRangef(depth_stencil->min_depth, depth_stencil->max_depth);
+            }
 
-          const ngf_blend_info *blend = &(pipeline->blend);
-          const ngf_blend_info *cached_blend = &(cached_state->blend);
-          if (cached_blend->enable != blend->enable ||
-              cached_blend->sfactor != blend->sfactor ||
-              cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
-            if (blend->enable) {
-              glEnable(GL_BLEND);
-              glBlendFunc(get_gl_blendfactor(blend->sfactor),
-                          get_gl_blendfactor(blend->dfactor));
-            } else {
-              glDisable(GL_BLEND);
+            const ngf_blend_info *blend = &(pipeline->blend);
+            const ngf_blend_info *cached_blend = &(cached_state->blend);
+            if (cached_blend->enable != blend->enable ||
+                cached_blend->sfactor != blend->sfactor ||
+                cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
+              if (blend->enable) {
+                glEnable(GL_BLEND);
+                glBlendFunc(get_gl_blendfactor(blend->sfactor),
+                            get_gl_blendfactor(blend->dfactor));
+              } else {
+                glDisable(GL_BLEND);
+              }
             }
+            glBindVertexArray(pipeline->vao);
+            CURRENT_CONTEXT->cached_state = *pipeline;
           }
-          glBindVertexArray(pipeline->vao);
-          CURRENT_CONTEXT->cached_state = *pipeline;
-        }
-        CURRENT_CONTEXT->force_pipeline_update = false;
-        bound_pipeline = pipeline;
-        glEnable(GL_SCISSOR_TEST);
-        break; }
+          CURRENT_CONTEXT->force_pipeline_update = false;
+          bound_pipeline = pipeline;
+          glEnable(GL_SCISSOR_TEST);
+          break; }
 
-      case _NGF_CMD_VIEWPORT:
-        glViewport(cmd->viewport.x,
-                   cmd->viewport.y,
-                   cmd->viewport.width,
-                   cmd->viewport.height);
+        case _NGF_CMD_VIEWPORT:
+          glViewport(cmd->viewport.x,
+                     cmd->viewport.y,
+                     cmd->viewport.width,
+                     cmd->viewport.height);
+            break;
+
+        case _NGF_CMD_SCISSOR:
+          glScissor(cmd->scissor.x,
+                    cmd->scissor.y,
+                    cmd->scissor.width,
+                    cmd->scissor.height);
           break;
 
-      case _NGF_CMD_SCISSOR:
-        glScissor(cmd->scissor.x,
-                  cmd->scissor.y,
-                  cmd->scissor.width,
-                  cmd->scissor.height);
-        break;
+        case _NGF_CMD_LINE_WIDTH:
+          glLineWidth(cmd->line_width);
+          break;
 
-      case _NGF_CMD_LINE_WIDTH:
-        glLineWidth(cmd->line_width);
-        break;
+        case _NGF_CMD_BLEND_CONSTANTS:
+          glBlendFunc(cmd->blend_factors.sfactor,
+                      cmd->blend_factors.dfactor);
+          break;
 
-      case _NGF_CMD_BLEND_CONSTANTS:
-        glBlendFunc(cmd->blend_factors.sfactor,
-                    cmd->blend_factors.dfactor);
-        break;
+        case _NGF_CMD_STENCIL_WRITE_MASK:
+          glStencilMaskSeparate(GL_FRONT, cmd->stencil_write_mask.front);
+          glStencilMaskSeparate(GL_BACK, cmd->stencil_write_mask.back);
+          break;
 
-      case _NGF_CMD_STENCIL_WRITE_MASK:
-        glStencilMaskSeparate(GL_FRONT, cmd->stencil_write_mask.front);
-        glStencilMaskSeparate(GL_BACK, cmd->stencil_write_mask.back);
-        break;
-
-      case _NGF_CMD_STENCIL_COMPARE_MASK: {
-        GLint back_func, front_func, front_ref, back_ref;
-        glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
-        glGetIntegerv(GL_STENCIL_FUNC, &front_func);
-        glGetIntegerv(GL_STENCIL_BACK_REF, &back_ref);
-        glGetIntegerv(GL_STENCIL_REF, &front_ref);
-        glStencilFuncSeparate(GL_FRONT,
-                              front_func,
-                              front_ref,
-                              cmd->stencil_compare_mask.front);
-        glStencilFuncSeparate(GL_BACK,
-                              back_func,
-                              back_ref,
-                              cmd->stencil_compare_mask.back);
-        break;
-      }
-
-      case _NGF_CMD_STENCIL_REFERENCE: {
-        GLint back_func, front_func, front_mask, back_mask;
-        glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
-        glGetIntegerv(GL_STENCIL_FUNC, &front_func);
-        glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &back_mask);
-        glGetIntegerv(GL_STENCIL_VALUE_MASK, &front_mask);
-        glStencilFuncSeparate(GL_FRONT,
-                              front_func,
-                              cmd->stencil_reference.front,
-                              front_mask);
-        glStencilFuncSeparate(GL_BACK,
-                              back_func,
-                              cmd->stencil_reference.back,
-                              back_mask);         
-        break;
-      }
-
-      case _NGF_CMD_BIND_UNIFORM_BUFFER:
-        glBindBufferRange(GL_UNIFORM_BUFFER,
-                          cmd->uniform_buffer_bind_op.index,
-                          cmd->uniform_buffer_bind_op.buffer,
-                          cmd->uniform_buffer_bind_op.offset,
-                          cmd->uniform_buffer_bind_op.range);
-        break;
-
-      case _NGF_CMD_BIND_TEXTURE:
-        glActiveTexture(GL_TEXTURE0 + cmd->texture_bind_op.unit);
-        glBindTexture(cmd->texture_bind_op.texture->bind_point,
-                      cmd->texture_bind_op.texture->glimage);
-        break;
-
-      case _NGF_CMD_BIND_SAMPLER:
-        glBindSampler(cmd->sampler_bind_op.unit,
-                      cmd->sampler_bind_op.sampler->glsampler);
-        break;
-
-      case _NGF_CMD_BIND_ATTRIB_BUFFER: {
-        GLsizei stride = 0;
-        bool found_binding = false;
-        for (uint32_t binding = 0;
-             !found_binding && binding < bound_pipeline->nvert_buf_bindings;
-             ++binding) {
-          if (bound_pipeline->vert_buf_bindings[binding].binding ==
-              cmd->attrib_buffer_bind_op.binding) {
-            stride = bound_pipeline->vert_buf_bindings[binding].stride;
-            found_binding = true;
-          }
+        case _NGF_CMD_STENCIL_COMPARE_MASK: {
+          GLint back_func, front_func, front_ref, back_ref;
+          glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
+          glGetIntegerv(GL_STENCIL_FUNC, &front_func);
+          glGetIntegerv(GL_STENCIL_BACK_REF, &back_ref);
+          glGetIntegerv(GL_STENCIL_REF, &front_ref);
+          glStencilFuncSeparate(GL_FRONT,
+                                front_func,
+                                front_ref,
+                                cmd->stencil_compare_mask.front);
+          glStencilFuncSeparate(GL_BACK,
+                                back_func,
+                                back_ref,
+                                cmd->stencil_compare_mask.back);
+          break;
         }
-        assert(found_binding);
-        glBindVertexBuffer(cmd->attrib_buffer_bind_op.binding,
-                           cmd->attrib_buffer_bind_op.buf->glbuffer,
-                           cmd->attrib_buffer_bind_op.offset,
-                           stride); 
-        break;
-      }
 
-      case _NGF_CMD_BIND_INDEX_BUFFER:
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                     cmd->index_buffer_bind.index_buffer->glbuffer);
-        CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
-        break;
+        case _NGF_CMD_STENCIL_REFERENCE: {
+          GLint back_func, front_func, front_mask, back_mask;
+          glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
+          glGetIntegerv(GL_STENCIL_FUNC, &front_func);
+          glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &back_mask);
+          glGetIntegerv(GL_STENCIL_VALUE_MASK, &front_mask);
+          glStencilFuncSeparate(GL_FRONT,
+                                front_func,
+                                cmd->stencil_reference.front,
+                                front_mask);
+          glStencilFuncSeparate(GL_BACK,
+                                back_func,
+                                cmd->stencil_reference.back,
+                                back_mask);         
+          break;
+        }
 
-      case _NGF_CMD_BEGIN_PASS: {
-        const ngf_render_target *target = cmd->begin_pass.target;
-        glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
-        uint32_t color_clear = 0u;
-        glDisable(GL_SCISSOR_TEST);
-        for (uint32_t a = 0u; a < target->nattachments; ++a) {
-          const ngf_attachment *attachment = &target->attachment_infos[a];
-          if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
-            const ngf_clear *clear = &attachment->clear;
-            switch (target->attachment_infos[a].type) {
-            case NGF_ATTACHMENT_COLOR:
-              glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
-              break;
-            case NGF_ATTACHMENT_DEPTH:
-              glClearBufferfv(GL_DEPTH, 0, &clear->clear_depth);
-              break;
-            case NGF_ATTACHMENT_STENCIL: {
-              GLint v = clear->clear_stencil;
-              glClearBufferiv(GL_STENCIL, 0, &v);
-              break;
-            case NGF_ATTACHMENT_DEPTH_STENCIL:
-              break;
-            }
+        case _NGF_CMD_BIND_UNIFORM_BUFFER:
+          glBindBufferRange(GL_UNIFORM_BUFFER,
+                            cmd->uniform_buffer_bind_op.index,
+                            cmd->uniform_buffer_bind_op.buffer,
+                            cmd->uniform_buffer_bind_op.offset,
+                            cmd->uniform_buffer_bind_op.range);
+          break;
+
+        case _NGF_CMD_BIND_TEXTURE:
+          glActiveTexture(GL_TEXTURE0 + cmd->texture_bind_op.unit);
+          glBindTexture(cmd->texture_bind_op.texture->bind_point,
+                        cmd->texture_bind_op.texture->glimage);
+          break;
+
+        case _NGF_CMD_BIND_SAMPLER:
+          glBindSampler(cmd->sampler_bind_op.unit,
+                        cmd->sampler_bind_op.sampler->glsampler);
+          break;
+
+        case _NGF_CMD_BIND_ATTRIB_BUFFER: {
+          GLsizei stride = 0;
+          bool found_binding = false;
+          for (uint32_t binding = 0;
+               !found_binding && binding < bound_pipeline->nvert_buf_bindings;
+               ++binding) {
+            if (bound_pipeline->vert_buf_bindings[binding].binding ==
+                cmd->attrib_buffer_bind_op.binding) {
+              stride = bound_pipeline->vert_buf_bindings[binding].stride;
+              found_binding = true;
             }
           }
+          assert(found_binding);
+          glBindVertexBuffer(cmd->attrib_buffer_bind_op.binding,
+                             cmd->attrib_buffer_bind_op.buf->glbuffer,
+                             cmd->attrib_buffer_bind_op.offset,
+                             stride); 
+          break;
         }
-        glEnable(GL_SCISSOR_TEST);
-        break;
-      }
 
-      case _NGF_CMD_DRAW:
-        if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
-          glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
-                       cmd->draw.nelements);
-        } else if (!cmd->draw.indexed && cmd->draw.ninstances > 1u) {
-          glDrawArraysInstanced(bound_pipeline->primitive_type,
-                                cmd->draw.first_element,
-                                cmd->draw.nelements,
-                                cmd->draw.ninstances);
-        } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
-          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
-                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
-          size_t elem_size =
-              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
-                                                                          : 4;
-          glDrawElements(bound_pipeline->primitive_type,
-                         cmd->draw.nelements,
-                         get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                         (void*)(uintptr_t)(cmd->draw.first_element *
-                                            elem_size));
-        } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
-          assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
-                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
-          size_t elem_size =
-              CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
-                                                                          : 4;
-          glDrawElementsInstanced(bound_pipeline->primitive_type,
+        case _NGF_CMD_BIND_INDEX_BUFFER:
+          glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                       cmd->index_buffer_bind.index_buffer->glbuffer);
+          CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
+          break;
+
+        case _NGF_CMD_BEGIN_PASS: {
+          const ngf_render_target *target = cmd->begin_pass.target;
+          glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
+          uint32_t color_clear = 0u;
+          glDisable(GL_SCISSOR_TEST);
+          for (uint32_t a = 0u; a < target->nattachments; ++a) {
+            const ngf_attachment *attachment = &target->attachment_infos[a];
+            if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
+              const ngf_clear *clear = &attachment->clear;
+              switch (target->attachment_infos[a].type) {
+              case NGF_ATTACHMENT_COLOR:
+                glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
+                break;
+              case NGF_ATTACHMENT_DEPTH:
+                glClearBufferfv(GL_DEPTH, 0, &clear->clear_depth);
+                break;
+              case NGF_ATTACHMENT_STENCIL: {
+                GLint v = clear->clear_stencil;
+                glClearBufferiv(GL_STENCIL, 0, &v);
+                break;
+              case NGF_ATTACHMENT_DEPTH_STENCIL:
+                break;
+              }
+              }
+            }
+          }
+          glEnable(GL_SCISSOR_TEST);
+          break;
+        }
+
+        case _NGF_CMD_DRAW:
+          if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+            glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
+                         cmd->draw.nelements);
+          } else if (!cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+            glDrawArraysInstanced(bound_pipeline->primitive_type,
+                                  cmd->draw.first_element,
                                   cmd->draw.nelements,
-                                  get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
-                                  (void*)((uintptr_t)(cmd->draw.first_element *
-                                                      elem_size)),  
                                   cmd->draw.ninstances);
+          } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
+            assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                   CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+            size_t elem_size =
+                CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                            : 4;
+            glDrawElements(bound_pipeline->primitive_type,
+                           cmd->draw.nelements,
+                           get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                           (void*)(uintptr_t)(cmd->draw.first_element *
+                                              elem_size));
+          } else if (cmd->draw.indexed && cmd->draw.ninstances > 1u) {
+            assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
+                   CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
+            size_t elem_size =
+                CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
+                                                                            : 4;
+            glDrawElementsInstanced(bound_pipeline->primitive_type,
+                                    cmd->draw.nelements,
+                                    get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
+                                    (void*)((uintptr_t)(cmd->draw.first_element *
+                                                        elem_size)),  
+                                    cmd->draw.ninstances);
+          }
+          break;
+        default:
+          assert(false);
         }
-        break;
-      default:
-        assert(false);
       }
     }
     _ngf_cmd_buffer_free_cmds(bufs[b]);
