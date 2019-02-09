@@ -131,7 +131,7 @@ void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc) {
 }
 
 void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc) {
-  if (alloc->freelist) {
+  if (alloc->freelist == NULL) {
     _ngf_blkallock_add_pool(alloc);
   }
   _ngf_blkalloc_block *blk = alloc->freelist;
