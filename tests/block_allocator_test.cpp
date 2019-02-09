@@ -20,8 +20,9 @@ TEST_CASE("Basic block allocator functionality", "[blkalloc_basic]") {
     REQUIRE(data[i] != NULL);
     data[i]->p2 = (void*)data[i];
   }
+  // Max. number of entries reached, try adding a pool.
   test_data *null_blk = (test_data*)_ngf_blkalloc_alloc(allocator);
-  REQUIRE(null_blk == NULL);
+  REQUIRE(null_blk != NULL);
   for (uint32_t i = 0u; i < num_max_entries; ++i) {
     REQUIRE(data[i]->p2 == (void*)data[i]);
     _ngf_blkalloc_error err = _ngf_blkalloc_free(allocator, data[i]);
@@ -55,7 +56,8 @@ TEST_CASE("Block allocator fuzz test", "[blkalloc_fuzz]") {
     if (allocate) {
       test_data *x = (test_data*)_ngf_blkalloc_alloc(allocator);
       if (active_blocks == num_max_entries) {
-        REQUIRE(x == NULL);
+        REQUIRE(x != NULL);
+        _ngf_blkalloc_free(allocator, x);
       }
       else {
         REQUIRE(x != NULL);
