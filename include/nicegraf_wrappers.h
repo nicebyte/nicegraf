@@ -1,25 +1,24 @@
 /**
-Copyright © 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 #pragma once
 
 #include "nicegraf.h"
@@ -100,5 +99,59 @@ NGF_DEFINE_WRAPPER_TYPE(index_buffer);
 NGF_DEFINE_WRAPPER_TYPE(uniform_buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
+
+template <uint32_t S>
+struct descriptor_set {
+  template <uint32_t B>
+  struct binding {
+    static ngf_resource_bind_op texture(const ngf_image *image) {
+      ngf_resource_bind_op op;
+      op.type = NGF_DESCRIPTOR_TEXTURE;
+      op.target_binding = B;
+      op.target_set = S;
+      op.info.image_sampler.image_subresource.image = image;
+      return op;
+    }
+
+    static ngf_resource_bind_op uniform_buffer(const ngf_uniform_buffer *buf,
+                                               size_t offset, size_t range) {
+      ngf_resource_bind_op op;
+      op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
+      op.target_binding = B;
+      op.target_set = S;
+      op.info.uniform_buffer.buffer = buf;
+      op.info.uniform_buffer.offset = offset;
+      op.info.uniform_buffer.range = range;
+      return op;
+    }
+
+    static ngf_resource_bind_op sampler(const ngf_sampler *sampler) {
+      ngf_resource_bind_op op;
+      op.type = NGF_DESCRIPTOR_SAMPLER;
+      op.target_binding = B;
+      op.target_set = S;
+      op.info.image_sampler.sampler = sampler;
+      return op;
+    }
+
+    static ngf_resource_bind_op texture_and_sampler(
+        const ngf_image *image,
+        const ngf_sampler *sampler) {
+      ngf_resource_bind_op op;
+      op.type = NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
+      op.target_binding = B;
+      op.target_set = S;
+      op.info.image_sampler.image_subresource.image = image;
+      op.info.image_sampler.sampler = sampler;
+      return op;
+    }
+  };
+};
+
+template <class ...Args>
+void cmd_bind_resources(ngf_cmd_buffer *buf, const Args&&... args) {
+  const ngf_resource_bind_op ops[] = { args... };
+  ngf_cmd_bind_resources(buf, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
+}
 
 }  // namespace ngf
