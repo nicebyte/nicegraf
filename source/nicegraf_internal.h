@@ -106,7 +106,7 @@ typedef enum {
 _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc, void *ptr);
 
 // For fixing unreferenced parameter warnings.
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__clang__)
 static void _NGF_FAKE_USE_HELPER(int _, ...) { _ <<= 0u; }
 #define _NGF_FAKE_USE(...) _NGF_FAKE_USE_HELPER(0u, __VA_ARGS__)
 #else

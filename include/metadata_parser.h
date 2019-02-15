@@ -18,8 +18,11 @@ SOFTWARE.
 */
 
 #pragma once
+
+#ifdef _MSC_VER
 #pragma warning(push)
 #pragma warning(disable:4200)
+#endif
 
 #include <stddef.h>
 #include <stdint.h>
@@ -185,4 +188,6 @@ const char* ngf_plmd_get_error_name(const ngf_plmd_error err);
 }
 #endif
 
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
