@@ -38,8 +38,10 @@ extern "C" {
 #define NGF_VER_MAJ 0
 #define NGF_VER_MIN 0
 
+#ifdef _MSC_VER
 #pragma region ngf_type_declarations
-
+#endif
+    
 /**
  * Error codes.
  *
@@ -1008,9 +1010,12 @@ typedef struct ngf_cmd_buffer_info {
  */
 typedef struct ngf_cmd_buffer ngf_cmd_buffer;
 
+#ifdef _MSC_VER
 #pragma endregion
 
-#pragma region ngf_function_declarations 
+#pragma region ngf_function_declarations
+#endif
+    
 /**
  * Set the memory allocation callbacks that the library will use for its
  * internal needs.
@@ -1352,8 +1357,10 @@ ngf_error ngf_begin_frame(ngf_context *ctx);
  * @return Error codes: NGF_ERROR_END_FRAME_FAILED
  */
 ngf_error ngf_end_frame(ngf_context *ctx);
+#ifdef _MSC_VER
 #pragma endregion
-
+#endif
+    
 #ifdef __cplusplus
 }
 #endif
