@@ -221,7 +221,7 @@ typedef struct _ngf_emulated_cmd {
   };
 } _ngf_emulated_cmd;
 
-#define _NGF_CMDS_PER_CMD_BLOCK 8u
+#define _NGF_CMDS_PER_CMD_BLOCK  16u
 
 typedef struct _ngf_cmd_block {
    struct _ngf_cmd_block *next;
@@ -1284,9 +1284,9 @@ ngf_error ngf_default_render_target(
   if (CURRENT_CONTEXT->has_swapchain) {
     ngf_render_target *default_render_target =
       (ngf_render_target*)NGF_ALLOCN(uint8_t,
-                                    offsetof(ngf_render_target,
-                                             attachment_infos) +
-                                    3u * sizeof(ngf_attachment));
+                                     offsetof(ngf_render_target,
+                                              attachment_infos) +
+                                     3u * sizeof(ngf_attachment));
     if (default_render_target == NULL) {
       return NGF_ERROR_OUTOFMEM;
     }
@@ -1546,8 +1546,8 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
 }
 
 void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer *buf) {
-  bool has_first_cmd = buf->first_cmd_block != NULL;
-  bool has_last_cmd = buf->last_cmd_block != NULL;
+  const bool has_first_cmd = buf->first_cmd_block != NULL;
+  const bool has_last_cmd = buf->last_cmd_block != NULL;
   assert(!(has_first_cmd ^ has_last_cmd));
   if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
     for (_ngf_cmd_block *c = buf->first_cmd_block; c != NULL; c = c->next) {
