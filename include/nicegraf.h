@@ -1,24 +1,24 @@
 /**
-Copyright (c) 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 /**
  * @file nicegraf.h
@@ -284,7 +284,7 @@ typedef struct ngf_rasterization_info {
   bool discard; /**< Enable/disable rasterizer discard. Use in pipelines that
                      don't write fragment data.*/
   ngf_polygon_mode polygon_mode; /**< How to draw polygons.*/
-  ngf_cull_mode cull_mode; /**< Which polygoons to cull.*/
+  ngf_cull_mode cull_mode; /**< Which polygons to cull.*/
   ngf_front_face_mode front_face; /**< Which winding counts as front-facing.*/
   float line_width; /**< Width of a line.*/
 } ngf_rasterization_info ;
@@ -447,82 +447,6 @@ typedef struct ngf_multisample_info {
   bool multisample; /**< Whether to enable multisampling.*/
   bool alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
 } ngf_multisample_info;
-
-/**
- * Vertex data usage hints.
- *
- * These values hint the library how the vertex data (attributes and indices)
- * is intended to be consumed on the graphics device side.
- */
-typedef enum ngf_vertex_data_usage {
-  /**
-   * This hint indicates that the vertex data is intended to be read many times
-   * on the graphics device. An example usage scenario would be a character
-   * mesh.
-   */
-  NGF_VERTEX_DATA_USAGE_STATIC,
-
-  /**
-   * This hint indicates that the vertex data is intended to be consumed once,
-   * or very few times on the graphics device. An example would be displaying
-   * "immediate-mode" GUI.
-   */
-  NGF_VERTEX_DATA_USAGE_TRANSIENT
- } ngf_vertex_data_usage;
-
- /**
-  * Buffers can be populated directly by user-provided callbacks, potentially
-  * obviating the need for additional host-side memory allocations.
-  * The callback receives three parameters:
-  *   - a pointer to a region of host-visible device memory, into which the
-  *     user must write data (do not read from this buffer);
-  *   - the size of the buffer;
-  *   - a pointer to arbitrary user-provided data.
-  */
- typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
-                                             void *userdata);
-
- /**
-  * Vertex data description.
-  *
-  * This structure provides information necessary to create and populate a
-  * vertex attribute or index buffer.
-  */
-typedef struct ngf_vertex_data_info {
-  size_t buffer_size; /**< Buffer size in bytes. */
-
-  /**
-   * Pointer to the data that the buffer will be populated with. Set this to
-   * `NULL` to populate the buffer using a callback instead.
-   */
-  const void *buffer_ptr;
-
-  /**
-   * This callback will be invoked to populate the buffer with data if
-   * the \ref buffer_ptr field is set to `NULL` (otherwise this field is
-   * ignored).
-   */
-  ngf_buffer_populate_callback fill_callback;
-
-  /**
-   * This pointer shall be passed to \ref fill_callback as its third parameter.
-   */
-  void *fill_callback_userdata;
-  ngf_vertex_data_usage usage_hint;
- } ngf_vertex_data_info;
-
- typedef ngf_vertex_data_info ngf_attrib_buffer_info;
- typedef ngf_vertex_data_info ngf_index_buffer_info;
-
- /**
-  * A vertex attribute buffer.
-  */
- typedef struct ngf_attrib_buffer ngf_attrib_buffer;
-
- /**
-  * A vertex index buffer.
-  */
- typedef struct ngf_index_buffer ngf_index_buffer;
 
  /**
   * Specifies the data necessary for the creation of a uniform buffer.
@@ -1009,6 +933,84 @@ typedef struct ngf_cmd_buffer_info {
  * as long as the submitting and recording threads have shared contexts.
  */
 typedef struct ngf_cmd_buffer ngf_cmd_buffer;
+
+/**
+ * Vertex data usage hints.
+ *
+ * These values hint the library how the vertex data (attributes and indices)
+ * is intended to be consumed on the graphics device side.
+ */
+typedef enum ngf_vertex_data_usage {
+  /**
+   * This hint indicates that the vertex data is intended to be read many times
+   * on the graphics device. An example usage scenario would be a character
+   * mesh.
+   */
+  NGF_VERTEX_DATA_USAGE_STATIC,
+
+  /**
+   * This hint indicates that the vertex data is intended to be consumed once,
+   * or very few times on the graphics device. An example would be displaying
+   * "immediate-mode" GUI.
+   */
+  NGF_VERTEX_DATA_USAGE_TRANSIENT
+ } ngf_vertex_data_usage;
+
+ /**
+  * Buffers can be populated directly by user-provided callbacks, potentially
+  * obviating the need for additional host-side memory allocations.
+  * The callback receives three parameters:
+  *   - a pointer to a region of host-visible device memory, into which the
+  *     user must write data (do not read from this buffer);
+  *   - the size of the buffer;
+  *   - a pointer to arbitrary user-provided data.
+  */
+ typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
+                                             void *userdata);
+
+ /**
+  * Vertex data description.
+  *
+  * This structure provides information necessary to create and populate a
+  * vertex attribute or index buffer.
+  */
+typedef struct ngf_vertex_data_info {
+  size_t buffer_size; /**< Buffer size in bytes. */
+
+  /**
+   * Pointer to the data that the buffer will be populated with. Set this to
+   * `NULL` to populate the buffer using a callback instead.
+   */
+  const void *buffer_ptr;
+
+  /**
+   * This callback will be invoked to populate the buffer with data if
+   * the \ref buffer_ptr field is set to `NULL` (otherwise this field is
+   * ignored).
+   */
+  ngf_buffer_populate_callback fill_callback;
+
+  /**
+   * This pointer shall be passed to \ref fill_callback as its third parameter.
+   */
+  void *fill_callback_userdata;
+  ngf_vertex_data_usage usage_hint;
+  ngf_cmd_buffer *cmdbuf;
+ } ngf_vertex_data_info;
+
+ typedef ngf_vertex_data_info ngf_attrib_buffer_info;
+ typedef ngf_vertex_data_info ngf_index_buffer_info;
+
+ /**
+  * A vertex attribute buffer.
+  */
+ typedef struct ngf_attrib_buffer ngf_attrib_buffer;
+
+ /**
+  * A vertex index buffer.
+  */
+ typedef struct ngf_index_buffer ngf_index_buffer;
+
 
 #ifdef _MSC_VER
 #pragma endregion
