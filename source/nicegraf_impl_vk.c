@@ -117,6 +117,14 @@ struct ngf_cmd_buffer {
   bool recording;
 };
 
+struct ngf_attrib_buffer {
+  VkBuffer vkbuf;
+  VkBuffer vkstaging_buf;
+  VmaAllocation buf_alloc;
+  VmaAllocation staging_buf_alloc;
+  size_t   size;
+};
+
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(ngf_cmd_buffer)        submitted_cmdbuffers;
@@ -2111,3 +2119,105 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   };
   vkCmdSetScissor(buf->vkcmdbuf, 0u, 1u, &scissor_rect);
 }
+
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
+                                const ngf_attrib_buffer *abuf,
+                                uint32_t binding,
+                                uint32_t offset) {
+  VkDeviceSize vkoffset = offset;
+  vkCmdBindVertexBuffers(buf->vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
+}
+
+ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
+                                   ngf_attrib_buffer **result) {
+  assert(info);
+  assert(result);
+  ngf_attrib_buffer *buf = NGF_ALLOC(ngf_attrib_buffer);
+  *result = buf;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->size = info->buffer_size;
+  VkBufferCreateInfo staging_buf_vk_info = {
+    .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .pNext                 = NULL,
+    .flags                 = 0u,
+    .size                  = buf->size,
+    .usage                 = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0u,
+    .pQueueFamilyIndices   = NULL
+  };
+   VkBufferCreateInfo buf_vk_info = {
+    .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    .pNext                 = NULL,
+    .flags                 = 0u,
+    .size                  = buf->size,
+    .usage                 = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0u,
+    .pQueueFamilyIndices   = NULL
+  };
+  VmaAllocationCreateInfo staging_buf_alloc_info = {
+    .flags          = 0u,
+    .usage          = VMA_MEMORY_USAGE_CPU_ONLY,
+    .requiredFlags  = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+    .preferredFlags = 0u,
+    .memoryTypeBits = 0u,
+    .pool           = VK_NULL_HANDLE,
+    .pUserData      = NULL
+  };
+  VmaAllocationCreateInfo buf_alloc_info = {
+    .flags          = 0u,
+    .usage          = VMA_MEMORY_USAGE_GPU_ONLY,
+    .requiredFlags  = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    .preferredFlags = 0u,
+    .memoryTypeBits = 0u,
+    .pool           = VK_NULL_HANDLE,
+    .pUserData      = NULL
+  };
+  vmaCreateBuffer(CURRENT_CONTEXT->allocator, &buf_vk_info, &buf_alloc_info, &buf->vkbuf, &buf->buf_alloc, NULL);
+  vmaCreateBuffer(CURRENT_CONTEXT->allocator, &staging_buf_vk_info, &staging_buf_alloc_info, &buf->vkstaging_buf, &buf->staging_buf_alloc, NULL);
+  void *staging_buf_ptr = NULL;
+  vmaMapMemory(CURRENT_CONTEXT->allocator, buf->staging_buf_alloc,
+               &staging_buf_ptr);
+  if (info->buffer_ptr) {
+    memcpy(staging_buf_ptr, info->buffer_ptr, buf->size);
+  } else {
+    info->fill_callback(staging_buf_ptr, buf->size,
+                        info->fill_callback_userdata);
+  }
+  VkBufferCopy copy_region = {
+    .srcOffset = 0u,
+    .dstOffset = 0u,
+    .size      = buf->size
+  };
+  vkCmdCopyBuffer(info->cmdbuf->vkcmdbuf, buf->vkstaging_buf, buf->vkbuf,
+                  1u, &copy_region);
+  VkBufferMemoryBarrier buf_mem_bar = {
+    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    .pNext = NULL,
+    .buffer = buf->vkbuf,
+    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+    .srcQueueFamilyIndex = _vk.xfer_family_idx,
+    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .offset = 0,
+    .size = buf->size
+  };
+  vkCmdPipelineBarrier(info->cmdbuf->vkcmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0u, NULL,
+                       1u, &buf_mem_bar, 0, NULL);
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer) {
+//TODO: implement
+  NGF_FREE(buffer);
+}
+
+/*ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
+                                  ngf_index_buffer **result) {
+
+}*/
