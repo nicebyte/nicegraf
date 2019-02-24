@@ -151,7 +151,7 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
     _ngf_blkalloc_block *blk = 
         (_ngf_blkalloc_block*)((uint8_t*)ptr -
                                 offsetof(_ngf_blkalloc_block, data));
-
+#if !defined(NDEBUG)
     uint32_t blk_tag = (~MARKER_MASK) & blk->header.marker_and_tag;
     uint32_t my_tag = alloc->tag;
     uint32_t blk_marker = MARKER_MASK & blk->header.marker_and_tag;
@@ -164,6 +164,10 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
     } else {
       result = _NGF_BLK_WRONG_ALLOCATOR;
     }
+#else
+    blk->header.next_free = alloc->freelist;
+    alloc->freelist = blk;
+#endif
   }
   return result;
 }
