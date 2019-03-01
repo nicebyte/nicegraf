@@ -89,6 +89,11 @@ else()
         ${NICEGRAF_DEPS}
         volk
         vma)
+    if (NOT WIN32)
+      set(NICEGRAF_DEPS
+          ${NICEGRAF_DEPS}
+          xcb)
+    endif()
     set(NICEGRAF_PRIVATE_INCLUDES 
         ${NICEGRAF_PRIVATE_INCLUDES} ${VK_INCLUDE_PATH})
   endif()
