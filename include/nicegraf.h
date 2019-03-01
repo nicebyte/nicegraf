@@ -11,7 +11,7 @@
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -447,6 +447,55 @@ typedef struct ngf_multisample_info {
   bool multisample; /**< Whether to enable multisampling.*/
   bool alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
 } ngf_multisample_info;
+
+/**
+ * Types of memory backing a buffer object.
+ */
+typedef enum ngf_buffer_storage_type {
+  /**
+   * Readable/writeable memory can be accessed by the host after mapping the
+   * buffer.
+   */
+  NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+
+  /**
+   * Private memory cannot be accessed by the host directly. The contents of a
+   * buffer backed by this type of memory can only be modified by executing a
+   * `ngf_cmd_copy_xxxxx_buffer`.
+   */
+  NGF_BUFFER_STORAGE_PRIVATE
+} ngf_buffer_storage_type;
+
+/**
+ * Information required for buffer creation.
+ */
+typedef struct ngf_buffer_info {
+  size_t size_bytes;
+  ngf_buffer_storage_type storage_type;
+} ngf_buffer_info;
+
+/**
+ * Options for mapping a buffer to host memory.
+ */
+typedef enum ngf_buffer_map_flags {
+  NGF_BUFFER_MAP_READ_BIT = 0x01, /** < Mapped memory is readable. */
+  NGF_BUFFER_MAP_WRITE_BIT = 0x02,/** < Mapped memory is writeable. */
+  /**
+   * When a buffer is mapped with this flag, its previous contents becomes
+   * undefined for any commands submitted after the mapping operation.
+   */
+  NGF_BUFFER_MAP_DISCARD_BIT = 0x04 
+} ngf_buffer_map_flags;
+
+/**
+ * Indicates nicegraf buffer type.
+ */
+typedef enum ngf_buffer_type {
+  NGF_BUFFER_TYPE_ATTRIB,
+  NGF_BUFFER_TYPE_INDEX,
+  NGF_BUFFER_TYPE_UNIFORM,
+  NGF_BUFFER_TYPE_COUNT
+} ngf_buffer_type;
 
  /**
   * Specifies the data necessary for the creation of a uniform buffer.
@@ -996,21 +1045,32 @@ typedef struct ngf_vertex_data_info {
   void *fill_callback_userdata;
   ngf_vertex_data_usage usage_hint;
   ngf_cmd_buffer *cmdbuf;
- } ngf_vertex_data_info;
+} ngf_vertex_data_info;
 
- typedef ngf_vertex_data_info ngf_attrib_buffer_info;
- typedef ngf_vertex_data_info ngf_index_buffer_info;
+typedef ngf_vertex_data_info ngf_attrib_buffer_info;
+typedef ngf_vertex_data_info ngf_index_buffer_info;
 
- /**
-  * A vertex attribute buffer.
-  */
- typedef struct ngf_attrib_buffer ngf_attrib_buffer;
+/**
+ * A vertex attribute buffer.
+ */
+typedef struct ngf_attrib_buffer ngf_attrib_buffer;
 
- /**
-  * A vertex index buffer.
-  */
- typedef struct ngf_index_buffer ngf_index_buffer;
+/**
+ * A vertex index buffer.
+ */
+typedef struct ngf_index_buffer ngf_index_buffer;
 
+/**
+ * Wraps pointers to nicegraf buffer for generic buffer operations.
+ */
+typedef struct ngf_buffer_ptr {
+  ngf_buffer_type type;
+  union {
+    ngf_attrib_buffer *attrib;
+    ngf_index_buffer *index;
+    ngf_uniform_buffer *uniform;
+  };
+} ngf_buffer_ptr;
 
 #ifdef _MSC_VER
 #pragma endregion
@@ -1219,6 +1279,47 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf);
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
                                    const void *data,
                                    size_t size);
+
+/**
+ * Map a region of a given buffer to host memory.
+ * It is an error to bind a mapped buffer using any command. If a buffer that
+ * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure
+ * any new data in the mapped range becomes visible to the subsequent commands,
+ * then call \ref ngf_buffer_unmap. Then it will be safe to bind the buffer.
+ * Writing into any region that could be in use by previously submitted commands
+ * results in undefined behavior.
+ * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
+ *            needs to be mapped. Buffers that are backed by private memory
+ *            cannot be mapped.
+ * @param offset Offset at which the mapped region starts, in bytes. It must
+ *               satisfy platform-specific alignment requirements.
+ * @param size  Size of the mapped region in bytes.
+ * @param flags A combination of flags from \ref ngf_buffer_map_flags.
+ * @return A pointer to the mapped memory, or NULL if the buffer could not be
+ *         mapped.
+ */
+void* ngf_buffer_map_range(ngf_buffer_ptr ptr,
+                           size_t offset,
+                           size_t size,
+                           uint32_t flags);
+/**
+ * Ensure that any new data in the mapped range will be visible to subsequently
+ * submitted commands.
+ * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
+ *            needs to be flushed.
+ * @param offset Offset at which the flushed region starts, in bytes.
+ * @param size  Size of the flushed region in bytes.
+ */
+void ngf_buffer_flush_range(ngf_buffer_ptr ptr,
+                            size_t offset);
+
+/**
+ * Unmaps a previously mapped buffer. The pointer returned for that buffer
+ * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
+ * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
+ *            needs to be unmapped.
+ */
+void ngf_buffer_unmap(ngf_buffer_ptr ptr);
 
 /**
  * Wait for all pending rendering commands to complete.
