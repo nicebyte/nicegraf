@@ -1453,6 +1453,61 @@ GLuint _ngf_create_vertex_data_buffer(GLenum type,
   return buf;
 }
 
+GLuint _ngf_create_buffer(GLenum type,
+                          const ngf_buffer_info *info) {
+  assert(type == GL_ARRAY_BUFFER ||
+         type == GL_ELEMENT_ARRAY_BUFFER ||
+         type == GL_UNIFORM_BUFFER);
+  GLuint buf;
+  glGenBuffers(1u, &buf);
+  glBindBuffer(type, buf);
+  GLenum gl_buffer_usage = GL_NONE;
+  switch (info->storage_type) {
+  case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
+    gl_buffer_usage = GL_STREAM_DRAW;
+    break;
+  case NGF_BUFFER_STORAGE_PRIVATE:
+    gl_buffer_usage = GL_STATIC_DRAW;
+    break;
+  }
+
+  glBufferData(type, info->size, NULL, gl_buffer_usage);
+
+  return buf;
+}
+
+void* _ngf_buffer_map_range(GLenum bind_target,
+                            GLuint gl_buffer,
+                            size_t offset,
+                            size_t size,
+                            uint32_t flags) {
+  // TODO: return NULL if buffer uses private storage.
+  glBindBuffer(bind_target, gl_buffer);
+  GLbitfield map_access =
+      GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_FLUSH_EXPLICIT_BIT;
+  if (flags & NGF_BUFFER_MAP_READ_BIT) map_access |= GL_MAP_READ_BIT;
+  if (flags & NGF_BUFFER_MAP_WRITE_BIT) map_access |= GL_MAP_WRITE_BIT;
+  if (flags & NGF_BUFFER_MAP_DISCARD_BIT)
+    map_access |= GL_MAP_INVALIDATE_BUFFER_BIT;
+  return glMapBufferRange(bind_target, offset, size, map_access);
+}
+
+void _ngf_buffer_flush_range(GLenum bind_target,
+                             GLuint gl_buffer,
+                             size_t offset,
+                             size_t size) {
+  // TODO: assert that buffer is mapped.
+  glBindBuffer(bind_target, gl_buffer);
+  glFlushMappedBufferRange(bind_target, offset, size);
+}
+
+void _ngf_buffer_unmap(GLenum bind_target,
+                       GLuint gl_buffer) {
+  // TODO: assert that buffer is mapped.
+  glBindBuffer(bind_target, gl_buffer);
+  glUnmapBuffer(bind_target);
+}
+
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer **result) {
   assert(info);
@@ -1471,6 +1526,29 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buf) {
     glDeleteBuffers(1u, &buf->glbuffer);
     NGF_FREE(buf);
   }
+}
+
+void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
+                                  size_t offset,
+                                  size_t size,
+                                  uint32_t flags) {
+  return _ngf_buffer_map_range(GL_ARRAY_BUFFER,
+                               buf->glbuffer,
+                               offset,
+                               size,
+                               flags);
+}
+
+void ngf_attrib_buffer_flush_range(ngf_attrib_buffer *buf,
+                                   size_t offset,
+                                   size_t size) {
+  _ngf_buffer_flush_range(GL_ARRAY_BUFFER,
+                          buf->glbuffer,
+                          offset, size);
+}
+
+void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf) {
+  _ngf_buffer_unmap(GL_ARRAY_BUFFER, buf->glbuffer);
 }
 
 ngf_error ngf_create_index_buffer(const ngf_attrib_buffer_info *info,
@@ -1492,6 +1570,29 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
     glDeleteBuffers(1u, &buf->glbuffer);
     NGF_FREE(buf);
   }
+}
+
+void* ngf_index_buffer_map_range(ngf_index_buffer *buf,
+                                 size_t offset,
+                                 size_t size,
+                                 uint32_t flags) {
+  return _ngf_buffer_map_range(GL_ELEMENT_ARRAY_BUFFER,
+                               buf->glbuffer,
+                               offset,
+                               size,
+                               flags);
+}
+
+void ngf_index_buffer_flush_range(ngf_index_buffer *buf,
+                                   size_t offset,
+                                   size_t size) {
+  _ngf_buffer_flush_range(GL_ELEMENT_ARRAY_BUFFER,
+                          buf->glbuffer,
+                          offset, size);
+}
+
+void ngf_index_buffer_unmap(ngf_index_buffer *buf) {
+  _ngf_buffer_unmap(GL_ELEMENT_ARRAY_BUFFER, buf->glbuffer);
 }
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
@@ -1525,6 +1626,31 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
     glDeleteBuffers(1u, &buf->glbuffer);
     NGF_FREE(buf);
   }
+}
+
+void* ngf_uniform_buffer_map_range(ngf_uniform_buffer *buf,
+                                   size_t offset,
+                                   size_t size,
+                                   uint32_t flags) {
+  return _ngf_buffer_map_range(GL_UNIFORM_BUFFER,
+                               buf->glbuffer,
+                               offset,
+                               size,
+                               flags);
+}
+
+void ngf_uniform_buffer_flush_range(ngf_uniform_buffer *buf,
+                                    size_t offset,
+                                    size_t size) {
+  _ngf_buffer_flush_range(GL_UNIFORM_BUFFER,
+                          buf->glbuffer,
+                          offset,
+                          size);
+}
+
+void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf) {
+  _ngf_buffer_unmap(GL_UNIFORM_BUFFER,
+                    buf->glbuffer);
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
