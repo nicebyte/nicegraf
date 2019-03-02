@@ -160,6 +160,7 @@ typedef enum {
   _NGF_CMD_BIND_INDEX_BUFFER,
   _NGF_CMD_DRAW,
   _NGF_CMD_DRAW_INDEXED,
+  _NGF_CMD_COPY,
   _NGF_CMD_NONE
 } _ngf_emulated_cmd_type;
 
@@ -218,6 +219,13 @@ typedef struct _ngf_emulated_cmd {
       uint32_t first_element;
       bool indexed;
     } draw;
+    struct {
+      GLuint src;
+      GLuint dst;
+      size_t size;
+      size_t src_offset;
+      size_t dst_offset;
+    } copy;
   };
 } _ngf_emulated_cmd;
 
@@ -1929,6 +1937,53 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   cmd->draw.indexed = indexed;
 }
 
+void _ngf_cmd_copy_buffer(ngf_cmd_buffer *buf,
+                          GLuint src,
+                          GLuint dst,
+                          size_t size,
+                          size_t src_offset,
+                          size_t dst_offset) {
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
+  cmd->type = _NGF_CMD_COPY;
+  cmd->copy.src = src;
+  cmd->copy.dst = dst;
+  cmd->copy.size = size;
+  cmd->copy.src_offset = src_offset;
+  cmd->copy.dst_offset = dst_offset;
+
+}
+
+void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
+                                ngf_attrib_buffer *src,
+                                ngf_attrib_buffer *dst,
+                                size_t size,
+                                size_t src_offset,
+                                size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+                       size, src_offset, dst_offset);
+}
+
+void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
+                               ngf_index_buffer *src,
+                               ngf_index_buffer *dst,
+                               size_t size,
+                               size_t src_offset,
+                               size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+                       size, src_offset, dst_offset);
+ }
+
+void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
+                                 ngf_uniform_buffer *src,
+                                 ngf_uniform_buffer *dst,
+                                 size_t size,
+                                 size_t src_offset,
+                                 size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+                       size, src_offset, dst_offset);
+ }
+
 ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
   const ngf_graphics_pipeline *bound_pipeline =
@@ -2277,6 +2332,15 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                                         elem_size)),  
                                     cmd->draw.ninstances);
           }
+          break;
+        case _NGF_CMD_COPY:
+          glBindBuffer(GL_COPY_READ_BUFFER, cmd->copy.src);
+          glBindBuffer(GL_COPY_WRITE_BUFFER, cmd->copy.dst);
+          glCopyBufferSubData(GL_COPY_READ_BUFFER,
+                              GL_COPY_WRITE_BUFFER,
+                              (GLintptr)cmd->copy.src_offset,
+                              (GLintptr)cmd->copy.dst_offset,
+                              (GLsizei)cmd->copy.size);
           break;
         default:
           assert(false);
