@@ -470,7 +470,7 @@ typedef enum ngf_buffer_storage_type {
  * Information required for buffer creation.
  */
 typedef struct ngf_buffer_info {
-  size_t size_bytes;
+  size_t size;
   ngf_buffer_storage_type storage_type;
 } ngf_buffer_info;
 
@@ -486,16 +486,6 @@ typedef enum ngf_buffer_map_flags {
    */
   NGF_BUFFER_MAP_DISCARD_BIT = 0x04 
 } ngf_buffer_map_flags;
-
-/**
- * Indicates nicegraf buffer type.
- */
-typedef enum ngf_buffer_type {
-  NGF_BUFFER_TYPE_ATTRIB,
-  NGF_BUFFER_TYPE_INDEX,
-  NGF_BUFFER_TYPE_UNIFORM,
-  NGF_BUFFER_TYPE_COUNT
-} ngf_buffer_type;
 
  /**
   * Specifies the data necessary for the creation of a uniform buffer.
@@ -1060,18 +1050,6 @@ typedef struct ngf_attrib_buffer ngf_attrib_buffer;
  */
 typedef struct ngf_index_buffer ngf_index_buffer;
 
-/**
- * Wraps pointers to nicegraf buffer for generic buffer operations.
- */
-typedef struct ngf_buffer_ptr {
-  ngf_buffer_type type;
-  union {
-    ngf_attrib_buffer *attrib;
-    ngf_index_buffer *index;
-    ngf_uniform_buffer *uniform;
-  };
-} ngf_buffer_ptr;
-
 #ifdef _MSC_VER
 #pragma endregion
 
@@ -1237,11 +1215,52 @@ void ngf_destroy_render_target(ngf_render_target *target);
  */
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer **result);
+ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
+                                    ngf_attrib_buffer **result);
 
 /**
  * Discards the given vertex attribute buffer.
  */
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer);
+
+/**
+ * Map a region of a given buffer to host memory.
+ * It is an error to bind a mapped buffer using any command. If a buffer that
+ * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure
+ * any new data in the mapped range becomes visible to the subsequent commands,
+ * then call \ref ngf_buffer_unmap. Then it will be safe to bind the buffer.
+ * Writing into any region that could be in use by previously submitted commands
+ * results in undefined behavior.
+ * @param buf The buffer to be mapped.
+ * @param offset Offset at which the mapped region starts, in bytes. It must
+ *               satisfy platform-specific alignment requirements.
+ * @param size  Size of the mapped region in bytes.
+ * @param flags A combination of flags from \ref ngf_buffer_map_flags.
+ * @return A pointer to the mapped memory, or NULL if the buffer could not be
+ *         mapped.
+ */
+void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
+                                  size_t offset,
+                                  size_t size,
+                                  uint32_t flags);
+/**
+ * Ensure that any new data in the mapped range will be visible to subsequently
+ * submitted commands.
+ * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
+ *            needs to be flushed.
+ * @param offset Offset at which the flushed region starts, in bytes.
+ * @param size  Size of the flushed region in bytes.
+ */
+void ngf_attrib_buffer_flush_range(ngf_attrib_buffer *buf,
+                                   size_t offset,
+                                   size_t size);
+
+/**
+ * Unmaps a previously mapped buffer. The pointer returned for that buffer
+ * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
+ * @param buf The buffer that needs to be unmapped.
+ */
+void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf);
 
 /**
  * Creates a new vertex index buffer.
@@ -1250,10 +1269,32 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer);
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                   ngf_index_buffer **result);
+ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
+                                    ngf_attrib_buffer **result);
+
 /**
  * Discards the given vertex index buffer.
  */
 void ngf_destroy_index_buffer(ngf_index_buffer *buffer);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_map_range, but for index buffers.
+ */
+void* ngf_index_buffer_map_range(ngf_index_buffer *buf,
+                                 size_t offset,
+                                 size_t size,
+                                 uint32_t flags);
+/**
+ * Similar to \ref ngf_attrib_buffer_flush_range, but for index buffers.
+ */
+void ngf_index_buffer_flush_range(ngf_index_buffer *buf,
+                                  size_t offset,
+                                  size_t size);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_unmap, but for index buffers.
+ */
+void ngf_index_buffer_unmap(ngf_index_buffer *buf);
 
 /**
  * Creates a new uniform buffer.
@@ -1261,11 +1302,30 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buffer);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
-                                     ngf_uniform_buffer **result);
+                                    ngf_uniform_buffer **result);
 /**
  * Discards the given uniform buffer.
  */
 void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_map_range, but for uniform buffers.
+ */
+void* ngf_uniform_buffer_map_range(ngf_uniform_buffer *buf,
+                                   size_t offset,
+                                   size_t size,
+                                   uint32_t flags);
+/**
+ * Similar to \ref ngf_attrib_buffer_flush_range, but for uniform buffers.
+ */
+void ngf_uniform_buffer_flush_range(ngf_uniform_buffer *buf,
+                                    size_t offset,
+                                    size_t size);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_unmap, but for uniform buffers.
+ */
+void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf);
 
 /**
  * Fill the given uniform buffer with data.
@@ -1280,46 +1340,6 @@ ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
                                    const void *data,
                                    size_t size);
 
-/**
- * Map a region of a given buffer to host memory.
- * It is an error to bind a mapped buffer using any command. If a buffer that
- * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure
- * any new data in the mapped range becomes visible to the subsequent commands,
- * then call \ref ngf_buffer_unmap. Then it will be safe to bind the buffer.
- * Writing into any region that could be in use by previously submitted commands
- * results in undefined behavior.
- * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
- *            needs to be mapped. Buffers that are backed by private memory
- *            cannot be mapped.
- * @param offset Offset at which the mapped region starts, in bytes. It must
- *               satisfy platform-specific alignment requirements.
- * @param size  Size of the mapped region in bytes.
- * @param flags A combination of flags from \ref ngf_buffer_map_flags.
- * @return A pointer to the mapped memory, or NULL if the buffer could not be
- *         mapped.
- */
-void* ngf_buffer_map_range(ngf_buffer_ptr ptr,
-                           size_t offset,
-                           size_t size,
-                           uint32_t flags);
-/**
- * Ensure that any new data in the mapped range will be visible to subsequently
- * submitted commands.
- * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
- *            needs to be flushed.
- * @param offset Offset at which the flushed region starts, in bytes.
- * @param size  Size of the flushed region in bytes.
- */
-void ngf_buffer_flush_range(ngf_buffer_ptr ptr,
-                            size_t offset);
-
-/**
- * Unmaps a previously mapped buffer. The pointer returned for that buffer
- * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
- * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
- *            needs to be unmapped.
- */
-void ngf_buffer_unmap(ngf_buffer_ptr ptr);
 
 /**
  * Wait for all pending rendering commands to complete.
