@@ -1412,7 +1412,24 @@ void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances);
-
+void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
+                                ngf_attrib_buffer *src,
+                                ngf_attrib_buffer *dst,
+                                size_t size,
+                                size_t src_offset,
+                                size_t dst_offse);
+void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
+                               ngf_index_buffer *src,
+                               ngf_index_buffer *dst,
+                               size_t size,
+                               size_t src_offset,
+                               size_t dst_offset);
+void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
+                                 ngf_uniform_buffer *src,
+                                 ngf_uniform_buffer *dst,
+                                 size_t size,
+                                 size_t src_offset,
+                                 size_t dst_offset);
 /**
  * Initialize Nicegraf.
  * @param dev_pref specifies what type of GPU to prefer. Note that this setting
