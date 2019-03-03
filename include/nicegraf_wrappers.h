@@ -154,4 +154,61 @@ void cmd_bind_resources(ngf_cmd_buffer *buf, const Args&&... args) {
   ngf_cmd_bind_resources(buf, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
 }
 
+/**
+ * A convenience class for streaming uniform data.
+ */
+template <typename T>
+class streamed_uniform {
+public:
+  explicit streamed_uniform(uint32_t nframes) :
+    frame_(0u),
+    current_offset_(0u),
+    nframes_(nframes),
+    // TODO: replace 256 with real alignment
+    aligned_size_(sizeof(T) + (256u - sizeof(T)%256u)) {
+    const ngf_buffer_info buffer_info = {
+      aligned_size_ * nframes,
+      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE
+    };
+    ngf_uniform_buffer *buf = nullptr;
+    ngf_create_uniform_buffer2(&buffer_info, &buf);
+    buf_.reset(buf);
+  }
+
+  void write(const T &data) {
+    current_offset_ = (frame_) * aligned_size_;
+    const uint32_t flags =
+      (current_offset_ == 0u)
+          ? (NGF_BUFFER_MAP_WRITE_BIT | NGF_BUFFER_MAP_DISCARD_BIT)
+          :  NGF_BUFFER_MAP_WRITE_BIT;
+    void *mapped_buf = ngf_uniform_buffer_map_range(buf_.get(),
+                                                    current_offset_,
+                                                    aligned_size_,
+                                                    flags);
+    memcpy(mapped_buf, (void*)&data, sizeof(T));
+    ngf_uniform_buffer_flush_range(buf_.get(), current_offset_, aligned_size_);
+    ngf_uniform_buffer_unmap(buf_.get());
+    frame_ = (frame_ + 1u) % nframes_;
+  }
+
+  ngf_resource_bind_op bind_op_at_current_offset(uint32_t set,
+                                                 uint32_t binding) {
+    ngf_resource_bind_op op;
+    op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
+    op.target_binding = binding;
+    op.target_set = set;
+    op.info.uniform_buffer.buffer = buf_.get();
+    op.info.uniform_buffer.offset = current_offset_;
+    op.info.uniform_buffer.range = aligned_size_;
+    return op;
+  }
+
+private:
+  uniform_buffer buf_;
+  uint32_t frame_;
+  size_t current_offset_;
+  const uint32_t nframes_;
+  const size_t aligned_size_;
+};
+
 }  // namespace ngf
