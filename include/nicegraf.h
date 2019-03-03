@@ -1269,8 +1269,8 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf);
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                   ngf_index_buffer **result);
-ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
-                                    ngf_attrib_buffer **result);
+ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
+                                   ngf_index_buffer **result);
 
 /**
  * Discards the given vertex index buffer.
@@ -1303,6 +1303,8 @@ void ngf_index_buffer_unmap(ngf_index_buffer *buf);
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result);
+ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
+                                     ngf_uniform_buffer **result);
 /**
  * Discards the given uniform buffer.
  */
