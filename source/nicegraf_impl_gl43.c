@@ -1471,6 +1471,8 @@ GLuint _ngf_create_buffer(GLenum type,
   glBindBuffer(type, buf);
   GLenum gl_buffer_usage = GL_NONE;
   switch (info->storage_type) {
+  case NGF_BUFFER_STORAGE_HOST_READABLE:
+  case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
     gl_buffer_usage = GL_STREAM_DRAW;
     break;
