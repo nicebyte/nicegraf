@@ -453,8 +453,17 @@ typedef struct ngf_multisample_info {
  */
 typedef enum ngf_buffer_storage_type {
   /**
-   * Readable/writeable memory can be accessed by the host after mapping the
-   * buffer.
+   * Memory that can be read by the host.
+   */
+  NGF_BUFFER_STORAGE_HOST_READABLE,
+  
+  /**
+   * Memory that can be written to by the host.
+   */
+  NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+  /**
+   * Memory that can be both read from and written to by the
+   * host.
    */
   NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
 
