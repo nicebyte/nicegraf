@@ -1529,6 +1529,19 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
+                                    ngf_attrib_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_attrib_buffer);
+  ngf_attrib_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->glbuffer = _ngf_create_buffer(GL_ARRAY_BUFFER, info);
+  return NGF_ERROR_OK;
+}
+
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buf) {
   if (buf != NULL) {
     glDeleteBuffers(1u, &buf->glbuffer);
@@ -1570,6 +1583,19 @@ ngf_error ngf_create_index_buffer(const ngf_attrib_buffer_info *info,
   }
   buf->glbuffer = _ngf_create_vertex_data_buffer(GL_ELEMENT_ARRAY_BUFFER,
                                                  info);
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
+                                   ngf_index_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_index_buffer);
+  ngf_index_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->glbuffer = _ngf_create_buffer(GL_ELEMENT_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
 }
 
@@ -1615,6 +1641,19 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   glGenBuffers(1u, &buf->glbuffer);
   glBindBuffer(GL_UNIFORM_BUFFER, buf->glbuffer);
   buf->size = info->size;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
+                                     ngf_uniform_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_uniform_buffer);
+  ngf_uniform_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  buf->glbuffer = _ngf_create_buffer(GL_UNIFORM_BUFFER, info);
   return NGF_ERROR_OK;
 }
 
@@ -1953,6 +1992,8 @@ void _ngf_cmd_copy_buffer(ngf_cmd_buffer *buf,
   cmd->copy.dst_offset = dst_offset;
 
 }
+
+// TODO: assert that buffer is not mapped below.
 
 void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
                                 ngf_attrib_buffer *src,
