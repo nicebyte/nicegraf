@@ -991,19 +991,20 @@ id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
 
 id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
   MTLResourceOptions options = 0u;
+  MTLResourceOptions managed_storage = 0u;
 #if TARGET_OS_OSX
-  options |= MTLResourceStorageModeManaged;
+  managed_storage = MTLResourceStorageModeManaged;
 #endif
   switch(info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
-      options |= MTLResourceCPUCacheModeDefaultCache;
+      options = MTLResourceCPUCacheModeDefaultCache | managed_storage;
       break;
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
-      options |= MTLResourceCPUCacheModeWriteCombined;
+      options = MTLResourceCPUCacheModeWriteCombined | managed_storage;
       break;
   case NGF_BUFFER_STORAGE_PRIVATE:
-      options |= MTLResourceStorageModePrivate;
+      options = MTLResourceStorageModePrivate;
       break;
   default: assert(false);
   }
