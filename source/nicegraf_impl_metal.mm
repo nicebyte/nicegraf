@@ -1,24 +1,24 @@
 /**
-Copyright (c) 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 #include "nicegraf.h"
 #include "nicegraf_wrappers.h"
@@ -988,10 +988,40 @@ id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
   return mtl_buffer;
 }
 
+id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
+  MTLResourceOptions options;
+  switch(info.storage_type) {
+  case NGF_BUFFER_STORAGE_HOST_READABLE:
+  case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
+      options = MTLResourceCPUCacheModeDefaultCache;
+      break;
+  case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
+      options = MTLResourceCPUCacheModeWriteCombined;
+      break;
+  case NGF_BUFFER_STORAGE_PRIVATE:
+      options = MTLResourceStorageModePrivate;
+      break;
+  default: assert(false);
+  }
+  id<MTLBuffer> mtl_buffer =
+  [CURRENT_CONTEXT->device
+      newBufferWithLength:info.size
+                  options:options];
+  return mtl_buffer;
+}
+
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                      ngf_attrib_buffer **result) {
+                                   ngf_attrib_buffer **result) {
   _NGF_NURSERY(attrib_buffer, buf);
   buf->mtl_buffer = _ngf_create_buffer(info);
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
+                                    ngf_attrib_buffer **result) {
+  _NGF_NURSERY(attrib_buffer, buf);
+  buf->mtl_buffer = _ngf_create_buffer2(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1011,6 +1041,14 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
+                                   ngf_index_buffer **result) {
+  _NGF_NURSERY(index_buffer, buf);
+  buf->mtl_buffer = _ngf_create_buffer2(*info);
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
 void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
   if (buf != nullptr) {
     buf->~ngf_index_buffer();
@@ -1025,6 +1063,14 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   buf->mtl_buffer = [CURRENT_CONTEXT->device
     newBufferWithLength:buf->size * 3u
     options:MTLResourceOptionCPUCacheModeWriteCombined];
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
+                                     ngf_uniform_buffer **result) {
+  _NGF_NURSERY(uniform_buffer, buf);
+  buf->mtl_buffer = _ngf_create_buffer2(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1395,4 +1441,5 @@ PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 
 void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
+  // TODO: implement
 }
