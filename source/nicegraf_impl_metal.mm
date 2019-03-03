@@ -989,17 +989,20 @@ id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
 }
 
 id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
-  MTLResourceOptions options;
+  MTLResourceOptions options = 0u;
+#if TARGET_OS_OSX
+  options |= MTLResourceStorageModeManaged;
+#endif
   switch(info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
-      options = MTLResourceCPUCacheModeDefaultCache;
+      options |= MTLResourceCPUCacheModeDefaultCache;
       break;
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
-      options = MTLResourceCPUCacheModeWriteCombined;
+      options |= MTLResourceCPUCacheModeWriteCombined;
       break;
   case NGF_BUFFER_STORAGE_PRIVATE:
-      options = MTLResourceStorageModePrivate;
+      options |= MTLResourceStorageModePrivate;
       break;
   default: assert(false);
   }
@@ -1008,6 +1011,12 @@ id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
       newBufferWithLength:info.size
                   options:options];
   return mtl_buffer;
+}
+
+uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer,
+                      size_t offset,
+                      [[maybe_unused]] size_t size) {
+  return (uint8_t*)buffer.contents + offset;
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
@@ -1033,6 +1042,25 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buf) {
   }
 }
 
+void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
+                                  size_t offset,
+                                  size_t size,
+                                  [[maybe_unused]] uint32_t flags) {
+  // TODO: handle discard flag
+  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
+}
+
+void ngf_attrib_buffer_flush_range(
+    [[maybe_unused]] ngf_attrib_buffer *buf,
+    [[maybe_unused]] size_t offset,
+    [[maybe_unused]] size_t size) {
+#if TARGET_OS_OSX
+  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+#endif
+}
+
+void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer *buf) {}
+
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                    ngf_index_buffer **result) {
   _NGF_NURSERY(index_buffer, buf);
@@ -1048,6 +1076,25 @@ ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
   *result = buf.release();
   return NGF_ERROR_OK;
 }
+
+void* ngf_index_buffer_map_range(ngf_index_buffer *buf,
+                                 size_t offset,
+                                 size_t size,
+                                 [[maybe_unused]] uint32_t flags) {
+  // TODO: handle discard flag
+  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
+}
+
+void ngf_index_buffer_flush_range(
+    [[maybe_unused]] ngf_index_buffer *buf,
+    [[maybe_unused]] size_t offset,
+    [[maybe_unused]] size_t size) {
+#if TARGET_OS_OSX
+  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+#endif
+}
+
+void ngf_index_buffer_unmap([[maybe_unused]] ngf_index_buffer *buf) {}
 
 void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
   if (buf != nullptr) {
@@ -1081,6 +1128,25 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf) {
     NGF_FREE(buf);
   }
 }
+
+void* ngf_uniform_buffer_map_range(ngf_uniform_buffer *buf,
+                                   size_t offset,
+                                   size_t size,
+                                   [[maybe_unused]] uint32_t flags) {
+  // TODO: handle discard flag
+  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
+}
+
+void ngf_uniform_buffer_flush_range(
+                                    [[maybe_unused]] ngf_uniform_buffer *buf,
+                                    [[maybe_unused]] size_t offset,
+                                    [[maybe_unused]] size_t size) {
+#if TARGET_OS_OSX
+  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+#endif
+}
+
+void ngf_uniform_buffer_unmap([[maybe_unused]] ngf_uniform_buffer *buf) {}
 
 ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
                                    const void *data, size_t size) {
