@@ -101,6 +101,7 @@ struct ngf_render_target {
 struct ngf_cmd_buffer {
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
+  id<MTLBlitCommandEncoder> active_bce = nil;
   const ngf_graphics_pipeline *active_pipe = nullptr;
   const ngf_render_target *active_rt = nullptr;
   id<MTLBuffer> bound_index_buffer = nil;
@@ -1299,6 +1300,10 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *cmd_buffer,
                         const ngf_render_target *rt) {
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
+    cmd_buffer->active_rce = nil;
+  } else if (cmd_buffer->active_bce) {
+    [cmd_buffer->active_bce endEncoding];
+    cmd_buffer->active_bce = nil;
   }
   if (rt->is_default) {
     assert(CURRENT_CONTEXT->frame.color_drawable);
@@ -1494,6 +1499,47 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
       case NGF_DESCRIPTOR_TYPE_COUNT: assert(false);
     }
   }
+}
+
+void _ngf_cmd_copy_buffer(ngf_cmd_buffer *buf,
+                          id<MTLBuffer> src, id<MTLBuffer> dst,
+                          size_t size, size_t src_offset, size_t dst_offset) {
+  assert(buf->active_rce == nil);
+  if (buf->active_bce == nil) {
+    buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
+  }
+  [buf->active_bce copyFromBuffer:src sourceOffset:src_offset toBuffer:dst
+                destinationOffset:dst_offset size:size];
+}
+
+void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
+                                ngf_attrib_buffer *src,
+                                ngf_attrib_buffer *dst,
+                                size_t size,
+                                size_t src_offset,
+                                size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+                       dst_offset);
+}
+
+void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
+                               ngf_index_buffer *src,
+                               ngf_index_buffer *dst,
+                               size_t size,
+                               size_t src_offset,
+                               size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+                       dst_offset);
+}
+
+void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
+                                 ngf_uniform_buffer *src,
+                                 ngf_uniform_buffer *dst,
+                                 size_t size,
+                                 size_t src_offset,
+                                 size_t dst_offset) {
+  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+                       dst_offset);
 }
 
 #define PLACEHOLDER_CMD(name, ...) \
