@@ -2465,7 +2465,10 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           const ngf_offset3d *offset = &cmd->write_image.offset;
           const ngf_extent3d *extent = &cmd->write_image.dimensions;
           const GLenum bind_point = img_ref->image->bind_point;
+          glGetError();
           glBindBuffer(GL_PIXEL_UNPACK_BUFFER, cmd->write_image.src_pbuffer);
+
+          glBindTexture(bind_point, img_ref->image->glimage);
           if (bind_point != GL_TEXTURE_3D &&
               bind_point != GL_TEXTURE_2D_ARRAY) {
             glTexSubImage2D(bind_point,
@@ -2491,6 +2494,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                             (void*)cmd->write_image.src_data_offset);
           }
           glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+          break;
         }
         default:
           assert(false);
