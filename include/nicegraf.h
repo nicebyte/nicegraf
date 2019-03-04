@@ -1502,8 +1502,10 @@ void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
                                  size_t dst_offset);
 void ngf_cmd_write_image(ngf_cmd_buffer *buf,
                          const ngf_pixel_buffer *src,
+                         size_t src_offset,
                          ngf_image_ref dst,
-                         size_t offset);
+                         const ngf_offset3d *offset,
+                         const ngf_extent3d *extent);
 /**
  * Initialize Nicegraf.
  * @param dev_pref specifies what type of GPU to prefer. Note that this setting
