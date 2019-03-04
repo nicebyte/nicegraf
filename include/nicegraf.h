@@ -1390,7 +1390,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
 /**
  * Discards a given pixel buffer.
  */
-ngf_error ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf);
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf);
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for pixel buffers.
