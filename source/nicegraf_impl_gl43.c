@@ -104,13 +104,6 @@ struct ngf_shader_stage {
   uint32_t source_code_size;
 };
 
-struct ngf_buffer {
-  GLuint glbuffer;
-  GLint bind_point;
-  GLint bind_point_read;
-  GLenum access_type;
-};
-
 struct ngf_attrib_buffer {
   GLuint glbuffer;
 };
@@ -120,6 +113,11 @@ struct ngf_index_buffer {
 };
 
 struct ngf_uniform_buffer {
+  GLuint glbuffer;
+  size_t size;
+};
+
+struct ngf_pixel_buffer {
   GLuint glbuffer;
   size_t size;
 };
@@ -1465,7 +1463,8 @@ GLuint _ngf_create_buffer(GLenum type,
                           const ngf_buffer_info *info) {
   assert(type == GL_ARRAY_BUFFER ||
          type == GL_ELEMENT_ARRAY_BUFFER ||
-         type == GL_UNIFORM_BUFFER);
+         type == GL_UNIFORM_BUFFER ||
+         type == GL_PIXEL_UNPACK_BUFFER);
   GLuint buf;
   glGenBuffers(1u, &buf);
   glBindBuffer(type, buf);
@@ -1700,6 +1699,58 @@ void ngf_uniform_buffer_flush_range(ngf_uniform_buffer *buf,
 void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf) {
   _ngf_buffer_unmap(GL_UNIFORM_BUFFER,
                     buf->glbuffer);
+}
+
+ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
+                                  ngf_pixel_buffer **result) {
+  assert(info);
+  assert(result);
+  *result = NGF_ALLOC(ngf_pixel_buffer);
+  ngf_pixel_buffer *buf = *result;
+  if (buf == NULL) {
+    return NGF_ERROR_OUTOFMEM;
+  }
+  ngf_buffer_info buf_info;
+  buf_info.size = info->size;
+  switch (info->usage) {
+  case NGF_PIXEL_BUFFER_USAGE_WRITE:
+    buf_info.storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE;
+    break;
+  default: assert(false);
+  }
+  buf->glbuffer = _ngf_create_buffer(GL_PIXEL_UNPACK_BUFFER, &buf_info);
+  return NGF_ERROR_OK;
+}
+
+void* ngf_pixel_buffer_map_range(ngf_pixel_buffer *buf,
+  size_t offset,
+  size_t size,
+  uint32_t flags) {
+  return _ngf_buffer_map_range(GL_PIXEL_UNPACK_BUFFER,
+                               buf->glbuffer,
+                               offset,
+                               size,
+                               flags);
+}
+
+void ngf_pixel_buffer_flush_range(ngf_pixel_buffer *buf,
+  size_t offset,
+  size_t size) {
+  _ngf_buffer_flush_range(GL_PIXEL_UNPACK_BUFFER,
+                          buf->glbuffer,
+                          offset,
+                          size);
+}
+
+void ngf_pixel_buffer_unmap(ngf_pixel_buffer *buf) {
+  _ngf_buffer_unmap(GL_PIXEL_UNPACK_BUFFER, buf->glbuffer);
+}
+
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf) {
+  if (buf != NULL) {
+    glDeleteBuffers(1, &buf->glbuffer);
+    NGF_FREE(buf);
+  }
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
