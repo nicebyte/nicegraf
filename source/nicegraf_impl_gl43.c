@@ -159,6 +159,7 @@ typedef enum {
   _NGF_CMD_DRAW,
   _NGF_CMD_DRAW_INDEXED,
   _NGF_CMD_COPY,
+  _NGF_CMD_WRITE_IMAGE,
   _NGF_CMD_NONE
 } _ngf_emulated_cmd_type;
 
@@ -224,6 +225,13 @@ typedef struct _ngf_emulated_cmd {
       size_t src_offset;
       size_t dst_offset;
     } copy;
+    struct {
+      GLuint src_pbuffer;
+      size_t src_data_offset;
+      ngf_image_ref dst_image_ref;
+      ngf_offset3d offset;
+      ngf_extent3d dimensions;
+    } write_image;
   };
 } _ngf_emulated_cmd;
 
@@ -2046,6 +2054,22 @@ void _ngf_cmd_copy_buffer(ngf_cmd_buffer *buf,
 
 }
 
+void ngf_cmd_write_image(ngf_cmd_buffer *buf,
+                         const ngf_pixel_buffer *src,
+                         size_t src_offset,
+                         ngf_image_ref dst,
+                         const ngf_offset3d *offset,
+                         const ngf_extent3d *extent) {
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
+  cmd->type = _NGF_CMD_WRITE_IMAGE;
+  cmd->write_image.src_pbuffer = src->glbuffer;
+  cmd->write_image.src_data_offset = src_offset;
+  cmd->write_image.dst_image_ref = dst;
+  cmd->write_image.offset = *offset;
+  cmd->write_image.dimensions = *extent;
+}
+
 // TODO: assert that buffer is not mapped below.
 
 void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
@@ -2436,6 +2460,38 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                               (GLintptr)cmd->copy.dst_offset,
                               (GLsizei)cmd->copy.size);
           break;
+        case _NGF_CMD_WRITE_IMAGE: {
+          const ngf_image_ref *img_ref = &cmd->write_image.dst_image_ref;
+          const ngf_offset3d *offset = &cmd->write_image.offset;
+          const ngf_extent3d *extent = &cmd->write_image.dimensions;
+          const GLenum bind_point = img_ref->image->bind_point;
+          glBindBuffer(GL_PIXEL_UNPACK_BUFFER, cmd->write_image.src_pbuffer);
+          if (bind_point != GL_TEXTURE_3D &&
+              bind_point != GL_TEXTURE_2D_ARRAY) {
+            glTexSubImage2D(bind_point,
+                            img_ref->mip_level,
+                            offset->x,
+                            offset->y,
+                            extent->width,
+                            extent->height,
+                            img_ref->image->glformat,
+                            img_ref->image->gltype,
+                            (void*)cmd->write_image.src_data_offset);
+          } else {
+            glTexSubImage3D(bind_point,
+                            img_ref->mip_level,
+                            offset->x,
+                            offset->y,
+                            offset->z,
+                            extent->width,
+                            extent->height,
+                            extent->depth,
+                            img_ref->image->glformat,
+                            img_ref->image->gltype,
+                            (void*)cmd->write_image.src_data_offset);
+          }
+          glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        }
         default:
           assert(false);
         }
