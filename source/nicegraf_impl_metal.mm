@@ -1585,6 +1585,32 @@ void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
                        dst_offset);
 }
 
+void ngf_cmd_write_image(ngf_cmd_buffer *buf,
+                         const ngf_pixel_buffer *src,
+                         size_t src_offset,
+                         ngf_image_ref dst,
+                         const ngf_offset3d *offset,
+                         const ngf_extent3d *extent) {
+  assert(buf->active_rce == nil);
+  if (buf->active_bce == nil) {
+    buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
+  }
+  // TODO: this assumes 4bpp image data for now...
+  [buf->active_bce copyFromBuffer:src->mtl_buffer
+                     sourceOffset:src_offset
+                sourceBytesPerRow:extent->width * 4u
+              sourceBytesPerImage:extent->width * extent->height * 4u
+                       sourceSize:MTLSizeMake(extent->width,
+                                              extent->height,
+                                              extent->depth)
+                        toTexture:dst.image->texture
+                 destinationSlice:0
+                 destinationLevel:dst.mip_level
+                destinationOrigin:MTLOriginMake((NSUInteger)offset->x,
+                                                (NSUInteger)offset->y,
+                                                (NSUInteger)offset->z)];
+}
+
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
 
