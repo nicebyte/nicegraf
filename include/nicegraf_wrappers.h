@@ -97,6 +97,7 @@ NGF_DEFINE_WRAPPER_TYPE(render_target);
 NGF_DEFINE_WRAPPER_TYPE(attrib_buffer);
 NGF_DEFINE_WRAPPER_TYPE(index_buffer);
 NGF_DEFINE_WRAPPER_TYPE(uniform_buffer);
+NGF_DEFINE_WRAPPER_TYPE(pixel_buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
