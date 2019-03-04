@@ -152,6 +152,10 @@ struct ngf_uniform_buffer {
   size_t size = 0u;
 };
 
+struct ngf_pixel_buffer {
+  id<MTLBuffer> mtl_buffer = nil;
+};
+
 struct ngf_sampler {
   id<MTLSamplerState> sampler = nil;
 };
@@ -1139,8 +1143,7 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer *buf,
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
-void ngf_uniform_buffer_flush_range(
-                                    [[maybe_unused]] ngf_uniform_buffer *buf,
+void ngf_uniform_buffer_flush_range([[maybe_unused]] ngf_uniform_buffer *buf,
                                     [[maybe_unused]] size_t offset,
                                     [[maybe_unused]] size_t size) {
 #if TARGET_OS_OSX
@@ -1162,6 +1165,45 @@ ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buf,
   memcpy(target, data, size);
   return NGF_ERROR_OK;
 }
+
+ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
+                                  ngf_pixel_buffer **result) {
+  assert(info);
+  assert(result);
+  _NGF_NURSERY(pixel_buffer, buf);
+  ngf_buffer_info bufinfo = {
+    info->size,
+    NGF_BUFFER_STORAGE_HOST_WRITEABLE
+  };
+  buf->mtl_buffer = _ngf_create_buffer2(bufinfo);
+  *result = buf.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf) {
+  if (buf != nullptr) {
+    buf->~ngf_pixel_buffer();
+    NGF_FREE(buf);
+  }
+}
+
+void* ngf_pixel_buffer_map_range(ngf_pixel_buffer *buf,
+                                 size_t offset,
+                                 size_t size,
+                                 [[maybe_unused]] uint32_t flags) {
+  // TODO: handle discard flag
+  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
+}
+
+void ngf_pixel_buffer_flush_range([[maybe_unused]] ngf_pixel_buffer *buf,
+                                  [[maybe_unused]] size_t offset,
+                                  [[maybe_unused]] size_t size) {
+#if TARGET_OS_OSX
+  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+#endif
+}
+
+void ngf_pixel_buffer_unmap([[maybe_unused]] ngf_pixel_buffer *buf) {}
 
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler **result) {
