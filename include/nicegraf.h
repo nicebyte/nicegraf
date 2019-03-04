@@ -496,17 +496,46 @@ typedef enum ngf_buffer_map_flags {
   NGF_BUFFER_MAP_DISCARD_BIT = 0x04 
 } ngf_buffer_map_flags;
 
- /**
-  * Specifies the data necessary for the creation of a uniform buffer.
-  */
- typedef struct ngf_uniform_buffer_info {
-   size_t size; /**< Size of the buffer in bytes. */
- } ngf_uniform_buffer_info;
+/**
+ * Specifies the data necessary for the creation of a uniform buffer.
+ */
+typedef struct ngf_uniform_buffer_info {
+  size_t size; /**< Size of the buffer in bytes. */
+} ngf_uniform_buffer_info;
 
- /**
-  * A uniform buffer.
-  */
- typedef struct ngf_uniform_buffer ngf_uniform_buffer;
+/**
+ * A uniform buffer.
+ */
+typedef struct ngf_uniform_buffer ngf_uniform_buffer;
+
+/**
+ * Possible usages of a pixel buffer object.
+ */
+typedef enum ngf_pixel_buffer_usage {
+  // TODO: NGF_PIXEL_BUFFER_USAGE_READ
+  /**
+   * This value indicates that a pixel buffer object will be used by the
+   * application to transfer pixel data to the device.
+   */
+  NGF_PIXEL_BUFFER_USAGE_WRITE
+} ngf_pixel_buffer_usage;
+
+/**
+ * Information required to create a pixel buffer object.
+ */
+typedef struct ngf_pixel_buffer_info {
+  size_t size; /**< Size in bytes. */
+  ngf_pixel_buffer_usage usage; /**< Intended usage. */
+} ngf_pixel_buffer_info;
+
+/**
+ * Pixel buffers are used to transfer pixel data between the host and the
+ * device. They can be memory-mapped, similar to other types of buffers backed
+ * by host-visible storage, and their contents can be transferred to images via
+ * \ref ngf_cmd_write_image.
+ */
+typedef struct ngf_pixel_buffer ngf_pixel_buffer;
+
 /**
  * Possible image types.
  */
@@ -1188,12 +1217,11 @@ void ngf_destroy_sampler(ngf_sampler *sampler);
  *   buffer to. Otherwise, this parameter is ignored.
  *
  */
-ngf_error ngf_default_render_target(
-  ngf_attachment_load_op color_load_op,
-  ngf_attachment_load_op depth_load_op,
-  const ngf_clear *clear_color,
-  const ngf_clear *clear_depth,
-  ngf_render_target **result);
+ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
+                                    ngf_attachment_load_op depth_load_op,
+                                    const ngf_clear *clear_color,
+                                    const ngf_clear *clear_depth,
+                                    ngf_render_target **result);
 
 /**
  * Create a new rendertarget with the given configuration.
@@ -1353,6 +1381,37 @@ ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
 
 
 /**
+ * Creates a new pixel buffer.
+ * @param info see \ref ngf_pixel_buffer_info.
+ * @param result the new buffer handle will be stored in here.
+ */
+ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
+                                  ngf_pixel_buffer **result);
+/**
+ * Discards a given pixel buffer.
+ */
+ngf_error ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_map_range, but for pixel buffers.
+ */
+void* ngf_pixel_buffer_map_range(ngf_pixel_buffer *buf,
+                                 size_t offset,
+                                 size_t size,
+                                 uint32_t flags);
+/**
+ * Similar to \ref ngf_attrib_buffer_flush_range, but for pixel buffers.
+ */
+void ngf_pixel_buffer_flush_range(ngf_pixel_buffer *buf,
+                                  size_t offset,
+                                  size_t size);
+
+/**
+ * Similar to \ref ngf_attrib_buffer_unmap, but for pixel buffers.
+ */
+void ngf_pixel_buffer_unmap(ngf_pixel_buffer *buf);
+
+/**
  * Wait for all pending rendering commands to complete.
  */
 void ngf_finish();
@@ -1441,6 +1500,10 @@ void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset);
+void ngf_cmd_write_image(ngf_cmd_buffer *buf,
+                         const ngf_pixel_buffer *src,
+                         ngf_image_ref dst,
+                         size_t offset);
 /**
  * Initialize Nicegraf.
  * @param dev_pref specifies what type of GPU to prefer. Note that this setting
