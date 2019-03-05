@@ -1869,7 +1869,7 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *scissor) {
   _ngf_emulated_cmd *cmd = NULL;
   _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_SCISSOR;
-  cmd->viewport = *scissor;
+  cmd->scissor = *scissor;
 }
 
 void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
@@ -2122,8 +2122,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           if (cached_state->id != pipeline->id || force_pipeline_update) {
             CURRENT_CONTEXT->cached_state.id = pipeline->id;
             glBindProgramPipeline(pipeline->program_pipeline);
-            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
-                (!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
+            if ((!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
                  force_pipeline_update)) {
               glViewport(pipeline->viewport.x,
                          pipeline->viewport.y,
@@ -2131,8 +2130,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                          pipeline->viewport.height);
             }
 
-            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
-                 (!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
+            if ((!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
                   force_pipeline_update)) {
               glScissor(pipeline->scissor.x,
                         pipeline->scissor.y,
