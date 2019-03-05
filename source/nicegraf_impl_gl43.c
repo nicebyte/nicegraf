@@ -1869,7 +1869,7 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *scissor) {
   _ngf_emulated_cmd *cmd = NULL;
   _NGF_NEWCMD(buf, cmd);
   cmd->type = _NGF_CMD_SCISSOR;
-  cmd->viewport = *scissor;
+  cmd->scissor = *scissor;
 }
 
 void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
