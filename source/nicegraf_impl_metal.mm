@@ -191,7 +191,9 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
     MTLPixelFormatDepth32Float,
 #if TARGET_OS_OSX
     MTLPixelFormatDepth16Unorm,
-    MTLPixelFormatDepth24Unorm_Stencil8,
+    MTLPixelFormatDepth32Float_Stencil8, // instead of 24Unorm_Stencil8,
+                                         // because metal validator doesn't
+                                         // like it for some reason...
 #else
     MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
     MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
@@ -726,6 +728,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   rt->pass_descriptor = [MTLRenderPassDescriptor new];
   rt->is_default = false;
   uint32_t color_attachment_idx = 0u;
+  rt->pass_descriptor.depthAttachment.texture = nil;
+  rt->pass_descriptor.stencilAttachment.texture = nil;
   for (uint32_t a = 0u; a < info->nattachments; ++a) {
     const ngf_attachment &attachment = info->attachments[a];
     rt->width = attachment.image_ref.image->texture.width;
@@ -815,7 +819,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
     mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
   }
-  if (compatible_rt.pass_descriptor.depthAttachment) {
+
+  if (compatible_rt.pass_descriptor.depthAttachment.texture) {
     mtl_pipe_desc.depthAttachmentPixelFormat =
         compatible_rt.pass_descriptor.depthAttachment.texture.pixelFormat;
   } else if (compatible_rt.is_default &&
@@ -824,13 +829,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     mtl_pipe_desc.depthAttachmentPixelFormat =
         get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt);
   }
+
   if (mtl_pipe_desc.depthAttachmentPixelFormat ==
           MTLPixelFormatDepth32Float_Stencil8) {
     // TODO support other stencil formats
     mtl_pipe_desc.stencilAttachmentPixelFormat =
         MTLPixelFormatDepth32Float_Stencil8;
   }
-  
+
   // Populate specialization constant values.
   MTLFunctionConstantValues *spec_consts = nil;
   if (info->spec_info != nullptr) {
@@ -898,15 +904,6 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       MTLPrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
   }
-  
-  // TODO: fix (depth and stencil both) - set appropriate formats
-  if (CURRENT_CONTEXT->swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-    mtl_pipe_desc.depthAttachmentPixelFormat =
-        MTLPixelFormatDepth32Float_Stencil8;
-    mtl_pipe_desc.stencilAttachmentPixelFormat =
-        MTLPixelFormatDepth32Float_Stencil8;
-  }
-  
   
   _NGF_NURSERY(graphics_pipeline, pipeline);
   pipeline->layout.ndescriptor_set_layouts =
