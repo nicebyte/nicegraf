@@ -293,7 +293,8 @@ get_mtl_primitive_topology_class(ngf_primitive_type type) {
   return topo_class[type];
 }
 
-static std::optional<MTLPrimitiveType> get_mtl_primitive_type(ngf_primitive_type type) {
+static std::optional<MTLPrimitiveType> get_mtl_primitive_type(
+    ngf_primitive_type type) {
   static const std::optional<MTLPrimitiveType>
       types[NGF_PRIMITIVE_TYPE_COUNT] = {
     MTLPrimitiveTypeTriangle,
@@ -348,7 +349,8 @@ static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
 
 static std::optional<MTLSamplerAddressMode>
     get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
-  static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] = {
+  static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] =
+  {
     MTLSamplerAddressModeClampToEdge,
 #if TARGET_OS_OSX
     MTLSamplerAddressModeClampToBorderColor,
@@ -747,15 +749,18 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       break;
     }
     case NGF_ATTACHMENT_DEPTH: {
-      assert(false);
+      auto desc = [MTLRenderPassDepthAttachmentDescriptor new];
+      _ngf_attachment_set_common(desc, attachment);
+      desc.clearDepth = attachment.clear.clear_depth;
+      rt->pass_descriptor.depthAttachment = desc;
       break;
     }
     case NGF_ATTACHMENT_STENCIL: {
-      assert(false);
+      assert(false); // TODO: implement
       break;
     }
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
-      assert(false);
+      assert(false); // TODO: implement
       break;
     }
     }
