@@ -96,6 +96,8 @@ struct ngf_render_target {
   mutable MTLRenderPassDescriptor *pass_descriptor = nil;
   uint32_t ncolor_attachments = 0u;
   bool is_default = false;
+  NSUInteger width;
+  NSUInteger height;
 };
 
 struct ngf_cmd_buffer {
@@ -726,6 +728,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   uint32_t color_attachment_idx = 0u;
   for (uint32_t a = 0u; a < info->nattachments; ++a) {
     const ngf_attachment &attachment = info->attachments[a];
+    rt->width = attachment.image_ref.image->texture.width;
+    rt->height = attachment.image_ref.image->texture.height;
     switch(attachment.type) {
     case NGF_ATTACHMENT_COLOR: {
       auto desc = [MTLRenderPassColorAttachmentDescriptor new];
@@ -1388,9 +1392,13 @@ void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
 void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   MTLViewport viewport;
   viewport.originX = r->x;
-  int32_t top = r->y + (int32_t)r->height;
-  // TODO use rendertarget height
-  viewport.originY = (int32_t)CURRENT_CONTEXT->swapchain_info.height - top;
+  const uint32_t top = (uint32_t)r->y + r->height;
+  const ngf_render_target *rt = buf->active_rt;
+  if (rt->is_default) {
+    viewport.originY = CURRENT_CONTEXT->swapchain_info.height - top;
+  } else {
+    viewport.originY = rt->height - top;
+  }
   viewport.width = r->width;
   viewport.height = r->height;
 
@@ -1404,10 +1412,13 @@ void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
 void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   MTLScissorRect scissor;
   scissor.x = (NSUInteger)r->x;
-  int32_t top = r->y + (int32_t)r->height;
-  // TODO use rendertarget height
-  scissor.y =
-      (NSUInteger)((int32_t)CURRENT_CONTEXT->swapchain_info.height - top);
+  const uint32_t top = (uint32_t)r->y + r->height;
+  const ngf_render_target *rt = buf->active_rt;
+  if (rt->is_default) {
+    scissor.y = CURRENT_CONTEXT->swapchain_info.height - top;
+  } else {
+    scissor.y = rt->height;
+  }
   scissor.width = r->width;
   scissor.height = r->height;
   [buf->active_rce setScissorRect:scissor];
