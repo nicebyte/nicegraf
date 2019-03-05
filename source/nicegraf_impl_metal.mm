@@ -1419,7 +1419,7 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   if (rt->is_default) {
     scissor.y = CURRENT_CONTEXT->swapchain_info.height - top;
   } else {
-    scissor.y = rt->height;
+    scissor.y = rt->height - top;
   }
   scissor.width = r->width;
   scissor.height = r->height;
