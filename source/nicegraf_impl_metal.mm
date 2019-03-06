@@ -39,6 +39,23 @@ using _NGF_VIEW_TYPE = NSView;
 using _NGF_VIEW_TYPE = UIView;
 #endif
 
+// Indicates the maximum amount of buffers (attrib, index and uniform) that
+// could be bound at the same time.
+// This is required to work around a discrepancy between nicegraf's and Metal's
+// buffer binding models.
+// In Metal, bindings for vertex attribute buffers share the same space of IDs
+// with regular buffers. Therefore assigning binding 0 to a vertex
+// attrib buffer would cause a conflict if a vertex shader also requires a
+// uniform buffer bound at 0.
+// In order to solve this, attribute buffer bindings are remapped in the
+// following way:
+// nicegraf's attrib binding 0 becomes Metal vertex buffer binding 30
+// attrib binding 1 becomes Metal vertex buffer binding 29
+// ...and so on.
+// TODO: consider using information from pipeline metadata to use an alternative
+//       remapping scheme: attrib binding 0 -> N; attrib binding 1 -> N+1;...
+//       etc. where N is the total number of uniform buffers consumed by the
+//       vertex stage.
 static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 
 id<MTLDevice> MTL_DEVICE = nil;
