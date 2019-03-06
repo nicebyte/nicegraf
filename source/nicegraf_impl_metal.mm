@@ -21,12 +21,14 @@
  */
 
 #include "nicegraf.h"
-#include "nicegraf_wrappers.h"
 #include "nicegraf_internal.h"
+#include "nicegraf_wrappers.h"
+
+#include <memory>
 #include <new>
 #include <optional>
-#include <memory>
 #include <string>
+
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
