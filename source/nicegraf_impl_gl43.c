@@ -2390,6 +2390,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
+          glDepthMask(GL_TRUE);
           for (uint32_t a = 0u; a < target->nattachments; ++a) {
             const ngf_attachment *attachment = &target->attachment_infos[a];
             if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
