@@ -500,6 +500,7 @@ private:
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 #if TARGET_OS_OSX
+  // On macOS, try picking a device in accordance with user's preferences.
   id<NSObject> dev_observer = nil;
   const NSArray<id<MTLDevice>> *devices =
       MTLCopyAllDevicesWithObserver(&dev_observer,
@@ -508,10 +509,13 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   bool found_device = false;
   for (uint32_t d = 0u; !found_device && d < devices.count; ++d) {
     MTL_DEVICE = devices[d++];
+    // If the user prefers discrete GPU, do not pick a low-power device.
+    // Otherwise, anything will do.
     found_device = (dev_pref != NGF_DEVICE_PREFERENCE_DISCRETE) ||
                    !MTL_DEVICE.lowPower;
   }
 #else
+  // On other targets, simply pick the default device.
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
   bool found_device = (MTL_DEVICE != nil);
 #endif
