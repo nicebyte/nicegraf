@@ -58,46 +58,335 @@ using _NGF_VIEW_TYPE = UIView;
 //       vertex stage.
 static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 
+// Metal device handle. We choose one upon initialization and always use that
+// one.
 id<MTLDevice> MTL_DEVICE = nil;
 
-#pragma mark ngf_struct_definitions
+#pragma mark ngf_enum_maps
 
+static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
+  static const MTLPixelFormat pixel_formats[NGF_IMAGE_FORMAT_COUNT] = {
+    MTLPixelFormatR8Unorm,
+    MTLPixelFormatRG8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatRGBA8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatRGBA8Unorm_sRGB,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatBGRA8Unorm,
+    MTLPixelFormatInvalid, // RGB8, Metal does not support.
+    MTLPixelFormatBGRA8Unorm_sRGB,
+    MTLPixelFormatR32Float,
+    MTLPixelFormatRG32Float,
+    MTLPixelFormatInvalid, // RGB32F, Metal does not support.
+    MTLPixelFormatRGBA32Float,
+    MTLPixelFormatR16Float,
+    MTLPixelFormatRG16Float,
+    MTLPixelFormatInvalid, // RGB16F, Metal does not support.
+    MTLPixelFormatRGBA16Float,
+    MTLPixelFormatDepth32Float,
+#if TARGET_OS_OSX
+    MTLPixelFormatDepth16Unorm,
+    MTLPixelFormatDepth32Float_Stencil8, // instead of 24Unorm_Stencil8,
+    // because metal validator doesn't
+    // like it for some reason...
+#else
+    MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
+    MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
+#endif
+  };
+  return pixel_formats[fmt];
+}
+
+static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
+  static const MTLLoadAction action[NGF_LOAD_OP_COUNT] = {
+    MTLLoadActionDontCare,
+    MTLLoadActionLoad,
+    MTLLoadActionClear
+  };
+  return action[op];
+}
+
+static MTLDataType get_mtl_type(ngf_type type) {
+  static const MTLDataType types[NGF_TYPE_COUNT] = {
+    MTLDataTypeNone, /* Int8, Metal does not support.*/
+    MTLDataTypeNone, /*UInt8, Metal does not support*/
+    MTLDataTypeShort,
+    MTLDataTypeUShort,
+    MTLDataTypeInt,
+    MTLDataTypeUInt,
+    MTLDataTypeFloat,
+    MTLDataTypeHalf,
+    MTLDataTypeNone /* Double,Metal does not support.*/
+  };
+  return types[type];
+}
+
+static MTLVertexFormat get_mtl_attrib_format(ngf_type type,
+                                             uint32_t size,
+                                             bool normalized) {
+  static const MTLVertexFormat formats[NGF_TYPE_COUNT][2][4] = {
+    { {MTLVertexFormatChar, MTLVertexFormatChar2,
+      MTLVertexFormatChar3, MTLVertexFormatChar4},
+      {MTLVertexFormatCharNormalized, MTLVertexFormatChar2Normalized,
+        MTLVertexFormatChar3Normalized, MTLVertexFormatChar4Normalized} },
+    { {MTLVertexFormatUChar, MTLVertexFormatUChar2,
+      MTLVertexFormatUChar3, MTLVertexFormatUChar4},
+      {MTLVertexFormatUCharNormalized, MTLVertexFormatUChar2Normalized,
+        MTLVertexFormatUChar3Normalized, MTLVertexFormatUChar4Normalized} },
+    { {MTLVertexFormatShort, MTLVertexFormatShort2,
+      MTLVertexFormatShort3, MTLVertexFormatShort4},
+      {MTLVertexFormatShortNormalized, MTLVertexFormatShort2Normalized,
+        MTLVertexFormatShort3Normalized, MTLVertexFormatShort4Normalized} },
+    { {MTLVertexFormatUShort, MTLVertexFormatUShort2,
+      MTLVertexFormatUShort3, MTLVertexFormatUShort4},
+      {MTLVertexFormatUShortNormalized, MTLVertexFormatUShort2Normalized,
+        MTLVertexFormatUShort3Normalized, MTLVertexFormatUShort4Normalized} },
+    { {MTLVertexFormatInt, MTLVertexFormatInt2,
+      MTLVertexFormatInt3, MTLVertexFormatInt4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+        MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatUInt, MTLVertexFormatUInt2,
+      MTLVertexFormatUInt3, MTLVertexFormatUInt4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+        MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatFloat, MTLVertexFormatFloat2,
+      MTLVertexFormatFloat3, MTLVertexFormatFloat4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+        MTLVertexFormatInvalid, MTLVertexFormatInvalid } },
+    { {MTLVertexFormatHalf, MTLVertexFormatHalf2,
+      MTLVertexFormatHalf3, MTLVertexFormatHalf4},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+        MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
+    { {MTLVertexFormatInvalid, MTLVertexFormatInvalid, // Double, Metal does not support.
+      MTLVertexFormatInvalid, MTLVertexFormatInvalid},
+      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
+        MTLVertexFormatInvalid, MTLVertexFormatInvalid} }
+  };
+  assert(size <= 4u && size > 0u);
+  return formats[type][normalized? 1 : 0][size - 1u];
+}
+
+static MTLVertexStepFunction get_mtl_step_function(ngf_input_rate rate) {
+  static const MTLVertexStepFunction funcs[NGF_INPUT_RATE_COUNT] = {
+    MTLVertexStepFunctionPerVertex,
+    MTLVertexStepFunctionPerInstance
+  };
+  return funcs[rate];
+}
+
+static MTLPrimitiveTopologyClass
+get_mtl_primitive_topology_class(ngf_primitive_type type) {
+  static const MTLPrimitiveTopologyClass
+  topo_class[NGF_PRIMITIVE_TYPE_COUNT] = {
+    MTLPrimitiveTopologyClassTriangle,
+    MTLPrimitiveTopologyClassTriangle,
+    MTLPrimitiveTopologyClassUnspecified, // Triangle Fan, Metal does not
+    // support.
+    MTLPrimitiveTopologyClassLine,
+    MTLPrimitiveTopologyClassLine,
+  };
+  return topo_class[type];
+}
+
+static std::optional<MTLPrimitiveType> get_mtl_primitive_type(
+                                                              ngf_primitive_type type) {
+  static const std::optional<MTLPrimitiveType>
+  types[NGF_PRIMITIVE_TYPE_COUNT] = {
+    MTLPrimitiveTypeTriangle,
+    MTLPrimitiveTypeTriangleStrip,
+    std::nullopt, // Triangle Fan not supported.
+    MTLPrimitiveTypeLine,
+    MTLPrimitiveTypeLineStrip
+  };
+  return types[type];
+}
+
+static MTLIndexType get_mtl_index_type(ngf_type type) {
+  assert(type == NGF_TYPE_UINT16 || type == NGF_TYPE_UINT32);
+  return type == NGF_TYPE_UINT16 ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
+}
+
+static MTLCompareFunction get_mtl_compare_function(ngf_compare_op op) {
+  static const MTLCompareFunction compare_fns[NGF_COMPARE_OP_COUNT] = {
+    MTLCompareFunctionNever,
+    MTLCompareFunctionLess,
+    MTLCompareFunctionLessEqual,
+    MTLCompareFunctionEqual,
+    MTLCompareFunctionGreaterEqual,
+    MTLCompareFunctionGreater,
+    MTLCompareFunctionNotEqual,
+    MTLCompareFunctionAlways
+  };
+  return compare_fns[op];
+}
+
+static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
+  static const MTLStencilOperation stencil_ops[NGF_STENCIL_OP_COUNT] = {
+    MTLStencilOperationKeep,
+    MTLStencilOperationZero,
+    MTLStencilOperationReplace,
+    MTLStencilOperationIncrementClamp,
+    MTLStencilOperationIncrementWrap,
+    MTLStencilOperationDecrementClamp,
+    MTLStencilOperationDecrementWrap,
+    MTLStencilOperationInvert
+  };
+  return stencil_ops[op];
+}
+
+static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
+  static const MTLTextureType types[NGF_IMAGE_TYPE_COUNT] = {
+    MTLTextureType2D,
+    MTLTextureType3D
+  };
+  return types[type];
+}
+
+static std::optional<MTLSamplerAddressMode>
+get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
+  static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] =
+  {
+    MTLSamplerAddressModeClampToEdge,
+#if TARGET_OS_OSX
+    MTLSamplerAddressModeClampToBorderColor,
+#else
+    //ClampToBorderColor is unsupported on iOS, temp solution:
+    std::nullopt,
+#endif
+    MTLSamplerAddressModeRepeat,
+    MTLSamplerAddressModeMirrorRepeat
+  };
+  return modes[mode];
+}
+
+static MTLSamplerMinMagFilter get_mtl_minmag_filter(ngf_sampler_filter f) {
+  static MTLSamplerMinMagFilter filters[NGF_FILTER_COUNT] = {
+    MTLSamplerMinMagFilterNearest,
+    MTLSamplerMinMagFilterLinear
+  };
+  return filters[f];
+}
+
+static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
+  static MTLSamplerMipFilter filters[NGF_FILTER_COUNT] = {
+    MTLSamplerMipFilterNearest,
+    MTLSamplerMipFilterLinear
+  };
+  return filters[f];
+}
+
+// Manages the final presentation surfaces.
 class _ngf_swapchain {
 public:
   struct frame {
     id<CAMetalDrawable> color_drawable = nil;
-    id<MTLTexture> depth_texture = nil;
+    id<MTLTexture>      depth_texture  = nil;
   };
   
   _ngf_swapchain() = default;
   _ngf_swapchain(_ngf_swapchain &&other) { *this = std::move(other); }
   _ngf_swapchain& operator=(_ngf_swapchain &&other) {
-    layer_ = other.layer_;
-    other.layer_ = nil;
+    layer_        = other.layer_;
+    other.layer_  = nil;
     depth_images_ = std::move(other.depth_images_);
-    capacity_ = other.capacity_;
-    img_idx_ = other.img_idx_;
+    capacity_     = other.capacity_;
+    img_idx_      = other.img_idx_;
+    
     return *this;
   }
+  
+  // Delete copy ctor and copy assignment to make this type move-only.
   _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
   _ngf_swapchain(const _ngf_swapchain&) = delete;
   
-  ngf_error initialize(ngf_swapchain_info &swapchain_info,
-                       id<MTLDevice> device);
+  ngf_error initialize(const ngf_swapchain_info &swapchain_info,
+                       id<MTLDevice>             device) {
+    // Initialize the Metal layer.
+    const CGSize size = {
+      (CGFloat)swapchain_info.width,
+      (CGFloat)swapchain_info.height
+    };
+    const MTLPixelFormat pixel_format =
+        get_mtl_pixel_format(swapchain_info.cfmt);
+    if (pixel_format == MTLPixelFormatInvalid) {
+      return NGF_ERROR_INVALID_IMAGE_FORMAT;
+    }
+    layer_ = [CAMetalLayer layer];
+    layer_.device = device;
+    layer_.drawableSize = size;
+    layer_.pixelFormat = pixel_format;
+    layer_.framebufferOnly = YES;
+#if TARGET_OS_OSX
+    if (@available(macOS 10.13.2, *)) {
+      layer_.maximumDrawableCount = swapchain_info.capacity_hint;
+    }
+    if (@available(macOS 10.13, *)) {
+      layer_.displaySyncEnabled =
+      (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
+    }
+#endif
+    
+    // Associate the newly created Metal layer with the user-provided View.
+    _NGF_VIEW_TYPE *view=
+        CFBridgingRelease((void*)swapchain_info.native_handle);
+#if TARGET_OS_OSX
+    [view setLayer:layer_];
+#else
+    [view.layer addSublayer:layer_];
+    [layer_ setContentsScale:view.layer.contentsScale];
+    [layer_ setContentsGravity:kCAGravityCenter];
+    [layer_ setPosition:view.center];
+#endif
+    CFBridgingRetain(view);
+    
+    // Remember the number of images in the swapchain.
+    capacity_ = swapchain_info.capacity_hint;
+    
+    // Initialize depth attachments if necessary.
+    if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+      depth_images_.reset(
+                          new id<MTLTexture>[swapchain_info.capacity_hint]);
+      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.dfmt);
+      assert(depth_format != MTLPixelFormatInvalid);
+      for (uint32_t i = 0u; i < capacity_; ++i) {
+        auto *depth_texture_desc            = [MTLTextureDescriptor new];
+        depth_texture_desc.textureType      = MTLTextureType2D;
+        depth_texture_desc.width            = swapchain_info.width;
+        depth_texture_desc.height           = swapchain_info.height;
+        depth_texture_desc.pixelFormat      = depth_format;
+        depth_texture_desc.depth            = 1u;
+        depth_texture_desc.sampleCount      = 1u;
+        depth_texture_desc.mipmapLevelCount = 1u;
+        depth_texture_desc.arrayLength      = 1u;
+        depth_texture_desc.usage            = MTLTextureUsageRenderTarget;
+        depth_texture_desc.storageMode      = MTLStorageModePrivate;
+        depth_texture_desc.resourceOptions  = MTLResourceStorageModePrivate;
+        if (@available(macOS 10.14, *)) {
+          depth_texture_desc.allowGPUOptimizedContents = true;
+        }
+        depth_images_[i] =
+            [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
+      }
+    }
+    return NGF_ERROR_OK;
+  }
   
   frame next_frame() {
     img_idx_ = (img_idx_ + 1u) % capacity_;
     return { [layer_ nextDrawable],
-             depth_images_.get() ? depth_images_[img_idx_] : nil };
+      depth_images_.get() ? depth_images_[img_idx_] : nil };
   }
   operator bool() { return layer_; }
   
 private:
-  CAMetalLayer *layer_ = nil;
-  std::unique_ptr<id<MTLTexture>[]> depth_images_;
-  uint32_t img_idx_ = 0u;
-  uint32_t capacity_ = 0u;
+  CAMetalLayer                      *layer_    = nil;
+  uint32_t                           img_idx_  = 0u;
+  uint32_t                           capacity_ = 0u;
+  std::unique_ptr<id<MTLTexture>[]>  depth_images_;
 };
+
+#pragma mark ngf_struct_definitions
 
 struct ngf_context {
   id<MTLDevice> device = nil;
@@ -184,220 +473,6 @@ struct ngf_sampler {
 struct ngf_image {
   id<MTLTexture> texture = nil;
 };
-
-#pragma mark ngf_enum_maps
-
-static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
-  static const MTLPixelFormat pixel_formats[NGF_IMAGE_FORMAT_COUNT] = {
-    MTLPixelFormatR8Unorm,
-    MTLPixelFormatRG8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatRGBA8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatRGBA8Unorm_sRGB,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatBGRA8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatBGRA8Unorm_sRGB,
-    MTLPixelFormatR32Float,
-    MTLPixelFormatRG32Float,
-    MTLPixelFormatInvalid, // RGB32F, Metal does not support.
-    MTLPixelFormatRGBA32Float,
-    MTLPixelFormatR16Float,
-    MTLPixelFormatRG16Float,
-    MTLPixelFormatInvalid, // RGB16F, Metal does not support.
-    MTLPixelFormatRGBA16Float,
-    MTLPixelFormatDepth32Float,
-#if TARGET_OS_OSX
-    MTLPixelFormatDepth16Unorm,
-    MTLPixelFormatDepth32Float_Stencil8, // instead of 24Unorm_Stencil8,
-                                         // because metal validator doesn't
-                                         // like it for some reason...
-#else
-    MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
-    MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
-#endif
-  };
-  return pixel_formats[fmt];
-}
-
-static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
-  static const MTLLoadAction action[NGF_LOAD_OP_COUNT] = {
-    MTLLoadActionDontCare,
-    MTLLoadActionLoad,
-    MTLLoadActionClear
-  };
-  return action[op];
-}
-
-static MTLDataType get_mtl_type(ngf_type type) {
-  static const MTLDataType types[NGF_TYPE_COUNT] = {
-    MTLDataTypeNone, /* Int8, Metal does not support.*/
-    MTLDataTypeNone, /*UInt8, Metal does not support*/
-    MTLDataTypeShort,
-    MTLDataTypeUShort,
-    MTLDataTypeInt,
-    MTLDataTypeUInt,
-    MTLDataTypeFloat,
-    MTLDataTypeHalf,
-    MTLDataTypeNone /* Double,Metal does not support.*/
-  };
-  return types[type];
-}
-
-static MTLVertexFormat get_mtl_attrib_format(ngf_type type,
-                                             uint32_t size,
-                                             bool normalized) {
-  static const MTLVertexFormat formats[NGF_TYPE_COUNT][2][4] = {
-    { {MTLVertexFormatChar, MTLVertexFormatChar2,
-       MTLVertexFormatChar3, MTLVertexFormatChar4},
-      {MTLVertexFormatCharNormalized, MTLVertexFormatChar2Normalized,
-       MTLVertexFormatChar3Normalized, MTLVertexFormatChar4Normalized} },
-    { {MTLVertexFormatUChar, MTLVertexFormatUChar2,
-       MTLVertexFormatUChar3, MTLVertexFormatUChar4},
-      {MTLVertexFormatUCharNormalized, MTLVertexFormatUChar2Normalized,
-       MTLVertexFormatUChar3Normalized, MTLVertexFormatUChar4Normalized} },
-    { {MTLVertexFormatShort, MTLVertexFormatShort2,
-       MTLVertexFormatShort3, MTLVertexFormatShort4},
-      {MTLVertexFormatShortNormalized, MTLVertexFormatShort2Normalized,
-       MTLVertexFormatShort3Normalized, MTLVertexFormatShort4Normalized} },
-    { {MTLVertexFormatUShort, MTLVertexFormatUShort2,
-       MTLVertexFormatUShort3, MTLVertexFormatUShort4},
-      {MTLVertexFormatUShortNormalized, MTLVertexFormatUShort2Normalized,
-       MTLVertexFormatUShort3Normalized, MTLVertexFormatUShort4Normalized} },
-    { {MTLVertexFormatInt, MTLVertexFormatInt2,
-       MTLVertexFormatInt3, MTLVertexFormatInt4},
-      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
-    { {MTLVertexFormatUInt, MTLVertexFormatUInt2,
-       MTLVertexFormatUInt3, MTLVertexFormatUInt4},
-      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
-    { {MTLVertexFormatFloat, MTLVertexFormatFloat2,
-       MTLVertexFormatFloat3, MTLVertexFormatFloat4},
-      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid } },
-    { {MTLVertexFormatHalf, MTLVertexFormatHalf2,
-       MTLVertexFormatHalf3, MTLVertexFormatHalf4},
-      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid} },
-    { {MTLVertexFormatInvalid, MTLVertexFormatInvalid, // Double, Metal does not support.
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid},
-      {MTLVertexFormatInvalid, MTLVertexFormatInvalid,
-       MTLVertexFormatInvalid, MTLVertexFormatInvalid} }
-  };
-  assert(size <= 4u && size > 0u);
-  return formats[type][normalized? 1 : 0][size - 1u];
-}
-
-static MTLVertexStepFunction get_mtl_step_function(ngf_input_rate rate) {
-  static const MTLVertexStepFunction funcs[NGF_INPUT_RATE_COUNT] = {
-    MTLVertexStepFunctionPerVertex,
-    MTLVertexStepFunctionPerInstance
-  };
-  return funcs[rate];
-}
-
-static MTLPrimitiveTopologyClass
-get_mtl_primitive_topology_class(ngf_primitive_type type) {
-  static const MTLPrimitiveTopologyClass
-  topo_class[NGF_PRIMITIVE_TYPE_COUNT] = {
-    MTLPrimitiveTopologyClassTriangle,
-    MTLPrimitiveTopologyClassTriangle,
-    MTLPrimitiveTopologyClassUnspecified, // Triangle Fan, Metal does not
-                                          // support.
-    MTLPrimitiveTopologyClassLine,
-    MTLPrimitiveTopologyClassLine,
-  };
-  return topo_class[type];
-}
-
-static std::optional<MTLPrimitiveType> get_mtl_primitive_type(
-    ngf_primitive_type type) {
-  static const std::optional<MTLPrimitiveType>
-      types[NGF_PRIMITIVE_TYPE_COUNT] = {
-    MTLPrimitiveTypeTriangle,
-    MTLPrimitiveTypeTriangleStrip,
-    std::nullopt, // Triangle Fan not supported.
-    MTLPrimitiveTypeLine,
-    MTLPrimitiveTypeLineStrip
-  };
-  return types[type];
-}
-
-static MTLIndexType get_mtl_index_type(ngf_type type) {
-  assert(type == NGF_TYPE_UINT16 || type == NGF_TYPE_UINT32);
-  return type == NGF_TYPE_UINT16 ? MTLIndexTypeUInt16 : MTLIndexTypeUInt32;
-}
-
-static MTLCompareFunction get_mtl_compare_function(ngf_compare_op op) {
-  static const MTLCompareFunction compare_fns[NGF_COMPARE_OP_COUNT] = {
-    MTLCompareFunctionNever,
-    MTLCompareFunctionLess,
-    MTLCompareFunctionLessEqual,
-    MTLCompareFunctionEqual,
-    MTLCompareFunctionGreaterEqual,
-    MTLCompareFunctionGreater,
-    MTLCompareFunctionNotEqual,
-    MTLCompareFunctionAlways
-  };
-  return compare_fns[op];
-}
-
-static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
-  static const MTLStencilOperation stencil_ops[NGF_STENCIL_OP_COUNT] = {
-    MTLStencilOperationKeep,
-    MTLStencilOperationZero,
-    MTLStencilOperationReplace,
-    MTLStencilOperationIncrementClamp,
-    MTLStencilOperationIncrementWrap,
-    MTLStencilOperationDecrementClamp,
-    MTLStencilOperationDecrementWrap,
-    MTLStencilOperationInvert
-  };
-  return stencil_ops[op];
-}
-
-static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
-  static const MTLTextureType types[NGF_IMAGE_TYPE_COUNT] = {
-    MTLTextureType2D,
-    MTLTextureType3D
-  };
-  return types[type];
-}
-
-static std::optional<MTLSamplerAddressMode>
-    get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
-  static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] =
-  {
-    MTLSamplerAddressModeClampToEdge,
-#if TARGET_OS_OSX
-    MTLSamplerAddressModeClampToBorderColor,
-#else
-    //ClampToBorderColor is unsupported on iOS, temp solution:
-    std::nullopt,
-#endif
-    MTLSamplerAddressModeRepeat,
-    MTLSamplerAddressModeMirrorRepeat
-  };
-  return modes[mode];
-}
-
-static MTLSamplerMinMagFilter get_mtl_minmag_filter(ngf_sampler_filter f) {
-  static MTLSamplerMinMagFilter filters[NGF_FILTER_COUNT] = {
-    MTLSamplerMinMagFilterNearest,
-    MTLSamplerMinMagFilterLinear
-  };
-  return filters[f];
-}
-
-static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
-  static MTLSamplerMipFilter filters[NGF_FILTER_COUNT] = {
-    MTLSamplerMipFilterNearest,
-    MTLSamplerMipFilterLinear
-  };
-  return filters[f];
-}
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
 class _ngf_object_nursery {
@@ -513,91 +588,6 @@ ngf_error ngf_default_render_target(
   } else {
     return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;;
   }
-}
-
-ngf_error _ngf_swapchain::initialize(ngf_swapchain_info &swapchain_info,
-                                     id<MTLDevice> device) {
-  // Initialize the Metal layer.
-  layer_ = [CAMetalLayer layer];
-  layer_.device = device;
-  CGSize size;
-  size.width = swapchain_info.width;
-  size.height = swapchain_info.height;
-  layer_.drawableSize = size;
-  MTLPixelFormat pixel_format = get_mtl_pixel_format(swapchain_info.cfmt);
-  if (pixel_format == MTLPixelFormatInvalid) {
-    return NGF_ERROR_INVALID_IMAGE_FORMAT;
-  }
-  layer_.pixelFormat = pixel_format;
-  layer_.framebufferOnly = YES;
-#if TARGET_OS_OSX
-  if (@available(macOS 10.13.2, *)) {
-    layer_.maximumDrawableCount = swapchain_info.capacity_hint;
-  }
-  if (@available(macOS 10.13, *)) {
-    layer_.displaySyncEnabled =
-          (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
-  }
-#endif
-  _NGF_VIEW_TYPE *view=
-        CFBridgingRelease((void*)swapchain_info.native_handle);
-#if TARGET_OS_OSX
-  [view setLayer:layer_];
-#else
-  [view.layer addSublayer:layer_];
-  [layer_ setContentsScale:view.layer.contentsScale];
-  [layer_ setContentsGravity:kCAGravityCenter];
-  [layer_ setPosition:view.center];
-#endif
-  swapchain_info.native_handle = (uintptr_t)(CFBridgingRetain(view));
-
-  capacity_ = swapchain_info.capacity_hint;
-  
-  // Initialize depth attachments if necessary.
-  if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-    depth_images_.reset(
-        new id<MTLTexture>[swapchain_info.capacity_hint]);
-    for (uint32_t i = 0u; i < capacity_; ++i) {
-      auto *depth_texture_desc = [MTLTextureDescriptor new];
-      depth_texture_desc.textureType = MTLTextureType2D;
-      depth_texture_desc.width = swapchain_info.width;
-      depth_texture_desc.height = swapchain_info.height;
-      depth_texture_desc.depth = 1u;
-      depth_texture_desc.sampleCount = 1u;
-      depth_texture_desc.mipmapLevelCount = 1u;
-      depth_texture_desc.arrayLength = 1u;
-      depth_texture_desc.usage = MTLTextureUsageRenderTarget;
-      if (@available(macOS 10.14, *)) {
-        depth_texture_desc.allowGPUOptimizedContents = true;
-      }
-      depth_texture_desc.storageMode = MTLStorageModePrivate;
-      depth_texture_desc.resourceOptions = MTLResourceStorageModePrivate;
-      MTLPixelFormat depth_format = MTLPixelFormatInvalid;
-      switch(swapchain_info.dfmt) {
-      case NGF_IMAGE_FORMAT_DEPTH24_STENCIL8:
-          // Depth24Stencil8 is weird on metal i guess...
-          depth_format = 	MTLPixelFormatDepth32Float_Stencil8;
-          break;
-      case NGF_IMAGE_FORMAT_DEPTH16:
-#if TARGET_OS_OSX
-          depth_format = MTLPixelFormatDepth16Unorm;
-#else
-          //Depth16Unorm is unsupported on iOS
-          depth_format = MTLPixelFormatInvalid;
-#endif
-          break;
-      case NGF_IMAGE_FORMAT_DEPTH32:
-          depth_format = MTLPixelFormatDepth32Float;
-          break;
-      default: return NGF_ERROR_INVALID_DEPTH_FORMAT;
-      }
-      assert(depth_format != MTLPixelFormatInvalid);
-      depth_texture_desc.pixelFormat = depth_format;
-      depth_images_[i] =
-        [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
-    }
-  }
-  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
