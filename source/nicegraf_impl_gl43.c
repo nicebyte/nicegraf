@@ -2380,8 +2380,8 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                                     ndiscarded_attachments,
                                     gl_attachments);
           }
+          break;
         }
-          
         case _NGF_CMD_DRAW:
           if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
             glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
