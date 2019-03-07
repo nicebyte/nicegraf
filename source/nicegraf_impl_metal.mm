@@ -994,24 +994,7 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipe) {
   }
 }
 
-id<MTLBuffer> _ngf_create_buffer(const ngf_vertex_data_info *info) {
-  // TODO: take usage hint into account.
-  id<MTLBuffer> mtl_buffer =
-      [CURRENT_CONTEXT->device newBufferWithLength:info->buffer_size
-                           options:MTLResourceOptionCPUCacheModeWriteCombined];
-  if (info->buffer_ptr) {
-    memcpy((uint8_t*)[mtl_buffer contents],
-                      info->buffer_ptr, info->buffer_size);
-  } else {
-    assert(info->fill_callback);
-    info->fill_callback([mtl_buffer contents],
-                        info->buffer_size,
-                        info->fill_callback_userdata);
-  }
-  return mtl_buffer;
-}
-
-id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
+id<MTLBuffer> _ngf_create_buffer(const ngf_buffer_info &info) {
   MTLResourceOptions options = 0u;
   MTLResourceOptions managed_storage = 0u;
 #if TARGET_OS_OSX
@@ -1046,15 +1029,7 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer,
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer **result) {
   _NGF_NURSERY(attrib_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer(info);
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
-                                    ngf_attrib_buffer **result) {
-  _NGF_NURSERY(attrib_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer2(*info);
+  buf->mtl_buffer = _ngf_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1086,17 +1061,9 @@ void ngf_attrib_buffer_flush_range(
 void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer *buf) {}
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                   ngf_index_buffer **result) {
+                                  ngf_index_buffer **result) {
   _NGF_NURSERY(index_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer(info);
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
-                                   ngf_index_buffer **result) {
-  _NGF_NURSERY(index_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer2(*info);
+  buf->mtl_buffer = _ngf_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1130,18 +1097,7 @@ void ngf_destroy_index_buffer(ngf_index_buffer *buf) {
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result) {
   _NGF_NURSERY(uniform_buffer, buf);
-  buf->size = info->size + (256u - info->size % 256u);
-  buf->mtl_buffer = [CURRENT_CONTEXT->device
-    newBufferWithLength:buf->size * 3u
-    options:MTLResourceOptionCPUCacheModeWriteCombined];
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
-                                     ngf_uniform_buffer **result) {
-  _NGF_NURSERY(uniform_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer2(*info);
+  buf->mtl_buffer = _ngf_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1193,7 +1149,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
     info->size,
     NGF_BUFFER_STORAGE_HOST_WRITEABLE
   };
-  buf->mtl_buffer = _ngf_create_buffer2(bufinfo);
+  buf->mtl_buffer = _ngf_create_buffer(bufinfo);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
