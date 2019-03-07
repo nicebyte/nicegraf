@@ -1411,17 +1411,17 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   }
   return NGF_ERROR_OK;
 }
-ngf_error ngf_begin_frame(ngf_context *ctx) {
+ngf_error ngf_begin_frame() {
   ngf_error err = NGF_ERROR_OK;
-  uint32_t fi = ctx->frame_number;
-  if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
+  uint32_t fi = CURRENT_CONTEXT->frame_number;
+  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     const VkResult vk_err =
         vkAcquireNextImageKHR(_vk.device,
-                              ctx->swapchain.vk_swapchain,
+                              CURRENT_CONTEXT->swapchain.vk_swapchain,
                               UINT64_MAX,
-                              ctx->swapchain.image_semaphores[fi],
+                              CURRENT_CONTEXT->swapchain.image_semaphores[fi],
                               VK_NULL_HANDLE,
-                              &ctx->swapchain.image_idx);
+                              &CURRENT_CONTEXT->swapchain.image_idx);
     if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
   }
   CURRENT_CONTEXT->frame_res[fi].active = true;
@@ -1430,7 +1430,7 @@ ngf_error ngf_begin_frame(ngf_context *ctx) {
   return err;
 }
 
-ngf_error ngf_end_frame(ngf_context *ctx) {
+ngf_error ngf_end_frame() {
   ngf_error err = NGF_ERROR_OK;
 
   const uint32_t fi = CURRENT_CONTEXT->frame_number;
@@ -1470,7 +1470,7 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
   };
   vkQueueSubmit(_vk.gfx_queue, 1u, &submit_info, frame_sync->fence);
 
-  if (ctx->swapchain.vk_swapchain != VK_NULL_HANDLE) {
+  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     VkResult present_result = VK_SUCCESS;
     VkPresentInfoKHR present_info = {
       .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -1479,8 +1479,8 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
           (uint32_t)_NGF_DARRAY_SIZE(frame_sync->wait_vksemaphores),
       .pWaitSemaphores = frame_sync->wait_vksemaphores.data,
       .swapchainCount = 1,
-      .pSwapchains = &ctx->swapchain.vk_swapchain,
-      .pImageIndices = &ctx->swapchain.image_idx,
+      .pSwapchains = &CURRENT_CONTEXT->swapchain.vk_swapchain,
+      .pImageIndices = &CURRENT_CONTEXT->swapchain.image_idx,
       .pResults = &present_result
     };
     vkQueuePresentKHR(_vk.present_queue, &present_info);
@@ -1495,12 +1495,14 @@ ngf_error ngf_end_frame(ngf_context *ctx) {
     pthread_cond_wait(&CURRENT_SHARED_STATE->recording_inactive_cond,
                       &CURRENT_SHARED_STATE->record_counter_mut);
   }
-  uint32_t next_fi = (fi + 1u) % ctx->max_inflight_frames;
-  _ngf_frame_resources *next_frame_sync = &ctx->frame_res[next_fi];
+  uint32_t next_fi = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  _ngf_frame_resources *next_frame_sync = &CURRENT_CONTEXT->frame_res[next_fi];
   _ngf_retire_resources(next_frame_sync);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
-  ctx->frame_number = (ctx->frame_number + 1u) % ctx->max_inflight_frames;
+  CURRENT_CONTEXT->frame_number =
+      (CURRENT_CONTEXT->frame_number + 1u) %
+       CURRENT_CONTEXT->max_inflight_frames;
   return err;
 }
 
