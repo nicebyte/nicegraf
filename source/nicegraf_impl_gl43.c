@@ -1447,30 +1447,6 @@ ngf_error ngf_resolve_render_target(const ngf_render_target *src,
   return NGF_ERROR_OK;
 }
 
-GLuint _ngf_create_vertex_data_buffer(GLenum type,
-                                      const ngf_vertex_data_info *info) {
-  assert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
-  GLuint buf;
-  glGenBuffers(1u, &buf);
-  glBindBuffer(type, buf);
-  GLenum gl_buffer_usage = get_gl_buffer_usage(info->usage_hint);
-
-  glBufferData(type, info->buffer_size, info->buffer_ptr,
-               gl_buffer_usage);
-
-  if (info->buffer_ptr == NULL) {
-    assert(info->fill_callback);
-    volatile void *buffer_data = glMapBufferRange(type,
-                                                  0u,
-                                                  info->buffer_size,
-                                                  GL_WRITE_ONLY);
-    info->fill_callback(buffer_data, info->buffer_size,
-                        info->fill_callback_userdata);
-    glUnmapBuffer(type);
-  }
-  return buf;
-}
-
 GLuint _ngf_create_buffer(GLenum type,
                           const ngf_buffer_info *info) {
   assert(type == GL_ARRAY_BUFFER ||
