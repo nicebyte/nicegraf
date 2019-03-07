@@ -144,6 +144,7 @@ struct ngf_pass {
 typedef enum {
   _NGF_CMD_BIND_PIPELINE,
   _NGF_CMD_BEGIN_PASS,
+  _NGF_CMD_END_PASS,
   _NGF_CMD_VIEWPORT,
   _NGF_CMD_SCISSOR,
   _NGF_CMD_LINE_WIDTH,
@@ -1950,6 +1951,9 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
 
 void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
   buf->renderpass_active = false;
+  _ngf_emulated_cmd *cmd = NULL;
+  _NGF_NEWCMD(buf, cmd);
+  cmd->type = _NGF_CMD_END_PASS;
 }
 
 void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
@@ -2033,6 +2037,7 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
   assert(bufs);
   const ngf_graphics_pipeline *bound_pipeline =
       &(CURRENT_CONTEXT->cached_state);
+  const ngf_render_target *active_rt = NULL;
   for (uint32_t b = 0u; b < nbuffers; ++b) {
     const ngf_cmd_buffer *buf = bufs[b];
     for (const _ngf_cmd_block *block = buf->first_cmd_block; block!= NULL;
@@ -2313,16 +2318,16 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           break;
 
         case _NGF_CMD_BEGIN_PASS: {
-          const ngf_render_target *target = cmd->begin_pass.target;
-          glBindFramebuffer(GL_FRAMEBUFFER, target->framebuffer);
+          active_rt = cmd->begin_pass.target;
+          glBindFramebuffer(GL_FRAMEBUFFER, active_rt->framebuffer);
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
           glDepthMask(GL_TRUE);
-          for (uint32_t a = 0u; a < target->nattachments; ++a) {
-            const ngf_attachment *attachment = &target->attachment_infos[a];
+          for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
+            const ngf_attachment *attachment = &active_rt->attachment_infos[a];
             if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
               const ngf_clear *clear = &attachment->clear;
-              switch (target->attachment_infos[a].type) {
+              switch (attachment->type) {
               case NGF_ATTACHMENT_COLOR:
                 glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
                 break;
@@ -2343,6 +2348,40 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
           break;
         }
 
+        case _NGF_CMD_END_PASS: {
+          GLenum *gl_attachments =
+              alloca(sizeof(GLenum) * active_rt->nattachments);
+          uint32_t ndiscarded_attachments = 0u;
+          uint32_t ndiscarded_color_attachments = 0u;
+          for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
+            const ngf_attachment *attachment = &active_rt->attachment_infos[a];
+            if (attachment->store_op == NGF_STORE_OP_DONTCARE) {
+              switch (attachment->type) {
+              case NGF_ATTACHMENT_COLOR:
+                gl_attachments[ndiscarded_attachments++] =
+                    GL_COLOR_ATTACHMENT0 + (++ndiscarded_color_attachments);
+                break;
+              case NGF_ATTACHMENT_DEPTH:
+                gl_attachments[ndiscarded_attachments++] = GL_DEPTH_ATTACHMENT;
+                break;
+              case NGF_ATTACHMENT_STENCIL:
+                gl_attachments[ndiscarded_attachments++] =
+                    GL_STENCIL_ATTACHMENT;
+                break;
+              case NGF_ATTACHMENT_DEPTH_STENCIL:
+                gl_attachments[ndiscarded_attachments++] =
+                    GL_DEPTH_STENCIL_ATTACHMENT;
+                break;
+              }
+            }
+          }
+          if (ndiscarded_attachments > 0u) {
+            glInvalidateFramebuffer(GL_FRAMEBUFFER,
+                                    ndiscarded_attachments,
+                                    gl_attachments);
+          }
+        }
+          
         case _NGF_CMD_DRAW:
           if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
             glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
