@@ -649,8 +649,8 @@ typedef enum ngf_attachment_store_op {
   
   /**
    * Make sure the contents is written out to system memory. Use this if you
-   * plan on reading the contents of the attachment in any shaders or presenting
-   * it to screen.
+   * plan on reading the contents of the attachment in any shaders or
+   * presenting it to screen.
    */
   NGF_STORE_OP_STORE
 } ngf_attachment_store_op;
@@ -676,6 +676,11 @@ typedef struct ngf_attachment {
    * pass.
    */
   ngf_attachment_load_op load_op;
+
+  /**
+   * Indicates what to do with this attachment at the end of a render pass.
+   */
+  ngf_attachment_store_op store_op;
 
   /**
    * If the `load_op` field  is NGF_LOAD_OP_CLEAR, contains the value(s) to
