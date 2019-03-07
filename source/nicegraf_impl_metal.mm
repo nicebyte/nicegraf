@@ -523,15 +523,14 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
   return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
 }
 
-ngf_error ngf_begin_frame(ngf_context *ctx) {
-  assert(ctx && ctx == CURRENT_CONTEXT);
-  CURRENT_CONTEXT->frame = ctx->swapchain.next_frame();
+ngf_error ngf_begin_frame() {
+  CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
   return (!CURRENT_CONTEXT->frame.color_drawable)
-           ?  NGF_ERROR_NO_FRAME
+           ? NGF_ERROR_NO_FRAME
            : NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame(ngf_context*) {
+ngf_error ngf_end_frame() {
   if(CURRENT_CONTEXT->frame.color_drawable &&
      CURRENT_CONTEXT->pending_cmd_buffer) {
     [CURRENT_CONTEXT->pending_cmd_buffer
@@ -1032,9 +1031,9 @@ id<MTLBuffer> _ngf_create_buffer2(const ngf_buffer_info &info) {
   default: assert(false);
   }
   id<MTLBuffer> mtl_buffer =
-  [CURRENT_CONTEXT->device
-      newBufferWithLength:info.size
-                  options:options];
+      [CURRENT_CONTEXT->device
+          newBufferWithLength:info.size
+                      options:options];
   return mtl_buffer;
 }
 
