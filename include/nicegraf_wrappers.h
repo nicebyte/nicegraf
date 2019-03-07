@@ -171,9 +171,7 @@ public:
       aligned_size_ * nframes,
       NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE
     };
-    ngf_uniform_buffer *buf = nullptr;
-    ngf_create_uniform_buffer2(&buffer_info, &buf);
-    buf_.reset(buf);
+    buf_.initialize(buffer_info);
   }
 
   void write(const T &data) {
