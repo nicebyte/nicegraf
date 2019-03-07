@@ -452,11 +452,6 @@ static GLenum get_gl_wrap(ngf_sampler_wrap_mode e) {
   return modes[e];
 }
 
-static GLenum get_gl_buffer_usage(ngf_vertex_data_usage usage) {
-  return
-      usage == NGF_VERTEX_DATA_USAGE_STATIC ? GL_STATIC_DRAW : GL_STREAM_DRAW;
-}
-
 #pragma endregion
 
 void (*NGF_DEBUG_CALLBACK)(const char *message, const void *userdata) = NULL;
