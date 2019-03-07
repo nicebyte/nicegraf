@@ -1447,30 +1447,6 @@ ngf_error ngf_resolve_render_target(const ngf_render_target *src,
   return NGF_ERROR_OK;
 }
 
-GLuint _ngf_create_vertex_data_buffer(GLenum type,
-                                      const ngf_vertex_data_info *info) {
-  assert(type == GL_ARRAY_BUFFER || type == GL_ELEMENT_ARRAY_BUFFER);
-  GLuint buf;
-  glGenBuffers(1u, &buf);
-  glBindBuffer(type, buf);
-  GLenum gl_buffer_usage = get_gl_buffer_usage(info->usage_hint);
-
-  glBufferData(type, info->buffer_size, info->buffer_ptr,
-               gl_buffer_usage);
-
-  if (info->buffer_ptr == NULL) {
-    assert(info->fill_callback);
-    volatile void *buffer_data = glMapBufferRange(type,
-                                                  0u,
-                                                  info->buffer_size,
-                                                  GL_WRITE_ONLY);
-    info->fill_callback(buffer_data, info->buffer_size,
-                        info->fill_callback_userdata);
-    glUnmapBuffer(type);
-  }
-  return buf;
-}
-
 GLuint _ngf_create_buffer(GLenum type,
                           const ngf_buffer_info *info) {
   assert(type == GL_ARRAY_BUFFER ||
@@ -1538,19 +1514,6 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->glbuffer = _ngf_create_vertex_data_buffer(GL_ARRAY_BUFFER, info);
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
-                                    ngf_attrib_buffer **result) {
-  assert(info);
-  assert(result);
-  *result = NGF_ALLOC(ngf_attrib_buffer);
-  ngf_attrib_buffer *buf = *result;
-  if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
-  }
   buf->glbuffer = _ngf_create_buffer(GL_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
 }
@@ -1585,22 +1548,8 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf) {
   _ngf_buffer_unmap(GL_ARRAY_BUFFER, buf->glbuffer);
 }
 
-ngf_error ngf_create_index_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_index_buffer **result) {
-  assert(info);
-  assert(result);
-  *result = NGF_ALLOC(ngf_index_buffer);
-  ngf_index_buffer *buf = *result;
-  if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
-  }
-  buf->glbuffer = _ngf_create_vertex_data_buffer(GL_ELEMENT_ARRAY_BUFFER,
-                                                 info);
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
-                                   ngf_index_buffer **result) {
+ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
+                                  ngf_index_buffer **result) {
   assert(info);
   assert(result);
   *result = NGF_ALLOC(ngf_index_buffer);
@@ -1651,33 +1600,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  glGenBuffers(1u, &buf->glbuffer);
-  glBindBuffer(GL_UNIFORM_BUFFER, buf->glbuffer);
-  buf->size = info->size;
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
-                                     ngf_uniform_buffer **result) {
-  assert(info);
-  assert(result);
-  *result = NGF_ALLOC(ngf_uniform_buffer);
-  ngf_uniform_buffer *buf = *result;
-  if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
-  }
   buf->glbuffer = _ngf_create_buffer(GL_UNIFORM_BUFFER, info);
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
-                                   const void *data,
-                                   size_t size) {
-  if (size != buffer->size) {
-    return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
-  }
-  glBindBuffer(GL_UNIFORM_BUFFER, buffer->glbuffer);
-  glBufferData(GL_UNIFORM_BUFFER, size, data, GL_STREAM_DRAW);
   return NGF_ERROR_OK;
 }
 

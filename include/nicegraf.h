@@ -499,9 +499,7 @@ typedef enum ngf_buffer_map_flags {
 /**
  * Specifies the data necessary for the creation of a uniform buffer.
  */
-typedef struct ngf_uniform_buffer_info {
-  size_t size; /**< Size of the buffer in bytes. */
-} ngf_uniform_buffer_info;
+typedef ngf_buffer_info ngf_uniform_buffer_info;
 
 /**
  * A uniform buffer.
@@ -1063,38 +1061,8 @@ typedef enum ngf_vertex_data_usage {
  typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
                                              void *userdata);
 
- /**
-  * Vertex data description.
-  *
-  * This structure provides information necessary to create and populate a
-  * vertex attribute or index buffer.
-  */
-typedef struct ngf_vertex_data_info {
-  size_t buffer_size; /**< Buffer size in bytes. */
-
-  /**
-   * Pointer to the data that the buffer will be populated with. Set this to
-   * `NULL` to populate the buffer using a callback instead.
-   */
-  const void *buffer_ptr;
-
-  /**
-   * This callback will be invoked to populate the buffer with data if
-   * the \ref buffer_ptr field is set to `NULL` (otherwise this field is
-   * ignored).
-   */
-  ngf_buffer_populate_callback fill_callback;
-
-  /**
-   * This pointer shall be passed to \ref fill_callback as its third parameter.
-   */
-  void *fill_callback_userdata;
-  ngf_vertex_data_usage usage_hint;
-  ngf_cmd_buffer *cmdbuf;
-} ngf_vertex_data_info;
-
-typedef ngf_vertex_data_info ngf_attrib_buffer_info;
-typedef ngf_vertex_data_info ngf_index_buffer_info;
+typedef ngf_buffer_info ngf_attrib_buffer_info;
+typedef ngf_buffer_info ngf_index_buffer_info;
 
 /**
  * A vertex attribute buffer.
@@ -1270,8 +1238,6 @@ void ngf_destroy_render_target(ngf_render_target *target);
  */
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer **result);
-ngf_error ngf_create_attrib_buffer2(const ngf_buffer_info *info,
-                                    ngf_attrib_buffer **result);
 
 /**
  * Discards the given vertex attribute buffer.
@@ -1324,8 +1290,6 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf);
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                   ngf_index_buffer **result);
-ngf_error ngf_create_index_buffer2(const ngf_buffer_info *info,
-                                   ngf_index_buffer **result);
 
 /**
  * Discards the given vertex index buffer.
@@ -1358,8 +1322,7 @@ void ngf_index_buffer_unmap(ngf_index_buffer *buf);
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer **result);
-ngf_error ngf_create_uniform_buffer2(const ngf_buffer_info *info,
-                                     ngf_uniform_buffer **result);
+
 /**
  * Discards the given uniform buffer.
  */
@@ -1383,20 +1346,6 @@ void ngf_uniform_buffer_flush_range(ngf_uniform_buffer *buf,
  * Similar to \ref ngf_attrib_buffer_unmap, but for uniform buffers.
  */
 void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf);
-
-/**
- * Fill the given uniform buffer with data.
- * @param buffer the target uniform buffer.
- * @param data A pointer to the source buffer. Exaclty `N` bytes will be read
-               from here, where `N` is the size of the target uniform buffer.
- * @param size This parameter is for sanity checking. If it is not equal to the
- *             size of the target uniform buffer, no data will be written and
- *             an error will be generated.
- */
-ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer *buffer,
-                                   const void *data,
-                                   size_t size);
-
 
 /**
  * Creates a new pixel buffer.
