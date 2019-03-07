@@ -633,11 +633,29 @@ typedef enum ngf_attachment_type {
  * What to do on attachment load.
  */
 typedef enum ngf_attachment_load_op {
-  NGF_LOAD_OP_DONTCARE = 0,
-  NGF_LOAD_OP_KEEP,
-  NGF_LOAD_OP_CLEAR,
+  NGF_LOAD_OP_DONTCARE = 0, /**< Don't care what happens. */
+  NGF_LOAD_OP_KEEP, /**< Preserve the prior contents of the attachment. */
+  NGF_LOAD_OP_CLEAR, /**< Clear attachment. */
   NGF_LOAD_OP_COUNT
 } ngf_attachment_load_op;
+  
+/**
+ * What to do on attachment store.
+ */
+typedef enum ngf_attachment_store_op {
+   /**
+    * Don't care what happens. Use this if you don't plan on reading back the
+    * contents of the attachment in any shaders or presenting it to screen.
+    */
+  NGF_STORE_OP_DONTCARE = 0,
+  
+  /**
+   * Make sure the contents is written out to system memory. Use this if you
+   * plan on reading the contents of the attachment in any shaders or presenting
+   * it to screen.
+   */
+  NGF_STORE_OP_STORE
+} ngf_attachment_store_op;
 
 /**
  * Specifies a rendertarget clear operation.
