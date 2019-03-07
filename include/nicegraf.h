@@ -1558,21 +1558,19 @@ ngf_error ngf_set_context(ngf_context *ctx);
 
 /**
  * Begin a frame of rendering. This functions starts a frame of rendering in
- * the given context. It acquires an image from the context's associated
- * swap chain. 
- * @param ctx The context to operate on.
- * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED
+ * the thread's current context. It acquires an image from the context's
+ * associated swap chain.
+ * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
  */
-ngf_error ngf_begin_frame(ngf_context *ctx);
+ngf_error ngf_begin_frame();
 
 /**
  * End a frame of rendering. This function releases the image that was
- * previously acquired from the context's associated swapchain by
- * ngf_begin_frame. 
- * @param ctx The context to operate on.
+ * previously acquired from the current context's associated swapchain by
+ * ngf_begin_frame.
  * @return Error codes: NGF_ERROR_END_FRAME_FAILED
  */
-ngf_error ngf_end_frame(ngf_context *ctx);
+ngf_error ngf_end_frame();
 #ifdef _MSC_VER
 #pragma endregion
 #endif

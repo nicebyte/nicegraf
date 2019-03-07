@@ -611,8 +611,12 @@ NGF_THREADLOCAL _ngf_block_allocator *COMMAND_POOL = NULL;
 
 ngf_error ngf_set_context(ngf_context *ctx) {
   assert(ctx);
-  if (CURRENT_CONTEXT == ctx) return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
-  if (CURRENT_CONTEXT && (CURRENT_CONTEXT != ctx)) return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
+  if (CURRENT_CONTEXT == ctx) {
+    return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
+  }
+  if (CURRENT_CONTEXT && (CURRENT_CONTEXT != ctx)) {
+    return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
+  }
 
   bool result = eglMakeCurrent(ctx->dpy, ctx->surface, ctx->surface, ctx->ctx);
   if (result) {
@@ -2543,13 +2547,12 @@ void ngf_end_debug_group() {
   glPopDebugGroup();
 }
 
-ngf_error ngf_begin_frame(ngf_context *ctx) {
-  _NGF_FAKE_USE(ctx);
+ngf_error ngf_begin_frame() {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame(ngf_context *ctx) {
-  return eglSwapBuffers(ctx->dpy, ctx->surface)
+ngf_error ngf_end_frame() {
+  return eglSwapBuffers(CURRENT_CONTEXT->dpy, CURRENT_CONTEXT->surface)
       ? NGF_ERROR_OK
       : NGF_ERROR_END_FRAME_FAILED;
 }
