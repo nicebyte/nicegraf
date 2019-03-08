@@ -107,6 +107,14 @@ static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
   return action[op];
 }
 
+static MTLStoreAction get_mtl_store_action(ngf_attachment_store_op op) {
+  static const MTLStoreAction action[NGF_STORE_OP_COUNT] = {
+    MTLStoreActionDontCare,
+    MTLStoreActionStore
+  };
+  return action[op];
+}
+
 static MTLDataType get_mtl_type(ngf_type type) {
   static const MTLDataType types[NGF_TYPE_COUNT] = {
     MTLDataTypeNone, /* Int8, Metal does not support.*/
@@ -545,6 +553,8 @@ ngf_error ngf_end_frame() {
 ngf_error ngf_default_render_target(
     ngf_attachment_load_op color_load_op,
     ngf_attachment_load_op depth_load_op,
+    ngf_attachment_store_op color_store_op,
+    ngf_attachment_store_op depth_store_op,
     const ngf_clear *clear_color,
     const ngf_clear *clear_depth,
     ngf_render_target **result) {
@@ -557,7 +567,8 @@ ngf_error ngf_default_render_target(
     rt->pass_descriptor.colorAttachments[0].texture = nil;
     rt->pass_descriptor.colorAttachments[0].loadAction =
         get_mtl_load_action(color_load_op);
-    rt->pass_descriptor.colorAttachments[0].storeAction = MTLStoreActionStore;
+    rt->pass_descriptor.colorAttachments[0].storeAction =
+        get_mtl_store_action(color_store_op);
     if (color_load_op == NGF_LOAD_OP_CLEAR) {
       assert(clear_color);
       rt->pass_descriptor.colorAttachments[0].clearColor =
@@ -573,14 +584,14 @@ ngf_error ngf_default_render_target(
       rt->pass_descriptor.depthAttachment.loadAction =
           get_mtl_load_action(depth_load_op);
       rt->pass_descriptor.depthAttachment.storeAction =
-          MTLStoreActionStore; // TODO store actions
+          get_mtl_store_action(depth_store_op);
       if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
         rt->pass_descriptor.stencilAttachment =
             [MTLRenderPassStencilAttachmentDescriptor new];
         rt->pass_descriptor.stencilAttachment.loadAction =
             get_mtl_load_action(depth_load_op);
         rt->pass_descriptor.stencilAttachment.storeAction =
-            MTLStoreActionStore; // TODO store actions
+            get_mtl_store_action(depth_store_op);
       }
     } else {
       rt->pass_descriptor.depthAttachment = nil;
@@ -726,12 +737,11 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
 
 void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
                                 const ngf_attachment &info) {
-  attachment.texture = info.image_ref.image->texture;
-  attachment.level = info.image_ref.mip_level;
-  attachment.slice = info.image_ref.layer; // ?
-
-  attachment.loadAction = get_mtl_load_action(info.load_op);
-  attachment.storeAction = MTLStoreActionStore; // TODO store actions
+  attachment.texture     = info.image_ref.image->texture;
+  attachment.level       = info.image_ref.mip_level;
+  attachment.slice       = info.image_ref.layer;
+  attachment.loadAction  = get_mtl_load_action(info.load_op);
+  attachment.storeAction = get_mtl_store_action(info.store_op);
 }
 
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
