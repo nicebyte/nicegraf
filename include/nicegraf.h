@@ -652,7 +652,9 @@ typedef enum ngf_attachment_store_op {
    * plan on reading the contents of the attachment in any shaders or
    * presenting it to screen.
    */
-  NGF_STORE_OP_STORE
+  NGF_STORE_OP_STORE,
+  
+  NGF_STORE_OP_COUNT
 } ngf_attachment_store_op;
 
 /**
