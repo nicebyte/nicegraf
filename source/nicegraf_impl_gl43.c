@@ -1291,6 +1291,8 @@ void ngf_destroy_sampler(ngf_sampler *sampler) {
 ngf_error ngf_default_render_target(
     ngf_attachment_load_op color_load_op,
     ngf_attachment_load_op depth_load_op,
+    ngf_attachment_store_op color_store_op,
+    ngf_attachment_store_op depth_store_op,
     const ngf_clear *clear_color,
     const ngf_clear *clear_depth,
     ngf_render_target **result) {
@@ -1308,6 +1310,7 @@ ngf_error ngf_default_render_target(
         &default_render_target->attachment_infos[0];
     default_color_attachment->type = NGF_ATTACHMENT_COLOR;
     default_color_attachment->load_op = color_load_op;
+    default_color_attachment->store_op = color_store_op;
     if (color_load_op == NGF_LOAD_OP_CLEAR) {
       assert(clear_color);
       default_color_attachment->clear = *clear_color;
@@ -1318,6 +1321,7 @@ ngf_error ngf_default_render_target(
           &default_render_target->attachment_infos[1];
       default_depth_attachment->type = NGF_ATTACHMENT_DEPTH;
       default_depth_attachment->load_op = depth_load_op;
+      default_depth_attachment->store_op = depth_store_op;
       if (depth_load_op == NGF_LOAD_OP_CLEAR) {
         assert(clear_depth);
         default_depth_attachment->clear = *clear_depth;
