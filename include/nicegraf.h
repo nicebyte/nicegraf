@@ -1195,10 +1195,14 @@ void ngf_destroy_sampler(ngf_sampler *sampler);
  * object. Doing so does not affect the swapchain.
  *
  * @param color_load_op specifies the operation to perform on the color
- *  attachment the render target at the beginning of a rend render pass.
+ *  attachment of the render target at the beginning of a rend render pass.
  * @param depth_load_op if the context's swap chain has an accompanying depth
  *  buffer, specifies the operation to perform on it at the beginning of a
  *  render pass. Otherwise, this value is ignored.
+ * @param color_store_op specifies the operation to perform on the color
+ *  attachment of the render target at the end of a render pass.
+* @param depth_store_op specifies the operation to perform on the depth
+ *  attachment of the render target at the end of a render pass.
  * @param clear_color If `color_load_op` is `NGF_LOAD_OP_CLEAR`, specifies the
  *  color to clear the color attachment of the render target to. Otherwise,
     this value is ignored.
@@ -1210,6 +1214,8 @@ void ngf_destroy_sampler(ngf_sampler *sampler);
  */
 ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
                                     ngf_attachment_load_op depth_load_op,
+                                    ngf_attachment_store_op color_store_op,
+                                    ngf_attachment_store_op depth_store_op,
                                     const ngf_clear *clear_color,
                                     const ngf_clear *clear_depth,
                                     ngf_render_target **result);
