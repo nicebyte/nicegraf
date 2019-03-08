@@ -551,13 +551,13 @@ ngf_error ngf_end_frame() {
 }
 
 ngf_error ngf_default_render_target(
-    ngf_attachment_load_op color_load_op,
-    ngf_attachment_load_op depth_load_op,
+    ngf_attachment_load_op  color_load_op,
+    ngf_attachment_load_op  depth_load_op,
     ngf_attachment_store_op color_store_op,
     ngf_attachment_store_op depth_store_op,
-    const ngf_clear *clear_color,
-    const ngf_clear *clear_depth,
-    ngf_render_target **result) {
+    const ngf_clear        *clear_color,
+    const ngf_clear        *clear_depth,
+    ngf_render_target     **result) {
   assert(result);
   if (CURRENT_CONTEXT->swapchain) {
     _NGF_NURSERY(render_target, rt);
@@ -577,7 +577,7 @@ ngf_error ngf_default_render_target(
                             clear_color->clear_color[2],
                             clear_color->clear_color[3]);
     }
-    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
+    const ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
     if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
       rt->pass_descriptor.depthAttachment =
           [MTLRenderPassDepthAttachmentDescriptor new];
@@ -585,6 +585,11 @@ ngf_error ngf_default_render_target(
           get_mtl_load_action(depth_load_op);
       rt->pass_descriptor.depthAttachment.storeAction =
           get_mtl_store_action(depth_store_op);
+      if (depth_load_op == NGF_LOAD_OP_CLEAR) {
+        assert(clear_depth);
+        rt->pass_descriptor.depthAttachment.clearDepth =
+            clear_depth->clear_depth;
+      }
       if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
         rt->pass_descriptor.stencilAttachment =
             [MTLRenderPassStencilAttachmentDescriptor new];
