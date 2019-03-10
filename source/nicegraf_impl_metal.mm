@@ -1291,6 +1291,9 @@ ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
   }
+  if (cmd_buffer->active_bce) {
+    [cmd_buffer->active_bce endEncoding];
+  }
   return NGF_ERROR_OK;
 }
 
