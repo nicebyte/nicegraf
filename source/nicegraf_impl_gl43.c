@@ -2348,28 +2348,47 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
         }
 
         case _NGF_CMD_END_PASS: {
+          const uint32_t max_discarded_attachments =
+              active_rt->nattachments + 1u; // +1 needed in case we need to
+                                            // handle depth/stencil separately.
           GLenum *gl_attachments =
-              alloca(sizeof(GLenum) * active_rt->nattachments);
+              alloca(sizeof(GLenum) * max_discarded_attachments);
           uint32_t ndiscarded_attachments = 0u;
           uint32_t ndiscarded_color_attachments = 0u;
+          // Annoyingly, desktop GL specification of glInvalidateFramebuffer
+          // differs strongly between which enum values to use for invalidating
+          // attachments of a "normal" vs default framebuffer. This distinction
+          // is not present on GLES 3 though (TODO: turn off this path for
+          // GLES 3).
+          const bool is_default_framebuffer = active_rt->framebuffer == 0;
           for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
             const ngf_attachment *attachment = &active_rt->attachment_infos[a];
             if (attachment->store_op == NGF_STORE_OP_DONTCARE) {
               switch (attachment->type) {
               case NGF_ATTACHMENT_COLOR:
                 gl_attachments[ndiscarded_attachments++] =
-                    GL_COLOR_ATTACHMENT0 + (++ndiscarded_color_attachments);
+                  is_default_framebuffer 
+                    ? GL_COLOR
+                    : GL_COLOR_ATTACHMENT0 + (++ndiscarded_color_attachments);
                 break;
               case NGF_ATTACHMENT_DEPTH:
-                gl_attachments[ndiscarded_attachments++] = GL_DEPTH_ATTACHMENT;
+                gl_attachments[ndiscarded_attachments++] = 
+                  is_default_framebuffer ? GL_DEPTH : GL_DEPTH_ATTACHMENT;
                 break;
               case NGF_ATTACHMENT_STENCIL:
                 gl_attachments[ndiscarded_attachments++] =
-                    GL_STENCIL_ATTACHMENT;
+                  is_default_framebuffer
+                    ? GL_STENCIL
+                    : GL_STENCIL_ATTACHMENT;
                 break;
               case NGF_ATTACHMENT_DEPTH_STENCIL:
-                gl_attachments[ndiscarded_attachments++] =
-                    GL_DEPTH_STENCIL_ATTACHMENT;
+                if (!is_default_framebuffer) {
+                  gl_attachments[ndiscarded_attachments++] =
+                      GL_DEPTH_STENCIL_ATTACHMENT;
+                } else {
+                  gl_attachments[ndiscarded_attachments++] = GL_DEPTH;
+                  gl_attachments[ndiscarded_attachments++] = GL_STENCIL;
+                }
                 break;
               }
             }
