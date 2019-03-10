@@ -84,6 +84,8 @@ void ngf_util_create_default_graphics_pipeline_data(
   if (window_size != NULL) {
     result->scissor = result->viewport = *window_size;
   } else {
+    const ngf_irect2d empty_region  = {0, 0, 0u, 0u};
+    result->scissor = result->viewport = empty_region;
     dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR;
   }
   ngf_specialization_info spi = {
