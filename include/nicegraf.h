@@ -1154,21 +1154,6 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p);
  */
 ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result);
 
-
-/**
- * Upload data to the specified image subresource.
- * @param image the image to modify
- * @param level mip level to modify
- * @param offset within the mip level at which to write data
- * @param dimensions width and height of the written chunk
- * @param data buffer with the image data
- */
-ngf_error ngf_populate_image(ngf_image *image,
-                             uint32_t level,
-                             ngf_offset3d offset,
-                             ngf_extent3d dimensions,
-                             const void *data);
-
 /**
  * Destroy the given image object.
  */
