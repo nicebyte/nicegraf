@@ -1236,18 +1236,22 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
 
 ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   auto *mtl_img_desc = [MTLTextureDescriptor new];
-  mtl_img_desc.textureType = get_mtl_texture_type(info->type);
-  mtl_img_desc.pixelFormat = get_mtl_pixel_format(info->format);
-  if (mtl_img_desc.pixelFormat == MTLPixelFormatInvalid) {
+  
+  const MTLPixelFormat fmt = get_mtl_pixel_format(info->format);
+  if (fmt == MTLPixelFormatInvalid) {
     return NGF_ERROR_INVALID_IMAGE_FORMAT;
   }
-  mtl_img_desc.width = info->extent.width;
-  mtl_img_desc.height = info->extent.height;
-  mtl_img_desc.depth = info->extent.depth;
+
+  mtl_img_desc.textureType      = get_mtl_texture_type(info->type);
+  mtl_img_desc.pixelFormat      = fmt;
+  mtl_img_desc.width            = info->extent.width;
+  mtl_img_desc.height           = info->extent.height;
+  mtl_img_desc.depth            = info->extent.depth;
   mtl_img_desc.mipmapLevelCount = info->nmips;
+  mtl_img_desc.storageMode      = MTLStorageModePrivate;
+  mtl_img_desc.arrayLength      = 1u; // TODO texture arrays
   // TODO multisampled textures
   mtl_img_desc.sampleCount = info->nsamples == 0u ? 1u : info->nsamples;
-  mtl_img_desc.arrayLength = 1u; // TODO texture arrays
   if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc.usage |= MTLTextureUsageRenderTarget;
   }
@@ -1266,28 +1270,6 @@ void ngf_destroy_image(ngf_image *image) {
     image->~ngf_image();
     NGF_FREE(image);
   }
-}
-
-ngf_error ngf_populate_image(ngf_image *image,
-                             uint32_t level,
-                             ngf_offset3d offset,
-                             ngf_extent3d dimensions,
-                             const void *data) {
-  MTLRegion region;
-  region.origin.x = (NSUInteger)offset.x;
-  region.origin.y = (NSUInteger)offset.y;
-  region.origin.z = (NSUInteger)offset.z;
-  region.size.width = dimensions.width;
-  region.size.height = dimensions.height;
-  region.size.depth = dimensions.depth;
-  // TODO blit command encoder
-  uint32_t bpp = 4u; // TODO fix, get_mtl_format_bpp
-  [image->texture
-   replaceRegion:region
-   mipmapLevel:level
-   withBytes:data
-   bytesPerRow:dimensions.width * bpp];
-  return NGF_ERROR_OK;
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
