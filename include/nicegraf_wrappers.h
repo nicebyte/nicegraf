@@ -206,7 +206,7 @@ public:
                                                     ALIGNED_SIZE,
                                                     flags);
     memcpy(mapped_buf, (void*)&data, sizeof(T));
-    ngf_uniform_buffer_flush_range(buf_.get(), current_offset_, ALIGNED_SIZE);
+    ngf_uniform_buffer_flush_range(buf_.get(), 0, ALIGNED_SIZE);
     ngf_uniform_buffer_unmap(buf_.get());
     frame_ = (frame_ + 1u) % nframes_;
   }
