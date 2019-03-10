@@ -1267,7 +1267,8 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
  * submitted commands.
  * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
  *            needs to be flushed.
- * @param offset Offset at which the flushed region starts, in bytes.
+ * @param offset Offset, relative to the start of the mapped range, at which
+ *               the flushed region starts, in bytes.
  * @param size  Size of the flushed region in bytes.
  */
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer *buf,
