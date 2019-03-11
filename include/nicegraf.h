@@ -540,6 +540,7 @@ typedef struct ngf_pixel_buffer ngf_pixel_buffer;
 typedef enum ngf_image_type {
   NGF_IMAGE_TYPE_IMAGE_2D = 0,
   NGF_IMAGE_TYPE_IMAGE_3D,
+  NGF_IMAGE_TYPE_CUBE,
   NGF_IMAGE_TYPE_COUNT
 } ngf_image_type;
 
@@ -608,13 +609,27 @@ typedef struct ngf_image_info {
 typedef struct ngf_image ngf_image;
 
 /**
- * Reference to an image part.
+ * Indicates the face of a cubemap.
+ */
+typedef enum ngf_cubemap_face {
+  NGF_CUBEMAP_FACE_POSITIVE_X,
+  NGF_CUBEMAP_FACE_NEGATIVE_X,
+  NGF_CUBEMAP_FACE_POSITIVE_Y,
+  NGF_CUBEMAP_FACE_NEGATIVE_Y,
+  NGF_CUBEMAP_FACE_POSITIVE_Z,
+  NGF_CUBEMAP_FACE_NEGATIVE_Z,
+  NGF_CUBEMAP_FACE_COUNT
+} ngf_cubemap_face;
+
+/**
+ * Reference to a part of an image.
  */
 typedef struct {
   const ngf_image *image; /**< Image being referred to.*/
   uint32_t mip_level; /**< Mip level within the image.*/
   uint32_t layer; /**< Layer within the image.*/
-  bool layered; /**< Whether the referred image is layered.*/
+  ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
+                                      non-cubemap textures.*/
 } ngf_image_ref;
 
 /**
