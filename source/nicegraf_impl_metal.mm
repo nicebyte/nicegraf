@@ -862,12 +862,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt);
   }
 
+  mtl_pipe_desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
+  /* TODO:
   if (mtl_pipe_desc.depthAttachmentPixelFormat ==
           MTLPixelFormatDepth32Float_Stencil8) {
     // TODO support other stencil formats
     mtl_pipe_desc.stencilAttachmentPixelFormat =
         MTLPixelFormatDepth32Float_Stencil8;
-  }
+  }*/
 
   // Populate specialization constant values.
   MTLFunctionConstantValues *spec_consts = nil;
@@ -1290,9 +1292,11 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
 ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buffer) {
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
+    cmd_buffer->active_rce = nil;
   }
   if (cmd_buffer->active_bce) {
     [cmd_buffer->active_bce endEncoding];
+    cmd_buffer->active_bce = nil;
   }
   return NGF_ERROR_OK;
 }
