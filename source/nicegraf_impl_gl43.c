@@ -376,7 +376,7 @@ static GLenum get_gl_primitive_type(ngf_primitive_type p) {
   return primitives[p];
 }
 
-typedef struct {
+typedef struct glformat {
   GLenum internal_format;
   GLenum format;
   GLenum type;
@@ -1121,14 +1121,17 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
     return NGF_ERROR_OUTOFMEM;
   }
 
-  glformat glf = get_gl_format(info->format);
+  const glformat glf = get_gl_format(info->format);
   image->glformat = glf.format;
   image->gltype = glf.type;
   image->is_multisample = info->nsamples > 1;
-  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM ||
+
+  const bool cant_use_renderbuffer =
+      info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM ||
       info->nmips > 1 ||
       info->extent.depth > 1 ||
-      info->type != NGF_IMAGE_TYPE_IMAGE_2D) {
+      info->type != NGF_IMAGE_TYPE_IMAGE_2D;
+  if (cant_use_renderbuffer) {
     image->is_renderbuffer = false;
     if (info->type == NGF_IMAGE_TYPE_IMAGE_2D &&
         info->extent.depth <= 1) {
@@ -1140,18 +1143,28 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
           info->nsamples > 1
             ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY
             : GL_TEXTURE_2D_ARRAY;
-    } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D) {
+    } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D &&
+               info->nsamples == 1u) {
       image->bind_point = GL_TEXTURE_3D;
+    } else if (info->type == NGF_IMAGE_TYPE_CUBE &&
+               info->nsamples == 1u) {
+      image->bind_point = GL_TEXTURE_CUBE_MAP;
+    } else {
+      ngf_destroy_image(image);
+      return NGF_ERROR_IMAGE_CREATION_FAILED;
     }
+ 
     glGenTextures(1, &(image->glimage));
     glBindTexture(image->bind_point, image->glimage);
-    if (image->bind_point == GL_TEXTURE_2D) {
+    if (image->bind_point == GL_TEXTURE_2D ||
+        image->bind_point == GL_TEXTURE_CUBE_MAP) {
       glTexStorage2D(image->bind_point,
                      info->nmips,
                      glf.internal_format,
                      info->extent.width,
                      info->extent.height);
     } else if (image->bind_point == GL_TEXTURE_2D_ARRAY ||
+               image->bind_point == GL_TEXTURE_CUBE_MAP_ARRAY ||
                image->bind_point == GL_TEXTURE_3D) { 
       glTexStorage3D(image->bind_point,
                      info->nmips,
@@ -1174,7 +1187,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
                                 info->extent.height,
                                 info->extent.depth,
                                 GL_TRUE);
-    }  
+    }
   } else {
     image->is_renderbuffer = true;
     image->bind_point = GL_RENDERBUFFER;
@@ -1383,18 +1396,17 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       assert(0);
     }
     if (!a->image_ref.image->is_renderbuffer &&
-        (a->image_ref.layered ||
-         a->image_ref.image->bind_point != GL_TEXTURE_2D_ARRAY)) {
-      glFramebufferTexture(GL_FRAMEBUFFER,
-                           gl_attachment,
-                           a->image_ref.image->glimage,
-                           a->image_ref.mip_level);
-    } else if (!a->image_ref.image->is_renderbuffer) {
+        (a->image_ref.image->bind_point == GL_TEXTURE_2D_ARRAY)) {
       glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                 gl_attachment,
                                 a->image_ref.image->glimage,
                                 a->image_ref.mip_level,
                                 a->image_ref.layer);
+    } else if (!a->image_ref.image->is_renderbuffer) {
+      glFramebufferTexture(GL_FRAMEBUFFER,
+                           gl_attachment,
+                           a->image_ref.image->glimage,
+                           a->image_ref.mip_level);
     } else {
       glBindRenderbuffer(GL_RENDERBUFFER, 0);
       glFramebufferRenderbuffer(GL_FRAMEBUFFER,
