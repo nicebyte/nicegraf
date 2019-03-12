@@ -1220,44 +1220,6 @@ void ngf_destroy_image(ngf_image *image) {
   }
 }
 
-ngf_error ngf_populate_image(ngf_image *image,
-                             uint32_t level,
-                             ngf_offset3d offset,
-                             ngf_extent3d dimensions,
-                             const void *data) {
-  assert(image);
-  assert(data);
-  if (image->is_multisample || image->is_renderbuffer) {
-    return NGF_ERROR_CANT_POPULATE_IMAGE;
-  } else {
-    glBindTexture(image->bind_point, image->glimage);
-    if (image->bind_point == GL_TEXTURE_2D) {
-      glTexSubImage2D(image->bind_point,
-                      level,
-                      offset.x,
-                      offset.y,
-                      dimensions.width,
-                      dimensions.height,
-                      image->glformat,
-                      image->gltype,
-                      data);
-    } else {
-      glTexSubImage3D(image->bind_point,
-                      level,
-                      offset.x,
-                      offset.y,
-                      offset.z,
-                      dimensions.width,
-                      dimensions.height,
-                      dimensions.depth,
-                      image->glformat,
-                      image->gltype,
-                      data);
-    }
-  }
-  return NGF_ERROR_OK;
-}
-
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler **result) {
   assert(info);
