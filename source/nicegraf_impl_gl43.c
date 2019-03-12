@@ -452,6 +452,18 @@ static GLenum get_gl_wrap(ngf_sampler_wrap_mode e) {
   return modes[e];
 }
 
+static GLenum get_gl_cubemap_face(ngf_cubemap_face face) {
+  static const GLenum faces[NGF_CUBEMAP_FACE_COUNT] = {
+    GL_TEXTURE_CUBE_MAP_POSITIVE_X,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+    GL_TEXTURE_CUBE_MAP_POSITIVE_Y,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+    GL_TEXTURE_CUBE_MAP_POSITIVE_Z,
+    GL_TEXTURE_CUBE_MAP_NEGATIVE_Z,
+  };
+  return faces[face];
+}
+
 #pragma endregion
 
 void (*NGF_DEBUG_CALLBACK)(const char *message, const void *userdata) = NULL;
@@ -2431,8 +2443,13 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
 
           glBindTexture(bind_point, img_ref->image->glimage);
           if (bind_point != GL_TEXTURE_3D &&
-              bind_point != GL_TEXTURE_2D_ARRAY) {
-            glTexSubImage2D(bind_point,
+              bind_point != GL_TEXTURE_2D_ARRAY &&
+              bind_point != GL_TEXTURE_CUBE_MAP_ARRAY) {
+            const GLenum real_bind_point =
+                bind_point != GL_TEXTURE_CUBE_MAP
+                    ? bind_point
+                    : get_gl_cubemap_face(img_ref->cubemap_face);
+            glTexSubImage2D(real_bind_point,
                             img_ref->mip_level,
                             offset->x,
                             offset->y,
@@ -2442,11 +2459,15 @@ ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
                             img_ref->image->gltype,
                             (void*)cmd->write_image.src_data_offset);
           } else {
+            const GLsizei z =
+                bind_point != GL_TEXTURE_CUBE_MAP_ARRAY
+                    ? offset->z
+                    : offset->z * 6 + img_ref->cubemap_face;
             glTexSubImage3D(bind_point,
                             img_ref->mip_level,
                             offset->x,
                             offset->y,
-                            offset->z,
+                            z,
                             extent->width,
                             extent->height,
                             extent->depth,
