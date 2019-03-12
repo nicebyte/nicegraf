@@ -1165,13 +1165,17 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
                      info->extent.height);
     } else if (image->bind_point == GL_TEXTURE_2D_ARRAY ||
                image->bind_point == GL_TEXTURE_CUBE_MAP_ARRAY ||
-               image->bind_point == GL_TEXTURE_3D) { 
+               image->bind_point == GL_TEXTURE_3D) {
+      // NOTE: for cube map array textures the "depth" is counted in
+      // layer-faces, not layers.
+      const GLsizei depth = info->extent.depth *
+          (image->bind_point == GL_TEXTURE_CUBE_MAP_ARRAY ? 6 : 1);
       glTexStorage3D(image->bind_point,
                      info->nmips,
                      glf.internal_format,
                      info->extent.width,
                      info->extent.height,
-                     info->extent.depth);
+                     depth);
     } else if (image->bind_point == GL_TEXTURE_2D_MULTISAMPLE) {
       glTexStorage2DMultisample(image->bind_point,
                                 info->nsamples,
