@@ -1159,8 +1159,10 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
                info->nsamples == 1u) {
       image->bind_point = GL_TEXTURE_3D;
     } else if (info->type == NGF_IMAGE_TYPE_CUBE &&
-               info->nsamples == 1u) {
-      image->bind_point = GL_TEXTURE_CUBE_MAP;
+               info->nsamples == 0u) {
+      image->bind_point = info->extent.depth > 1
+          ? GL_TEXTURE_CUBE_MAP_ARRAY
+          : GL_TEXTURE_CUBE_MAP;
     } else {
       ngf_destroy_image(image);
       return NGF_ERROR_IMAGE_CREATION_FAILED;
