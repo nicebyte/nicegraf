@@ -92,7 +92,7 @@ static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
     // like it for some reason...
 #else
     MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
-    MTLPixelFormatInvalid, // DEPTH24_STENCIL8, iOS does not support.
+    MTLPixelFormatDepth32Float_Stencil8, // Emulate DEPTH24_STENCIL8 on iOS.
 #endif
   };
   return pixel_formats[fmt];
