@@ -49,13 +49,6 @@
 
 #pragma region ngf_impl_type_definitions
 
-typedef struct {
-  uint32_t ngf_binding_id;
-  uint32_t native_binding_id;
-  uint32_t ncis_bindings;
-  uint32_t *cis_bindings;
-} _ngf_native_binding;
-
 struct ngf_graphics_pipeline {
   uint32_t id;
   GLuint program_pipeline;
@@ -71,7 +64,7 @@ struct ngf_graphics_pipeline {
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
   uint32_t ndescriptors_layouts;
-  _ngf_native_binding **binding_map;
+  _ngf_native_binding_map binding_map;
   GLuint owned_stages[NGF_STAGE_COUNT];
   uint32_t nowned_stages;
 };
@@ -971,62 +964,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Create a map of NGF -> OpenGL resource bindings.
   const ngf_pipeline_layout_info *pipeline_layout = info->layout;
   pipeline->ndescriptors_layouts = pipeline_layout->ndescriptor_set_layouts;
-  _ngf_native_binding **binding_map =
-      NGF_ALLOCN(_ngf_native_binding*,
-                 pipeline_layout->ndescriptor_set_layouts);
-  pipeline->binding_map = binding_map;
-  if (pipeline->binding_map == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+  err = _ngf_create_native_binding_map(pipeline_layout,
+                                       info->image_to_combined_map,
+                                       info->sampler_to_combined_map,
+                                       &pipeline->binding_map);
+  if (err != NGF_ERROR_OK) {
     goto ngf_create_pipeline_cleanup;
-  }
-  memset(binding_map, 0,
-         sizeof(_ngf_native_binding*) *
-           pipeline_layout->ndescriptor_set_layouts);
-  uint32_t total_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
-  for (uint32_t set = 0u; set < pipeline_layout->ndescriptor_set_layouts;
-       ++set) {
-    uint32_t set_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
-    const ngf_descriptor_set_layout_info *set_layout =
-        &pipeline_layout->descriptor_set_layouts[set];
-    binding_map[set] = NGF_ALLOCN(_ngf_native_binding,
-                                  set_layout->ndescriptors + 1u);
-    if (binding_map[set] == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_pipeline_cleanup;
-    }
-    binding_map[set][set_layout->ndescriptors].ngf_binding_id = (uint32_t)(-1);
-    for (uint32_t b = 0u; b < set_layout->ndescriptors; ++b) {
-      const ngf_descriptor_info *desc_info = &set_layout->descriptors[b];
-      const ngf_descriptor_type desc_type = desc_info->type;
-      _ngf_native_binding *mapping = &binding_map[set][b];
-      mapping->ngf_binding_id = desc_info->id;
-      mapping->native_binding_id = total_c[desc_type] + (set_c[desc_type]++);
-      if (desc_info->type == NGF_DESCRIPTOR_SAMPLER ||
-          desc_info->type == NGF_DESCRIPTOR_TEXTURE) {
-        const ngf_plmd_cis_map *cis_map =
-            desc_info->type == NGF_DESCRIPTOR_SAMPLER
-                ? info->sampler_to_combined_map
-                : info->image_to_combined_map;
-        assert(cis_map); // TODO: report error
-        const ngf_plmd_cis_map_entry *combined_list =
-            _lookup_cis_map(set, desc_info->id, cis_map);
-        assert(combined_list); // TODO: report error
-        mapping->cis_bindings =
-            NGF_ALLOCN(uint32_t, combined_list->ncombined_ids);
-        if (mapping->cis_bindings == NULL) {
-          err = NGF_ERROR_OUTOFMEM;
-          goto ngf_create_pipeline_cleanup;
-        }
-        memcpy(mapping->cis_bindings, combined_list->combined_ids,
-               sizeof(uint32_t) * combined_list->ncombined_ids);
-        mapping->ncis_bindings = combined_list->ncombined_ids;
-      } else {
-        mapping->cis_bindings = NULL;
-      }
-    }
-    for (uint32_t i = 0u; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-      total_c[i] += set_c[i];
-    }
   }
 
   // Store attribute format in VAO.
@@ -1103,17 +1046,7 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *pipeline) {
         pipeline->vert_buf_bindings) {
       NGF_FREEN(pipeline->vert_buf_bindings, pipeline->nvert_buf_bindings);
     }
-    if (pipeline->binding_map) {
-      for (uint32_t set = 0u; set < pipeline->ndescriptors_layouts; ++set) {
-        if (pipeline->binding_map[set]) {
-          NGF_FREEN(
-              pipeline->binding_map[set]->cis_bindings,
-              pipeline->binding_map[set]->ncis_bindings);
-          NGF_FREE(pipeline->binding_map[set]);
-        }
-      }
-      NGF_FREE(pipeline->binding_map);
-    }
+    _ngf_destroy_binding_map(pipeline->binding_map);
     glDeleteProgramPipelines(1, &pipeline->program_pipeline);
     glDeleteVertexArrays(1, &pipeline->vao);
     for (uint32_t s = 0u; s < pipeline->nowned_stages; ++s) {
