@@ -214,7 +214,7 @@ public:
   ngf_resource_bind_op bind_op_at_current_offset(
       uint32_t set,
       uint32_t binding,
-      size_t   additional_offset = 0) {
+      size_t   additional_offset = 0) const {
     ngf_resource_bind_op op;
     op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding = binding;
