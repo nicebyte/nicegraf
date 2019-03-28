@@ -211,14 +211,16 @@ public:
     frame_ = (frame_ + 1u) % nframes_;
   }
 
-  ngf_resource_bind_op bind_op_at_current_offset(uint32_t set,
-                                                 uint32_t binding) {
+  ngf_resource_bind_op bind_op_at_current_offset(
+      uint32_t set,
+      uint32_t binding,
+      size_t   additional_offset = 0) {
     ngf_resource_bind_op op;
     op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding = binding;
     op.target_set = set;
     op.info.uniform_buffer.buffer = buf_.get();
-    op.info.uniform_buffer.offset = current_offset_;
+    op.info.uniform_buffer.offset = current_offset_ + additional_offset;
     op.info.uniform_buffer.range = ALIGNED_SIZE;
     return op;
   }
