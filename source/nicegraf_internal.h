@@ -1,24 +1,24 @@
 /**
-Copyright © 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2019 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy 
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 #pragma once
 
@@ -30,17 +30,17 @@ SOFTWARE.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 // emulate pthread mutexes and condvars
-typedef CRITICAL_SECTION pthread_mutex_t;
+typedef CRITICAL_SECTION   pthread_mutex_t;
 typedef CONDITION_VARIABLE pthread_cond_t;
-#define pthread_mutex_lock(m) (EnterCriticalSection(m),0)
-#define pthread_mutex_unlock(m) (LeaveCriticalSection(m),0)
+#define pthread_mutex_lock(m)    (EnterCriticalSection(m),0)
+#define pthread_mutex_unlock(m)  (LeaveCriticalSection(m),0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m),0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m),0)
-#define pthread_cond_init(c, a) (InitializeConditionVariable(c))
-#define pthread_cond_wait(c, m) (SleepConditionVariableCS(c, m, INFINITE))
-#define pthread_cond_signal(c) (WakeConditionVariable(c))
+#define pthread_cond_init(c, a)  (InitializeConditionVariable(c))
+#define pthread_cond_wait(c, m)  (SleepConditionVariableCS(c, m, INFINITE))
+#define pthread_cond_signal(c)   (WakeConditionVariable(c))
+#define _ngf_cur_thread_id()     (GetCurrentThreadId())
 #define pthread_cond_destroy(c)
-#define _ngf_cur_thread_id() (GetCurrentThreadId())
 #else
 #define NGF_THREADLOCAL __thread
 #include <pthread.h>
@@ -61,10 +61,10 @@ extern "C" {
 extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 
 // Convenience macros for invoking custom memory allocation callbacks.
-#define NGF_ALLOC(type) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), 1))
+#define NGF_ALLOC(type)     ((type*) NGF_ALLOC_CB->allocate(sizeof(type), 1))
 #define NGF_ALLOCN(type, n) ((type*) NGF_ALLOC_CB->allocate(sizeof(type), n))
-#define NGF_FREE(ptr) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1))
-#define NGF_FREEN(ptr, n) (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n))
+#define NGF_FREE(ptr)       (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1))
+#define NGF_FREEN(ptr, n)   (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n))
 
 // Macro for determining size of arrays.
 #if defined(_MSC_VER)
@@ -86,7 +86,8 @@ typedef struct _ngf_block_allocator _ngf_block_allocator;
 
 // Creates a new block allocator with a given fixed `block_size` and a given
 // initial capacity of `nblocks`.
-_ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size, uint32_t nblocks);
+_ngf_block_allocator* _ngf_blkalloc_create(uint32_t block_size,
+                                           uint32_t nblocks);
 
 // Destroys the given block allocator. All unfreed pointers obtained from the
 // destroyed allocator become invalid.
@@ -118,6 +119,28 @@ static void _NGF_FAKE_USE_HELPER(int _, ...) { _ <<= 0u; }
 #pragma warning(disable:4200)
 #pragma warning(disable:4204)
 #pragma warning(disable:4221)
+
+// Info about a native resource binding.
+typedef struct {
+  uint32_t  ngf_binding_id;    // Nicegraf binding id.
+  uint32_t  native_binding_id; // Actual backend api-specific binding id.
+  uint32_t  ncis_bindings;     // Number of associated combined image/sampler
+                               // bindings.
+  uint32_t *cis_bindings;      // Associated combined image/sampler bindings.
+} _ngf_native_binding;
+
+// Mapping from (set, binding) to (native binding).
+typedef _ngf_native_binding** _ngf_native_binding_map;
+
+// Generates a (set, binding) to (native binding) map from the given pipeline
+// layout and combined image/sampler maps.
+ngf_error _ngf_create_native_binding_map(
+    const ngf_pipeline_layout_info *layout,
+    const ngf_plmd_cis_map *images_to_cis,
+    const ngf_plmd_cis_map *samplers_to_cis,
+   _ngf_native_binding_map *result);
+
+void _ngf_destroy_binding_map(_ngf_native_binding_map map);
 
 #ifdef __cplusplus
 }
