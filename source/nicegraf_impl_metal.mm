@@ -845,7 +845,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         compatible_rt.pass_descriptor.colorAttachments[ca].texture.pixelFormat;
     }
     // TODO set up blending correctly
-    mtl_pipe_desc.colorAttachments[ca].blendingEnabled = YES;
+    mtl_pipe_desc.colorAttachments[ca].blendingEnabled = info->blend->enable;
     mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
     mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
     mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
