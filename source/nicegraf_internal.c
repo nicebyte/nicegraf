@@ -23,6 +23,7 @@
 #include "nicegraf_internal.h"
 #include "dynamic_array.h"
 #include <stdlib.h>
+#include <string.h> 
 
 // Default allocation callbacks.
 void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
