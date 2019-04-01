@@ -24,6 +24,7 @@
 #include "nicegraf.h"
 #include <optional>
 #include <utility>
+#include <queue>
 
 namespace ngf {
 
@@ -236,6 +237,61 @@ private:
   uint32_t frame_;
   size_t current_offset_;
   uint32_t nframes_;
+};
+
+// This is a helper for disposing of staging buffers at an appropriate time.
+// After a buffer is enqueued, it will be destroyed once it is no
+// longer needed.
+class resource_dispose_queue {
+  template <class ResHandleType>
+  struct entry {
+    uint32_t frame;
+    ResHandleType handle;
+  };
+public:
+
+  // Disposes of previously enqueued buffers that are no longer needed by
+  // any commands.
+  // Do not call this more than once per frame.
+  void update() {
+    update_queue(idx_buf_queue_);
+    update_queue(attr_buf_queue_);
+    update_queue(uniform_buf_queue_);
+    update_queue(pixel_buf_queue_);
+    frame_++;
+  }
+
+  void enqueue(index_buffer buf) { 
+    idx_buf_queue_.emplace(entry<index_buffer>{frame_, std::move(buf)});
+  }
+   
+  void enqueue(attrib_buffer buf) { 
+    attr_buf_queue_.emplace(entry<attrib_buffer>{frame_, std::move(buf)});
+  }
+
+  void enqueue(uniform_buffer buf) { 
+    uniform_buf_queue_.emplace(entry<uniform_buffer>{frame_, std::move(buf)});
+  }
+
+  void enqueue(pixel_buffer buf) { 
+    pixel_buf_queue_.emplace(entry<pixel_buffer>{frame_, std::move(buf)});
+  }
+
+private:
+  template <class T>
+  void update_queue(std::queue<entry<T>> &q) {
+    while (!q.empty() && frame_ > q.front().frame) {
+      entry<T> e = std::move(q.front());
+      q.pop();
+      e.handle.reset(nullptr);
+    }
+  }
+
+  std::queue<entry<index_buffer>> idx_buf_queue_;
+  std::queue<entry<attrib_buffer>> attr_buf_queue_;
+  std::queue<entry<uniform_buffer>> uniform_buf_queue_;
+  std::queue<entry<pixel_buffer>> pixel_buf_queue_;
+  uint32_t frame_ = 0u;
 };
 
 }  // namespace ngf
