@@ -788,6 +788,13 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       _ngf_attachment_set_common(desc, attachment);
       desc.clearDepth = attachment.clear.clear_depth;
       rt->pass_descriptor.depthAttachment = desc;
+      if (attachment.image_ref.image->texture.pixelFormat ==
+          MTLPixelFormatDepth32Float_Stencil8) {
+        rt->pass_descriptor.stencilAttachment =
+        [MTLRenderPassStencilAttachmentDescriptor new];
+        _ngf_attachment_set_common(rt->pass_descriptor.stencilAttachment,
+                                   attachment);
+      }
       break;
     }
     case NGF_ATTACHMENT_STENCIL: {
