@@ -105,32 +105,6 @@ NGF_DEFINE_WRAPPER_TYPE(pixel_buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
-class plmd {
-public:
-  plmd() = default;
-  plmd(const plmd&) = delete;
-  plmd(plmd &&other) { *this = std::move(other); }
-  ~plmd() {
-    if (plmd_) {
-      ngf_plmd_destroy(plmd_, nullptr);
-    }
-  }
-
-  ngf_plmd_error load(const void *buf, size_t buf_size) {
-    return ngf_plmd_load(buf, buf_size, nullptr, &plmd_);
-  }
-
-  plmd& operator=(const plmd&) = delete;
-  plmd& operator=(plmd &&other) {
-    plmd_ = other.plmd_;
-    other.plmd_ = nullptr;
-    return *this;
-  }
-
-private:
-  ngf_plmd *plmd_ = nullptr;
-};
-
 template <uint32_t S>
 struct descriptor_set {
   template <uint32_t B>
@@ -451,7 +425,7 @@ public:
                          size_t          source_size,
                          size_t          source_offset,
                          size_t          target_offset) {
-    T::init_type staging_buffer_info {
+    ngf_buffer_info staging_buffer_info {
       source_size,
       NGF_BUFFER_STORAGE_HOST_WRITEABLE
     };
