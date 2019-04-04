@@ -157,6 +157,34 @@ void cmd_bind_resources(ngf_cmd_buffer *buf, const Args&&... args) {
   ngf_cmd_bind_resources(buf, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
 }
 
+inline void* buffer_map_range(ngf_attrib_buffer *buf,
+                              size_t offset,
+                              size_t size,
+                              uint32_t flags) {
+  return ngf_attrib_buffer_map_range(buf, offset, size, flags);
+}
+
+inline void* buffer_map_range(ngf_index_buffer *buf,
+                              size_t offset,
+                              size_t size,
+                              uint32_t flags) {
+  return ngf_index_buffer_map_range(buf, offset, size, flags);
+}
+
+inline void* buffer_map_range(ngf_uniform_buffer *buf,
+                              size_t offset,
+                              size_t size,
+                              uint32_t flags) {
+  return ngf_uniform_buffer_map_range(buf, offset, size, flags);
+}
+
+inline void* buffer_map_range(ngf_pixel_buffer *buf,
+                              size_t offset,
+                              size_t size,
+                              uint32_t flags) {
+  return ngf_pixel_buffer_map_range(buf, offset, size, flags);
+}
+
 /**
  * A convenience class for streaming uniform data.
  */
