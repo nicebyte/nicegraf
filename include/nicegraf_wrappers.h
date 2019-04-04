@@ -23,6 +23,8 @@
 
 #include "nicegraf.h"
 #include <optional>
+#include <string.h>
+#include <tuple>
 #include <utility>
 #include <queue>
 
