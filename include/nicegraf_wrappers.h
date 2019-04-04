@@ -223,6 +223,33 @@ inline void buffer_unmap(ngf_pixel_buffer *buf) {
   ngf_pixel_buffer_unmap(buf);
 }
 
+inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
+                            ngf_attrib_buffer *src,
+                            ngf_attrib_buffer *dst,
+                            size_t size,
+                            size_t src_offset,
+                            size_t dst_offset) {
+  ngf_cmd_copy_attrib_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+}
+
+inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
+                            ngf_index_buffer *src,
+                            ngf_index_buffer *dst,
+                            size_t size,
+                            size_t src_offset,
+                            size_t dst_offset) {
+  ngf_cmd_copy_index_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+}
+
+inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
+                            ngf_uniform_buffer *src,
+                            ngf_uniform_buffer *dst,
+                            size_t size,
+                            size_t src_offset,
+                            size_t dst_offset) {
+  ngf_cmd_copy_uniform_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+}
+
 /**
  * A convenience class for streaming uniform data.
  */
