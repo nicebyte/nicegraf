@@ -369,7 +369,37 @@ public:
   void enqueue(pixel_buffer buf) { 
     pixel_buf_queue_.emplace(entry<pixel_buffer>{frame_, std::move(buf)});
   }
-
+  
+  template <class T>
+  ngf_error write_buffer(ngf_cmd_buffer *cmd_buf,
+                         T &target_buffer,
+                         void *source_data,
+                         size_t source_size,
+                         size_t source_offset,
+                         size_t target_offset) {
+    T::init_type staging_buffer_info {
+      source_size,
+      NGF_BUFFER_STORAGE_HOST_WRITEABLE
+    };
+    T staging_buffer;
+    ngf_error err = staging_buffer.initialize(staging_buffer_info);
+    if (err != NGF_ERROR_OK) return err;
+    void *mapped_staging_buffer = buffer_map_range(staging_buffer.get(),
+                                                   0,
+                                                   source_size,
+                                                   NGF_BUFFER_MAP_WRITE_BIT);
+    memcpy(mapped_staging_buffer, source_data, source_size);
+    buffer_flush_range(staging_buffer.get(), 0, source_size);
+    buffer_unmap(staging_buffer.get());
+    cmd_copy_buffer(cmd_buf,
+                    staging_buffer.get(),
+                    target_buffer.get(),
+                    source_size,
+                    source_offset,
+                    target_offset);
+    enqueue(std::move(staging_buffer));
+    return NGF_ERROR_OK;
+  }
 private:
   template <class T>
   void update_queue(std::queue<entry<T>> &q) {
