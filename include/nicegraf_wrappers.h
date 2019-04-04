@@ -420,11 +420,11 @@ public:
   
   template <class T>
   ngf_error write_buffer(ngf_cmd_buffer *cmd_buf,
-                         T &target_buffer,
-                         void *source_data,
-                         size_t source_size,
-                         size_t source_offset,
-                         size_t target_offset) {
+                         T              &target_buffer,
+                         const void     *source_data,
+                         size_t          source_size,
+                         size_t          source_offset,
+                         size_t          target_offset) {
     T::init_type staging_buffer_info {
       source_size,
       NGF_BUFFER_STORAGE_HOST_WRITEABLE
@@ -445,6 +445,39 @@ public:
                     source_size,
                     source_offset,
                     target_offset);
+    enqueue(std::move(staging_buffer));
+    return NGF_ERROR_OK;
+  }
+
+  ngf_error write_image(ngf_cmd_buffer *cmd_buf,
+                        const void     *source_data,
+                        size_t          source_size,
+                        size_t          source_offset,
+                        ngf_image_ref   target,
+                        ngf_offset3d    target_offset,
+                        ngf_extent3d    target_extent) {
+    const ngf_pixel_buffer_info staging_buffer_info {
+      source_size,
+      NGF_PIXEL_BUFFER_USAGE_WRITE
+    };
+    ngf::pixel_buffer staging_buffer;
+    const ngf_error err = staging_buffer.initialize(staging_buffer_info);
+    if (err != NGF_ERROR_OK) {
+      return err;
+    }
+    void *mapped_staging_buffer = buffer_map_range(staging_buffer.get(),
+                                                   0,
+                                                   source_size,
+                                                   NGF_BUFFER_MAP_WRITE_BIT);
+    memcpy(mapped_staging_buffer, source_data, source_size);
+    buffer_flush_range(staging_buffer.get(), 0, source_size);
+    buffer_unmap(staging_buffer.get());
+    ngf_cmd_write_image(cmd_buf,
+                        staging_buffer.get(),
+                        source_offset,
+                        target,
+                       &target_offset,
+                       &target_extent);
     enqueue(std::move(staging_buffer));
     return NGF_ERROR_OK;
   }
