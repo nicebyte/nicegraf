@@ -250,6 +250,54 @@ inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
   ngf_cmd_copy_uniform_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
 }
 
+inline ngf_image_ref image_ref(const ngf_image *img) {
+  return {
+    img,
+    0,
+    0,
+    NGF_CUBEMAP_FACE_POSITIVE_X
+  };
+}
+
+inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip) {
+  return {
+    img,
+    mip,
+    0,
+    NGF_CUBEMAP_FACE_POSITIVE_X
+  };
+}
+
+inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+                               uint32_t layer) {
+  return {
+    img,
+    mip,
+    layer,
+    NGF_CUBEMAP_FACE_POSITIVE_X
+  };
+}
+
+inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+                               ngf_cubemap_face face) {
+  return {
+    img,
+    mip,
+    0,
+    face 
+  };
+}
+
+inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+                               uint32_t layer, ngf_cubemap_face face) {
+  return {
+    img,
+    mip,
+    layer,
+    face 
+  };
+}
+
 /**
  * A convenience class for streaming uniform data.
  */
@@ -400,6 +448,7 @@ public:
     enqueue(std::move(staging_buffer));
     return NGF_ERROR_OK;
   }
+
 private:
   template <class T>
   void update_queue(std::queue<entry<T>> &q) {
