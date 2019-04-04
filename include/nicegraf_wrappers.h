@@ -187,6 +187,42 @@ inline void* buffer_map_range(ngf_pixel_buffer *buf,
   return ngf_pixel_buffer_map_range(buf, offset, size, flags);
 }
 
+inline void buffer_flush_range(ngf_attrib_buffer *buf,
+                               size_t offset, size_t size) {
+  ngf_attrib_buffer_flush_range(buf, offset, size);
+}
+
+inline void buffer_flush_range(ngf_index_buffer *buf,
+                               size_t offset, size_t size) {
+  ngf_index_buffer_flush_range(buf, offset, size);
+}
+
+inline void buffer_flush_range(ngf_uniform_buffer *buf,
+                               size_t offset, size_t size) {
+  ngf_uniform_buffer_flush_range(buf, offset, size);
+}
+
+inline void buffer_flush_range(ngf_pixel_buffer *buf,
+                               size_t offset, size_t size) {
+  ngf_pixel_buffer_flush_range(buf, offset, size);
+}
+
+inline void buffer_unmap(ngf_attrib_buffer *buf) {
+  ngf_attrib_buffer_unmap(buf);
+}
+
+inline void buffer_unmap(ngf_index_buffer *buf) {
+  ngf_index_buffer_unmap(buf);
+}
+
+inline void buffer_unmap(ngf_uniform_buffer *buf) {
+  ngf_uniform_buffer_unmap(buf);
+}
+
+inline void buffer_unmap(ngf_pixel_buffer *buf) {
+  ngf_pixel_buffer_unmap(buf);
+}
+
 /**
  * A convenience class for streaming uniform data.
  */
