@@ -65,9 +65,10 @@ static ngf_plmd_error _create_cis_map(uint8_t *ptr,
   return NGF_PLMD_ERROR_OK;
 }
 
-ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
-                     const ngf_plmd_alloc_callbacks *alloc_cb,
-                     ngf_plmd **result) {
+ngf_plmd_error ngf_plmd_load(const void *buf,
+                             size_t buf_size,
+                             const ngf_plmd_alloc_callbacks *alloc_cb,
+                             ngf_plmd **result) {
   static const uint32_t START_OF_RAW_BYTE_BLOCK = 0xffffffff;
   static const uint32_t MAGIC_NUMBER = 0xdeadbeef;
   ngf_plmd_error err = NGF_PLMD_ERROR_OK;
