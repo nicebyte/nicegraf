@@ -15,7 +15,7 @@ static const ngf_plmd_alloc_callbacks stdlib_alloc = {
   .free = free
 };
 
-struct plmd {
+struct ngf_plmd {
   uint8_t *raw_data;
   const ngf_plmd_header *header;
   ngf_plmd_layout layout;
@@ -45,11 +45,11 @@ static ngf_plmd_error _create_cis_map(uint8_t *ptr,
 
 ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
                      const ngf_plmd_alloc_callbacks *alloc_cb,
-                     plmd **result) {
+                     ngf_plmd **result) {
   static const uint32_t START_OF_RAW_BYTE_BLOCK = 0xffffffff;
   static const uint32_t MAGIC_NUMBER = 0xdeadbeef;
   ngf_plmd_error err = NGF_PLMD_ERROR_OK;
-  plmd *meta = NULL;
+  ngf_plmd *meta = NULL;
   assert(buf);
   assert(result);
 
@@ -67,12 +67,12 @@ ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
                                                        // blocks in the buffer.
 
   // Allocate space for the result.
-  meta = alloc_cb->alloc(sizeof(plmd));
+  meta = alloc_cb->alloc(sizeof(ngf_plmd));
   if (result == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
   }
-  memset(meta, 0u, sizeof(plmd));
+  memset(meta, 0u, sizeof(ngf_plmd));
   *result = meta;
 
   // Create a copy of the metadata buffer.
@@ -177,7 +177,7 @@ ngf_plmd_load_cleanup:
   return err;
 }
 
-void ngf_plmd_destroy(plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb) {
+void ngf_plmd_destroy(ngf_plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb) {
   if (alloc_cb == NULL) {
     alloc_cb = &stdlib_alloc;
   }
@@ -201,23 +201,23 @@ void ngf_plmd_destroy(plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb) {
   }
 }
 
-const ngf_plmd_layout* ngf_plmd_get_layout(const plmd *m) {
+const ngf_plmd_layout* ngf_plmd_get_layout(const ngf_plmd *m) {
   return &m->layout;
 }
 
-const ngf_plmd_cis_map* ngf_plmd_get_image_to_cis_map(const plmd *m) {
+const ngf_plmd_cis_map* ngf_plmd_get_image_to_cis_map(const ngf_plmd *m) {
   return &m->images_to_cis_map;
 }
 
-const ngf_plmd_cis_map* ngf_plmd_get_sampler_to_cis_map(const plmd *m) {
+const ngf_plmd_cis_map* ngf_plmd_get_sampler_to_cis_map(const ngf_plmd *m) {
   return &m->samplers_to_cis_map;
 }
 
-const ngf_plmd_user* ngf_plmd_get_user(const plmd *m) {
+const ngf_plmd_user* ngf_plmd_get_user(const ngf_plmd *m) {
   return &m->user;
 }
 
-const ngf_plmd_header* ngf_plmd_get_header(const plmd *m) {
+const ngf_plmd_header* ngf_plmd_get_header(const ngf_plmd *m) {
   return m->header;
 }
 
