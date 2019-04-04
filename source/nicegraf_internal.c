@@ -173,6 +173,19 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
   return result;
 }
 
+const _ngf_native_binding* _ngf_binding_map_lookup(const _ngf_native_binding_map binding_map,
+                                                   uint32_t set,
+                                                   uint32_t binding) {
+  const _ngf_native_binding *set_map = binding_map[set];
+  uint32_t b_idx = 0u;
+  while (set_map[b_idx].ngf_binding_id != binding &&
+         set_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
+  if (set_map[b_idx].native_binding_id == (uint32_t)(-1)) {
+    return NULL;
+  }
+  return &set_map[b_idx];
+}
+
 ngf_error _ngf_create_native_binding_map(
     const ngf_pipeline_layout_info *layout,
     const ngf_plmd_cis_map *images_to_cis,
