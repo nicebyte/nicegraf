@@ -141,6 +141,11 @@ ngf_error _ngf_create_native_binding_map(
    _ngf_native_binding_map *result);
 
 void _ngf_destroy_binding_map(_ngf_native_binding_map map);
+  
+const _ngf_native_binding* _ngf_binding_map_lookup(
+    const _ngf_native_binding_map map,
+    uint32_t set,
+    uint32_t binding);
 
 #ifdef __cplusplus
 }
