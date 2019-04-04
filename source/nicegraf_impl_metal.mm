@@ -433,12 +433,17 @@ struct ngf_shader_stage {
 };
 
 struct ngf_graphics_pipeline {
-  id<MTLRenderPipelineState> pipeline = nil;
-  id<MTLDepthStencilState> depth_stencil = nil;
+  id<MTLRenderPipelineState> pipeline      = nil;
+  id<MTLDepthStencilState>   depth_stencil = nil;
+  
   uint32_t front_stencil_reference = 0u;
-  uint32_t back_stencil_reference = 0u;
+  uint32_t back_stencil_reference  = 0u;
+  
   MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
+  
+ _ngf_native_binding_map   binding_map = nullptr;
   ngf_pipeline_layout_info layout;
+
   ~ngf_graphics_pipeline() {
     for (uint32_t s = 0u;
          layout.descriptor_set_layouts != nullptr &&
@@ -448,6 +453,9 @@ struct ngf_graphics_pipeline {
         NGF_FREEN(layout.descriptor_set_layouts[s].descriptors,
                   layout.descriptor_set_layouts[s].ndescriptors);
       }
+    }
+    if (binding_map) {
+      _ngf_destroy_binding_map(binding_map);
     }
   }
 };
@@ -963,7 +971,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
            sizeof(ngf_descriptor_info) *
            descriptor_set_layouts[s].ndescriptors);
   }
-
+  ngf_error ngf_err =
+      _ngf_create_native_binding_map(info->layout,
+                                     nullptr,
+                                     nullptr,
+                                    &pipeline->binding_map);
+  if (ngf_err != NGF_ERROR_OK) {
+    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+  }
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
@@ -1443,8 +1458,14 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
                             uint32_t nbind_ops) {
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op &bind_op = bind_ops[o];
+    assert(cmd_buf->active_pipe);
+    const _ngf_native_binding *nb =
+        _ngf_binding_map_lookup(cmd_buf->active_pipe->binding_map,
+                                bind_op.target_set,
+                                bind_op.target_binding);
+    assert(nb);
     const uint32_t ngf_binding = bind_op.target_binding;
-    const uint32_t native_binding = ngf_binding; // TODO: fix (map {set,binding} to binding).
+    const uint32_t native_binding = nb->native_binding_id;
     const ngf_pipeline_layout_info &layout = cmd_buf->active_pipe->layout;
     const ngf_descriptor_set_layout_info &set_layout =
         layout.descriptor_set_layouts[bind_op.target_set];
