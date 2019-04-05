@@ -1597,7 +1597,7 @@ void _ngf_cmd_copy_buffer(ngf_cmd_buffer *buf,
 }
 
 void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
-                                ngf_attrib_buffer *src,
+                                const ngf_attrib_buffer *src,
                                 ngf_attrib_buffer *dst,
                                 size_t size,
                                 size_t src_offset,
@@ -1607,7 +1607,7 @@ void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
 }
 
 void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
-                               ngf_index_buffer *src,
+                               const ngf_index_buffer *src,
                                ngf_index_buffer *dst,
                                size_t size,
                                size_t src_offset,
@@ -1617,7 +1617,7 @@ void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
 }
 
 void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
-                                 ngf_uniform_buffer *src,
+                                 const ngf_uniform_buffer *src,
                                  ngf_uniform_buffer *dst,
                                  size_t size,
                                  size_t src_offset,
