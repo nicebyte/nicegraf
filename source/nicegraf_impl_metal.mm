@@ -243,12 +243,20 @@ static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
   return stencil_ops[op];
 }
 
-static MTLTextureType get_mtl_texture_type(ngf_image_type type) {
-  static const MTLTextureType types[NGF_IMAGE_TYPE_COUNT] = {
-    MTLTextureType2D,
-    MTLTextureType3D
-  };
-  return types[type];
+static std::optional<MTLTextureType> get_mtl_texture_type(ngf_image_type type,
+                                                          uint32_t nlayers) {
+  if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1) {
+    return MTLTextureType2D;
+  } else if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1) {
+    return MTLTextureType2DArray;
+  } else if (type == NGF_IMAGE_TYPE_IMAGE_3D) {
+    return MTLTextureType3D;
+  } else if (type == NGF_IMAGE_TYPE_CUBE && nlayers == 1) {
+    return MTLTextureTypeCube;
+  } else if(type == NGF_IMAGE_TYPE_CUBE && nlayers > 1) {
+    return MTLTextureTypeCubeArray;
+  }
+  return std::nullopt;
 }
 
 static std::optional<MTLSamplerAddressMode>
@@ -1266,21 +1274,38 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
     return NGF_ERROR_INVALID_IMAGE_FORMAT;
   }
 
-  mtl_img_desc.textureType      = get_mtl_texture_type(info->type);
+  std::optional<MTLTextureType> maybe_texture_type =
+      get_mtl_texture_type(info->type, info->extent.depth);
+  if (!maybe_texture_type.has_value()) {
+    return NGF_ERROR_INVALID_IMAGE_FORMAT;
+  }
+  mtl_img_desc.textureType      = maybe_texture_type.value();
   mtl_img_desc.pixelFormat      = fmt;
   mtl_img_desc.width            = info->extent.width;
   mtl_img_desc.height           = info->extent.height;
-  mtl_img_desc.depth            = info->extent.depth;
   mtl_img_desc.mipmapLevelCount = info->nmips;
   mtl_img_desc.storageMode      = MTLStorageModePrivate;
-  mtl_img_desc.arrayLength      = 1u; // TODO texture arrays
-  // TODO multisampled textures
-  mtl_img_desc.sampleCount = info->nsamples == 0u ? 1u : info->nsamples;
+  // TODO: multisample textures.
+  mtl_img_desc.sampleCount      = info->nsamples == 0u ? 1u : info->nsamples;
   if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc.usage |= MTLTextureUsageRenderTarget;
   }
   if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
     mtl_img_desc.usage |= MTLTextureUsageShaderRead;
+  }
+  switch(mtl_img_desc.textureType) {
+  case MTLTextureType2D:
+  case MTLTextureType3D:
+  case MTLTextureTypeCube:
+      mtl_img_desc.depth = info->extent.depth;
+      break;
+  case MTLTextureType2DArray:
+  case MTLTextureTypeCubeArray:
+      mtl_img_desc.depth       = 1u;
+      mtl_img_desc.arrayLength = info->extent.depth;
+      break;
+  default:
+      assert(false);
   }
   _NGF_NURSERY(image, image);
   image->texture =
@@ -1611,6 +1636,11 @@ void ngf_cmd_write_image(ngf_cmd_buffer *buf,
   if (buf->active_bce == nil) {
     buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
   }
+  const MTLTextureType texture_type = dst.image->texture.textureType;
+  const bool           is_cubemap   = texture_type == MTLTextureTypeCube ||
+                                      texture_type == MTLTextureTypeCubeArray;
+  const uint32_t       target_slice = (is_cubemap ? 6u : 1u) * dst.layer +
+                                      (is_cubemap ? dst.cubemap_face : 0);
   // TODO: this assumes 4bpp image data for now...
   [buf->active_bce copyFromBuffer:src->mtl_buffer
                      sourceOffset:src_offset
@@ -1620,7 +1650,7 @@ void ngf_cmd_write_image(ngf_cmd_buffer *buf,
                                               extent->height,
                                               extent->depth)
                         toTexture:dst.image->texture
-                 destinationSlice:0
+                 destinationSlice:target_slice
                  destinationLevel:dst.mip_level
                 destinationOrigin:MTLOriginMake((NSUInteger)offset->x,
                                                 (NSUInteger)offset->y,
