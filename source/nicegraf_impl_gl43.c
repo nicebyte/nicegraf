@@ -1775,15 +1775,11 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
                             uint32_t nbind_ops) {
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op *bind_op = &bind_ops[o];
-    const _ngf_native_binding *binding_map =
-        buf->bound_pipeline->binding_map[bind_op->target_set];
-    uint32_t b_idx = 0u;
-    while (binding_map[b_idx].ngf_binding_id != bind_op->target_binding && 
-           binding_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
-    if (binding_map[b_idx].native_binding_id == (uint32_t)(-1)) {
-      assert(false); // TODO: call into debug callback.
-    }
-    const _ngf_native_binding *native_binding = &binding_map[b_idx];
+    const _ngf_native_binding *native_binding =
+        _ngf_binding_map_lookup(buf->bound_pipeline->binding_map,
+                                bind_op->target_set,
+                                bind_op->target_binding);
+    assert(native_binding);
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       _ngf_emulated_cmd *uniform_buffer_bind_cmd = NULL;
