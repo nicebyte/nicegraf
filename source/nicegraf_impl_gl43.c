@@ -630,6 +630,8 @@ ngf_error ngf_set_context(ngf_context *ctx) {
       eglSwapInterval(ctx->dpy, 0);
     }
   }
+  if (result) glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
   return result ? NGF_ERROR_OK : NGF_ERROR_INVALID_CONTEXT;
 }
 
