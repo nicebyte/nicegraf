@@ -1779,7 +1779,17 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
         _ngf_binding_map_lookup(buf->bound_pipeline->binding_map,
                                 bind_op->target_set,
                                 bind_op->target_binding);
-    assert(native_binding);
+    if (native_binding == NULL) {
+      static const char *err_msg = "invalid binding id";
+      ngf_gl_debug_callback(GL_DEBUG_SOURCE_OTHER,
+                            GL_DEBUG_TYPE_ERROR,
+                            0,
+                            GL_DEBUG_SEVERITY_HIGH,
+                            (GLsizei)strlen(err_msg),
+                            err_msg,
+                            NULL);
+      return;
+    }
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       _ngf_emulated_cmd *uniform_buffer_bind_cmd = NULL;
