@@ -39,6 +39,7 @@ using _NGF_VIEW_TYPE = NSView;
 using _NGF_VIEW_TYPE = UIView;
 #endif
 
+
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // could be bound at the same time.
 // This is required to work around a discrepancy between nicegraf's and Metal's
@@ -1495,7 +1496,10 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
         _ngf_binding_map_lookup(cmd_buf->active_pipe->binding_map,
                                 bind_op.target_set,
                                 bind_op.target_binding);
-    assert(nb);
+    if (nb == nullptr) {
+      // TODO: call debug callback.
+      return;
+    }
     const uint32_t ngf_binding = bind_op.target_binding;
     const uint32_t native_binding = nb->native_binding_id;
     const ngf_pipeline_layout_info &layout = cmd_buf->active_pipe->layout;
