@@ -1788,7 +1788,7 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
                             (GLsizei)strlen(err_msg),
                             err_msg,
                             NULL);
-      return;
+      continue;
     }
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
