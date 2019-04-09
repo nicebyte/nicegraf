@@ -1512,7 +1512,7 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer *cmd_buf,
                                 bind_op.target_binding);
     if (nb == nullptr) {
       // TODO: call debug callback.
-      return;
+      continue;
     }
     const uint32_t ngf_binding = bind_op.target_binding;
     const uint32_t native_binding = nb->native_binding_id;
