@@ -180,7 +180,7 @@ const _ngf_native_binding* _ngf_binding_map_lookup(const _ngf_native_binding_map
   uint32_t b_idx = 0u;
   while (set_map[b_idx].ngf_binding_id != binding &&
          set_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
-  if (set_map[b_idx].native_binding_id == (uint32_t)(-1)) {
+  if (set_map[b_idx].ngf_binding_id == (uint32_t)(-1)) {
     return NULL;
   }
   return &set_map[b_idx];
