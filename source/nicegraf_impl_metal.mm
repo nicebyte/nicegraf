@@ -65,38 +65,50 @@ id<MTLDevice> MTL_DEVICE = nil;
 
 #pragma mark ngf_enum_maps
 
-static MTLPixelFormat get_mtl_pixel_format(ngf_image_format fmt) {
-  static const MTLPixelFormat pixel_formats[NGF_IMAGE_FORMAT_COUNT] = {
-    MTLPixelFormatR8Unorm,
-    MTLPixelFormatRG8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatRGBA8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatRGBA8Unorm_sRGB,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatBGRA8Unorm,
-    MTLPixelFormatInvalid, // RGB8, Metal does not support.
-    MTLPixelFormatBGRA8Unorm_sRGB,
-    MTLPixelFormatR32Float,
-    MTLPixelFormatRG32Float,
-    MTLPixelFormatInvalid, // RGB32F, Metal does not support.
-    MTLPixelFormatRGBA32Float,
-    MTLPixelFormatR16Float,
-    MTLPixelFormatRG16Float,
-    MTLPixelFormatInvalid, // RGB16F, Metal does not support.
-    MTLPixelFormatRGBA16Float,
-    MTLPixelFormatDepth32Float,
+struct mtl_format {
+  const MTLPixelFormat format;
+  const uint8_t rbits;
+  const uint8_t gbits;
+  const uint8_t bbits;
+  const uint8_t abits;
+  const uint8_t dbits;
+  const uint8_t sbits;
+  const bool    srgb;
+};
+
+static mtl_format get_mtl_pixel_format(ngf_image_format f) {
+  static const mtl_format formats[NGF_IMAGE_FORMAT_COUNT] = {
+    {MTLPixelFormatR8Unorm, 8, 0, 0, 0, 0, 0, false},
+    {MTLPixelFormatRG8Unorm, 8, 8, 0, 0, 0, 0, false},
+    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, false}, // RGB8, unsupported on Metal
+    {MTLPixelFormatRGBA8Unorm, 8, 8, 8, 8, 0, 0, false},
+    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, true}, // SRGB8, unsupported on Metal
+    {MTLPixelFormatRGBA8Unorm_sRGB, 8, 8, 8, 8, 0, 0, true},
+    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, false}, // BGR8, unsupported on Metal
+    {MTLPixelFormatBGRA8Unorm, 8, 8, 8, 8, 0, 0, false},
+    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, true}, // BGR8_SRGB, unsupported on Metal
+    {MTLPixelFormatBGRA8Unorm_sRGB, 8, 8, 8, 8, 0, 0, true},
+    {MTLPixelFormatR32Float, 32, 0, 0, 0, 0, 0, false},
+    {MTLPixelFormatRG32Float, 32, 32, 0, 0, 0, 0, false},
+    {MTLPixelFormatInvalid, 32, 32, 32, 0, 0, 0,  false}, // RGB32F, unsupported on Metal
+    {MTLPixelFormatRGBA32Float, 32, 32, 32, 32, 0, 0,  false},
+    {MTLPixelFormatR16Float, 16, 0, 0, 0, 0, 0, false},
+    {MTLPixelFormatRG16Float, 16, 16, 0, 0, 0, 0, false},
+    {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16F, unsupported on Metal
+    {MTLPixelFormatRGBA16Float, 16, 16, 16, 16, 0, 0, false},
+    {MTLPixelFormatDepth32Float, 0, 0, 0, 0, 32, 0, false},
 #if TARGET_OS_OSX
-    MTLPixelFormatDepth16Unorm,
-    MTLPixelFormatDepth32Float_Stencil8, // instead of 24Unorm_Stencil8,
+    {MTLPixelFormatDepth16Unorm, 0, 0, 0, 0, 16, 0, false},
+    {MTLPixelFormatDepth32Float_Stencil8, 0, 0, 0, 0, 24, 8, false}, // instead of 24Unorm_Stencil8,
     // because metal validator doesn't
     // like it for some reason...
 #else
-    MTLPixelFormatInvalid, // DEPTH16, iOS does not support.
-    MTLPixelFormatDepth32Float_Stencil8, // Emulate DEPTH24_STENCIL8 on iOS.
+    {MTLPixelFormatInvalid, 0, 0, 0, 0, 16, 0, false}, // DEPTH16, iOS does not support.
+    {MTLPixelFormatDepth32Float_Stencil8, 0, 0, 0, 0, 24, 8, false}, // Emulate DEPTH24_STENCIL8 on iOS
 #endif
+    {MTLPixelFormatInvalid, 0, 0, 0, 0, 0, 0, false}
   };
-  return pixel_formats[fmt];
+  return formats[f];
 }
 
 static MTLLoadAction get_mtl_load_action(ngf_attachment_load_op op) {
@@ -325,7 +337,7 @@ public:
       (CGFloat)swapchain_info.height
     };
     const MTLPixelFormat pixel_format =
-        get_mtl_pixel_format(swapchain_info.cfmt);
+        get_mtl_pixel_format(swapchain_info.cfmt).format;
     if (pixel_format == MTLPixelFormatInvalid) {
       return NGF_ERROR_INVALID_IMAGE_FORMAT;
     }
@@ -364,7 +376,7 @@ public:
     if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
       depth_images_.reset(
                           new id<MTLTexture>[swapchain_info.capacity_hint]);
-      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.dfmt);
+      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.dfmt).format;
       assert(depth_format != MTLPixelFormatInvalid);
       for (uint32_t i = 0u; i < capacity_; ++i) {
         auto *depth_texture_desc            = [MTLTextureDescriptor new];
@@ -497,6 +509,7 @@ struct ngf_sampler {
 
 struct ngf_image {
   id<MTLTexture> texture = nil;
+  ngf_image_format format;
 };
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
@@ -862,7 +875,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   for (uint32_t ca = 0u; ca < compatible_rt.ncolor_attachments; ++ca) {
     if (compatible_rt.is_default) {
       mtl_pipe_desc.colorAttachments[ca].pixelFormat =
-          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.cfmt);
+          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.cfmt).format;
     }
     else {
       mtl_pipe_desc.colorAttachments[ca].pixelFormat =
@@ -883,7 +896,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
              CURRENT_CONTEXT->swapchain_info.dfmt !=
                  NGF_IMAGE_FORMAT_UNDEFINED) {
     mtl_pipe_desc.depthAttachmentPixelFormat =
-        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt);
+        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt).format;
   }
 
   mtl_pipe_desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
@@ -1270,7 +1283,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
 ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   auto *mtl_img_desc = [MTLTextureDescriptor new];
   
-  const MTLPixelFormat fmt = get_mtl_pixel_format(info->format);
+  const MTLPixelFormat fmt = get_mtl_pixel_format(info->format).format;
   if (fmt == MTLPixelFormatInvalid) {
     return NGF_ERROR_INVALID_IMAGE_FORMAT;
   }
@@ -1311,6 +1324,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
   _NGF_NURSERY(image, image);
   image->texture =
       [CURRENT_CONTEXT->device newTextureWithDescriptor:mtl_img_desc];
+  image->format = info->format;
   *result = image.release();
   return NGF_ERROR_OK;
 }
@@ -1630,6 +1644,12 @@ void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
                        dst_offset);
 }
 
+static uint32_t _get_pitch(const uint32_t width, const ngf_image_format format) {
+  const mtl_format f = get_mtl_pixel_format(format);
+  const uint32_t bits = f.rbits + f.gbits + f.bbits + f.abits + f.dbits + f.sbits;
+  return width * bits / 8;
+}
+
 void ngf_cmd_write_image(ngf_cmd_buffer *buf,
                          const ngf_pixel_buffer *src,
                          size_t src_offset,
@@ -1645,11 +1665,11 @@ void ngf_cmd_write_image(ngf_cmd_buffer *buf,
                                       texture_type == MTLTextureTypeCubeArray;
   const uint32_t       target_slice = (is_cubemap ? 6u : 1u) * dst.layer +
                                       (is_cubemap ? dst.cubemap_face : 0);
-  // TODO: this assumes 4bpp image data for now...
+  const uint32_t pitch = _get_pitch(extent->width, dst.image->format);
   [buf->active_bce copyFromBuffer:src->mtl_buffer
                      sourceOffset:src_offset
-                sourceBytesPerRow:extent->width * 4u
-              sourceBytesPerImage:extent->width * extent->height * 4u
+                sourceBytesPerRow:pitch
+              sourceBytesPerImage:pitch * extent->height
                        sourceSize:MTLSizeMake(extent->width,
                                               extent->height,
                                               extent->depth)
