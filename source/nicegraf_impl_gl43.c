@@ -374,8 +374,8 @@ typedef struct glformat {
   GLenum format;
   GLenum type;
   uint8_t rbits;
-  uint8_t bbits;
   uint8_t gbits;
+  uint8_t bbits;
   uint8_t abits;
   uint8_t dbits;
   uint8_t sbits;
