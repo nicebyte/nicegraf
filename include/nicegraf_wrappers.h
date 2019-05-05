@@ -37,7 +37,7 @@ namespace ngf {
 template <class T, class ObjectManagementFuncs>
 class ngf_handle {
 public:
-  explicit ngf_handle(T *raw) : handle_(raw) {}
+  explicit ngf_handle(T raw) : handle_(raw) {}
   ngf_handle() : handle_(nullptr) {}
   ngf_handle(const ngf_handle&) = delete;
   ngf_handle(ngf_handle &&other) : handle_(nullptr) {
@@ -60,17 +60,17 @@ public:
     return ObjectManagementFuncs::create(&info, &handle_);
   }
 
-  T* get() { return handle_; }
-  const T* get() const { return handle_; }
-  T* release() {
-    T *tmp = handle_;
+  T get() { return handle_; }
+  const T get() const { return handle_; }
+  T release() {
+    T tmp = handle_;
     handle_ = nullptr;
     return tmp;
   }
-  operator T*() { return handle_; }
-  operator const T*() const { return handle_; }
+  operator T() { return handle_; }
+  operator const T() const { return handle_; }
 
-  void reset(T *new_handle) { destroy_if_necessary(); handle_ = new_handle; }
+  void reset(T new_handle) { destroy_if_necessary(); handle_ = new_handle; }
 
 private:
   void destroy_if_necessary() {
@@ -80,16 +80,16 @@ private:
     }
   }
 
-  T *handle_;
+  T handle_;
 };
 
 #define NGF_DEFINE_WRAPPER_TYPE(name) \
   struct ngf_##name##_ManagementFuncs { \
     using InitType = ngf_##name##_info; \
-    static ngf_error create(const InitType *info, ngf_##name **r) { \
+    static ngf_error create(const InitType *info, ngf_##name *r) { \
       return ngf_create_##name(info, r); \
     } \
-    static void destroy(ngf_##name *handle) { ngf_destroy_##name(handle); } \
+    static void destroy(ngf_##name handle) { ngf_destroy_##name(handle); } \
   }; \
   using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
@@ -109,7 +109,7 @@ template <uint32_t S>
 struct descriptor_set {
   template <uint32_t B>
   struct binding {
-    static ngf_resource_bind_op texture(const ngf_image *image) {
+    static ngf_resource_bind_op texture(const ngf_image image) {
       ngf_resource_bind_op op;
       op.type = NGF_DESCRIPTOR_TEXTURE;
       op.target_binding = B;
@@ -118,7 +118,7 @@ struct descriptor_set {
       return op;
     }
 
-    static ngf_resource_bind_op uniform_buffer(const ngf_uniform_buffer *buf,
+    static ngf_resource_bind_op uniform_buffer(const ngf_uniform_buffer buf,
                                                size_t offset, size_t range) {
       ngf_resource_bind_op op;
       op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
@@ -130,7 +130,7 @@ struct descriptor_set {
       return op;
     }
 
-    static ngf_resource_bind_op sampler(const ngf_sampler *sampler) {
+    static ngf_resource_bind_op sampler(const ngf_sampler sampler) {
       ngf_resource_bind_op op;
       op.type = NGF_DESCRIPTOR_SAMPLER;
       op.target_binding = B;
@@ -154,103 +154,103 @@ struct descriptor_set {
 };
 
 template <class ...Args>
-void cmd_bind_resources(ngf_cmd_buffer *buf, const Args&&... args) {
+void cmd_bind_resources(ngf_cmd_buffer buf, const Args&&... args) {
   const ngf_resource_bind_op ops[] = { args... };
   ngf_cmd_bind_resources(buf, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
 }
 
-inline void* buffer_map_range(ngf_attrib_buffer *buf,
+inline void* buffer_map_range(ngf_attrib_buffer buf,
                               size_t offset,
                               size_t size,
                               uint32_t flags) {
   return ngf_attrib_buffer_map_range(buf, offset, size, flags);
 }
 
-inline void* buffer_map_range(ngf_index_buffer *buf,
+inline void* buffer_map_range(ngf_index_buffer buf,
                               size_t offset,
                               size_t size,
                               uint32_t flags) {
   return ngf_index_buffer_map_range(buf, offset, size, flags);
 }
 
-inline void* buffer_map_range(ngf_uniform_buffer *buf,
+inline void* buffer_map_range(ngf_uniform_buffer buf,
                               size_t offset,
                               size_t size,
                               uint32_t flags) {
   return ngf_uniform_buffer_map_range(buf, offset, size, flags);
 }
 
-inline void* buffer_map_range(ngf_pixel_buffer *buf,
+inline void* buffer_map_range(ngf_pixel_buffer buf,
                               size_t offset,
                               size_t size,
                               uint32_t flags) {
   return ngf_pixel_buffer_map_range(buf, offset, size, flags);
 }
 
-inline void buffer_flush_range(ngf_attrib_buffer *buf,
+inline void buffer_flush_range(ngf_attrib_buffer buf,
                                size_t offset, size_t size) {
   ngf_attrib_buffer_flush_range(buf, offset, size);
 }
 
-inline void buffer_flush_range(ngf_index_buffer *buf,
+inline void buffer_flush_range(ngf_index_buffer buf,
                                size_t offset, size_t size) {
   ngf_index_buffer_flush_range(buf, offset, size);
 }
 
-inline void buffer_flush_range(ngf_uniform_buffer *buf,
+inline void buffer_flush_range(ngf_uniform_buffer buf,
                                size_t offset, size_t size) {
   ngf_uniform_buffer_flush_range(buf, offset, size);
 }
 
-inline void buffer_flush_range(ngf_pixel_buffer *buf,
+inline void buffer_flush_range(ngf_pixel_buffer buf,
                                size_t offset, size_t size) {
   ngf_pixel_buffer_flush_range(buf, offset, size);
 }
 
-inline void buffer_unmap(ngf_attrib_buffer *buf) {
+inline void buffer_unmap(ngf_attrib_buffer buf) {
   ngf_attrib_buffer_unmap(buf);
 }
 
-inline void buffer_unmap(ngf_index_buffer *buf) {
+inline void buffer_unmap(ngf_index_buffer buf) {
   ngf_index_buffer_unmap(buf);
 }
 
-inline void buffer_unmap(ngf_uniform_buffer *buf) {
+inline void buffer_unmap(ngf_uniform_buffer buf) {
   ngf_uniform_buffer_unmap(buf);
 }
 
-inline void buffer_unmap(ngf_pixel_buffer *buf) {
+inline void buffer_unmap(ngf_pixel_buffer buf) {
   ngf_pixel_buffer_unmap(buf);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
-                            const ngf_attrib_buffer *src,
-                            ngf_attrib_buffer *dst,
+inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+                            const ngf_attrib_buffer src,
+                            ngf_attrib_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
   ngf_cmd_copy_attrib_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
-                            const ngf_index_buffer *src,
-                            ngf_index_buffer *dst,
+inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+                            const ngf_index_buffer src,
+                            ngf_index_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
   ngf_cmd_copy_index_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer *cmd_buf,
-                            const ngf_uniform_buffer *src,
-                            ngf_uniform_buffer *dst,
+inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+                            const ngf_uniform_buffer src,
+                            ngf_uniform_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
   ngf_cmd_copy_uniform_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
 }
 
-inline ngf_image_ref image_ref(const ngf_image *img) {
+inline ngf_image_ref image_ref(const ngf_image img) {
   return {
     img,
     0,
@@ -259,7 +259,7 @@ inline ngf_image_ref image_ref(const ngf_image *img) {
   };
 }
 
-inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip) {
+inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip) {
   return {
     img,
     mip,
@@ -268,7 +268,7 @@ inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip) {
   };
 }
 
-inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip,
                                uint32_t layer) {
   return {
     img,
@@ -278,7 +278,7 @@ inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
   };
 }
 
-inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip,
                                ngf_cubemap_face face) {
   return {
     img,
@@ -288,7 +288,7 @@ inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
   };
 }
 
-inline ngf_image_ref image_ref(const ngf_image *img, uint32_t mip,
+inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip,
                                uint32_t layer, ngf_cubemap_face face) {
   return {
     img,
@@ -419,7 +419,7 @@ public:
   }
   
   template <class T>
-  ngf_error write_buffer(ngf_cmd_buffer *cmd_buf,
+  ngf_error write_buffer(ngf_cmd_buffer  cmd_buf,
                          T              &target_buffer,
                          const void     *source_data,
                          size_t          source_size,
@@ -449,7 +449,7 @@ public:
     return NGF_ERROR_OK;
   }
 
-  ngf_error write_image(ngf_cmd_buffer *cmd_buf,
+  ngf_error write_image(ngf_cmd_buffer  cmd_buf,
                         const void     *source_data,
                         size_t          source_size,
                         size_t          source_offset,
