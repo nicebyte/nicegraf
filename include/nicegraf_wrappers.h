@@ -140,8 +140,8 @@ struct descriptor_set {
     }
 
     static ngf_resource_bind_op texture_and_sampler(
-        const ngf_image *image,
-        const ngf_sampler *sampler) {
+        const ngf_image image,
+        const ngf_sampler sampler) {
       ngf_resource_bind_op op;
       op.type = NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
       op.target_binding = B;
