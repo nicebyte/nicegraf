@@ -244,7 +244,7 @@ typedef struct ngf_shader_stage_info {
  * that was created from a binary - it only works if the source code is
  * available.
  */
-typedef struct ngf_shader_stage ngf_shader_stage;
+typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
 /**
  * Ways to draw polygons.
@@ -504,7 +504,7 @@ typedef ngf_buffer_info ngf_uniform_buffer_info;
 /**
  * A uniform buffer.
  */
-typedef struct ngf_uniform_buffer ngf_uniform_buffer;
+typedef struct ngf_uniform_buffer_t* ngf_uniform_buffer;
 
 /**
  * Possible usages of a pixel buffer object.
@@ -532,7 +532,7 @@ typedef struct ngf_pixel_buffer_info {
  * by host-visible storage, and their contents can be transferred to images via
  * \ref ngf_cmd_write_image.
  */
-typedef struct ngf_pixel_buffer ngf_pixel_buffer;
+typedef struct ngf_pixel_buffer_t* ngf_pixel_buffer;
 
 /**
  * Possible image types.
@@ -606,7 +606,7 @@ typedef struct ngf_image_info {
                             combination of image usage flags.*/
 } ngf_image_info;
 
-typedef struct ngf_image ngf_image;
+typedef struct ngf_image_t* ngf_image;
 
 /**
  * Indicates the face of a cubemap.
@@ -625,7 +625,7 @@ typedef enum ngf_cubemap_face {
  * Reference to a part of an image.
  */
 typedef struct {
-  const ngf_image *image; /**< Image being referred to.*/
+  ngf_image image; /**< Image being referred to.*/
   uint32_t mip_level; /**< Mip level within the image.*/
   uint32_t layer; /**< Layer within the image.*/
   ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
@@ -717,7 +717,7 @@ typedef struct ngf_render_target_info {
 /**
  * Framebuffer
  */
-typedef struct ngf_render_target ngf_render_target;
+typedef struct ngf_render_target_t* ngf_render_target;
 
 
 /**
@@ -778,7 +778,7 @@ typedef struct {
 /**
  * Sampler object.
  */
-typedef struct ngf_sampler ngf_sampler;
+typedef struct ngf_sampler_t* ngf_sampler;
 
 /** Available descriptor types.
  * Not that some back-ends may not support all of the listed descriptor types.
@@ -842,7 +842,7 @@ typedef struct {
  * Specifies a buffer bind operation.
  */
 typedef struct {
-  const ngf_uniform_buffer *buffer; /**< Which buffer to bind.*/
+  ngf_uniform_buffer buffer; /**< Which buffer to bind.*/
   size_t offset; /**< Offset at which to bind the buffer.*/
   size_t range;  /**< Bound range.*/
 } ngf_uniform_buffer_bind_info;
@@ -852,7 +852,7 @@ typedef struct {
  */
 typedef struct {
   ngf_image_ref image_subresource; /**< Image portion to bind.*/
-  const ngf_sampler *sampler; /**< Sampler to use.*/
+  ngf_sampler sampler; /**< Sampler to use.*/
 } ngf_image_sampler_bind_info;
 
 typedef struct {
@@ -868,7 +868,7 @@ typedef struct {
 /**
  * Graphics pipeline object.
  */
-typedef struct ngf_graphics_pipeline ngf_graphics_pipeline;
+typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
 /** 
  * Flags for specifying which aspects of the pipeline are to be configured
@@ -926,7 +926,7 @@ typedef struct ngf_specialization_info {
  * Specifies information for creation of a graphics pipeline.
  */
 typedef struct ngf_graphics_pipeline_info {
-  const ngf_shader_stage *shader_stages[5];
+  ngf_shader_stage shader_stages[5];
   uint32_t nshader_stages;
   const ngf_irect2d *viewport;
   const ngf_irect2d *scissor;
@@ -939,7 +939,7 @@ typedef struct ngf_graphics_pipeline_info {
   ngf_primitive_type primitive_type;
   const ngf_pipeline_layout_info *layout;
   const ngf_specialization_info *spec_info;
-  const ngf_render_target *compatible_render_target;
+  ngf_render_target compatible_render_target;
   const ngf_plmd_cis_map *image_to_combined_map;
   const ngf_plmd_cis_map *sampler_to_combined_map;
 } ngf_graphics_pipeline_info;
@@ -979,7 +979,7 @@ typedef struct ngf_allocation_callbacks {
  * and even shared contexts cannot acquire, present or render to images from
  * that swapchain.
  */
-typedef struct ngf_context ngf_context;
+typedef struct ngf_context_t* ngf_context;
 
 /**
  * Configures a Nicegraf context.
@@ -996,7 +996,7 @@ typedef struct ngf_context_info {
    * to the other one's resources (such as buffers and textures) and vice versa
    * Can be NULL.
    */
-  const ngf_context *shared_context;
+  const ngf_context shared_context;
   bool debug; /**< Whether to enable debug features. */
 } ngf_context_info;
 
@@ -1047,41 +1047,7 @@ typedef struct ngf_cmd_buffer_info {
  * Submitting a command buffer for execution may be done by a different thread,
  * as long as the submitting and recording threads have shared contexts.
  */
-typedef struct ngf_cmd_buffer ngf_cmd_buffer;
-
-/**
- * Vertex data usage hints.
- *
- * These values hint the library how the vertex data (attributes and indices)
- * is intended to be consumed on the graphics device side.
- */
-typedef enum ngf_vertex_data_usage {
-  /**
-   * This hint indicates that the vertex data is intended to be read many times
-   * on the graphics device. An example usage scenario would be a character
-   * mesh.
-   */
-  NGF_VERTEX_DATA_USAGE_STATIC,
-
-  /**
-   * This hint indicates that the vertex data is intended to be consumed once,
-   * or very few times on the graphics device. An example would be displaying
-   * "immediate-mode" GUI.
-   */
-  NGF_VERTEX_DATA_USAGE_TRANSIENT
- } ngf_vertex_data_usage;
-
- /**
-  * Buffers can be populated directly by user-provided callbacks, potentially
-  * obviating the need for additional host-side memory allocations.
-  * The callback receives three parameters:
-  *   - a pointer to a region of host-visible device memory, into which the
-  *     user must write data (do not read from this buffer);
-  *   - the size of the buffer;
-  *   - a pointer to arbitrary user-provided data.
-  */
- typedef void(*ngf_buffer_populate_callback)(volatile void *buffer, size_t, 
-                                             void *userdata);
+typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
 typedef ngf_buffer_info ngf_attrib_buffer_info;
 typedef ngf_buffer_info ngf_index_buffer_info;
@@ -1089,12 +1055,12 @@ typedef ngf_buffer_info ngf_index_buffer_info;
 /**
  * A vertex attribute buffer.
  */
-typedef struct ngf_attrib_buffer ngf_attrib_buffer;
+typedef struct ngf_attrib_buffer_t* ngf_attrib_buffer;
 
 /**
  * A vertex index buffer.
  */
-typedef struct ngf_index_buffer ngf_index_buffer;
+typedef struct ngf_index_buffer_t* ngf_index_buffer;
 
 #ifdef _MSC_VER
 #pragma endregion
@@ -1121,7 +1087,7 @@ void ngf_debug_message_callback(void *userdata,
  * @return 
  */
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
-                                  ngf_shader_stage **result);
+                                  ngf_shader_stage *result);
 
 /**
  * Obtain the size (in bytes) of the shader stage's corresponding binary.
@@ -1129,7 +1095,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
  * @param stage The stage to obtain the size of.
  * @param size Result will be written here.
  */
-ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
+ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage stage,
                                            size_t *size);
 
 /**
@@ -1143,47 +1109,47 @@ ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
  * @param format A backend-specific format code will be written here (see
  *   comments for `ngf_shader_stage_info`.
  */
- ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage *stage,
+ ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage stage,
                                        size_t buf_size, void *buffer,
                                        uint32_t *format);
 /**
  * Detsroys a given shader stage.
  */
-void ngf_destroy_shader_stage(ngf_shader_stage *stage);
+void ngf_destroy_shader_stage(ngf_shader_stage stage);
 
 /**
  * Creates a graphics pipeline object.
  * @param info Configuration for the graphics pipeline.
  */
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline **result);
+                                       ngf_graphics_pipeline *result);
 
 /**
  * Destroys the given graphics pipeline object.
  */
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p);
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p);
 
 /**
  * Creates a new image object.
  * @param info Configuration of the image.
  */
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result);
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result);
 
 /**
  * Destroy the given image object.
  */
-void ngf_destroy_image(ngf_image *image);
+void ngf_destroy_image(ngf_image image);
 
 /**
  * Create a sampler object with the given configuration.
  */
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
-                             ngf_sampler **result);
+                             ngf_sampler *result);
 
 /**
  * Destroy a given sampler object.
  */
-void ngf_destroy_sampler(ngf_sampler *sampler);
+void ngf_destroy_sampler(ngf_sampler sampler);
 
 /**
  * Obtain a render target associated with the the current context's
@@ -1220,13 +1186,13 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
                                     ngf_attachment_store_op depth_store_op,
                                     const ngf_clear *clear_color,
                                     const ngf_clear *clear_depth,
-                                    ngf_render_target **result);
+                                    ngf_render_target *result);
 
 /**
  * Create a new rendertarget with the given configuration.
  */
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
-                                   ngf_render_target **result);
+                                   ngf_render_target *result);
 
 /**
  * Blit pixels from one render target to another. If the source render target
@@ -1235,14 +1201,14 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
  * @param dst destination rt
  * @param src_rect the region to copy from the source rt
  */
-ngf_error ngf_resolve_render_target(const ngf_render_target *src,
-                                    ngf_render_target *dst,
+ngf_error ngf_resolve_render_target(const ngf_render_target src,
+                                    ngf_render_target dst,
                                     const ngf_irect2d *src_rect);
 
 /**
  * Destroy the given render target.
  */
-void ngf_destroy_render_target(ngf_render_target *target);
+void ngf_destroy_render_target(ngf_render_target target);
 
 /**
  * Creates a new vertex attribute buffer.
@@ -1250,12 +1216,12 @@ void ngf_destroy_render_target(ngf_render_target *target);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer **result);
+                                   ngf_attrib_buffer *result);
 
 /**
  * Discards the given vertex attribute buffer.
  */
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer);
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer);
 
 /**
  * Map a region of a given buffer to host memory.
@@ -1273,7 +1239,7 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer);
  * @return A pointer to the mapped memory, or NULL if the buffer could not be
  *         mapped.
  */
-void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
+void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t offset,
                                   size_t size,
                                   uint32_t flags);
@@ -1286,7 +1252,7 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer *buf,
  *               the flushed region starts, in bytes.
  * @param size  Size of the flushed region in bytes.
  */
-void ngf_attrib_buffer_flush_range(ngf_attrib_buffer *buf,
+void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
                                    size_t size);
 
@@ -1295,7 +1261,7 @@ void ngf_attrib_buffer_flush_range(ngf_attrib_buffer *buf,
  * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
  * @param buf The buffer that needs to be unmapped.
  */
-void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf);
+void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf);
 
 /**
  * Creates a new vertex index buffer.
@@ -1303,31 +1269,31 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer *buf);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer **result);
+                                  ngf_index_buffer *result);
 
 /**
  * Discards the given vertex index buffer.
  */
-void ngf_destroy_index_buffer(ngf_index_buffer *buffer);
+void ngf_destroy_index_buffer(ngf_index_buffer buffer);
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for index buffers.
  */
-void* ngf_index_buffer_map_range(ngf_index_buffer *buf,
+void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  uint32_t flags);
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for index buffers.
  */
-void ngf_index_buffer_flush_range(ngf_index_buffer *buf,
+void ngf_index_buffer_flush_range(ngf_index_buffer buf,
                                   size_t offset,
                                   size_t size);
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for index buffers.
  */
-void ngf_index_buffer_unmap(ngf_index_buffer *buf);
+void ngf_index_buffer_unmap(ngf_index_buffer buf);
 
 /**
  * Creates a new uniform buffer.
@@ -1335,31 +1301,31 @@ void ngf_index_buffer_unmap(ngf_index_buffer *buf);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
-                                    ngf_uniform_buffer **result);
+                                    ngf_uniform_buffer *result);
 
 /**
  * Discards the given uniform buffer.
  */
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer *buf);
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf);
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for uniform buffers.
  */
-void* ngf_uniform_buffer_map_range(ngf_uniform_buffer *buf,
+void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t offset,
                                    size_t size,
                                    uint32_t flags);
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for uniform buffers.
  */
-void ngf_uniform_buffer_flush_range(ngf_uniform_buffer *buf,
+void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf,
                                     size_t offset,
                                     size_t size);
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for uniform buffers.
  */
-void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf);
+void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf);
 
 /**
  * Creates a new pixel buffer.
@@ -1367,30 +1333,30 @@ void ngf_uniform_buffer_unmap(ngf_uniform_buffer *buf);
  * @param result the new buffer handle will be stored in here.
  */
 ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
-                                  ngf_pixel_buffer **result);
+                                  ngf_pixel_buffer *result);
 /**
  * Discards a given pixel buffer.
  */
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer *buf);
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf);
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for pixel buffers.
  */
-void* ngf_pixel_buffer_map_range(ngf_pixel_buffer *buf,
+void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  uint32_t flags);
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for pixel buffers.
  */
-void ngf_pixel_buffer_flush_range(ngf_pixel_buffer *buf,
+void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
                                   size_t offset,
                                   size_t size);
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for pixel buffers.
  */
-void ngf_pixel_buffer_unmap(ngf_pixel_buffer *buf);
+void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf);
 
 /**
  * Wait for all pending rendering commands to complete.
@@ -1401,14 +1367,14 @@ void ngf_finish();
  * Creates a new command buffer that is in the "reset" state.
  */
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
-                                ngf_cmd_buffer **result);
+                                ngf_cmd_buffer *result);
 
 /**
  * Frees resources associated with the given command buffer.
  * Any work previously submitted via this command buffer will be finished
  * asynchronously.
  */
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer);
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer);
 
 /**
  * Begin recording a new batch of commands into a given command buffer,
@@ -1419,70 +1385,70 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer);
  * Note that if the buffer was "ready", the commands previously recorded into
  * it will be lost and never executed.
  */
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *buf);
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf);
 
 /**
  * Finishes recording a batch of commands into a buffer and transitions it into
  * the "ready" state.
  * The command buffer needs to be in the "recording" state.
  */
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *buf);
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer buf);
 
 /**
  * Submits the commands recorded in the given command buffer for execution.
  * The command buffer must be in the "ready" state, and will be transitioned to
  * the "submitted" state.
  */
-ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs);
+ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer *bufs);
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
-                           const ngf_graphics_pipeline *pipeline);
-void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r);
-void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r);
-void ngf_cmd_stencil_reference(ngf_cmd_buffer *buf, uint32_t front,
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
+                           const ngf_graphics_pipeline pipeline);
+void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r);
+void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r);
+void ngf_cmd_stencil_reference(ngf_cmd_buffer buf, uint32_t front,
                                uint32_t back);
-void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer *buf, uint32_t front,
+void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer buf, uint32_t front,
                                   uint32_t back);
-void ngf_cmd_stencil_write_mask(ngf_cmd_buffer *buf, uint32_t front,
+void ngf_cmd_stencil_write_mask(ngf_cmd_buffer buf, uint32_t front,
                                 uint32_t back);
-void ngf_cmd_line_width(ngf_cmd_buffer *buf, float line_width);
-void ngf_cmd_blend_factors(ngf_cmd_buffer *buf,
+void ngf_cmd_line_width(ngf_cmd_buffer buf, float line_width);
+void ngf_cmd_blend_factors(ngf_cmd_buffer buf,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor);
-void ngf_cmd_bind_resources(ngf_cmd_buffer *buf,
+void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
                             const ngf_resource_bind_op *bind_operations,
                             uint32_t nbind_operations);
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
-                                const ngf_attrib_buffer *vbuf,
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
+                                const ngf_attrib_buffer vbuf,
                                 uint32_t binding, uint32_t offset);
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer *buf,
-                               const ngf_index_buffer *idxbuf,
+void ngf_cmd_bind_index_buffer(ngf_cmd_buffer buf,
+                               const ngf_index_buffer idxbuf,
                                ngf_type index_type);
-void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target);
-void ngf_cmd_end_pass(ngf_cmd_buffer *buf);
-void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target);
+void ngf_cmd_end_pass(ngf_cmd_buffer buf);
+void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances);
-void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer *buf,
-                                const ngf_attrib_buffer *src,
-                                ngf_attrib_buffer *dst,
+void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer buf,
+                                const ngf_attrib_buffer src,
+                                ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset);
-void ngf_cmd_copy_index_buffer(ngf_cmd_buffer *buf,
-                               const ngf_index_buffer *src,
-                               ngf_index_buffer *dst,
+void ngf_cmd_copy_index_buffer(ngf_cmd_buffer buf,
+                               const ngf_index_buffer src,
+                               ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset);
-void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer *buf,
-                                 const ngf_uniform_buffer *src,
-                                 ngf_uniform_buffer *dst,
+void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer buf,
+                                 const ngf_uniform_buffer src,
+                                 ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset);
-void ngf_cmd_write_image(ngf_cmd_buffer *buf,
-                         const ngf_pixel_buffer *src,
+void ngf_cmd_write_image(ngf_cmd_buffer buf,
+                         const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
@@ -1505,13 +1471,13 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref);
  *  NGF_ERROR_SWAPCHAIN_CREATION_FAILED
  */
 ngf_error ngf_create_context(const ngf_context_info *info,
-                             ngf_context **result);
+                             ngf_context *result);
 
 /**
  * Destroy a Nicegraf context.
  * @param ctx The context to deallocate.
  */
-void ngf_destroy_context(ngf_context *ctx);
+void ngf_destroy_context(ngf_context ctx);
 
 /**
  * Adjust the size of a context's associated swapchain. This function must be
@@ -1521,7 +1487,7 @@ void ngf_destroy_context(ngf_context *ctx);
  * @param new_height New window height in pixels
  * @return Error codes: NGF_ERROR_SWAPCHAIN_CREATION_FAILED, NGF_ERROR_OUTOFMEM
  */
-ngf_error ngf_resize_context(ngf_context *ctx,
+ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t new_width,
                              uint32_t new_height);
 
@@ -1535,7 +1501,7 @@ ngf_error ngf_resize_context(ngf_context *ctx,
  *
  * @param ctx The context to set as current.
  */
-ngf_error ngf_set_context(ngf_context *ctx);
+ngf_error ngf_set_context(ngf_context ctx);
 
 /**
  * Begin a frame of rendering. This functions starts a frame of rendering in
