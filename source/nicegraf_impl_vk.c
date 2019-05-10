@@ -110,24 +110,24 @@ typedef struct _ngf_swapchain {
   } renderpass;
 } _ngf_swapchain;
 
-struct ngf_cmd_buffer {
+typedef struct ngf_cmd_buffer_t {
   VkCommandBuffer vkcmdbuf;
   VkSemaphore     vksem;
   VkCommandPool   vkpool;
   bool recording;
-};
+} ngf_cmd_buffer_t;
 
-struct ngf_attrib_buffer {
+typedef struct ngf_attrib_buffer_t {
   VkBuffer vkbuf;
   VkBuffer vkstaging_buf;
   VmaAllocation buf_alloc;
   VmaAllocation staging_buf_alloc;
   size_t   size;
-};
+} ngf_attrib_buffer_t;
 
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
- _NGF_DARRAY_OF(ngf_cmd_buffer)        submitted_cmdbuffers;
+ _NGF_DARRAY_OF(ngf_cmd_buffer_t)      submitted_cmdbuffers;
  _NGF_DARRAY_OF(VkSemaphore)           wait_vksemaphores; // 1 per cmdbuf.
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
@@ -136,7 +136,7 @@ typedef struct _ngf_frame_resources {
   bool                                 active;
 } _ngf_frame_resources;
 
-struct ngf_context {
+typedef struct ngf_context_t {
  _ngf_frame_resources       *frame_res;
  _ngf_context_shared_state **shared_state;
  _ngf_swapchain              swapchain;
@@ -146,26 +146,26 @@ struct ngf_context {
   VkSurfaceKHR               surface;
   uint32_t                   frame_number;
   uint32_t                   max_inflight_frames;
-};
+} ngf_context_t;
 
-struct ngf_shader_stage {
+typedef struct ngf_shader_stage_t {
   VkShaderModule         vk_module;
   VkShaderStageFlagBits  vk_stage_bits;
   char                  *entry_point_name;
-};
+} ngf_shader_stage_t;
 
-struct ngf_graphics_pipeline {
+typedef struct ngf_graphics_pipeline_t {
   VkPipeline                           vk_pipeline;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) vk_descriptor_set_layouts;
   VkPipelineLayout                     vk_pipeline_layout;
-};
+} ngf_graphics_pipeline_t;
 
-struct ngf_image {
+typedef struct ngf_image_t {
   VkImage vkimg;
   VmaAllocation alloc;
-};
+} ngf_image_t;
 
-struct ngf_render_target {
+typedef struct ngf_render_target_t {
   VkRenderPass                render_pass;
  _NGF_DARRAY_OF(VkClearValue) clear_values;
   uint32_t                    nclear_values;
@@ -173,9 +173,9 @@ struct ngf_render_target {
   uint32_t                    width;
   uint32_t                    height;
   // TODO: non-default render target
-};
+} ngf_render_target_t;
 
-NGF_THREADLOCAL ngf_context *CURRENT_CONTEXT = NULL;
+NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 #define CURRENT_SHARED_STATE (*(CURRENT_CONTEXT->shared_state))
 
 static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
@@ -963,23 +963,23 @@ _ngf_create_swapchain_cleanup:
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
-                             ngf_context **result) {
+                             ngf_context *result) {
   assert(info);
   assert(result);
 
   ngf_error                 err            = NGF_ERROR_OK;
   VkResult                  vk_err         = VK_SUCCESS;
   const ngf_swapchain_info *swapchain_info = info->swapchain_info;
-  const ngf_context        *shared         = info->shared_context;
+  const ngf_context         shared         = info->shared_context;
 
   // Allocate space for context data.
-  *result = NGF_ALLOC(ngf_context);
-  ngf_context *ctx = *result;
+  *result = NGF_ALLOC(struct ngf_context_t);
+  ngf_context ctx = *result;
   if (ctx == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_context_cleanup;
   }
-  memset(ctx, 0, sizeof(ngf_context));
+  memset(ctx, 0, sizeof(struct ngf_context_t));
 
   // Create swapchain if necessary.
   if (swapchain_info != NULL) {
@@ -1154,9 +1154,9 @@ ngf_create_context_cleanup:
   return err;
 }
 
-ngf_error ngf_resize_context(ngf_context *ctx,
-                             uint32_t new_width,
-                             uint32_t new_height) {
+ngf_error ngf_resize_context(ngf_context ctx,
+                             uint32_t    new_width,
+                             uint32_t    new_height) {
   assert(ctx);
   ngf_error err = NGF_ERROR_OK;
 
@@ -1178,7 +1178,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   for (uint32_t s = 0u;
        s < _NGF_DARRAY_SIZE(frame_res->wait_vksemaphores);
        ++s) {
-    ngf_cmd_buffer cmd_buffer =
+    ngf_cmd_buffer_t cmd_buffer =
         _NGF_DARRAY_AT(frame_res->submitted_cmdbuffers, s);
     vkFreeCommandBuffers(_vk.device,
                          cmd_buffer.vkpool, 1u, &cmd_buffer.vkcmdbuf);
@@ -1218,7 +1218,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
 }
 
-void ngf_destroy_context(ngf_context *ctx) {
+void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
 	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     _ngf_context_shared_state *shared_state = *(ctx->shared_state);
@@ -1263,18 +1263,18 @@ void ngf_destroy_context(ngf_context *ctx) {
   }
 }
 
-ngf_error ngf_set_context(ngf_context *ctx) {
+ngf_error ngf_set_context(ngf_context ctx) {
   CURRENT_CONTEXT = ctx;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
-                                ngf_cmd_buffer **result) {
+                                ngf_cmd_buffer *result) {
   assert(info);
   assert(result);
   _NGF_FAKE_USE(info);
 
-  ngf_cmd_buffer *cmd_buf = NGF_ALLOC(ngf_cmd_buffer);
+  ngf_cmd_buffer cmd_buf = NGF_ALLOC(ngf_cmd_buffer_t);
   *result = cmd_buf;
   if (cmd_buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1303,7 +1303,7 @@ void _ngf_dec_recorder_count() {
   pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
 }
 
-void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
+void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   if (cmd_buf  != NULL) {
     if (cmd_buf->vkcmdbuf != VK_NULL_HANDLE) {
       vkFreeCommandBuffers(_vk.device,
@@ -1316,7 +1316,7 @@ void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   }
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   assert(cmd_buf);
   ngf_error err   = NGF_ERROR_OK;
   VkResult vk_err = VK_SUCCESS;
@@ -1379,7 +1379,7 @@ ngf_start_cmd_buffer_cleanup:
   return err;
 }
 
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
+ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   assert(cmd_buf);
   if (!cmd_buf->recording) {
     return NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
@@ -1390,11 +1390,11 @@ ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer *cmd_buf) {
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer *buffer) {
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   _ngf_cleanup_cmd_buffer(buffer);
 }
 
-ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer **bufs) {
+ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   assert(bufs);
   uint32_t fi = CURRENT_CONTEXT->frame_number;
   _ngf_frame_resources *frame_sync_data = &CURRENT_CONTEXT->frame_res[fi];
@@ -1507,12 +1507,12 @@ ngf_error ngf_end_frame() {
 }
 
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
-                                  ngf_shader_stage **result) {
+                                  ngf_shader_stage *result) {
   assert(info);
   assert(result);
 
-  *result = NGF_ALLOC(ngf_shader_stage);
-  ngf_shader_stage *stage = *result;
+  *result = NGF_ALLOC(ngf_shader_stage_t);
+  ngf_shader_stage stage = *result;
   if (stage == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -1539,7 +1539,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
+void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage) {
     vkDestroyShaderModule(_vk.device, stage->vk_module, NULL);
     NGF_FREEN(stage->entry_point_name, strlen(stage->entry_point_name) + 1u);
@@ -1548,7 +1548,7 @@ void ngf_destroy_shader_stage(ngf_shader_stage *stage) {
 }
 
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline **result) {
+                                       ngf_graphics_pipeline *result) {
   assert(info);
   assert(result);
   VkVertexInputBindingDescription *vk_binding_descs = NULL;
@@ -1557,8 +1557,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   VkResult  vk_err = VK_SUCCESS;
 
   // Allocate space for the pipeline object.
-  *result = NGF_ALLOC(ngf_graphics_pipeline);
-  ngf_graphics_pipeline *pipeline = *result;
+  *result = NGF_ALLOC(ngf_graphics_pipeline_t);
+  ngf_graphics_pipeline pipeline = *result;
   if (pipeline == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_graphics_pipeline_cleanup;
@@ -1877,7 +1877,7 @@ ngf_create_graphics_pipeline_cleanup:
   return err;  
 }
 
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   if (p != NULL) {
     _ngf_frame_resources *res =
         &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_number];
@@ -1901,12 +1901,12 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline *p) {
 }
 
 
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image **result) {
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   assert(info);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_image);
-  ngf_image *img = *result;
+  *result = NGF_ALLOC(ngf_image_t);
+  ngf_image img = *result;
   if (img == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_image_cleanup;
@@ -1976,7 +1976,7 @@ ngf_create_image_cleanup:
   return err;
 }
 
-void ngf_destroy_image(ngf_image *img) {
+void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
     if (img->vkimg != VK_NULL_HANDLE) {
       vmaDestroyImage(CURRENT_CONTEXT->allocator,
@@ -1985,25 +1985,27 @@ void ngf_destroy_image(ngf_image *img) {
   }
 }
 
-void ngf_destroy_render_target(ngf_render_target *target) {
+void ngf_destroy_render_target(ngf_render_target target) {
   _NGF_FAKE_USE(target);
   // TODO: implement
 }
-
-ngf_error ngf_default_render_target(
-  ngf_attachment_load_op color_load_op,
-  ngf_attachment_load_op depth_load_op,
-  const ngf_clear *clear_color,
-  const ngf_clear *clear_depth,
-  ngf_render_target **result) {
+ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
+                                    ngf_attachment_load_op depth_load_op,
+                                    ngf_attachment_store_op color_store_op,
+                                    ngf_attachment_store_op depth_store_op,
+                                    const ngf_clear *clear_color,
+                                    const ngf_clear *clear_depth,
+                                    ngf_render_target *result) {
   assert(result);
-  ngf_render_target *rt = NULL;
+  ngf_render_target rt = NULL;
   ngf_error err = NGF_ERROR_OK;
   _NGF_FAKE_USE(depth_load_op);
   _NGF_FAKE_USE(clear_depth);
+  _NGF_FAKE_USE(color_store_op);
+  _NGF_FAKE_USE(depth_store_op);
   
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    rt = NGF_ALLOC(ngf_render_target);
+    rt = NGF_ALLOC(ngf_render_target_t);
     *result = rt;
     if (rt == NULL) {
       err = NGF_ERROR_OUTOFMEM;
@@ -2012,6 +2014,8 @@ ngf_error ngf_default_render_target(
     rt->is_default = true;
     VkAttachmentLoadOp vk_color_load_op = get_vk_load_op(color_load_op);
     // TODO: depth load op
+    // TODO: depth store op
+    // TODO: color store op
     const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
     VkAttachmentStoreOp vk_color_store_op = VK_ATTACHMENT_STORE_OP_STORE;
     VkAttachmentDescription attachment_descs[2] = {
@@ -2061,7 +2065,7 @@ void ngf_debug_message_callback(void *userdata,
 }
 
 
-void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
+void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target) {
   const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
   const VkFramebuffer fb =
       target->is_default
@@ -2082,11 +2086,11 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer *buf, const ngf_render_target *target) {
   vkCmdBeginRenderPass(buf->vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void ngf_cmd_end_pass(ngf_cmd_buffer *buf) {
+void ngf_cmd_end_pass(ngf_cmd_buffer buf) {
   vkCmdEndRenderPass(buf->vkcmdbuf);
 }
 
-void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
+void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
   if (indexed) {
@@ -2097,12 +2101,12 @@ void ngf_cmd_draw(ngf_cmd_buffer *buf, bool indexed,
   }
 }
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer *buf,
-                           const ngf_graphics_pipeline *pipeline) {
+void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
+                           const ngf_graphics_pipeline pipeline) {
   vkCmdBindPipeline(buf->vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
-void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   const VkViewport viewport = {
     .x        = (float)r->x,
     .y        = (float)r->y,
@@ -2114,7 +2118,7 @@ void ngf_cmd_viewport(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   vkCmdSetViewport(buf->vkcmdbuf, 0u, 1u, &viewport);
 }
 
-void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
+void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   const VkRect2D scissor_rect = {
     .offset = {r->x, r->y},
     .extent = {r->width, r->height}
@@ -2122,8 +2126,8 @@ void ngf_cmd_scissor(ngf_cmd_buffer *buf, const ngf_irect2d *r) {
   vkCmdSetScissor(buf->vkcmdbuf, 0u, 1u, &scissor_rect);
 }
 
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
-                                const ngf_attrib_buffer *abuf,
+void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
+                                const ngf_attrib_buffer abuf,
                                 uint32_t binding,
                                 uint32_t offset) {
   VkDeviceSize vkoffset = offset;
@@ -2131,15 +2135,15 @@ void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer *buf,
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer **result) {
+                                   ngf_attrib_buffer *result) {
   assert(info);
   assert(result);
-  ngf_attrib_buffer *buf = NGF_ALLOC(ngf_attrib_buffer);
+  ngf_attrib_buffer buf = NGF_ALLOC(ngf_attrib_buffer_t);
   *result = buf;
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->size = info->buffer_size;
+  buf->size = info->size;/*
   VkBufferCreateInfo staging_buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
@@ -2210,11 +2214,11 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   };
   vkCmdPipelineBarrier(info->cmdbuf->vkcmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);
+                       1u, &buf_mem_bar, 0, NULL);*/ 
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer *buffer) {
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
 //TODO: implement
   NGF_FREE(buffer);
 }
