@@ -237,12 +237,6 @@ typedef struct _ngf_cmd_block {
    uint32_t               next_cmd_idx;
 } _ngf_cmd_block;
 
-typedef enum {
-  _NGF_CMD_BUFFER_READY,
-  _NGF_CMD_BUFFER_RECORDING,
-  _NGF_CMD_BUFFER_SUBMITTED
-} _ngf_cmd_buffer_state;
-
 struct ngf_cmd_buffer_t {
   ngf_graphics_pipeline bound_pipeline;
   _ngf_cmd_block *first_cmd_block;
