@@ -1390,11 +1390,13 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if(cmd_buf->state != _NGF_CMD_BUFFER_RECORDING || !cmd_buf->active_rce) {
+  if(cmd_buf->state != _NGF_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
-  [cmd_buf->active_rce endEncoding];
-  cmd_buf->active_rce = nil;
+  if (cmd_buf->active_rce){
+    [cmd_buf->active_rce endEncoding];
+    cmd_buf->active_rce = nil;
+  }
   cmd_buf->state = _NGF_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
@@ -1412,11 +1414,13 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
 
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if (cmd_buf->state != _NGF_CMD_BUFFER_RECORDING || !cmd_buf->active_bce) {
+  if (cmd_buf->state != _NGF_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
-  [cmd_buf->active_bce endEncoding];
-  cmd_buf->active_bce = nil;
+  if (cmd_buf->active_bce) {
+    [cmd_buf->active_bce endEncoding];
+    cmd_buf->active_bce = nil;
+  }
   cmd_buf->state = _NGF_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
