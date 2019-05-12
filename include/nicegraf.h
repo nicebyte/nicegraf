@@ -1400,11 +1400,34 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf);
  */
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs);
 
+/**
+ * Starts a new encoder for rendering commands associated with the given
+ * command buffer.
+ * @param buf The buffer to create the encoder for. Must be in the "ready" 
+ *            state, will be transitioned to the "recording" state.
+ */
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
                                       ngf_render_encoder *enc);
+
+/**
+ * Starts a new encoder for transfer commands associated with the given 
+ * command buffer.
+ * @param buf The buffer to create the encoder for. Must be in the "ready" 
+ *            state, will be transitioned to the "recording" state.
+ */
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
                                     ngf_xfer_encoder *enc);
+
+/**
+ * Disposes of the given render cmd encoder, transitioning its corresponding
+ * command buffer to the "ready" state.
+ */
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc);
+
+/**
+ * Disposes of the given transfer cmd encoder, transitioning its corresponding
+ * command buffer to the "ready" state.
+ */
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc);
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf,
