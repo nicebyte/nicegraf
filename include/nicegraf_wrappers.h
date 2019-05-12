@@ -110,7 +110,21 @@ public:
   explicit render_encoder(ngf_cmd_buffer cmd_buf) {
     ngf_cmd_buffer_start_render(cmd_buf, &enc_);
   }
+
   ~render_encoder() { ngf_render_encoder_end(enc_); }
+
+  render_encoder(render_encoder &&other) {
+    *this = std::move(other);
+  }
+
+  render_encoder& operator=(render_encoder &&other) {
+    enc_ = other.enc_;
+    other.enc_.__handle = 0u;
+    return *this;
+  }
+
+  render_encoder(const render_encoder&) = delete;
+  render_encoder& operator=(const render_encoder&) = delete;
 
   operator ngf_render_encoder() { return enc_; }
 private:
@@ -122,7 +136,21 @@ public:
   explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
     ngf_cmd_buffer_start_xfer(cmd_buf, &enc_);
   }
+
   ~xfer_encoder() { ngf_xfer_encoder_end(enc_); }
+
+  xfer_encoder(xfer_encoder &&other) {
+    *this = std::move(other);
+  }
+
+  xfer_encoder& operator=(xfer_encoder &&other) {
+    enc_ = other.enc_;
+    other.enc_.__handle = 0u;
+    return *this;
+  }
+
+  xfer_encoder(const xfer_encoder&) = delete;
+  xfer_encoder& operator=(const xfer_encoder&) = delete;
 
   operator ngf_xfer_encoder() { return enc_; }
 
