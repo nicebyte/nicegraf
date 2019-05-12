@@ -54,7 +54,6 @@ typedef enum ngf_error {
   NGF_ERROR_FAILED_TO_CREATE_PIPELINE,
   NGF_ERROR_INCOMPLETE_PIPELINE, /**< Some information required to create
                                       a pipeline object was not provided.*/
-  NGF_ERROR_CANT_POPULATE_IMAGE, /**< Uploading data to image failed. */
   NGF_ERROR_IMAGE_CREATION_FAILED,
   NGF_ERROR_CREATE_SHADER_STAGE_FAILED, /**< On certain back-ends this means
                                              that compiling or linking code for
@@ -77,17 +76,7 @@ typedef enum ngf_error {
   NGF_ERROR_END_FRAME_FAILED,
   NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
                                bounds access. */
-  /**
-   * An attempt was made to start recording a command buffer that was already
-   * in a recording state.
-   */
-  NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING,
 
-  /**
-   * An attempt was made to finish recording a cmd buffer that was not
-   * recording.
-   */
-  NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING,
   NGF_ERROR_CONTEXT_ALREADY_CURRENT,
   NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
 
@@ -123,7 +112,7 @@ typedef enum ngf_error {
   /** Given vertex attribute format is not supported by the active backend.*/
   NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT,
   
-  /** Give sampler address mode is not supported by the active backend. */
+  /** Given sampler address mode is not supported by the active backend. */
   NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE,
 
   NGF_ERROR_RENDER_TARGET_CREATION_FAILED
