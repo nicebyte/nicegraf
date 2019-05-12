@@ -237,12 +237,18 @@ typedef struct _ngf_cmd_block {
    uint32_t               next_cmd_idx;
 } _ngf_cmd_block;
 
+typedef enum {
+  _NGF_CMD_BUFFER_READY,
+  _NGF_CMD_BUFFER_RECORDING,
+  _NGF_CMD_BUFFER_SUBMITTED
+} _ngf_cmd_buffer_state;
+
 struct ngf_cmd_buffer_t {
   ngf_graphics_pipeline bound_pipeline;
   _ngf_cmd_block *first_cmd_block;
   _ngf_cmd_block *last_cmd_block;
-  bool recording;
   bool renderpass_active;
+  _ngf_cmd_buffer_state state;
 };
 #pragma endregion
 
@@ -1628,8 +1634,8 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   if (buf == NULL) {
     err = NGF_ERROR_OUTOFMEM;
   }
-  buf->first_cmd_block = buf->last_cmd_block = NULL;
-  buf->recording = buf->renderpass_active = false;
+  buf->first_cmd_block = buf->last_cmd_block = NULL;\
+  buf->state = _NGF_CMD_BUFFER_READY;
   return err;
 }
 
@@ -1654,40 +1660,49 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   assert(buf);
+  if (buf->state != _NGF_CMD_BUFFER_READY) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
   ngf_error err = NGF_ERROR_OK;
-  //if (buf->recording) {
-  //  err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
-  //} else {
-    buf->recording = true;
-    if (buf->first_cmd_block != NULL) {
-      _ngf_cmd_buffer_free_cmds(buf);
-    }
-    buf->first_cmd_block = _ngf_blkalloc_alloc(COMMAND_POOL);
-    if (buf->first_cmd_block == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      NGF_FREE(buf);
-    } else {
-      buf->first_cmd_block->next_cmd_idx = 0u;
-      buf->first_cmd_block->next = NULL;
-      buf->last_cmd_block = buf->first_cmd_block;
-    }
-  //}
+  if (buf->first_cmd_block != NULL) {
+    _ngf_cmd_buffer_free_cmds(buf);
+  }
+  buf->first_cmd_block = _ngf_blkalloc_alloc(COMMAND_POOL);
+  if (buf->first_cmd_block == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    NGF_FREE(buf);
+  } else {
+    buf->first_cmd_block->next_cmd_idx = 0u;
+    buf->first_cmd_block->next = NULL;
+    buf->last_cmd_block = buf->first_cmd_block;
+  }
   buf->bound_pipeline = NULL;
   return err;
 }
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
                                       ngf_render_encoder *enc) {
+  if (buf->state != _NGF_CMD_BUFFER_READY) {
+    enc->__handle = 0u;
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
                                     ngf_xfer_encoder *enc) {
+  if (buf->state != _NGF_CMD_BUFFER_READY) {
+    enc->__handle = 0u;
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+  if (((ngf_cmd_buffer)enc.__handle)->renderpass_active) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
   enc.__handle = 0u;
   return NGF_ERROR_OK;
 }
