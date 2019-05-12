@@ -1777,9 +1777,9 @@ void ngf_cmd_blend_factors(ngf_render_encoder enc,
   cmd->blend_factors.dfactor = dfactor;
 }
 
-void ngf_cmd_bind_resources(ngf_render_encoder enc,
-                            const ngf_resource_bind_op *bind_ops,
-                            uint32_t nbind_ops) {
+void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
+                                const ngf_resource_bind_op *bind_ops,
+                                uint32_t nbind_ops) {
   ngf_cmd_buffer cmdbuf = (ngf_cmd_buffer)enc.__handle;
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op *bind_op = &bind_ops[o];
