@@ -1007,38 +1007,48 @@ typedef struct ngf_cmd_buffer_info {
 /**
  * Encodes a series of rendering commands.
  *
- * Internally, a command buffer may be in any of the following four states:
- *   - reset;
- *   - recording;
+ * Internally, a command buffer may be in any of the following three states:
  *   - ready;
+ *   - recording;
  *   - submitted.
  *
- * Every newly created command buffer is in the "reset" state.
- * When a command buffer is in the "reset" state, it is ready for a new
+ * Every newly created command buffer is in the "ready" state.
+ * When a command buffer is in the "ready" state, it is ready for a new
  * series of rendering commands to be recorded into it.
  *
- * Once the recording begins (via a call to \ref ngf_cmd_buffer_start), the
- * command buffer transitions into the "recording" state.
+ * Recording commands into a command buffer is performed using command
+ * encoders. There are a few different types of encoders, supporting different
+ * types of commands.
  *
- * Recording commands into a command buffer is done by calling `ngf_cmd_*` 
- * (i.e. \ref ngf_cmd_bind_pipeline etc.). All command-recording functions
- * require the command buffer to be in the "recording" state.
+ * A new encoder may be created for a command buffer only if the command buffer
+ * is in the "ready" state.
  *
- * Once all the commands have been recorded, the buffer needs to be
- * transitioned into the "ready" state via a call to \ref ngf_cmd_buffer_end.
+ * Creating a new encoder for a command buffer transitions that command buffer
+ * to the "recording" state.
  *
- * Only command buffers in the "ready" state may be submitted for execution
- * (via a call to \ref ngf_cmd_buffer_submit), which transitions them into the
- * "submitted" state.
+ * Finishing and disposing of an active encoder transitions its corresponding
+ * command buffer into the "ready" state.
  *
- * The results of re-submitting a command buffer that is already in the
- * "submitted" state are undefined.
+ * The three rules above mean that a command buffer may not have more than 
+ * one encoder active at a given time.
  *
- * Once a command buffer is in either "ready" or "submitted" state, it is
- * impossible to append new commands to it. It is, however, possible to begin
- * recording a new, separate batch of commands by calling
- * \ref ngf_cmd_buffer_start which implicitly transitions the buffer to the
- * "reset" state if it is ready or submitted.
+ * Once all the desired commands have been recorded, the command buffer may be 
+ * submitted for execution via a call to \ref ngf_cmd_buffer_submit, which
+ * transitions it into the "submitted" state.
+ 
+ * Submission may only be performed on command buffers that are in the "ready"
+ * state.
+ *
+ * Once a command buffer is in the "submitted" state, it is
+ * impossible to append any new commands to it.
+ * It is, however, possible to begin recording a new, completely separate batch
+ * of commands by calling \ref ngf_cmd_buffer_start which implicitly
+ * transitions the buffer to the "reset" state if it is already "submitted".
+ * This does not affect any previously submitted commands.
+ *
+ * Calling \ref ngf_cmd_buffer_start on a command buffer that is ready, but not
+ * submitted yet, completely resets the command buffer, erasing all the
+ * previosly recorded commands.
  *
  * Command buffers may be recorded in parrallel on different threads. Recording
  * and destroying a command buffer must always be done by the same thread that
@@ -1048,6 +1058,18 @@ typedef struct ngf_cmd_buffer_info {
  * as long as the submitting and recording threads have shared contexts.
  */
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
+
+/**
+ * A render encoder records rendering commands (such as draw calls) into its
+ * corresponding command buffer.
+ */
+typedef struct { uintptr_t __handle; } ngf_render_encoder;
+
+/**
+ * A transfer encoder records transfer commands (i.e. copying buffer contents)
+ * into its corresponding command buffer.
+ */
+typedef struct { uintptr_t __handle; } ngf_xfer_encoder;
 
 typedef ngf_buffer_info ngf_attrib_buffer_info;
 typedef ngf_buffer_info ngf_index_buffer_info;
@@ -1364,7 +1386,7 @@ void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf);
 void ngf_finish();
 
 /**
- * Creates a new command buffer that is in the "reset" state.
+ * Creates a new command buffer that is in the "ready" state.
  */
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
                                 ngf_cmd_buffer *result);
@@ -1377,77 +1399,72 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer);
 
 /**
- * Begin recording a new batch of commands into a given command buffer,
- * transitioning it into "recording" state.
- * The command buffer must be either "reset", "ready" or "submitted".
- * If the command buffer is either "ready" or "submitted", its state is
- * implicitly transitioned to "reset" before becoming "recording".
- * Note that if the buffer was "ready", the commands previously recorded into
- * it will be lost and never executed.
+ * Erases all the commands previously recorded into the given command buffer.
+ * The command buffer is required to be in the "ready" state.
  */
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf);
 
 /**
- * Finishes recording a batch of commands into a buffer and transitions it into
- * the "ready" state.
- * The command buffer needs to be in the "recording" state.
+ * Submits the commands recorded in the given command buffers for execution.
+ * All command buffers must be in the "ready" state, and will be transitioned
+ * to the "submitted" state.
  */
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer buf);
+ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs);
 
-/**
- * Submits the commands recorded in the given command buffer for execution.
- * The command buffer must be in the "ready" state, and will be transitioned to
- * the "submitted" state.
- */
-ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer *bufs);
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
+                                      ngf_render_encoder *enc);
+ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
+                                    ngf_xfer_encoder *enc);
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc);
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc);
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
-                           const ngf_graphics_pipeline pipeline);
-void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r);
-void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r);
-void ngf_cmd_stencil_reference(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf,
+                               const ngf_graphics_pipeline pipeline);
+void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d *r);
+void ngf_cmd_scissor(ngf_render_encoder buf, const ngf_irect2d *r);
+void ngf_cmd_stencil_reference(ngf_render_encoder buf, uint32_t front,
                                uint32_t back);
-void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front,
                                   uint32_t back);
-void ngf_cmd_stencil_write_mask(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front,
                                 uint32_t back);
-void ngf_cmd_line_width(ngf_cmd_buffer buf, float line_width);
-void ngf_cmd_blend_factors(ngf_cmd_buffer buf,
+void ngf_cmd_line_width(ngf_render_encoder buf, float line_width);
+void ngf_cmd_blend_factors(ngf_render_encoder buf,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor);
-void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
-                            const ngf_resource_bind_op *bind_operations,
-                            uint32_t nbind_operations);
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_bind_gfx_resources(ngf_render_encoder buf,
+                                const ngf_resource_bind_op *bind_operations,
+                                uint32_t nbind_operations);
+void ngf_cmd_bind_attrib_buffer(ngf_render_encoder buf,
                                 const ngf_attrib_buffer vbuf,
                                 uint32_t binding, uint32_t offset);
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_bind_index_buffer(ngf_render_encoder buf,
                                const ngf_index_buffer idxbuf,
                                ngf_type index_type);
-void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target);
-void ngf_cmd_end_pass(ngf_cmd_buffer buf);
-void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
+void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target);
+void ngf_cmd_end_pass(ngf_render_encoder buf);
+void ngf_cmd_draw(ngf_render_encoder buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances);
-void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder buf,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset);
-void ngf_cmd_copy_index_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_index_buffer(ngf_xfer_encoder buf,
                                const ngf_index_buffer src,
                                ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset);
-void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder buf,
                                  const ngf_uniform_buffer src,
                                  ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset);
-void ngf_cmd_write_image(ngf_cmd_buffer buf,
+void ngf_cmd_write_image(ngf_xfer_encoder buf,
                          const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
