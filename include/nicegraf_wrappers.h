@@ -105,6 +105,31 @@ NGF_DEFINE_WRAPPER_TYPE(pixel_buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
+class render_encoder {
+public:
+  explicit render_encoder(ngf_cmd_buffer cmd_buf) {
+    ngf_cmd_buffer_start_render(cmd_buf, &enc_);
+  }
+  ~render_encoder() { ngf_render_encoder_end(enc_); }
+
+  operator ngf_render_encoder() { return enc_; }
+private:
+  ngf_render_encoder enc_;
+};
+
+class xfer_encoder {
+public:
+  explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
+    ngf_cmd_buffer_start_xfer(cmd_buf, &enc_);
+  }
+  ~xfer_encoder() { ngf_xfer_encoder_end(enc_); }
+
+  operator ngf_xfer_encoder() { return enc_; }
+
+private:
+  ngf_xfer_encoder enc_;
+};
+
 template <uint32_t S>
 struct descriptor_set {
   template <uint32_t B>
@@ -419,12 +444,12 @@ public:
   }
   
   template <class T>
-  ngf_error write_buffer(ngf_cmd_buffer  cmd_buf,
-                         T              &target_buffer,
-                         const void     *source_data,
-                         size_t          source_size,
-                         size_t          source_offset,
-                         size_t          target_offset) {
+  ngf_error write_buffer(ngf_xfer_encoder enc,
+                         T               &target_buffer,
+                         const void      *source_data,
+                         size_t           source_size,
+                         size_t           source_offset,
+                         size_t           target_offset) {
     ngf_buffer_info staging_buffer_info {
       source_size,
       NGF_BUFFER_STORAGE_HOST_WRITEABLE
@@ -439,7 +464,7 @@ public:
     memcpy(mapped_staging_buffer, source_data, source_size);
     buffer_flush_range(staging_buffer.get(), 0, source_size);
     buffer_unmap(staging_buffer.get());
-    cmd_copy_buffer(cmd_buf,
+    cmd_copy_buffer(enc,
                     staging_buffer.get(),
                     target_buffer.get(),
                     source_size,
