@@ -147,6 +147,12 @@ const _ngf_native_binding* _ngf_binding_map_lookup(
     uint32_t set,
     uint32_t binding);
 
+typedef enum {
+  _NGF_CMD_BUFFER_READY,
+  _NGF_CMD_BUFFER_RECORDING,
+  _NGF_CMD_BUFFER_SUBMITTED
+} _ngf_cmd_buffer_state;
+  
 #ifdef __cplusplus
 }
 #endif
