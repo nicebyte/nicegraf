@@ -154,9 +154,9 @@ struct descriptor_set {
 };
 
 template <class ...Args>
-void cmd_bind_resources(ngf_cmd_buffer buf, const Args&&... args) {
+void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
   const ngf_resource_bind_op ops[] = { args... };
-  ngf_cmd_bind_resources(buf, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
+  ngf_cmd_bind_gfx_resources(enc, ops, sizeof(ops)/sizeof(ngf_resource_bind_op));
 }
 
 inline void* buffer_map_range(ngf_attrib_buffer buf,
@@ -223,31 +223,31 @@ inline void buffer_unmap(ngf_pixel_buffer buf) {
   ngf_pixel_buffer_unmap(buf);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+inline void cmd_copy_buffer(ngf_xfer_encoder enc,
                             const ngf_attrib_buffer src,
                             ngf_attrib_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
-  ngf_cmd_copy_attrib_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+  ngf_cmd_copy_attrib_buffer(enc, src, dst, size, src_offset, dst_offset);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+inline void cmd_copy_buffer(ngf_xfer_encoder enc,
                             const ngf_index_buffer src,
                             ngf_index_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
-  ngf_cmd_copy_index_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+  ngf_cmd_copy_index_buffer(enc, src, dst, size, src_offset, dst_offset);
 }
 
-inline void cmd_copy_buffer(ngf_cmd_buffer cmd_buf,
+inline void cmd_copy_buffer(ngf_xfer_encoder enc,
                             const ngf_uniform_buffer src,
                             ngf_uniform_buffer dst,
                             size_t size,
                             size_t src_offset,
                             size_t dst_offset) {
-  ngf_cmd_copy_uniform_buffer(cmd_buf, src, dst, size, src_offset, dst_offset);
+  ngf_cmd_copy_uniform_buffer(enc, src, dst, size, src_offset, dst_offset);
 }
 
 inline ngf_image_ref image_ref(const ngf_image img) {
@@ -449,7 +449,7 @@ public:
     return NGF_ERROR_OK;
   }
 
-  ngf_error write_image(ngf_cmd_buffer  cmd_buf,
+  ngf_error write_image(ngf_xfer_encoder enc,
                         const void     *source_data,
                         size_t          source_size,
                         size_t          source_offset,
@@ -472,7 +472,7 @@ public:
     memcpy(mapped_staging_buffer, source_data, source_size);
     buffer_flush_range(staging_buffer.get(), 0, source_size);
     buffer_unmap(staging_buffer.get());
-    ngf_cmd_write_image(cmd_buf,
+    ngf_cmd_write_image(enc,
                         staging_buffer.get(),
                         source_offset,
                         target,

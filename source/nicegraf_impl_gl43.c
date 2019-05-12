@@ -1655,9 +1655,9 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   assert(buf);
   ngf_error err = NGF_ERROR_OK;
-  if (buf->recording) {
-    err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
-  } else {
+  //if (buf->recording) {
+  //  err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
+  //} else {
     buf->recording = true;
     if (buf->first_cmd_block != NULL) {
       _ngf_cmd_buffer_free_cmds(buf);
@@ -1671,27 +1671,34 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
       buf->first_cmd_block->next = NULL;
       buf->last_cmd_block = buf->first_cmd_block;
     }
-  }
+  //}
   buf->bound_pipeline = NULL;
   return err;
 }
-
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer buf) {
-  assert(buf);
-  ngf_error err = NGF_ERROR_OK;
-  if (!buf->recording) {
-    err = NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
-  }
-  buf->recording = false;
-  return err;
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
+                                      ngf_render_encoder *enc) {
+  enc->__handle = (uintptr_t)buf;
+  return NGF_ERROR_OK;
 }
 
-#define _NGF_APPENDCMD(buf, cmd) { \
-    cmd->next = NULL; \
-    buf->last_cmd->next = cmd; \
-    buf->last_cmd = cmd; }
+ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
+                                    ngf_xfer_encoder *enc) {
+  enc->__handle = (uintptr_t)buf;
+  return NGF_ERROR_OK;
+}
 
-#define _NGF_NEWCMD(buf, cmd) {\
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+  enc.__handle = 0u;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+  enc.__handle = 0u;
+  return NGF_ERROR_OK;
+}
+
+#define _NGF_NEWCMD(enc, cmd) {\
+  ngf_cmd_buffer buf = (ngf_cmd_buffer)(void*)enc.__handle; \
   if (buf->last_cmd_block->next_cmd_idx == _NGF_CMDS_PER_CMD_BLOCK) { \
     buf->last_cmd_block->next = _ngf_blkalloc_alloc(COMMAND_POOL); \
     buf->last_cmd_block = buf->last_cmd_block->next; \
@@ -1702,81 +1709,82 @@ ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer buf) {
 }
 
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
-                           const ngf_graphics_pipeline pipeline) {
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
+                               const ngf_graphics_pipeline pipeline) {
 
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_BIND_PIPELINE;
   cmd->pipeline = pipeline;
-  buf->bound_pipeline = pipeline;
+  ((ngf_cmd_buffer)enc.__handle)->bound_pipeline = pipeline;
 }
 
-void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *viewport) {
+void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *viewport) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_VIEWPORT;
   cmd->viewport = *viewport;
 }
 
-void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *scissor) {
+void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *scissor) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_SCISSOR;
   cmd->scissor = *scissor;
 }
 
-void ngf_cmd_stencil_reference(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front,
                                uint32_t back) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_STENCIL_REFERENCE;
   cmd->stencil_reference.front = front;
   cmd->stencil_reference.back = back;
 }
 
-void ngf_cmd_stencil_compare_mask(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front,
                                   uint32_t back) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_STENCIL_COMPARE_MASK;
   cmd->stencil_compare_mask.front = front;
   cmd->stencil_compare_mask.back = back;
 }
 
-void ngf_cmd_stencil_write_mask(ngf_cmd_buffer buf, uint32_t front,
+void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front,
                                 uint32_t back) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_STENCIL_WRITE_MASK;
   cmd->stencil_write_mask.front = front;
   cmd->stencil_write_mask.back = back;
 }
 
-void ngf_cmd_line_width(ngf_cmd_buffer buf, float line_width) {
+void ngf_cmd_line_width(ngf_render_encoder enc, float line_width) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_LINE_WIDTH;
   cmd->line_width = line_width;
 }
 
-void ngf_cmd_blend_factors(ngf_cmd_buffer buf,
+void ngf_cmd_blend_factors(ngf_render_encoder enc,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_BLEND_CONSTANTS;
   cmd->blend_factors.sfactor = sfactor;
   cmd->blend_factors.dfactor = dfactor;
 }
 
-void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
+void ngf_cmd_bind_resources(ngf_render_encoder enc,
                             const ngf_resource_bind_op *bind_ops,
                             uint32_t nbind_ops) {
+  ngf_cmd_buffer cmdbuf = (ngf_cmd_buffer)enc.__handle;
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op *bind_op = &bind_ops[o];
     const _ngf_native_binding *native_binding =
-        _ngf_binding_map_lookup(buf->bound_pipeline->binding_map,
+        _ngf_binding_map_lookup(cmdbuf->bound_pipeline->binding_map,
                                 bind_op->target_set,
                                 bind_op->target_binding);
     if (native_binding == NULL) {
@@ -1793,7 +1801,7 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       _ngf_emulated_cmd *uniform_buffer_bind_cmd = NULL;
-      _NGF_NEWCMD(buf, uniform_buffer_bind_cmd);
+      _NGF_NEWCMD(enc, uniform_buffer_bind_cmd);
       uniform_buffer_bind_cmd->type = _NGF_CMD_BIND_UNIFORM_BUFFER;
       uniform_buffer_bind_cmd->uniform_buffer_bind_op.buffer =
           bind_op->info.uniform_buffer.buffer->glbuffer;
@@ -1808,7 +1816,7 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
     case NGF_DESCRIPTOR_TEXTURE: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
         _ngf_emulated_cmd *texture_bind_cmd = NULL;
-        _NGF_NEWCMD(buf, texture_bind_cmd);
+        _NGF_NEWCMD(enc, texture_bind_cmd);
         texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
         texture_bind_cmd->texture_bind_op.texture =
             bind_op->info.image_sampler.image_subresource.image;
@@ -1820,7 +1828,7 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
     case NGF_DESCRIPTOR_SAMPLER: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
         _ngf_emulated_cmd *sampler_bind_cmd = NULL;
-        _NGF_NEWCMD(buf, sampler_bind_cmd);
+        _NGF_NEWCMD(enc, sampler_bind_cmd);
         sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
         sampler_bind_cmd->sampler_bind_op.sampler =
             bind_op->info.image_sampler.sampler;
@@ -1831,14 +1839,14 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
     }
     case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
       _ngf_emulated_cmd *texture_bind_cmd = NULL;
-      _NGF_NEWCMD(buf, texture_bind_cmd);
+      _NGF_NEWCMD(enc, texture_bind_cmd);
       texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
       texture_bind_cmd->texture_bind_op.texture =
         bind_op->info.image_sampler.image_subresource.image;
       texture_bind_cmd->texture_bind_op.unit =
         native_binding->native_binding_id;
       _ngf_emulated_cmd *sampler_bind_cmd = NULL;
-      _NGF_NEWCMD(buf, sampler_bind_cmd);
+      _NGF_NEWCMD(enc, sampler_bind_cmd);
       sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
       sampler_bind_cmd->sampler_bind_op.sampler =
           bind_op->info.image_sampler.sampler;
@@ -1852,47 +1860,47 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer buf,
   }
 }
 
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
                                 const ngf_attrib_buffer vbuf,
                                 uint32_t binding, uint32_t offset) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_BIND_ATTRIB_BUFFER;
   cmd->attrib_buffer_bind_op.binding = binding;
   cmd->attrib_buffer_bind_op.buf = vbuf;
   cmd->attrib_buffer_bind_op.offset = offset;
 }
 
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
                                const ngf_index_buffer idxbuf,
                                ngf_type index_type) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
   cmd->index_buffer_bind.index_buffer = idxbuf;
   cmd->index_buffer_bind.type = index_type;
 }
 
-void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target) {
+void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_BEGIN_PASS;
   cmd->begin_pass.target = target;
-  buf->renderpass_active = true;
+  ((ngf_cmd_buffer)enc.__handle)->renderpass_active = true;
 }
 
-void ngf_cmd_end_pass(ngf_cmd_buffer buf) {
-  buf->renderpass_active = false;
+void ngf_cmd_end_pass(ngf_render_encoder enc) {
+  ((ngf_cmd_buffer)enc.__handle)->renderpass_active = false;
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_END_PASS;
 }
 
-void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
+void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_DRAW;
   cmd->draw.first_element = first_element;
   cmd->draw.nelements = nelements;
@@ -1900,14 +1908,14 @@ void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
   cmd->draw.indexed = indexed;
 }
 
-void _ngf_cmd_copy_buffer(ngf_cmd_buffer buf,
+void _ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
                           GLuint src,
                           GLuint dst,
                           size_t size,
                           size_t src_offset,
                           size_t dst_offset) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_COPY;
   cmd->copy.src = src;
   cmd->copy.dst = dst;
@@ -1917,14 +1925,14 @@ void _ngf_cmd_copy_buffer(ngf_cmd_buffer buf,
 
 }
 
-void ngf_cmd_write_image(ngf_cmd_buffer buf,
+void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
                          const ngf_extent3d *extent) {
   _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(buf, cmd);
+  _NGF_NEWCMD(enc, cmd);
   cmd->type = _NGF_CMD_WRITE_IMAGE;
   cmd->write_image.src_pbuffer = src->glbuffer;
   cmd->write_image.src_data_offset = src_offset;
@@ -1935,37 +1943,37 @@ void ngf_cmd_write_image(ngf_cmd_buffer buf,
 
 // TODO: assert that buffer is not mapped below.
 
-void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
 }
 
-void ngf_cmd_copy_index_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
                                const ngf_index_buffer src,
                                ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
  }
 
-void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  const ngf_uniform_buffer src,
                                  ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->glbuffer, dst->glbuffer,
+  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
  }
 
-ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
+ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   assert(bufs);
   ngf_graphics_pipeline bound_pipeline =
       &(CURRENT_CONTEXT->cached_state);
