@@ -437,6 +437,7 @@ struct ngf_render_target_t {
 };
 
 struct ngf_cmd_buffer_t {
+  _ngf_cmd_buffer_state state = _NGF_CMD_BUFFER_READY;
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
   id<MTLBlitCommandEncoder> active_bce = nil;
@@ -1354,22 +1355,12 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
   cmd_buffer->mtl_cmd_buffer = nil;
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
   cmd_buffer->active_rce = nil;
+  cmd_buffer->active_bce = nil;
+  cmd_buffer->state = _NGF_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
-  if (cmd_buffer->active_rce) {
-    [cmd_buffer->active_rce endEncoding];
-    cmd_buffer->active_rce = nil;
-  }
-  if (cmd_buffer->active_bce) {
-    [cmd_buffer->active_bce endEncoding];
-    cmd_buffer->active_bce = nil;
-  }
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_submit_cmd_buffer(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
+ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
   if (CURRENT_CONTEXT->pending_cmd_buffer) {
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
@@ -1381,12 +1372,58 @@ ngf_error ngf_submit_cmd_buffer(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
       CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
     }
     cmd_buffers[b]->mtl_cmd_buffer = nil;
+    cmd_buffers[b]->state =  _NGF_CMD_BUFFER_SUBMITTED;
   }
   return NGF_ERROR_OK;
 }
 
-void ngf_cmd_begin_pass(ngf_cmd_buffer cmd_buffer,
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
+                                      ngf_render_encoder *enc) {
+  if (cmd_buf->state != _NGF_CMD_BUFFER_READY) {
+    enc->__handle = 0u;
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
+  cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
+  enc->__handle = (uintptr_t)cmd_buf;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  if(cmd_buf->state != _NGF_CMD_BUFFER_RECORDING || !cmd_buf->active_rce) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
+  [cmd_buf->active_rce endEncoding];
+  cmd_buf->active_rce = nil;
+  cmd_buf->state = _NGF_CMD_BUFFER_READY;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
+                                    ngf_xfer_encoder *enc) {
+  if (cmd_buf->state != _NGF_CMD_BUFFER_READY) {
+    enc->__handle = 0u;
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
+  cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
+  enc->__handle = (uintptr_t)cmd_buf;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  if (cmd_buf->state != _NGF_CMD_BUFFER_RECORDING || !cmd_buf->active_bce) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
+  [cmd_buf->active_bce endEncoding];
+  cmd_buf->active_bce = nil;
+  cmd_buf->state = _NGF_CMD_BUFFER_READY;
+  return NGF_ERROR_OK;
+}
+
+void ngf_cmd_begin_pass(ngf_render_encoder enc,
                         const ngf_render_target rt) {
+  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
     cmd_buffer->active_rce = nil;
@@ -1413,14 +1450,16 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer cmd_buffer,
   cmd_buffer->active_rt = rt;
 }
 
-void ngf_cmd_end_pass(ngf_cmd_buffer cmd_buffer) {
+void ngf_cmd_end_pass(ngf_render_encoder enc) {
+  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
   [cmd_buffer->active_rce endEncoding];
   cmd_buffer->active_rce = nil;
   cmd_buffer->active_pipe = nullptr;
 }
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
-                           const ngf_graphics_pipeline pipeline) {
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
+                               const ngf_graphics_pipeline pipeline) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
   if (pipeline->depth_stencil) {
     [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
@@ -1431,7 +1470,8 @@ void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
   buf->active_pipe = pipeline;
 }
 
-void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
+void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLViewport viewport;
   viewport.originX = r->x;
   const uint32_t top = (uint32_t)r->y + r->height;
@@ -1451,7 +1491,8 @@ void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   [buf->active_rce setViewport:viewport];
 }
 
-void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
+void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLScissorRect scissor;
   scissor.x = (NSUInteger)r->x;
   const uint32_t top = (uint32_t)r->y + r->height;
@@ -1466,9 +1507,10 @@ void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   [buf->active_rce setScissorRect:scissor];
 }
 
-void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
+void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLPrimitiveType prim_type = buf->active_pipe->primitive_type;
   if (!indexed) {
     [buf->active_rce drawPrimitives:prim_type
@@ -1490,25 +1532,28 @@ void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
   }
 }
 
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer cmd_buf,
+void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
                                 const ngf_attrib_buffer buf,
                                 uint32_t binding,
                                 uint32_t offset) {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                 offset:offset
                                atIndex:MAX_BUFFER_BINDINGS - binding];
 }
 
-void ngf_cmd_bind_index_buffer(ngf_cmd_buffer cmd_buf,
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
                                const ngf_index_buffer buf,
                                ngf_type type) {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   cmd_buf->bound_index_buffer = buf->mtl_buffer;
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
-void ngf_cmd_bind_resources(ngf_cmd_buffer cmd_buf,
+void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                             const ngf_resource_bind_op *bind_ops,
                             uint32_t nbind_ops) {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op &bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
@@ -1609,9 +1654,10 @@ void ngf_cmd_bind_resources(ngf_cmd_buffer cmd_buf,
   }
 }
 
-void _ngf_cmd_copy_buffer(ngf_cmd_buffer buf,
+void _ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
                           id<MTLBuffer> src, id<MTLBuffer> dst,
                           size_t size, size_t src_offset, size_t dst_offset) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) {
     buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
@@ -1620,33 +1666,33 @@ void _ngf_cmd_copy_buffer(ngf_cmd_buffer buf,
                 destinationOffset:dst_offset size:size];
 }
 
-void ngf_cmd_copy_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
-void ngf_cmd_copy_index_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
                                const ngf_index_buffer src,
                                ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
-void ngf_cmd_copy_uniform_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  const ngf_uniform_buffer src,
                                  ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset) {
-  _ngf_cmd_copy_buffer(buf, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
@@ -1656,12 +1702,13 @@ static uint32_t _get_pitch(const uint32_t width, const ngf_image_format format) 
   return width * bits / 8;
 }
 
-void ngf_cmd_write_image(ngf_cmd_buffer buf,
+void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
                          const ngf_extent3d *extent) {
+  auto buf = (ngf_cmd_buffer)enc.__handle;
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) {
     buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
