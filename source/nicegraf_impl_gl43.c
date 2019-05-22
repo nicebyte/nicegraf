@@ -1630,6 +1630,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   }
   buf->first_cmd_block = buf->last_cmd_block = NULL;
   buf->state = _NGF_CMD_BUFFER_READY;
+  buf->renderpass_active = false;
   return err;
 }
 
