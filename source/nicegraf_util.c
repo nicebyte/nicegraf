@@ -218,9 +218,8 @@ const char* ngf_util_get_error_name(const ngf_error err) {
     "OUTOFMEM",
     "FAILED_TO_CREATE_PIPELINE",
     "INCOMPLETE_PIPELINE",
-    "CANT_POPULATE_IMAGE",
     "IMAGE_CREATION_FAILED",
-    "CREATE_SHADER_STAGE_FAILED"
+    "CREATE_SHADER_STAGE_FAILED",
     "INVALID_BINDING",
     "INVALID_INDEX_BUFFER_BINDING",
     "INVALID_VERTEX_BUFFER_BINDING",
@@ -236,8 +235,6 @@ const char* ngf_util_get_error_name(const ngf_error err) {
     "BEGIN_FRAME_FAILED",
     "END_FRAME_FAILED",
     "OUT_OF_BOUNDS",
-    "CMD_BUFFER_ALREADY_RECORDING",
-    "CMD_BUFFER_WAS_NOT_RECORDING",
     "CONTEXT_ALREADY_CURRENT",
     "CALLER_HAS_CURRENT_CONTEXT",
     "CANNOT_SPECIALIZE_SHADER_STAGE_BINARY",
@@ -250,6 +247,8 @@ const char* ngf_util_get_error_name(const ngf_error err) {
     "INVALID_DEPTH_FORMAT",
     "INVALID_VERTEX_ATTRIB_FORMAT",
     "INVALID_SAMPLER_ADDRESS_MODE",
+    "RENDER_TARGET_CREATION_FAILED",
+    "COMMAND_BUFFER_INVALID_STATE",
   };
   return ngf_error_names[err];
 }
