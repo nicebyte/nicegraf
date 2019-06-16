@@ -68,6 +68,7 @@
 #define _NGF_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
 
 // Singleton for holding vulkan instance and device handles.
+// This is the same for all contexts.
 struct {
   VkInstance       instance;
   VkPhysicalDevice phys_dev;
@@ -448,15 +449,15 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
 #if defined(XCB_NONE)
 xcb_connection_t *XCB_CONNECTION = NULL;
 xcb_visualid_t    XCB_VISUALID   = { 0 };
-
 #endif
+
 bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
-                                     uint32_t queue_family_index) {
+                                     uint32_t         queue_family_index) {
 #if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
                                                         queue_family_index);
 #elif defined(__ANDROID__)
-  return true;
+  return true; // All Android queues surfaces support present.
 #else
 
   if (XCB_CONNECTION == NULL) {
