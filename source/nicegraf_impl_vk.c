@@ -64,7 +64,8 @@
 #include "volk.h"
 #include <vk_mem_alloc.h>
 
-#define _NGF_INVALID_IDX (~0u)
+#define _NGF_INVALID_IDX      (~0u)
+#define _NGF_MAX_PHYS_DEVICES (64u) // 64 GPUs oughta be enough for everybody.
 
 // Singleton for holding vulkan instance and device handles.
 struct {
@@ -513,11 +514,10 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     volkLoadInstance(_vk.instance); // load instance-level Vulkan functions.
 
     // Obtain a list of available physical devices.
-    uint32_t nphysdev = 0u;
-    vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, NULL);
-    VkPhysicalDevice *physdevs = alloca(nphysdev * sizeof(VkPhysicalDevice));
-    assert(physdevs != NULL);
-    vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    uint32_t nphysdev = _NGF_MAX_PHYS_DEVICES;
+    VkPhysicalDevice physdevs[64];
+    vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
 
     // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
@@ -1321,13 +1321,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   ngf_error err   = NGF_ERROR_OK;
   VkResult vk_err = VK_SUCCESS;
 
-  // Verify we're not recording.
-  if (cmd_buf->recording) {
-    err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
-    goto ngf_start_cmd_buffer_cleanup;
-  }
-
-  // Create command buffer of reset existing one.
+  // Create command buffer or reset existing one.
   _ngf_inc_recorder_count();
   cmd_buf->recording = true;
   if (cmd_buf->vkcmdbuf == VK_NULL_HANDLE) { // no handle, create new cmdbuf.
@@ -1377,17 +1371,6 @@ ngf_start_cmd_buffer_cleanup:
   }
 
   return err;
-}
-
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer cmd_buf) {
-  assert(cmd_buf);
-  if (!cmd_buf->recording) {
-    return NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
-  }
-  vkEndCommandBuffer(cmd_buf->vkcmdbuf);
-  _ngf_dec_recorder_count();
-  cmd_buf->recording = false;
-  return NGF_ERROR_OK;
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
