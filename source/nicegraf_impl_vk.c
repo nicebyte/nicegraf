@@ -144,7 +144,8 @@ typedef struct ngf_context_t {
  _ngf_swapchain              swapchain;
   ngf_swapchain_info         swapchain_info;
   VmaAllocator               allocator;
-  VkCommandPool              cmd_pool;
+  VkCommandPool              cmd_pools[3];
+  uint32_t                   active_pool_idx;
   VkSurfaceKHR               surface;
   uint32_t                   frame_number;
   uint32_t                   max_inflight_frames;
@@ -568,7 +569,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
                                              &num_queue_families,
                                               queue_families);
 
-    // Pick suitable queue families for graphics and present.
+    // Pick suitable queue families for graphics, present and transfer.
     uint32_t gfx_family_idx     = _NGF_INVALID_IDX;
     uint32_t present_family_idx = _NGF_INVALID_IDX;
     uint32_t xfer_family_idx    = _NGF_INVALID_IDX;
@@ -1076,12 +1077,16 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     .queueFamilyIndex = _vk.gfx_family_idx
   };
-  vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
-                               &ctx->cmd_pool);
-  if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-    goto ngf_create_context_cleanup;
+  memset(ctx->cmd_pools, VK_NULL_HANDLE, sizeof(ctx->cmd_pools));
+  for (uint32_t p = 0u; p < _NGF_ARRAYSIZE(ctx->cmd_pools); ++p) {
+    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
+                                 &ctx->cmd_pools[p]);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+      goto ngf_create_context_cleanup;
+    }
   }
+  ctx->active_pool_idx = 0u;
 
   // Set up VMA.
   VmaVulkanFunctions vma_vk_fns = {
@@ -1238,7 +1243,11 @@ void ngf_destroy_context(ngf_context ctx) {
         _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
         vkDestroyFence(_vk.device, ctx->frame_res[f].fence, NULL);
       }
-      vkDestroyCommandPool(_vk.device, ctx->cmd_pool, NULL);
+      for (uint32_t p = 0; p < _NGF_ARRAYSIZE(ctx->cmd_pools); ++p) {
+        if (ctx->cmd_pools[p] != VK_NULL_HANDLE) {
+          vkDestroyCommandPool(_vk.device, ctx->cmd_pools[p], NULL);
+        }
+      }
       _ngf_destroy_swapchain(&ctx->swapchain);
       if (ctx->surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
@@ -1324,7 +1333,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
 
   // Verify we're not recording.
   if (cmd_buf->recording) {
-    err = NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING;
+    err = NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
     goto ngf_start_cmd_buffer_cleanup;
   }
 
@@ -1378,17 +1387,6 @@ ngf_start_cmd_buffer_cleanup:
   }
 
   return err;
-}
-
-ngf_error ngf_end_cmd_buffer(ngf_cmd_buffer cmd_buf) {
-  assert(cmd_buf);
-  if (!cmd_buf->recording) {
-    return NGF_ERROR_CMD_BUFFER_WAS_NOT_RECORDING;
-  }
-  vkEndCommandBuffer(cmd_buf->vkcmdbuf);
-  _ngf_dec_recorder_count();
-  cmd_buf->recording = false;
-  return NGF_ERROR_OK;
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
