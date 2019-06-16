@@ -64,7 +64,8 @@
 #include "volk.h"
 #include <vk_mem_alloc.h>
 
-#define _NGF_INVALID_IDX (~0u)
+#define _NGF_INVALID_IDX  (~0u)
+#define _NGF_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
 
 // Singleton for holding vulkan instance and device handles.
 struct {
@@ -513,11 +514,10 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     volkLoadInstance(_vk.instance); // load instance-level Vulkan functions.
 
     // Obtain a list of available physical devices.
-    uint32_t nphysdev = 0u;
-    vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, NULL);
-    VkPhysicalDevice *physdevs = alloca(nphysdev * sizeof(VkPhysicalDevice));
-    assert(physdevs != NULL);
-    vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    uint32_t nphysdev = _NGF_MAX_PHYS_DEV;
+    VkPhysicalDevice physdevs [_NGF_MAX_PHYS_DEV];
+    vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
 
     // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
