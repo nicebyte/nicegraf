@@ -80,6 +80,7 @@ extern const ngf_allocation_callbacks *NGF_ALLOC_CB;
 
 // It is $CURRENT_YEAR and C does not have a standard thing for this.
 #define NGF_MAX(a, b) (a > b ? a : b)
+#define NGF_MIN(a, b) (a < b ? a : b)
 
 // A fast fixed-size block allocator.
 typedef struct _ngf_block_allocator _ngf_block_allocator;
