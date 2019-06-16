@@ -124,18 +124,19 @@ typedef enum ngf_error {
 
 /**
  * Device hints.
+ * TODO: API for choosing device explicitly.
  */
 typedef enum ngf_device_preference {
-  NGF_DEVICE_PREFERENCE_DISCRETE, /**< Prefer discrete GPU. */
+  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete GPU. */
   NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
-  NGF_DEVICE_PREFERENCE_DONTCARE /**< No GPU preference. */
+  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No GPU preference. */
 } ngf_device_preference;
 
 /**
  * Possible present modes.
  */
 typedef enum ngf_present_mode {
-  NGF_PRESENTATION_MODE_FIFO, /**< Frames get queued ("wait for vsync") */
+  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
   NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
 } ngf_present_mode;
 
@@ -999,55 +1000,66 @@ typedef struct ngf_cmd_buffer_info {
 /**
  * Encodes a series of rendering commands.
  *
- * Internally, a command buffer may be in any of the following three states:
+ * Internally, a command buffer may be in any of the following four states:
  *   - ready;
  *   - recording;
+ *   - awaiting submission;
  *   - submitted.
  *
  * Every newly created command buffer is in the "ready" state.
- * When a command buffer is in the "ready" state, it is ready for a new
- * series of rendering commands to be recorded into it.
+ * When a command buffer is in the "ready" state, you may begin recording a new
+ * series of rendering commands into it.
  *
  * Recording commands into a command buffer is performed using command
  * encoders. There are a few different types of encoders, supporting different
  * types of commands.
  *
  * A new encoder may be created for a command buffer only if the command buffer
- * is in the "ready" state.
+ * is in either the "ready" or the "awaiting submission" state.
  *
  * Creating a new encoder for a command buffer transitions that command buffer
  * to the "recording" state.
  *
  * Finishing and disposing of an active encoder transitions its corresponding
- * command buffer into the "ready" state.
+ * command buffer into the "awaiting submission" state.
  *
  * The three rules above mean that a command buffer may not have more than 
  * one encoder active at a given time.
  *
- * Once all the desired commands have been recorded, the command buffer may be 
+ * Once all the desired commands have been recorded, and the command buffer is
+ * in the "awaiting submission" state, the command buffer may be 
  * submitted for execution via a call to \ref ngf_cmd_buffer_submit, which
  * transitions it into the "submitted" state.
  
- * Submission may only be performed on command buffers that are in the "ready"
- * state.
+ * Submission may only be performed on command buffers that are in the
+ * "awaiting submission" state.
  *
  * Once a command buffer is in the "submitted" state, it is
  * impossible to append any new commands to it.
  * It is, however, possible to begin recording a new, completely separate batch
  * of commands by calling \ref ngf_cmd_buffer_start which implicitly
- * transitions the buffer to the "reset" state if it is already "submitted".
- * This does not affect any previously submitted commands.
+ * transitions the buffer to the "ready" state if it is already "submitted".
+ * This does not affect any previously submitted commands. Calling
+ * \ref ngf_cmd_buffer_start on a command buffer that is in the "ready" state
+ * is safe and has no effects.
  *
- * Calling \ref ngf_cmd_buffer_start on a command buffer that is ready, but not
- * submitted yet, completely resets the command buffer, erasing all the
- * previosly recorded commands.
- *
+ * Calling a command buffer function on a buffer that is in a state not
+ * expected by that function will result in an error. For example, calling
+ * \ref ngf_cmd_buffer_submit would produce an error on a buffer that is in
+ * the "ready" state, since, according to the rules outlined above,
+ * \ref ngf_cmd_buffer_submit expects command buffers to be in the "awaiting
+ * submission" state.
+ * 
  * Command buffers may be recorded in parrallel on different threads. Recording
  * and destroying a command buffer must always be done by the same thread that
  * created it.
  *
  * Submitting a command buffer for execution may be done by a different thread,
  * as long as the submitting and recording threads have shared contexts.
+ *
+ * Access to command buffer objects from different threads must be synchronized
+ * by the application. In other words, it falls on the application to ensure
+ * that no two threads ever access the same command buffer simultaneously.
  */
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
