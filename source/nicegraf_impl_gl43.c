@@ -69,8 +69,12 @@ struct ngf_graphics_pipeline_t {
   uint32_t nowned_stages;
 };
 
+#define _NGF_MAX_DRAW_BUFFERS 5
+
 struct ngf_render_target_t {
   GLuint framebuffer;
+  size_t ndraw_buffers;
+  GLenum draw_buffers[_NGF_MAX_DRAW_BUFFERS];
   uint32_t nattachments;
   ngf_attachment attachment_infos[];
 };
@@ -1294,9 +1298,13 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
     render_target->attachment_infos[i] = *a;
     GLenum gl_attachment;
     switch (a->type) {
-    case NGF_ATTACHMENT_COLOR:
+    case NGF_ATTACHMENT_COLOR: {
+      size_t draw_buffer = ncolor_attachment;
       gl_attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
+      assert(draw_buffer < _NGF_MAX_DRAW_BUFFERS);
+      render_target->draw_buffers[draw_buffer] = gl_attachment;
       break;
+    }
     case NGF_ATTACHMENT_DEPTH:
       gl_attachment = GL_DEPTH_ATTACHMENT;
       break;
@@ -1330,6 +1338,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
                                 a->image_ref.image->glimage);
     }
   }
+  render_target->ndraw_buffers = ncolor_attachment;
 
   GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   bool fb_ok = fb_status == GL_FRAMEBUFFER_COMPLETE;
@@ -2273,6 +2282,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
           glDepthMask(GL_TRUE);
+          glDrawBuffers((GLsizei)active_rt->ndraw_buffers,
+                         active_rt->draw_buffers);
           for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
             const ngf_attachment *attachment = &active_rt->attachment_infos[a];
             if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
