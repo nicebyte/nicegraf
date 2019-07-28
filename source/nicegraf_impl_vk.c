@@ -128,9 +128,7 @@ typedef struct {
 } _ngf_buffer;
 
 typedef struct ngf_attrib_buffer_t {
-  VkBuffer      vkbuf;
-  VmaAllocation buf_alloc;
-  size_t        size;
+  _ngf_buffer data;
 } ngf_attrib_buffer_t;
 
 typedef struct ngf_index_buffer_t {
@@ -2316,7 +2314,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
                                 uint32_t                offset) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   VkDeviceSize vkoffset = offset;
-  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
+  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->data.vkbuf, &vkoffset);
 }
 
 void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
@@ -2334,15 +2332,15 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
   };
   
   vkCmdCopyBuffer(buf->active_bundle.vkcmdbuf,
-                  src->vkbuf,
-                  dst->vkbuf,
+                  src->data.vkbuf,
+                  dst->data.vkbuf,
                   1u,
                  &copy_region);
 
   VkBufferMemoryBarrier buf_mem_bar = {
     .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
     .pNext               = NULL,
-    .buffer              = dst->vkbuf,
+    .buffer              = dst->data.vkbuf,
     .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
     .dstAccessMask       = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
     .srcQueueFamilyIndex = _vk.xfer_family_idx,
@@ -2441,13 +2439,13 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
     vk_usage_flags,
     vma_usage_flags,
     vk_mem_flags,
-   &buf->vkbuf,
-   &buf->buf_alloc);
+   &buf->data.vkbuf,
+   &buf->data.alloc);
 
   if (err != NGF_ERROR_OK) {
     NGF_FREE(buf);
   } else {
-    buf->size = info->size;
+    buf->data.size = info->size;
   }
 
   return err;
@@ -2456,9 +2454,9 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
   if (buffer) {
     _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
-                       buffer->vkbuf);
+                       buffer->data.vkbuf);
     _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
-                       buffer->buf_alloc);
+                       buffer->data.alloc);
     NGF_FREE(buffer);
   }
 }
@@ -2468,17 +2466,17 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t            size,
                                   uint32_t          flags) {
   _NGF_FAKE_USE(size, flags);
-  return _ngf_map_buffer(buf->buf_alloc, offset);
+  return _ngf_map_buffer(buf->data.alloc, offset);
 }
 
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
                                    size_t size) {
-  _ngf_flush_buffer(buf->buf_alloc, offset, size);
+  _ngf_flush_buffer(buf->data.alloc, offset, size);
 }
 
 void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
-  _ngf_unmap_buffer(buf->buf_alloc);
+  _ngf_unmap_buffer(buf->data.alloc);
 }
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
