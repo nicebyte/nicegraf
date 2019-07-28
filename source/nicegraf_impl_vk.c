@@ -130,11 +130,9 @@ typedef struct ngf_cmd_buffer_t {
 } ngf_cmd_buffer_t;
 
 typedef struct ngf_attrib_buffer_t {
-  VkBuffer vkbuf;
-  VkBuffer vkstaging_buf;
+  VkBuffer      vkbuf;
   VmaAllocation buf_alloc;
-  VmaAllocation staging_buf_alloc;
-  size_t   size;
+  size_t        size;
 } ngf_attrib_buffer_t;
 
 // Vulkan resources associated with a given frame.
@@ -466,6 +464,29 @@ static VkShaderStageFlagBits get_vk_shader_stage(ngf_stage_type s) {
     VK_SHADER_STAGE_FRAGMENT_BIT
   };
   return stages[s];
+}
+
+static VkBufferUsageFlags get_vk_buffer_usage(uint32_t usage) {
+  VkBufferUsageFlags flags = 0u;
+  if (usage & NGF_BUFFER_USAGE_XFER_DST)
+    flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+  if (usage & NGF_BUFFER_USAGE_XFER_SRC)
+    flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  return flags;
+}
+
+static VkMemoryPropertyFlags get_vk_memory_flags(ngf_buffer_storage_type s) {
+  switch (s) {
+  case NGF_BUFFER_STORAGE_HOST_READABLE:
+    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+           VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+  case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
+  case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
+    return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  case NGF_BUFFER_STORAGE_PRIVATE:
+    return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  }
+  return 0;
 }
 
 #if defined(XCB_NONE)
@@ -2241,8 +2262,45 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
   vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
 }
 
+void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
+                                const ngf_attrib_buffer src,
+                                ngf_attrib_buffer       dst,
+                                size_t                  size,
+                                size_t                  src_offset,
+                                size_t                  dst_offset) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf);
+  const VkBufferCopy copy_region = {
+    .srcOffset = src_offset,
+    .dstOffset = dst_offset,
+    .size      = size
+  };
+  
+  vkCmdCopyBuffer(buf->active_bundle.vkcmdbuf,
+                  src->vkbuf,
+                  dst->vkbuf,
+                  1u,
+                 &copy_region);
+
+  VkBufferMemoryBarrier buf_mem_bar = {
+    .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    .pNext               = NULL,
+    .buffer              = dst->vkbuf,
+    .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .dstAccessMask       = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+    .srcQueueFamilyIndex = _vk.xfer_family_idx,
+    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .offset              = dst_offset,
+    .size                = size
+  };
+  vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                       0, 0u, NULL,
+                       1u, &buf_mem_bar, 0, NULL);
+}
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer *result) {
+                                   ngf_attrib_buffer            *result) {
   assert(info);
   assert(result);
   ngf_attrib_buffer buf = NGF_ALLOC(ngf_attrib_buffer_t);
@@ -2250,84 +2308,73 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->size = info->size;/*
-  VkBufferCreateInfo staging_buf_vk_info = {
+
+  const VkBufferCreateInfo buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0u,
-    .size                  = buf->size,
-    .usage                 = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-    .queueFamilyIndexCount = 0u,
-    .pQueueFamilyIndices   = NULL
-  };
-   VkBufferCreateInfo buf_vk_info = {
-    .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-    .pNext                 = NULL,
-    .flags                 = 0u,
-    .size                  = buf->size,
-    .usage                 = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+    .size                  = info->size,
+    .usage                 = get_vk_buffer_usage(info->buffer_usage) |
                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
     .queueFamilyIndexCount = 0u,
     .pQueueFamilyIndices   = NULL
   };
-  VmaAllocationCreateInfo staging_buf_alloc_info = {
+
+  const VmaAllocationCreateInfo buf_alloc_info = {
     .flags          = 0u,
-    .usage          = VMA_MEMORY_USAGE_CPU_ONLY,
-    .requiredFlags  = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+    .usage          = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+                        ? VMA_MEMORY_USAGE_GPU_ONLY
+                        : VMA_MEMORY_USAGE_CPU_ONLY, // TODO: more intelligent usage
+                                                     //       selection.
+    .requiredFlags  = get_vk_memory_flags(info->storage_type),
     .preferredFlags = 0u,
     .memoryTypeBits = 0u,
     .pool           = VK_NULL_HANDLE,
     .pUserData      = NULL
   };
-  VmaAllocationCreateInfo buf_alloc_info = {
-    .flags          = 0u,
-    .usage          = VMA_MEMORY_USAGE_GPU_ONLY,
-    .requiredFlags  = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    .preferredFlags = 0u,
-    .memoryTypeBits = 0u,
-    .pool           = VK_NULL_HANDLE,
-    .pUserData      = NULL
-  };
-  vmaCreateBuffer(CURRENT_CONTEXT->allocator, &buf_vk_info, &buf_alloc_info, &buf->vkbuf, &buf->buf_alloc, NULL);
-  vmaCreateBuffer(CURRENT_CONTEXT->allocator, &staging_buf_vk_info, &staging_buf_alloc_info, &buf->vkstaging_buf, &buf->staging_buf_alloc, NULL);
-  void *staging_buf_ptr = NULL;
-  vmaMapMemory(CURRENT_CONTEXT->allocator, buf->staging_buf_alloc,
-               &staging_buf_ptr);
-  if (info->buffer_ptr) {
-    memcpy(staging_buf_ptr, info->buffer_ptr, buf->size);
-  } else {
-    info->fill_callback(staging_buf_ptr, buf->size,
-                        info->fill_callback_userdata);
-  }
-  VkBufferCopy copy_region = {
-    .srcOffset = 0u,
-    .dstOffset = 0u,
-    .size      = buf->size
-  };
-  vkCmdCopyBuffer(info->cmdbuf->vkcmdbuf, buf->vkstaging_buf, buf->vkbuf,
-                  1u, &copy_region);
-  VkBufferMemoryBarrier buf_mem_bar = {
-    .sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-    .pNext = NULL,
-    .buffer = buf->vkbuf,
-    .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
-    .srcQueueFamilyIndex = _vk.xfer_family_idx,
-    .dstQueueFamilyIndex = _vk.gfx_family_idx,
-    .offset = 0,
-    .size = buf->size
-  };
-  vkCmdPipelineBarrier(info->cmdbuf->vkcmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);*/
-  return NGF_ERROR_OK;
+
+  VkResult vkresult = vmaCreateBuffer(CURRENT_CONTEXT->allocator,
+                                     &buf_vk_info,
+                                     &buf_alloc_info,
+                                     &buf->vkbuf,
+                                     &buf->buf_alloc,
+                                      NULL);
+  buf->size = info->size;
+  return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
 //TODO: implement
   NGF_FREE(buffer);
+}
+
+void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
+                                  size_t            offset,
+                                  size_t            size,
+                                  uint32_t          flags) {
+  _NGF_FAKE_USE(offset, size, flags);
+  void* result = NULL;
+  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator,
+                                   buf->buf_alloc,
+                                  &result);
+  return vkresult == VK_SUCCESS ? result : NULL;
+}
+
+void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
+                                   size_t offset,
+                                   size_t size) {
+  // TODO: on VK the range offset is relative to the start of buffer,
+  //       but on GL it is relative to the start of the mapped range!
+  vmaFlushAllocation(CURRENT_CONTEXT->allocator,
+                     buf->buf_alloc,
+                     offset,
+                     size);
+}
+
+void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator,
+                 buf->buf_alloc);
 }
 
 /*ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
