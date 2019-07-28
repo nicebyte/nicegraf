@@ -145,6 +145,8 @@ typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
+ _NGF_DARRAY_OF(VkBuffer)              retire_buffers;
+ _NGF_DARRAY_OF(VmaAllocation)         retire_allocs;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -1140,6 +1142,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_allocs, 8);
     ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1274,6 +1278,13 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                       p),
                                   NULL);
   }
+  for (uint32_t a = 0;
+       a < _NGF_DARRAY_SIZE(frame_res->retire_allocs);
+     ++a) {
+    vmaDestroyBuffer(CURRENT_CONTEXT->allocator,
+                    _NGF_DARRAY_AT(frame_res->retire_buffers, a),
+                    _NGF_DARRAY_AT(frame_res->retire_allocs, a));
+  }
   _NGF_DARRAY_CLEAR(frame_res->submitted_gfx_cmds);
   _NGF_DARRAY_CLEAR(frame_res->submitted_xfer_cmds);
   _NGF_DARRAY_CLEAR(frame_res->signal_gfx_semaphores);
@@ -1283,6 +1294,8 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   _NGF_DARRAY_CLEAR(frame_res->retire_pipelines);
   _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
+  _NGF_DARRAY_CLEAR(frame_res->retire_buffers);
+  _NGF_DARRAY_CLEAR(frame_res->retire_allocs);
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -2370,8 +2383,13 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 }
 
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
-//TODO: implement
-  NGF_FREE(buffer);
+  if (buffer) {
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
+                       buffer->vkbuf);
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
+                       buffer->buf_alloc);
+    NGF_FREE(buffer);
+  }
 }
 
 void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
