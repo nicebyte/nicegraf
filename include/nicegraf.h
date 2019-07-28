@@ -118,7 +118,9 @@ typedef enum ngf_error {
   NGF_ERROR_RENDER_TARGET_CREATION_FAILED,
 
   /** The command buffer is in an invalid state. */
-  NGF_ERROR_COMMAND_BUFFER_INVALID_STATE
+  NGF_ERROR_COMMAND_BUFFER_INVALID_STATE,
+
+  NGF_ERROR_INVALID_OPERATION
   /*..add new errors above this line */
 } ngf_error ;
 
@@ -469,19 +471,33 @@ typedef enum ngf_buffer_storage_type {
 } ngf_buffer_storage_type;
 
 /**
+ * Flags for clarifying how the buffer is intended to be used.
+ */
+typedef enum ngf_buffer_usage {
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01, /** < Buffer may be used as a source for
+                                          transfer operations.
+                                      */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02, /** < Buffer may be used as a destination
+                                          for transfer operations.
+                                      */
+} ngf_buffer_usage;
+
+
+/**
  * Information required for buffer creation.
  */
 typedef struct ngf_buffer_info {
-  size_t size;
-  ngf_buffer_storage_type storage_type;
+  size_t                  size;         
+  ngf_buffer_storage_type storage_type;                                
+  uint32_t                buffer_usage;
 } ngf_buffer_info;
 
 /**
  * Options for mapping a buffer to host memory.
  */
 typedef enum ngf_buffer_map_flags {
-  NGF_BUFFER_MAP_READ_BIT = 0x01, /** < Mapped memory is readable. */
-  NGF_BUFFER_MAP_WRITE_BIT = 0x02,/** < Mapped memory is writeable. */
+  NGF_BUFFER_MAP_READ_BIT  = 0x01, /** < Mapped memory is readable. */
+  NGF_BUFFER_MAP_WRITE_BIT = 0x02, /** < Mapped memory is writeable. */
   /**
    * When a buffer is mapped with this flag, its previous contents becomes
    * undefined for any commands submitted after the mapping operation.
@@ -1473,7 +1489,7 @@ void ngf_cmd_end_pass(ngf_render_encoder buf);
 void ngf_cmd_draw(ngf_render_encoder buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances);
-void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder buf,
+void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer dst,
                                 size_t size,
