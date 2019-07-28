@@ -1065,24 +1065,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     ctx->swapchain_info = *swapchain_info;
   }
 
-  // Create a command pool.
-  VkCommandPoolCreateInfo cmd_pool_info = {
-    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-    .pNext            = NULL,
-    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-    .queueFamilyIndex = _vk.gfx_family_idx
-  };
-  _NGF_DARRAY_RESET(ctx->cmd_pools, ctx->max_inflight_frames);
-  for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-    VkCommandPool pool = VK_NULL_HANDLE;
-    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL, &pool);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-    _NGF_DARRAY_APPEND(ctx->cmd_pools, pool);
-  }
-
   // Set up VMA.
   VmaVulkanFunctions vma_vk_fns = {
     .vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties,
@@ -1159,6 +1141,26 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     }
   }
   ctx->frame_number = 0u;
+
+  // Create command pools.
+  VkCommandPoolCreateInfo cmd_pool_info = {
+    .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+    .pNext            = NULL,
+    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .queueFamilyIndex = _vk.gfx_family_idx
+  };
+  _NGF_DARRAY_RESET(ctx->cmd_pools, ctx->max_inflight_frames);
+  for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
+    VkCommandPool pool = VK_NULL_HANDLE;
+    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL, &pool);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+      goto ngf_create_context_cleanup;
+    }
+    _NGF_DARRAY_APPEND(ctx->cmd_pools, pool);
+  }
+
+
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -2193,8 +2195,8 @@ void ngf_cmd_draw(ngf_render_encoder enc,
   }
 }
 
-void ngf_cmd_bind_pipeline(ngf_render_encoder          enc,
-                           const ngf_graphics_pipeline pipeline) {
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
+                               const ngf_graphics_pipeline pipeline) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
