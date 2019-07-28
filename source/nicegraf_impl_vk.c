@@ -613,7 +613,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     uint32_t gfx_family_idx = _NGF_INVALID_IDX;
     uint32_t present_family_idx = _NGF_INVALID_IDX;
     uint32_t xfer_family_idx = _NGF_INVALID_IDX;
-    for (uint32_t q = 0; q < num_queue_families; ++q) {
+    for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
       const VkBool32     is_gfx = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
       const VkBool32     is_xfer = (flags & VK_QUEUE_TRANSFER_BIT) != 0;
@@ -2228,6 +2228,14 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
       target->is_default
           ? swapchain->framebuffers[swapchain->image_idx]
           : VK_NULL_HANDLE; // TODO: non-default render targets.
+  const VkExtent2D render_extent = {
+      target->is_default
+        ? CURRENT_CONTEXT->swapchain_info.width
+        : target->width,
+      target->is_default
+        ? CURRENT_CONTEXT->swapchain_info.height
+        : target->height
+  };
   const VkRenderPassBeginInfo begin_info = {
     .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .pNext           = NULL,
@@ -2237,7 +2245,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
     .renderPass      = target->render_pass,
     .renderArea = {
       .offset = {0u, 0u},
-      .extent = {target->width, target->height}
+      .extent = render_extent
      }
   };
   vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
