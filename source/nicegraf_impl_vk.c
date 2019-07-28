@@ -68,7 +68,7 @@
 #define _NGF_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
 
 // Singleton for holding vulkan instance and device handles.
-// This is the same for all contexts.
+// This is shared by all contexts.
 struct {
   VkInstance       instance;
   VkPhysicalDevice phys_dev;
@@ -80,6 +80,7 @@ struct {
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
   uint32_t         xfer_family_idx;
+  ATOMIC_INT       frame_id;
 } _vk;
 
 // State that is common among "shared" contexts (TODO: remove this?)
@@ -112,11 +113,29 @@ typedef struct _ngf_swapchain {
   } renderpass;
 } _ngf_swapchain;
 
+// Indicates the type of queue that a command bundle is intented for.
+typedef enum _ngf_cmd_bundle_type_t {
+  _NGF_BUNDLE_RENDERING,
+  _NGF_BUNDLE_XFER
+} _ngf_cmd_bundle_type;
+
+// A "command bundle" consists of a command buffer, a semaphore that is
+// signaled on its completion and a reference to the command buffer's parent
+// pool.
+typedef struct _ngf_cmd_bundle_t {
+  VkCommandBuffer      vkcmdbuf;
+  VkSemaphore          vksem;
+  VkCommandPool        vkpool;
+  _ngf_cmd_bundle_type type;
+} _ngf_cmd_bundle;
+
 typedef struct ngf_cmd_buffer_t {
-  VkCommandBuffer vkcmdbuf;
-  VkSemaphore     vksem;
-  VkCommandPool   vkpool;
-  bool recording;
+  _NGF_DARRAY_OF(_ngf_cmd_bundle) bundles;        // Finished bundles.
+  _ngf_cmd_bundle                 active_bundle;  // Current bundle.
+  ATOMIC_INT                      frame_id;       // Stores the id of the frame
+                                                  // that tha cmd buffer is
+                                                  // intended for.
+  _ngf_cmd_buffer_state           state;
 } ngf_cmd_buffer_t;
 
 typedef struct ngf_attrib_buffer_t {
@@ -129,26 +148,39 @@ typedef struct ngf_attrib_buffer_t {
 
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
- _NGF_DARRAY_OF(ngf_cmd_buffer_t)      submitted_cmdbuffers;
- _NGF_DARRAY_OF(VkSemaphore)           wait_vksemaphores; // 1 per cmdbuf.
+  // Command buffers submitted to the graphics queue, their
+  // associated semaphores and command pools.
+ _NGF_DARRAY_OF(VkCommandBuffer)       submitted_gfx_cmds;
+ _NGF_DARRAY_OF(VkSemaphore)           signal_gfx_semaphores;
+ _NGF_DARRAY_OF(VkCommandPool)         gfx_cmd_pools;
+  
+  // Same for transfer queue.
+ _NGF_DARRAY_OF(VkCommandBuffer)       submitted_xfer_cmds;
+ _NGF_DARRAY_OF(VkSemaphore)           signal_xfer_semaphores;
+ _NGF_DARRAY_OF(VkCommandPool)         xfer_cmd_pools;
+
+  // Resources that should be disposed of at some point after this
+  // frame's completion.
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
-  VkFence                              fence; // signaled when frame is done.
+
+  // Fences that will be signaled at the end of the frame.
+  VkFence                              fences[2];
+  uint32_t                             nfences;
   bool                                 active;
 } _ngf_frame_resources;
 
 typedef struct ngf_context_t {
- _ngf_frame_resources       *frame_res;
- _ngf_context_shared_state **shared_state;
- _ngf_swapchain              swapchain;
-  ngf_swapchain_info         swapchain_info;
-  VmaAllocator               allocator;
-  VkCommandPool              cmd_pools[3];
-  uint32_t                   active_pool_idx;
-  VkSurfaceKHR               surface;
-  uint32_t                   frame_number;
-  uint32_t                   max_inflight_frames;
+ _ngf_frame_resources         *frame_res;
+ _ngf_context_shared_state   **shared_state;
+ _ngf_swapchain                swapchain;
+  ngf_swapchain_info           swapchain_info;
+  VmaAllocator                 allocator;
+ _NGF_DARRAY_OF(VkCommandPool) cmd_pools;
+  VkSurfaceKHR                 surface;
+  uint32_t                     frame_number;
+  uint32_t                     max_inflight_frames;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -565,6 +597,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
                                              NULL);
     VkQueueFamilyProperties *queue_families =
         alloca(num_queue_families * sizeof(VkQueueFamilyProperties));
+    assert(queue_families);
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
                                              &num_queue_families,
                                               queue_families);
@@ -660,6 +693,9 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     // Load device-level entry points.
     volkLoadDevice(_vk.device);
 
+    // Initialize frame id.
+    _vk.frame_id = 0;
+
     // Done!
   }
   return NGF_ERROR_OK;
@@ -737,6 +773,7 @@ static ngf_error _ngf_create_swapchain(
   uint32_t nformats = 0u;
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, NULL);
   VkSurfaceFormatKHR *formats = alloca(sizeof(VkSurfaceFormatKHR) * nformats);
+  assert(formats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats,
                                         formats);
   const VkColorSpaceKHR color_space      = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR; // TODO: use correct colorspace here.
@@ -1077,16 +1114,16 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     .queueFamilyIndex = _vk.gfx_family_idx
   };
-  memset(ctx->cmd_pools, VK_NULL_HANDLE, sizeof(ctx->cmd_pools));
-  for (uint32_t p = 0u; p < _NGF_ARRAYSIZE(ctx->cmd_pools); ++p) {
-    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
-                                 &ctx->cmd_pools[p]);
+  _NGF_DARRAY_RESET(ctx->cmd_pools, ctx->max_inflight_frames);
+  for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
+    VkCommandPool pool = VK_NULL_HANDLE;
+    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL, &pool);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
+    _NGF_DARRAY_APPEND(ctx->cmd_pools, pool);
   }
-  ctx->active_pool_idx = 0u;
 
   // Set up VMA.
   VmaVulkanFunctions vma_vk_fns = {
@@ -1131,10 +1168,18 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     goto ngf_create_context_cleanup;
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    _NGF_DARRAY_RESET(ctx->frame_res[f].wait_vksemaphores,
+    _NGF_DARRAY_RESET(ctx->frame_res[f].signal_gfx_semaphores,
                       max_inflight_frames);
-    _NGF_DARRAY_RESET(ctx->frame_res[f].submitted_cmdbuffers,
+    _NGF_DARRAY_RESET(ctx->frame_res[f].signal_xfer_semaphores,
                       max_inflight_frames);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].gfx_cmd_pools,
+                      max_inflight_frames);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].submitted_gfx_cmds,
+                      max_inflight_frames);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].submitted_xfer_cmds,
+                      max_inflight_frames);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].xfer_cmd_pools,
+                      max_inflight_frames)
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
@@ -1144,11 +1189,15 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .pNext = NULL,
       .flags = 0u
     };
-    vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
-                           &ctx->frame_res[f].fence);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
+    ctx->frame_res[f].nfences =
+      _vk.gfx_family_idx == _vk.xfer_family_idx ? 1u : 2u;
+    for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
+      vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
+                             &ctx->frame_res[f].fences[i]);
+      if (vk_err != VK_SUCCESS) {
+        err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+        goto ngf_create_context_cleanup;
+      }
     }
   }
   ctx->frame_number = 0u;
@@ -1176,22 +1225,37 @@ ngf_error ngf_resize_context(ngf_context ctx,
 
 void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   if (frame_res->active) {
-    vkWaitForFences(_vk.device, 1u, &frame_res->fence, true, 1000000u);
-    vkResetFences(_vk.device, 1u,
-                  &frame_res->fence);
+    vkWaitForFences(_vk.device,
+                     frame_res->nfences,
+                     frame_res->fences,
+                     true,
+                     1000000u);
+    vkResetFences(_vk.device, frame_res->nfences,
+                   frame_res->fences);
   }
   frame_res->active = false;
   for (uint32_t s = 0u;
-       s < _NGF_DARRAY_SIZE(frame_res->wait_vksemaphores);
+       s < _NGF_DARRAY_SIZE(frame_res->signal_gfx_semaphores);
        ++s) {
-    ngf_cmd_buffer_t cmd_buffer =
-        _NGF_DARRAY_AT(frame_res->submitted_cmdbuffers, s);
-    vkFreeCommandBuffers(_vk.device,
-                         cmd_buffer.vkpool, 1u, &cmd_buffer.vkcmdbuf);
-    vkDestroySemaphore(_vk.device,
-                       _NGF_DARRAY_AT(frame_res->wait_vksemaphores, s),
-                       NULL);
+    VkCommandBuffer vk_cmd_buf =
+        _NGF_DARRAY_AT(frame_res->submitted_gfx_cmds, s);
+    VkSemaphore vk_sem = _NGF_DARRAY_AT(frame_res->signal_gfx_semaphores, s);
+    VkCommandPool vk_cmd_pool = _NGF_DARRAY_AT(frame_res->gfx_cmd_pools, s);
+    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
+    vkDestroySemaphore(_vk.device, vk_sem, NULL);
   }
+
+  for (uint32_t s = 0u;
+       s < _NGF_DARRAY_SIZE(frame_res->signal_gfx_semaphores);
+       ++s) {
+    VkCommandBuffer vk_cmd_buf =
+        _NGF_DARRAY_AT(frame_res->submitted_xfer_cmds, s);
+    VkSemaphore vk_sem = _NGF_DARRAY_AT(frame_res->signal_xfer_semaphores, s);
+    VkCommandPool vk_cmd_pool = _NGF_DARRAY_AT(frame_res->xfer_cmd_pools, s);
+    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
+    vkDestroySemaphore(_vk.device, vk_sem, NULL);
+  }
+
   for (uint32_t p = 0u;
        p < _NGF_DARRAY_SIZE(frame_res->retire_pipelines);
        ++p) {
@@ -1217,8 +1281,12 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                       p),
                                   NULL);
   }
-  _NGF_DARRAY_CLEAR(frame_res->submitted_cmdbuffers);
-  _NGF_DARRAY_CLEAR(frame_res->wait_vksemaphores);
+  _NGF_DARRAY_CLEAR(frame_res->submitted_gfx_cmds);
+  _NGF_DARRAY_CLEAR(frame_res->submitted_xfer_cmds);
+  _NGF_DARRAY_CLEAR(frame_res->signal_gfx_semaphores);
+  _NGF_DARRAY_CLEAR(frame_res->signal_xfer_semaphores);
+  _NGF_DARRAY_CLEAR(frame_res->gfx_cmd_pools);
+  _NGF_DARRAY_CLEAR(frame_res->xfer_cmd_pools);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipelines);
   _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
@@ -1236,18 +1304,26 @@ void ngf_destroy_context(ngf_context ctx) {
         if (ctx->frame_res[f].active) {
           _ngf_retire_resources(&ctx->frame_res[f]);
         }
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_cmdbuffers);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].wait_vksemaphores);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_gfx_cmds);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_xfer_cmds);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_gfx_semaphores);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_xfer_semaphores);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].gfx_cmd_pools);
+        _NGF_DARRAY_DESTROY(ctx->frame_res[f].xfer_cmd_pools);
         _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
         _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
         _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
-        vkDestroyFence(_vk.device, ctx->frame_res[f].fence, NULL);
-      }
-      for (uint32_t p = 0; p < _NGF_ARRAYSIZE(ctx->cmd_pools); ++p) {
-        if (ctx->cmd_pools[p] != VK_NULL_HANDLE) {
-          vkDestroyCommandPool(_vk.device, ctx->cmd_pools[p], NULL);
+        for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
+          vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
         }
       }
+      for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->cmd_pools); ++p) {
+        VkCommandPool pool = _NGF_DARRAY_AT(ctx->cmd_pools, p);
+        if (pool != VK_NULL_HANDLE) {
+          vkDestroyCommandPool(_vk.device, pool, NULL);
+        }
+      }
+      _NGF_DARRAY_DESTROY(ctx->cmd_pools);
       _ngf_destroy_swapchain(&ctx->swapchain);
       if (ctx->surface != VK_NULL_HANDLE) {
         vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
@@ -1289,130 +1365,169 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   if (cmd_buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
+  _NGF_DARRAY_RESET(cmd_buf->bundles, 3);
+  cmd_buf->state = _NGF_CMD_BUFFER_READY;
+  return NGF_ERROR_OK;
+}
 
-  cmd_buf->vkcmdbuf  = VK_NULL_HANDLE;
-  cmd_buf->vksem     = VK_NULL_HANDLE;
-  cmd_buf->vkpool    = VK_NULL_HANDLE;
-  cmd_buf->recording = false;
+static ngf_error _ngf_cmd_bundle_create(VkCommandPool        pool,
+                                        _ngf_cmd_bundle_type type,
+                                        _ngf_cmd_bundle     *bundle) {
+  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
+    .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+    .pNext              = NULL,
+    .commandPool        = pool,
+    .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+    .commandBufferCount = 1u
+  };
+  VkResult vk_err = vkAllocateCommandBuffers(_vk.device,
+                                             &vk_cmdbuf_info,
+                                             &bundle->vkcmdbuf);
+  if (vk_err != VK_SUCCESS) {
+    return NGF_ERROR_OUTOFMEM; // TODO: return appropriate error.
+  }
+  bundle->vkpool = pool;
+  VkCommandBufferBeginInfo cmd_buf_begin = {
+    .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+    .pNext            = NULL,
+    .flags            = 0,
+    .pInheritanceInfo = NULL
+  };
+  vkBeginCommandBuffer(bundle->vkcmdbuf, &cmd_buf_begin);
+  
+  // Create semaphore.
+  VkSemaphoreCreateInfo vk_sem_info = {
+    .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u
+  };
+  vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
+  if (vk_err != VK_SUCCESS) {
+    return NGF_ERROR_OUTOFMEM; // TODO: return appropriate error code
+  }
+
+  bundle->type = type;
 
   return NGF_ERROR_OK;
 }
 
-void _ngf_inc_recorder_count() {
-  pthread_mutex_lock(&CURRENT_SHARED_STATE->cmd_pool_mut);
-  CURRENT_SHARED_STATE->record_counter++;
-  pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
+static ngf_error _ngf_cmd_buffer_start_encoder(ngf_cmd_buffer      cmd_buf,
+                                              _ngf_cmd_bundle_type type) {
+  if (!_NGF_CMD_BUF_RECORDABLE(cmd_buf->state) ||
+      cmd_buf->frame_id != interlocked_read(&_vk.frame_id)) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+  }
+  const size_t pool_idx =
+      cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
+  VkCommandPool pool = _NGF_DARRAY_AT(CURRENT_CONTEXT->cmd_pools, pool_idx);
+  ngf_error err = _ngf_cmd_bundle_create(pool, type, &cmd_buf->active_bundle);
+  cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
+  return err;
 }
 
-void _ngf_dec_recorder_count() {
-  pthread_mutex_lock(&CURRENT_SHARED_STATE->record_counter_mut);
-  assert(CURRENT_SHARED_STATE->record_counter > 0u);
-  if (--(CURRENT_SHARED_STATE->record_counter) == 0u) {
-    pthread_cond_signal(&CURRENT_SHARED_STATE->recording_inactive_cond);
-  }
-  pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer      cmd_buf,
+                                      ngf_render_encoder *enc) {
+  enc->__handle = (uintptr_t)((void*)cmd_buf);
+  return _ngf_cmd_buffer_start_encoder(cmd_buf, _NGF_BUNDLE_RENDERING);
 }
 
-void _ngf_cleanup_cmd_buffer(ngf_cmd_buffer cmd_buf) {
-  if (cmd_buf  != NULL) {
-    if (cmd_buf->vkcmdbuf != VK_NULL_HANDLE) {
-      vkFreeCommandBuffers(_vk.device,
-                           cmd_buf->vkpool, 1u, &cmd_buf->vkcmdbuf);
-      if (cmd_buf->recording) _ngf_dec_recorder_count();
-    }
-    if (cmd_buf->vksem != VK_NULL_HANDLE) {
-      vkDestroySemaphore(_vk.device, cmd_buf->vksem, NULL);
-    }
+ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer    cmd_buf,
+                                    ngf_xfer_encoder *enc) {
+  enc->__handle = (uintptr_t)((void*)cmd_buf);
+  return _ngf_cmd_buffer_start_encoder(cmd_buf, _NGF_BUNDLE_XFER);
+}
+
+static ngf_error _ngf_encoder_end(ngf_cmd_buffer cmd_buf) {
+  if (!_NGF_CMD_BUF_RECORDABLE(cmd_buf->state)) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
+  vkEndCommandBuffer(cmd_buf->active_bundle.vkcmdbuf);
+  _NGF_DARRAY_APPEND(cmd_buf->bundles, cmd_buf->active_bundle);
+  cmd_buf->state = _NGF_CMD_BUFFER_AWAITING_SUBMIT;
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+  return _ngf_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
+}
+
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+  return _ngf_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
 }
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   assert(cmd_buf);
-  ngf_error err   = NGF_ERROR_OK;
-  VkResult vk_err = VK_SUCCESS;
 
-  // Verify we're not recording.
-  if (cmd_buf->recording) {
-    err = NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
-    goto ngf_start_cmd_buffer_cleanup;
+  // Verify we're in a valid state.
+  if (cmd_buf->state != _NGF_CMD_BUFFER_READY &&
+      cmd_buf->state != _NGF_CMD_BUFFER_SUBMITTED) {
+    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
+  assert(_NGF_DARRAY_SIZE(cmd_buf->bundles) == 0);
+  cmd_buf->frame_id = interlocked_read(&_vk.frame_id);
+  cmd_buf->state = _NGF_CMD_BUFFER_READY;
 
-  // Create command buffer of reset existing one.
-  _ngf_inc_recorder_count();
-  cmd_buf->recording = true;
-  if (cmd_buf->vkcmdbuf == VK_NULL_HANDLE) { // no handle, create new cmdbuf.
-    VkCommandBufferAllocateInfo vk_cmdbuf_info = {
-      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .pNext              = NULL,
-      .commandPool        = CURRENT_CONTEXT->cmd_pool,
-      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1u
-    };
-    vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info,
-                                      &cmd_buf->vkcmdbuf);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_OUTOFMEM; // TODO: return appropriate error.
-      goto ngf_start_cmd_buffer_cleanup;
-    }
-    cmd_buf->vkpool = CURRENT_CONTEXT->cmd_pool;
-    VkCommandBufferBeginInfo cmd_buf_begin = {
-      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .pNext            = NULL,
-      .flags            = 0,
-      .pInheritanceInfo = NULL
-    };
-    vkBeginCommandBuffer(cmd_buf->vkcmdbuf, &cmd_buf_begin);
-  } else { // have handle, reuse resources
-    vkResetCommandBuffer(cmd_buf->vkcmdbuf, 0);
-  }
-  
-  // Create semaphore.
-  if (cmd_buf->vksem == VK_NULL_HANDLE) {
-    VkSemaphoreCreateInfo vk_sem_info = {
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0u
-    };
-    vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL,
-                               &cmd_buf->vksem);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_OUTOFMEM; // TODO: return appropriate error code
-      goto ngf_start_cmd_buffer_cleanup;
-    }
-  }
-
-ngf_start_cmd_buffer_cleanup:
-  if (err != NGF_ERROR_OK) {
-    _ngf_cleanup_cmd_buffer(cmd_buf);
-  }
-
-  return err;
+  return NGF_ERROR_OK;
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
-  _ngf_cleanup_cmd_buffer(buffer);
+  assert(buffer);
+  const uint32_t nbundles = _NGF_DARRAY_SIZE(buffer->bundles);
+  for (uint32_t i = 0u; i < nbundles; ++i) {
+    _ngf_cmd_bundle *bundle = &(_NGF_DARRAY_AT(buffer->bundles, i));
+    vkFreeCommandBuffers(_vk.device, bundle->vkpool, 1, &bundle->vkcmdbuf);
+    vkDestroySemaphore(_vk.device, bundle->vksem, NULL);
+  }
+  _NGF_DARRAY_DESTROY(buffer->bundles);
+  // TODO: free active bundle.
+  NGF_FREE(buffer);
 }
 
-ngf_error ngf_submit_cmd_buffer(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
+ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   assert(bufs);
-  uint32_t fi = CURRENT_CONTEXT->frame_number;
-  _ngf_frame_resources *frame_sync_data = &CURRENT_CONTEXT->frame_res[fi];
+  ATOMIC_INT fi = interlocked_read(&_vk.frame_id);
+  _ngf_frame_resources *frame_sync_data = 
+      &CURRENT_CONTEXT->frame_res[fi % CURRENT_CONTEXT->max_inflight_frames];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
-    if (bufs[i]->recording) {
-      return NGF_ERROR_CMD_BUFFER_ALREADY_RECORDING; // TODO: return appropriate error code
+    if (bufs[i]->state != _NGF_CMD_BUFFER_AWAITING_SUBMIT ||
+        fi != bufs[i]->frame_id) {
+      return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
     }
-    _NGF_DARRAY_APPEND(frame_sync_data->wait_vksemaphores, bufs[i]->vksem);
-    _NGF_DARRAY_APPEND(frame_sync_data->submitted_cmdbuffers,
-                       *bufs[i]);
-    bufs[i]->vkcmdbuf = VK_NULL_HANDLE;
-    bufs[i]->vksem = VK_NULL_HANDLE;
-    bufs[i]->vkpool = VK_NULL_HANDLE;
+    for (uint32_t j = 0; j < _NGF_DARRAY_SIZE(bufs[i]->bundles); ++j) {
+      _ngf_cmd_bundle *bundle = &(_NGF_DARRAY_AT(bufs[i]->bundles, j));
+      switch (bundle->type) {
+      case _NGF_BUNDLE_RENDERING:
+        _NGF_DARRAY_APPEND(frame_sync_data->submitted_gfx_cmds,
+                           bundle->vkcmdbuf);
+        _NGF_DARRAY_APPEND(frame_sync_data->signal_gfx_semaphores,
+                           bundle->vksem);
+        _NGF_DARRAY_APPEND(frame_sync_data->gfx_cmd_pools,
+                           bundle->vkpool);
+        break;
+
+      case _NGF_BUNDLE_XFER:
+        _NGF_DARRAY_APPEND(frame_sync_data->submitted_xfer_cmds,
+                           bundle->vkcmdbuf);
+        _NGF_DARRAY_APPEND(frame_sync_data->signal_xfer_semaphores,
+                           bundle->vksem);
+        _NGF_DARRAY_APPEND(frame_sync_data->xfer_cmd_pools,
+                           bundle->vkpool);
+        break;
+
+      default:
+        assert(0);
+      }
+    }
+    _NGF_DARRAY_CLEAR(bufs[i]->bundles);
+    bufs[i]->state = _NGF_CMD_BUFFER_SUBMITTED;
   }
   return NGF_ERROR_OK;
 }
+
 ngf_error ngf_begin_frame() {
   ngf_error err = NGF_ERROR_OK;
-  uint32_t fi = CURRENT_CONTEXT->frame_number;
+  uint32_t fi =
+      interlocked_read(&_vk.frame_id) % CURRENT_CONTEXT->max_inflight_frames;
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     const VkResult vk_err =
         vkAcquireNextImageKHR(_vk.device,
@@ -1424,18 +1539,64 @@ ngf_error ngf_begin_frame() {
     if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
   }
   CURRENT_CONTEXT->frame_res[fi].active = true;
-  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_cmdbuffers);
-  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].wait_vksemaphores);
-  return err;
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_gfx_cmds);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_gfx_semaphores);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].gfx_cmd_pools);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_xfer_cmds);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_xfer_semaphores);
+  _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].xfer_cmd_pools);
+   return err;
+}
+
+static void _ngf_submit_commands(VkQueue                     queue,
+                                 const VkCommandBuffer      *cmd_bufs,
+								                 uint32_t                    ncmd_bufs,
+                                 const VkPipelineStageFlags *wait_stage_flags,
+								                 const VkSemaphore          *wait_sems,
+								                 uint32_t                    nwait_sems,
+                                 const VkSemaphore          *signal_sems,
+                                 uint32_t                    nsignal_sems,
+                                 VkFence                     fence) {
+  const VkSubmitInfo submit_info = {
+    .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+    .pNext                = NULL,
+    .waitSemaphoreCount   = nwait_sems,
+    .pWaitSemaphores      = wait_sems,
+    .pWaitDstStageMask    = wait_stage_flags,
+    .commandBufferCount   = ncmd_bufs,
+    .pCommandBuffers      = cmd_bufs,
+    .signalSemaphoreCount = nsignal_sems,
+    .pSignalSemaphores    = signal_sems
+  };
+  vkQueueSubmit(queue, 1, &submit_info, fence);
 }
 
 ngf_error ngf_end_frame() {
   ngf_error err = NGF_ERROR_OK;
 
-  const uint32_t fi = CURRENT_CONTEXT->frame_number;
+  // Obtain the current frame sync structure and increment frame number.
+  const ATOMIC_INT frame_id = interlocked_post_inc(&_vk.frame_id);
+  const uint32_t fi = frame_id % CURRENT_CONTEXT->max_inflight_frames;
   const _ngf_frame_resources *frame_sync = &CURRENT_CONTEXT->frame_res[fi];
 
-  // Submit the pending command buffers.
+  // Submit pending transfer commands if we're using separate gfx and xfer
+  // queues.
+  if (_vk.gfx_family_idx != _vk.xfer_family_idx) {
+    const uint32_t nsubmitted_xfer_cmdbuffers =
+      _NGF_DARRAY_SIZE(frame_sync->submitted_xfer_cmds);
+    _ngf_submit_commands(_vk.xfer_queue,
+                          frame_sync->submitted_xfer_cmds.data,
+                          nsubmitted_xfer_cmdbuffers,
+                          NULL,
+                          NULL,
+                          0u,
+                          frame_sync->signal_xfer_semaphores.data,
+                          nsubmitted_xfer_cmdbuffers,
+                          frame_sync->fences[1]);
+  }
+
+  // Submit pending graphics commands (if transfer and graphics are on the
+  // same queue, this will submit transfer commands as well).
   const VkPipelineStageFlags color_attachment_stage =
       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   uint32_t wait_sem_count = 0u;
@@ -1447,61 +1608,40 @@ ngf_error ngf_end_frame() {
       &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
     wait_stage_masks = &color_attachment_stage; 
   }
-  const uint32_t nsubmitted_cmdbuffers =
-      _NGF_DARRAY_SIZE(frame_sync->submitted_cmdbuffers);
-  VkCommandBuffer *submitted_vkcmdbuffers =
-      (VkCommandBuffer*)alloca(sizeof(VkCommandBuffer) * nsubmitted_cmdbuffers);
-  for (uint32_t c = 0u; c < nsubmitted_cmdbuffers; ++c) {
-    submitted_vkcmdbuffers[c] =
-        _NGF_DARRAY_AT(frame_sync->submitted_cmdbuffers, c).vkcmdbuf;
-  }
+  const uint32_t nsubmitted_gfx_cmdbuffers =
+      _NGF_DARRAY_SIZE(frame_sync->submitted_gfx_cmds);
+  _ngf_submit_commands(_vk.gfx_queue,
+                        frame_sync->submitted_gfx_cmds.data,
+                        nsubmitted_gfx_cmdbuffers,
+                        wait_stage_masks,
+                        wait_sems,
+                        wait_sem_count,
+                        frame_sync->signal_gfx_semaphores.data,
+                        nsubmitted_gfx_cmdbuffers,
+                        frame_sync->fences[0]);
 
-  VkSubmitInfo submit_info = {
-    .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-    .pNext = NULL,
-    .waitSemaphoreCount = wait_sem_count,
-    .pWaitSemaphores = wait_sems,
-    .pWaitDstStageMask = wait_stage_masks,
-    .commandBufferCount = nsubmitted_cmdbuffers,
-    .pCommandBuffers = submitted_vkcmdbuffers,
-    .signalSemaphoreCount = _NGF_DARRAY_SIZE(frame_sync->wait_vksemaphores),
-    .pSignalSemaphores = frame_sync->wait_vksemaphores.data
-  };
-  vkQueueSubmit(_vk.gfx_queue, 1u, &submit_info, frame_sync->fence);
-
+  // Present if necessary.
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    VkResult present_result = VK_SUCCESS;
-    VkPresentInfoKHR present_info = {
-      .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .pNext = NULL,
-      .waitSemaphoreCount =
-          (uint32_t)_NGF_DARRAY_SIZE(frame_sync->wait_vksemaphores),
-      .pWaitSemaphores = frame_sync->wait_vksemaphores.data,
-      .swapchainCount = 1,
-      .pSwapchains = &CURRENT_CONTEXT->swapchain.vk_swapchain,
-      .pImageIndices = &CURRENT_CONTEXT->swapchain.image_idx,
-      .pResults = &present_result
+    const VkPresentInfoKHR present_info = {
+      .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+      .pNext              = NULL,
+      .waitSemaphoreCount = (uint32_t)_NGF_DARRAY_SIZE(
+                               frame_sync->signal_gfx_semaphores),
+      .pWaitSemaphores    = frame_sync->signal_gfx_semaphores.data,
+      .swapchainCount     = 1,
+      .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
+      .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
+      .pResults           = NULL
     };
-    vkQueuePresentKHR(_vk.present_queue, &present_info);
-    if (present_result != VK_SUCCESS) 
-      err = NGF_ERROR_END_FRAME_FAILED;
-  } 
-
-  // Retire resources
-  pthread_mutex_lock(&CURRENT_SHARED_STATE->cmd_pool_mut);
-  pthread_mutex_lock(&CURRENT_SHARED_STATE->record_counter_mut);
-  while (CURRENT_SHARED_STATE->record_counter > 0u) {
-    pthread_cond_wait(&CURRENT_SHARED_STATE->recording_inactive_cond,
-                      &CURRENT_SHARED_STATE->record_counter_mut);
+    const VkResult present_result = vkQueuePresentKHR(_vk.present_queue,
+                                                      &present_info);
+    if (present_result != VK_SUCCESS) err = NGF_ERROR_END_FRAME_FAILED;
   }
+
+  // Retire resources.
   uint32_t next_fi = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
   _ngf_frame_resources *next_frame_sync = &CURRENT_CONTEXT->frame_res[next_fi];
   _ngf_retire_resources(next_frame_sync);
-  pthread_mutex_unlock(&CURRENT_SHARED_STATE->record_counter_mut);
-  pthread_mutex_unlock(&CURRENT_SHARED_STATE->cmd_pool_mut);
-  CURRENT_CONTEXT->frame_number =
-      (CURRENT_CONTEXT->frame_number + 1u) %
-       CURRENT_CONTEXT->max_inflight_frames;
   return err;
 }
 
@@ -2063,8 +2203,8 @@ void ngf_debug_message_callback(void *userdata,
   _NGF_FAKE_USE(callback);
 }
 
-
-void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target) {
+/*
+void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
   const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
   const VkFramebuffer fb =
       target->is_default
@@ -2082,27 +2222,27 @@ void ngf_cmd_begin_pass(ngf_cmd_buffer buf, const ngf_render_target target) {
       .extent = {target->width, target->height}
      }
   };
-  vkCmdBeginRenderPass(buf->vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+  vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void ngf_cmd_end_pass(ngf_cmd_buffer buf) {
-  vkCmdEndRenderPass(buf->vkcmdbuf);
+  vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
 }
 
 void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
   if (indexed) {
-    vkCmdDrawIndexed(buf->vkcmdbuf, nelements, ninstances, first_element,
+    vkCmdDrawIndexed(buf->active_bundle.vkcmdbuf, nelements, ninstances, first_element,
                      0u, 0u);
   } else {
-    vkCmdDraw(buf->vkcmdbuf, nelements, ninstances, first_element, 0u);
+    vkCmdDraw(buf->active_bundle.vkcmdbuf, nelements, ninstances, first_element, 0u);
   }
 }
 
 void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
                            const ngf_graphics_pipeline pipeline) {
-  vkCmdBindPipeline(buf->vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
+  vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
 void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
@@ -2114,7 +2254,7 @@ void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
     .minDepth = 0.0f,  // TODO: add depth parameter
     .maxDepth = 1.0f   // TODO: add max depth parameter
   };
-  vkCmdSetViewport(buf->vkcmdbuf, 0u, 1u, &viewport);
+  vkCmdSetViewport(buf->active_bundle.vkcmdbuf, 0u, 1u, &viewport);
 }
 
 void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
@@ -2122,7 +2262,7 @@ void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
     .offset = {r->x, r->y},
     .extent = {r->width, r->height}
   };
-  vkCmdSetScissor(buf->vkcmdbuf, 0u, 1u, &scissor_rect);
+  vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
 }
 
 void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
@@ -2130,7 +2270,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
                                 uint32_t binding,
                                 uint32_t offset) {
   VkDeviceSize vkoffset = offset;
-  vkCmdBindVertexBuffers(buf->vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
+  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
@@ -2213,7 +2353,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   };
   vkCmdPipelineBarrier(info->cmdbuf->vkcmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);*/ 
+                       1u, &buf_mem_bar, 0, NULL);
   return NGF_ERROR_OK;
 }
 
