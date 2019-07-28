@@ -133,7 +133,7 @@ typedef struct ngf_cmd_buffer_t {
   _NGF_DARRAY_OF(_ngf_cmd_bundle) bundles;        // Finished bundles.
   _ngf_cmd_bundle                 active_bundle;  // Current bundle.
   ATOMIC_INT                      frame_id;       // Stores the id of the frame
-                                                  // that tha cmd buffer is
+                                                  // that the cmd buffer is
                                                   // intended for.
   _ngf_cmd_buffer_state           state;
 } ngf_cmd_buffer_t;
@@ -2203,8 +2203,10 @@ void ngf_debug_message_callback(void *userdata,
   _NGF_FAKE_USE(callback);
 }
 
-/*
+#define _ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
+
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
   const VkFramebuffer fb =
       target->is_default
@@ -2225,13 +2227,17 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
   vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-void ngf_cmd_end_pass(ngf_cmd_buffer buf) {
+void ngf_cmd_end_pass(ngf_render_encoder enc) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
 }
 
-void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
-                  uint32_t first_element, uint32_t nelements,
-                  uint32_t ninstances) {
+void ngf_cmd_draw(ngf_render_encoder enc,
+                  bool               indexed,
+                  uint32_t           first_element,
+                  uint32_t           nelements,
+                  uint32_t           ninstances) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   if (indexed) {
     vkCmdDrawIndexed(buf->active_bundle.vkcmdbuf, nelements, ninstances, first_element,
                      0u, 0u);
@@ -2240,12 +2246,14 @@ void ngf_cmd_draw(ngf_cmd_buffer buf, bool indexed,
   }
 }
 
-void ngf_cmd_bind_pipeline(ngf_cmd_buffer buf,
+void ngf_cmd_bind_pipeline(ngf_render_encoder          enc,
                            const ngf_graphics_pipeline pipeline) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
-void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
+void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   const VkViewport viewport = {
     .x        = (float)r->x,
     .y        = (float)r->y,
@@ -2257,7 +2265,8 @@ void ngf_cmd_viewport(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   vkCmdSetViewport(buf->active_bundle.vkcmdbuf, 0u, 1u, &viewport);
 }
 
-void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
+void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   const VkRect2D scissor_rect = {
     .offset = {r->x, r->y},
     .extent = {r->width, r->height}
@@ -2265,10 +2274,11 @@ void ngf_cmd_scissor(ngf_cmd_buffer buf, const ngf_irect2d *r) {
   vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
 }
 
-void ngf_cmd_bind_attrib_buffer(ngf_cmd_buffer buf,
+void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
                                 const ngf_attrib_buffer abuf,
-                                uint32_t binding,
-                                uint32_t offset) {
+                                uint32_t                binding,
+                                uint32_t                offset) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   VkDeviceSize vkoffset = offset;
   vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->vkbuf, &vkoffset);
 }
@@ -2353,7 +2363,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   };
   vkCmdPipelineBarrier(info->cmdbuf->vkcmdbuf, VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);
+                       1u, &buf_mem_bar, 0, NULL);*/
   return NGF_ERROR_OK;
 }
 
