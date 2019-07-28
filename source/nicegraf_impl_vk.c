@@ -2346,23 +2346,19 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
                        0, 0u, NULL,
                        1u, &buf_mem_bar, 0, NULL);
 }
-ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer            *result) {
-  assert(info);
-  assert(result);
-  ngf_attrib_buffer buf = NGF_ALLOC(ngf_attrib_buffer_t);
-  *result = buf;
-  if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
-  }
 
-  const VkBufferCreateInfo buf_vk_info = {
+static ngf_error _ngf_create_buffer(size_t                 size,
+                                    VkBufferUsageFlags     vk_usage_flags,
+                                    uint32_t               vma_usage_flags,
+                                    VkMemoryPropertyFlags  vk_mem_flags,
+                                    VkBuffer              *vk_buffer,
+                                    VmaAllocation         *vma_alloc) {
+   const VkBufferCreateInfo buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0u,
-    .size                  = info->size,
-    .usage                 = get_vk_buffer_usage(info->buffer_usage) |
-                             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    .size                  = size,
+    .usage                 = vk_usage_flags,
     .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
     .queueFamilyIndexCount = 0u,
     .pQueueFamilyIndices   = NULL
@@ -2370,11 +2366,8 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 
   const VmaAllocationCreateInfo buf_alloc_info = {
     .flags          = 0u,
-    .usage          = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
-                        ? VMA_MEMORY_USAGE_GPU_ONLY
-                        : VMA_MEMORY_USAGE_CPU_ONLY, // TODO: more intelligent usage
-                                                     //       selection.
-    .requiredFlags  = get_vk_memory_flags(info->storage_type),
+    .usage          = vma_usage_flags,
+    .requiredFlags  = vk_mem_flags,
     .preferredFlags = 0u,
     .memoryTypeBits = 0u,
     .pool           = VK_NULL_HANDLE,
@@ -2384,11 +2377,46 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   VkResult vkresult = vmaCreateBuffer(CURRENT_CONTEXT->allocator,
                                      &buf_vk_info,
                                      &buf_alloc_info,
-                                     &buf->vkbuf,
-                                     &buf->buf_alloc,
+                                      vk_buffer,
+                                      vma_alloc,
                                       NULL);
-  buf->size = info->size;
+
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+}
+ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
+                                   ngf_attrib_buffer            *result) {
+  assert(info);
+  assert(result);
+  ngf_attrib_buffer buf = NGF_ALLOC(ngf_attrib_buffer_t);
+  *result = buf;
+
+  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+
+  const VkBufferUsageFlags vk_usage_flags =
+    get_vk_buffer_usage(info->buffer_usage) |
+    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  const VkMemoryPropertyFlags vk_mem_flags =
+    get_vk_memory_flags(info->storage_type);
+  const uint32_t vma_usage_flags =
+    info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+        ? VMA_MEMORY_USAGE_GPU_ONLY
+        : VMA_MEMORY_USAGE_CPU_ONLY;
+
+  ngf_error err = _ngf_create_buffer(
+    info->size,
+    vk_usage_flags,
+    vma_usage_flags,
+    vk_mem_flags,
+   &buf->vkbuf,
+   &buf->buf_alloc);
+
+  if (err != NGF_ERROR_OK) {
+    NGF_FREE(buf);
+  } else {
+    buf->size = info->size;
+  }
+
+  return err;
 }
 
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
