@@ -121,11 +121,21 @@ typedef struct ngf_cmd_buffer_t {
   _ngf_cmd_buffer_state           state;
 } ngf_cmd_buffer_t;
 
+typedef struct {
+  VkBuffer      vkbuf;
+  VmaAllocation alloc;
+  size_t        size;
+} _ngf_buffer;
+
 typedef struct ngf_attrib_buffer_t {
   VkBuffer      vkbuf;
   VmaAllocation buf_alloc;
   size_t        size;
 } ngf_attrib_buffer_t;
+
+typedef struct ngf_index_buffer_t {
+  _ngf_buffer data;
+} ngf_index_buffer_t;
 
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
@@ -2471,7 +2481,65 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
   _ngf_unmap_buffer(buf->buf_alloc);
 }
 
-/*ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer **result) {
+ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
+                                  ngf_index_buffer            *result) {
+  assert(info);
+  assert(result);
+  ngf_index_buffer buf = NGF_ALLOC(ngf_index_buffer_t);
+  *result = buf;
 
-}*/
+  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+
+  const VkBufferUsageFlags vk_usage_flags =
+    get_vk_buffer_usage(info->buffer_usage) |
+    VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
+  const VkMemoryPropertyFlags vk_mem_flags =
+    get_vk_memory_flags(info->storage_type);
+  const uint32_t vma_usage_flags =
+    info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+        ? VMA_MEMORY_USAGE_GPU_ONLY
+        : VMA_MEMORY_USAGE_CPU_ONLY;
+
+  ngf_error err = _ngf_create_buffer(
+    info->size,
+    vk_usage_flags,
+    vma_usage_flags,
+    vk_mem_flags,
+   &buf->data.vkbuf,
+   &buf->data.alloc);
+
+  if (err != NGF_ERROR_OK) {
+    NGF_FREE(buf);
+  } else {
+    buf->data.size = info->size;
+  }
+  return err;
+}
+
+void ngf_destroy_index_buffer(ngf_index_buffer buffer) {
+  if (buffer) {
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
+                       buffer->data.vkbuf);
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
+                       buffer->data.alloc);
+    NGF_FREE(buffer);
+  }
+}
+
+void* ngf_index_buffer_map_range(ngf_index_buffer buf,
+                                 size_t           offset,
+                                 size_t           size,
+                                 uint32_t         flags) {
+  _NGF_FAKE_USE(size, flags);
+  return _ngf_map_buffer(buf->data.alloc, offset);
+}
+
+void ngf_index_buffer_flush_range(ngf_index_buffer buf,
+                                  size_t           offset,
+                                  size_t           size) {
+  _ngf_flush_buffer(buf->data.alloc, offset, size);
+}
+
+void ngf_index_buffer_unmap(ngf_index_buffer buf) {
+  _ngf_unmap_buffer(buf->data.alloc);
+}
