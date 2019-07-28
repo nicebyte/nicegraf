@@ -83,15 +83,6 @@ struct {
   ATOMIC_INT       frame_id;
 } _vk;
 
-// State that is common among "shared" contexts (TODO: remove this?)
-typedef struct _ngf_context_shared_state {
-  pthread_mutex_t cmd_pool_mut;
-  pthread_mutex_t record_counter_mut;
-  pthread_cond_t  recording_inactive_cond;
-  uint32_t        record_counter;
-  uint32_t        refcount;
-} _ngf_context_shared_state;
-
 // Swapchain state.
 typedef struct _ngf_swapchain {
   VkSwapchainKHR   vk_swapchain;
@@ -173,7 +164,6 @@ typedef struct _ngf_frame_resources {
 
 typedef struct ngf_context_t {
  _ngf_frame_resources         *frame_res;
- _ngf_context_shared_state   **shared_state;
  _ngf_swapchain                swapchain;
   ngf_swapchain_info           swapchain_info;
   VmaAllocator                 allocator;
@@ -211,7 +201,6 @@ typedef struct ngf_render_target_t {
 } ngf_render_target_t;
 
 NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
-#define CURRENT_SHARED_STATE (*(CURRENT_CONTEXT->shared_state))
 
 static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
   switch(sample_count) {
@@ -1009,7 +998,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ngf_error                 err            = NGF_ERROR_OK;
   VkResult                  vk_err         = VK_SUCCESS;
   const ngf_swapchain_info *swapchain_info = info->swapchain_info;
-  const ngf_context         shared         = info->shared_context;
 
   // Allocate space for context data.
   *result = NGF_ALLOC(struct ngf_context_t);
@@ -1067,44 +1055,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     err = _ngf_create_swapchain(swapchain_info, ctx->surface, &ctx->swapchain);
     if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
     ctx->swapchain_info = *swapchain_info;
-  }
-
-  if (shared != NULL) {
-		pthread_mutex_lock(&_vk.ctx_refcount_mut);
-		_ngf_context_shared_state *shared_state = *(shared->shared_state);
-    if (shared_state == NULL) {
-      /* shared context might have been deleted */
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      pthread_mutex_unlock(&_vk.ctx_refcount_mut);
-      goto ngf_create_context_cleanup;
-    }
-    shared_state->refcount++;
-    ctx->shared_state = shared->shared_state;
-		pthread_mutex_unlock(&_vk.ctx_refcount_mut);
-  } else {
-    ctx->shared_state = NGF_ALLOC(_ngf_context_shared_state*);
-    if (ctx->shared_state == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_context_cleanup;
-    }
-    *(ctx->shared_state) = NGF_ALLOC(_ngf_context_shared_state);
-    _ngf_context_shared_state *shared_state = *(ctx->shared_state);
-    if (shared_state == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_context_cleanup;
-    }
-    memset(shared_state, 0, sizeof(_ngf_context_shared_state));
-    shared_state->refcount = 1;
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
-    // Create objects for cmd pool synchronization.
-    pthread_mutex_init(&shared_state->cmd_pool_mut, NULL);
-    pthread_mutex_init(&shared_state->record_counter_mut, NULL);
-    pthread_cond_init(&shared_state->recording_inactive_cond, NULL);
-    shared_state->record_counter = 0u;
   }
 
   // Create a command pool.
@@ -1295,50 +1245,39 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
 	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
-    _ngf_context_shared_state *shared_state = *(ctx->shared_state);
-    if (shared_state != NULL) {
-      vkDeviceWaitIdle(_vk.device);
-      for (uint32_t f = 0u;
-           ctx->frame_res != NULL && f < ctx->max_inflight_frames;
-           ++f) {
-        if (ctx->frame_res[f].active) {
-          _ngf_retire_resources(&ctx->frame_res[f]);
-        }
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_gfx_cmds);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_xfer_cmds);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_gfx_semaphores);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_xfer_semaphores);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].gfx_cmd_pools);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].xfer_cmd_pools);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
-        _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
-        for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
-          vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
-        }
+    vkDeviceWaitIdle(_vk.device);
+    for (uint32_t f = 0u;
+         ctx->frame_res != NULL && f < ctx->max_inflight_frames;
+         ++f) {
+      if (ctx->frame_res[f].active) {
+        _ngf_retire_resources(&ctx->frame_res[f]);
       }
-      for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->cmd_pools); ++p) {
-        VkCommandPool pool = _NGF_DARRAY_AT(ctx->cmd_pools, p);
-        if (pool != VK_NULL_HANDLE) {
-          vkDestroyCommandPool(_vk.device, pool, NULL);
-        }
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_gfx_cmds);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_xfer_cmds);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_gfx_semaphores);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_xfer_semaphores);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].gfx_cmd_pools);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].xfer_cmd_pools);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
+      for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
+        vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
-      _NGF_DARRAY_DESTROY(ctx->cmd_pools);
-      _ngf_destroy_swapchain(&ctx->swapchain);
-      if (ctx->surface != VK_NULL_HANDLE) {
-        vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
+    }
+    for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->cmd_pools); ++p) {
+      VkCommandPool pool = _NGF_DARRAY_AT(ctx->cmd_pools, p);
+      if (pool != VK_NULL_HANDLE) {
+        vkDestroyCommandPool(_vk.device, pool, NULL);
       }
-      if (ctx->allocator != VK_NULL_HANDLE) {
-        vmaDestroyAllocator(ctx->allocator);
-      }
-      shared_state->refcount--;
-      if (shared_state->refcount == 0) {
-        pthread_mutex_destroy(&shared_state->cmd_pool_mut);
-        pthread_mutex_destroy(&shared_state->record_counter_mut);
-        pthread_cond_destroy(&shared_state->recording_inactive_cond);
-        NGF_FREE(shared_state);
-        *(ctx->shared_state) = NULL;
-      } 
+    }
+    _NGF_DARRAY_DESTROY(ctx->cmd_pools);
+    _ngf_destroy_swapchain(&ctx->swapchain);
+    if (ctx->surface != VK_NULL_HANDLE) {
+      vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
+    }
+    if (ctx->allocator != VK_NULL_HANDLE) {
+      vmaDestroyAllocator(ctx->allocator);
     }
     pthread_mutex_unlock(&_vk.ctx_refcount_mut);
     if (ctx->frame_res != NULL) {
