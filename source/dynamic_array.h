@@ -68,14 +68,14 @@ SOFTWARE.
     assert(i < _NGF_DARRAY_SIZE(a) && j < _NGF_DARRAY_SIZE(a)); \
     if (i != j) { \
         uint8_t *tmp = alloca(sizeof(a.data[0])); \
-        memcpy(tmp, &a.data[i], sizeof(a.data[i])); \
+        memcpy(tmp, &(a.data[i]), sizeof(a.data[i])); \
         a.data[i] = a.data[j]; \
         memcpy(&a.data[j], tmp, sizeof(a.data[j])); \
     } \
 }
 
 #define _NGF_DARRAY_ERASE(a, i) {\
-  assert(a.endptr != a.data); \
+  assert((a).endptr != (a).data); \
   uint32_t lastidx = _NGF_DARRAY_SIZE(a) - 1u; \
   if (i < lastidx) _NGF_DARRAY_SWAP(a, i, lastidx); \
   _NGF_DARRAY_POP(a); \
