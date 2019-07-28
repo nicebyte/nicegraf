@@ -2383,6 +2383,30 @@ static ngf_error _ngf_create_buffer(size_t                 size,
 
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
+
+static void* _ngf_map_buffer(VmaAllocation alloc, size_t offset) {
+  void* result = NULL;
+  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator,
+                                   alloc,
+                                  &result);
+  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
+}
+
+static void _ngf_flush_buffer(VmaAllocation alloc,
+                              size_t        offset,
+                              size_t        size) {
+  // TODO: on VK the range offset is relative to the start of buffer,
+  //       but on GL it is relative to the start of the mapped range!
+  vmaFlushAllocation(CURRENT_CONTEXT->allocator,
+                     alloc,
+                     offset,
+                     size);
+}
+
+static void _ngf_unmap_buffer(VmaAllocation alloc) {
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator, alloc);
+}
+
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer            *result) {
   assert(info);
@@ -2433,28 +2457,18 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t            offset,
                                   size_t            size,
                                   uint32_t          flags) {
-  _NGF_FAKE_USE(offset, size, flags);
-  void* result = NULL;
-  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator,
-                                   buf->buf_alloc,
-                                  &result);
-  return vkresult == VK_SUCCESS ? result : NULL;
+  _NGF_FAKE_USE(size, flags);
+  return _ngf_map_buffer(buf->buf_alloc, offset);
 }
 
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
                                    size_t size) {
-  // TODO: on VK the range offset is relative to the start of buffer,
-  //       but on GL it is relative to the start of the mapped range!
-  vmaFlushAllocation(CURRENT_CONTEXT->allocator,
-                     buf->buf_alloc,
-                     offset,
-                     size);
+  _ngf_flush_buffer(buf->buf_alloc, offset, size);
 }
 
 void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator,
-                 buf->buf_alloc);
+  _ngf_unmap_buffer(buf->buf_alloc);
 }
 
 /*ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
