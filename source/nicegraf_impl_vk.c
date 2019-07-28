@@ -28,14 +28,6 @@
 
 #include <assert.h>
 #include <string.h>
-#if defined(WIN32)
-  #include <malloc.h>
-  #undef    alloca
-  #define   alloca _malloca
-  #define   freea  _freea
-#else
-  #include <alloca.h>
-#endif
 
 // Determine the correct WSI extension to use for VkSurface creation.
 // Do not change the relative order of this block, the Volk header include
@@ -160,12 +152,14 @@ typedef struct _ngf_frame_resources {
   bool                                 active;
 } _ngf_frame_resources;
 
+// API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
  _ngf_frame_resources         *frame_res;
  _ngf_swapchain                swapchain;
   ngf_swapchain_info           swapchain_info;
   VmaAllocator                 allocator;
- _NGF_DARRAY_OF(VkCommandPool) cmd_pools;
+ _NGF_DARRAY_OF(VkCommandPool) gfx_cmd_pools;
+ _NGF_DARRAY_OF(VkCommandPool) xfer_cmd_pools;
   VkSurfaceKHR                 surface;
   uint32_t                     frame_number;
   uint32_t                     max_inflight_frames;
@@ -790,7 +784,7 @@ static ngf_error _ngf_create_swapchain(
   // Check if the requested surface format is valid.
   uint32_t nformats = 0u;
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, NULL);
-  VkSurfaceFormatKHR *formats = alloca(sizeof(VkSurfaceFormatKHR) * nformats);
+  VkSurfaceFormatKHR *formats = malloc(sizeof(VkSurfaceFormatKHR) * nformats);
   assert(formats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats,
                                         formats);
@@ -807,6 +801,8 @@ static ngf_error _ngf_create_swapchain(
       goto _ngf_create_swapchain_cleanup;
     }
   }
+  free(formats);
+  formats = NULL;
   VkSurfaceCapabilitiesKHR surface_caps;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vk.phys_dev, surface,
                                             &surface_caps);
@@ -1164,24 +1160,40 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->frame_number = 0u;
 
   // Create command pools.
-  VkCommandPoolCreateInfo cmd_pool_info = {
+  VkCommandPoolCreateInfo gfx_cmd_pool_info = {
     .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
     .pNext            = NULL,
     .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     .queueFamilyIndex = _vk.gfx_family_idx
   };
-  _NGF_DARRAY_RESET(ctx->cmd_pools, ctx->max_inflight_frames);
+  _NGF_DARRAY_RESET(ctx->gfx_cmd_pools, ctx->max_inflight_frames);
   for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
     VkCommandPool pool = VK_NULL_HANDLE;
-    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL, &pool);
+    vk_err = vkCreateCommandPool(_vk.device, &gfx_cmd_pool_info, NULL, &pool);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
-    _NGF_DARRAY_APPEND(ctx->cmd_pools, pool);
+    _NGF_DARRAY_APPEND(ctx->gfx_cmd_pools, pool);
   }
-
-
+  if (_vk.gfx_family_idx != _vk.xfer_family_idx) {
+    VkCommandPoolCreateInfo xfer_cmd_pool_info = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .pNext = NULL,
+      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+      .queueFamilyIndex = _vk.xfer_family_idx
+    };
+    _NGF_DARRAY_RESET(ctx->xfer_cmd_pools, ctx->max_inflight_frames);
+    for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
+      VkCommandPool pool = VK_NULL_HANDLE;
+      vk_err = vkCreateCommandPool(_vk.device, &xfer_cmd_pool_info, NULL, &pool);
+      if (vk_err != VK_SUCCESS) {
+        err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+        goto ngf_create_context_cleanup;
+      }
+      _NGF_DARRAY_APPEND(ctx->xfer_cmd_pools, pool);
+    }
+  }
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -1225,7 +1237,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
     vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
     vkDestroySemaphore(_vk.device, vk_sem, NULL);
   }
-/*
+
   for (uint32_t s = 0u;
        s < _NGF_DARRAY_SIZE(frame_res->signal_xfer_semaphores);
        ++s) {
@@ -1235,7 +1247,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
     VkCommandPool vk_cmd_pool = _NGF_DARRAY_AT(frame_res->xfer_cmd_pools, s);
     vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
     vkDestroySemaphore(_vk.device, vk_sem, NULL);
-  }*/
+  }
 
   for (uint32_t p = 0u;
        p < _NGF_DARRAY_SIZE(frame_res->retire_pipelines);
@@ -1296,13 +1308,22 @@ void ngf_destroy_context(ngf_context ctx) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
     }
-    for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->cmd_pools); ++p) {
-      VkCommandPool pool = _NGF_DARRAY_AT(ctx->cmd_pools, p);
+    for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->gfx_cmd_pools); ++p) {
+      VkCommandPool pool = _NGF_DARRAY_AT(ctx->gfx_cmd_pools, p);
       if (pool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(_vk.device, pool, NULL);
       }
     }
-    _NGF_DARRAY_DESTROY(ctx->cmd_pools);
+    _NGF_DARRAY_DESTROY(ctx->gfx_cmd_pools);
+    if (_vk.xfer_family_idx != _vk.gfx_family_idx) {
+      for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->xfer_cmd_pools); ++p) {
+        VkCommandPool pool = _NGF_DARRAY_AT(ctx->xfer_cmd_pools, p);
+        if (pool != VK_NULL_HANDLE) {
+          vkDestroyCommandPool(_vk.device, pool, NULL);
+        }
+      }
+      _NGF_DARRAY_DESTROY(ctx->xfer_cmd_pools);
+    }
     _ngf_destroy_swapchain(&ctx->swapchain);
     if (ctx->surface != VK_NULL_HANDLE) {
       vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
@@ -1389,7 +1410,10 @@ static ngf_error _ngf_cmd_buffer_start_encoder(ngf_cmd_buffer      cmd_buf,
   }
   const size_t pool_idx =
       cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
-  VkCommandPool pool = _NGF_DARRAY_AT(CURRENT_CONTEXT->cmd_pools, pool_idx);
+  VkCommandPool pool =
+    type == _NGF_BUNDLE_RENDERING || _vk.gfx_family_idx == _vk.xfer_family_idx
+        ? _NGF_DARRAY_AT(CURRENT_CONTEXT->gfx_cmd_pools, pool_idx)
+        : _NGF_DARRAY_AT(CURRENT_CONTEXT->xfer_cmd_pools, pool_idx);
   ngf_error err = _ngf_cmd_bundle_create(pool, type, &cmd_buf->active_bundle);
   cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
   return err;
@@ -1906,7 +1930,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                     info->layout->ndescriptor_set_layouts);
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
     VkDescriptorSetLayoutBinding *vk_descriptor_bindings =
-        alloca(sizeof(VkDescriptorSetLayoutBinding) *
+        malloc(sizeof(VkDescriptorSetLayoutBinding) *
                info->layout->descriptor_set_layouts[s].ndescriptors);
     for (uint32_t b = 0u;
          b < info->layout->descriptor_set_layouts[s].ndescriptors;
@@ -1931,6 +1955,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         &_NGF_DARRAY_AT(pipeline->vk_descriptor_set_layouts, s);
     vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL,
                                           result_dsl);
+    free(vk_descriptor_bindings);
     if (vk_err != VK_SUCCESS) {
       // TODO: return error here.
     }
