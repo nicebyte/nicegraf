@@ -151,22 +151,26 @@ const _ngf_native_binding* _ngf_binding_map_lookup(
 typedef enum {
   _NGF_CMD_BUFFER_READY,
   _NGF_CMD_BUFFER_RECORDING,
-  _NGF_CMD_BUFFER_AWAITNG_SUBMIT,
+  _NGF_CMD_BUFFER_AWAITING_SUBMIT,
   _NGF_CMD_BUFFER_SUBMITTED
 } _ngf_cmd_buffer_state;
 
 #define _NGF_CMD_BUF_RECORDABLE(s) (s == _NGF_CMD_BUFFER_READY || \
-                                    s == _NGF_CMD_BUFFER_AWAITNG_SUBMIT)
+                                    s == _NGF_CMD_BUFFER_AWAITING_SUBMIT)
 
 // Interlocked ops.
 #if defined(_WIN32)
 #define ATOMIC_INT ULONG
-#define interlocked_inc(v)  ((ULONG)InterlockedIncrement((LONG*)v))
-#define interlocked_read(v) ((ULONG)InterlockedExchangeAdd((LONG*)v, 0))
+#define interlocked_inc(v)      ((ULONG)InterlockedIncrement((LONG*)v))
+#define interlocked_post_inc(v) ((ULONG)InterlockedExchangeAdd((LONG*)v, 1))
+#define interlocked_read(v)     ((ULONG)InterlockedExchangeAdd((LONG*)v, 0))
 #elif defined(_WIN64)
 #define ATOMIC_INT ULONG64
-#define interlocked_inc(v)  ((ULONG64)InterlockedIncrement64((LONG64*)x))
-#define interlocked_read(v) ((ULONG64)InterlockedExchangeAdd64((LONG64*)v, 0))
+#define interlocked_inc(v)      ((ULONG64)InterlockedIncrement64((LONG64*)x))
+#define interlocked_post_inc(v) ((ULONG64)InterlockedExchangeAdd64((LONG*)v, \
+                                                                          1))
+#define interlocked_read(v)     ((ULONG64)InterlockedExchangeAdd64( \
+                                              (LONG64*)v, 0))
 #else
 #if defined(__LP64__)
 #define ATOMIC_INT uint64_t
