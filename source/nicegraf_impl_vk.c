@@ -603,7 +603,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       NULL);
     {
     VkQueueFamilyProperties* queue_families =
-      malloc(num_queue_families * sizeof(VkQueueFamilyProperties));
+      NGF_ALLOCN(VkQueueFamilyProperties, num_queue_families);
     assert(queue_families);
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
       &num_queue_families,
@@ -631,7 +631,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
         present_family_idx = q;
       }
     }
-    free(queue_families);
+    NGF_FREEN(queue_families, num_queue_families);
     queue_families = NULL;
     if (gfx_family_idx == _NGF_INVALID_IDX ||
       xfer_family_idx == _NGF_INVALID_IDX ||
@@ -763,7 +763,7 @@ static ngf_error _ngf_create_swapchain(
   vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, surface,
                                             &npresent_modes, NULL);
   VkPresentModeKHR* present_modes =
-    malloc(sizeof(VkPresentModeKHR) * npresent_modes);
+    NGF_ALLOCN(VkPresentModeKHR, npresent_modes);
   vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, surface,
     &npresent_modes, present_modes);
   static const VkPresentModeKHR modes[] = {
@@ -778,7 +778,7 @@ static ngf_error _ngf_create_swapchain(
       break;
     }
   }
-  free(present_modes);
+  NGF_FREEN(present_modes, npresent_modes);
   present_modes = NULL;
   }
  
@@ -786,7 +786,7 @@ static ngf_error _ngf_create_swapchain(
   // Check if the requested surface format is valid.
   uint32_t nformats = 0u;
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, NULL);
-  VkSurfaceFormatKHR *formats = malloc(sizeof(VkSurfaceFormatKHR) * nformats);
+  VkSurfaceFormatKHR *formats = NGF_ALLOCN(VkSurfaceFormatKHR, nformats);
   assert(formats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats,
                                         formats);
@@ -803,7 +803,7 @@ static ngf_error _ngf_create_swapchain(
       goto _ngf_create_swapchain_cleanup;
     }
   }
-  free(formats);
+  NGF_FREEN(formats, nformats);
   formats = NULL;
   VkSurfaceCapabilitiesKHR surface_caps;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vk.phys_dev, surface,
@@ -1943,8 +1943,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                     info->layout->ndescriptor_set_layouts);
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
     VkDescriptorSetLayoutBinding *vk_descriptor_bindings =
-        malloc(sizeof(VkDescriptorSetLayoutBinding) *
-               info->layout->descriptor_set_layouts[s].ndescriptors);
+        NGF_ALLOCN(VkDescriptorSetLayoutBinding,
+                   info->layout->descriptor_set_layouts[s].ndescriptors);
     for (uint32_t b = 0u;
          b < info->layout->descriptor_set_layouts[s].ndescriptors;
          ++b) {
@@ -1968,7 +1968,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         &_NGF_DARRAY_AT(pipeline->vk_descriptor_set_layouts, s);
     vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL,
                                           result_dsl);
-    free(vk_descriptor_bindings);
+    NGF_FREEN(vk_descriptor_bindings,
+              info->layout->descriptor_set_layouts[s].ndescriptors);
     if (vk_err != VK_SUCCESS) {
       // TODO: return error here.
     }
