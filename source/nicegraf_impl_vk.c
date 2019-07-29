@@ -2604,3 +2604,6 @@ void ngf_index_buffer_flush_range(ngf_index_buffer buf,
 void ngf_index_buffer_unmap(ngf_index_buffer buf) {
   _ngf_unmap_buffer(buf->data.alloc);
 }
+
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) { _NGF_FAKE_USE(buf);  }
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) { _NGF_FAKE_USE(buf);  }
