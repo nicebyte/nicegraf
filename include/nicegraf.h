@@ -1311,7 +1311,7 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer *result);
+                                  ngf_index_buffer            *result);
 
 /**
  * Discards the given vertex index buffer.
@@ -1481,9 +1481,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder buf,
 void ngf_cmd_bind_attrib_buffer(ngf_render_encoder buf,
                                 const ngf_attrib_buffer vbuf,
                                 uint32_t binding, uint32_t offset);
-void ngf_cmd_bind_index_buffer(ngf_render_encoder buf,
+void ngf_cmd_bind_index_buffer(ngf_render_encoder     buf,
                                const ngf_index_buffer idxbuf,
-                               ngf_type index_type);
+                               ngf_type               index_type);
 void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target);
 void ngf_cmd_end_pass(ngf_render_encoder buf);
 void ngf_cmd_draw(ngf_render_encoder buf, bool indexed,
