@@ -135,6 +135,10 @@ typedef struct ngf_index_buffer_t {
   _ngf_buffer data;
 } ngf_index_buffer_t;
 
+typedef struct ngf_uniform_buffer_t {
+  _ngf_buffer data;
+} ngf_uniform_buffer_t;
+
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -2418,6 +2422,25 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder       enc,
 
 }
 
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder       enc,
+                                 const ngf_index_buffer src,
+                                 ngf_index_buffer       dst,
+                                 size_t                 size,
+                                 size_t                 src_offset,
+                                 size_t                 dst_offset) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf);
+  _ngf_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
+                       src->data.vkbuf,
+                       dst->data.vkbuf,
+                       size,
+                       src_offset,
+                       dst_offset,
+                       VK_ACCESS_UNIFORM_READ_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+
+}
+
 static ngf_error _ngf_create_buffer(size_t                 size,
                                     VkBufferUsageFlags     vk_usage_flags,
                                     uint32_t               vma_usage_flags,
@@ -2605,5 +2628,67 @@ void ngf_index_buffer_unmap(ngf_index_buffer buf) {
   _ngf_unmap_buffer(buf->data.alloc);
 }
 
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) { _NGF_FAKE_USE(buf);  }
+ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
+                                    ngf_uniform_buffer            *result) {
+  assert(info);
+  assert(result);
+  ngf_uniform_buffer buf = NGF_ALLOC(ngf_uniform_buffer_t);
+  *result = buf;
+
+  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+
+  const VkBufferUsageFlags vk_usage_flags =
+    get_vk_buffer_usage(info->buffer_usage) |
+    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+  const VkMemoryPropertyFlags vk_mem_flags =
+    get_vk_memory_flags(info->storage_type);
+  const uint32_t vma_usage_flags =
+    info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+        ? VMA_MEMORY_USAGE_GPU_ONLY
+        : VMA_MEMORY_USAGE_CPU_ONLY;
+
+  ngf_error err = _ngf_create_buffer(
+    info->size,
+    vk_usage_flags,
+    vma_usage_flags,
+    vk_mem_flags,
+   &buf->data.vkbuf,
+   &buf->data.alloc);
+
+  if (err != NGF_ERROR_OK) {
+    NGF_FREE(buf);
+  } else {
+    buf->data.size = info->size;
+  }
+  return err;
+}
+
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer buffer) {
+  if (buffer) {
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
+                       buffer->data.vkbuf);
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
+                       buffer->data.alloc);
+    NGF_FREE(buffer);
+  }
+}
+
+void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
+                                   size_t             offset,
+                                   size_t             size,
+                                   uint32_t           flags) {
+  _NGF_FAKE_USE(size, flags);
+  return _ngf_map_buffer(buf->data.alloc, offset);
+}
+
+void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf,
+                                    size_t             offset,
+                                    size_t             size) {
+  _ngf_flush_buffer(buf->data.alloc, offset, size);
+}
+
+void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) {
+  _ngf_unmap_buffer(buf->data.alloc);
+}
+
 void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) { _NGF_FAKE_USE(buf);  }
