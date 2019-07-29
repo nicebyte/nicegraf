@@ -493,6 +493,17 @@ static VkMemoryPropertyFlags get_vk_memory_flags(ngf_buffer_storage_type s) {
   return 0;
 }
 
+static VkIndexType get_vk_index_type(ngf_type t) {
+  switch (t) {
+  case NGF_TYPE_UINT16:
+    return VK_INDEX_TYPE_UINT16;
+  case NGF_TYPE_UINT32:
+    return VK_INDEX_TYPE_UINT32;
+  default:
+    return VK_INDEX_TYPE_MAX_ENUM;
+  }
+}
+
 #if defined(XCB_NONE)
 xcb_connection_t *XCB_CONNECTION = NULL;
 xcb_visualid_t    XCB_VISUALID   = { 0 };
@@ -2317,6 +2328,59 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
   vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->data.vkbuf, &vkoffset);
 }
 
+void ngf_cmd_bind_index_buffer(ngf_render_encoder     enc,
+                               const ngf_index_buffer ibuf,
+                               ngf_type               index_type) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  const VkIndexType idx_type = get_vk_index_type(index_type);
+  assert(idx_type == VK_INDEX_TYPE_UINT16 ||
+         idx_type == VK_INDEX_TYPE_UINT32);
+  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf,
+                       ibuf->data.vkbuf,
+                       0u,
+                       idx_type);
+}
+
+static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
+                                 VkBuffer             src,
+                                 VkBuffer             dst,
+                                 size_t               size,
+                                 size_t               src_offset,
+                                 size_t               dst_offset,
+                                 VkAccessFlags        dst_access_mask,
+                                 VkPipelineStageFlags dst_stage_mask) {
+  const VkBufferCopy copy_region = {
+    .srcOffset = src_offset,
+    .dstOffset = dst_offset,
+    .size      = size
+  };
+  
+  vkCmdCopyBuffer(vkcmdbuf,
+                  src,
+                  dst,
+                  1u,
+                 &copy_region);
+
+  VkBufferMemoryBarrier buf_mem_bar = {
+    .sType               =  VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    .pNext               =  NULL,
+    .buffer              =  dst,
+    .srcAccessMask       =  VK_ACCESS_TRANSFER_WRITE_BIT,
+    .dstAccessMask       =  dst_access_mask, //VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+    .srcQueueFamilyIndex = _vk.xfer_family_idx,
+    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .offset              =  dst_offset,
+    .size                =  size
+  };
+
+  vkCmdPipelineBarrier(vkcmdbuf,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       dst_stage_mask,
+                       0, 0u, NULL,
+                       1u, &buf_mem_bar, 0, NULL);
+
+}
+
 void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer       dst,
@@ -2325,34 +2389,33 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
                                 size_t                  dst_offset) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   assert(buf);
-  const VkBufferCopy copy_region = {
-    .srcOffset = src_offset,
-    .dstOffset = dst_offset,
-    .size      = size
-  };
-  
-  vkCmdCopyBuffer(buf->active_bundle.vkcmdbuf,
-                  src->data.vkbuf,
-                  dst->data.vkbuf,
-                  1u,
-                 &copy_region);
+  _ngf_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
+                       src->data.vkbuf,
+                       dst->data.vkbuf,
+                       size,
+                       src_offset,
+                       dst_offset,
+                       VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+}
 
-  VkBufferMemoryBarrier buf_mem_bar = {
-    .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-    .pNext               = NULL,
-    .buffer              = dst->data.vkbuf,
-    .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask       = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
-    .srcQueueFamilyIndex = _vk.xfer_family_idx,
-    .dstQueueFamilyIndex = _vk.gfx_family_idx,
-    .offset              = dst_offset,
-    .size                = size
-  };
-  vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-                       0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);
+void ngf_cmd_copy_index_buffer(ngf_xfer_encoder       enc,
+                               const ngf_index_buffer src,
+                               ngf_index_buffer       dst,
+                               size_t                 size,
+                               size_t                 src_offset,
+                               size_t                 dst_offset) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf);
+  _ngf_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
+                       src->data.vkbuf,
+                       dst->data.vkbuf,
+                       size,
+                       src_offset,
+                       dst_offset,
+                       VK_ACCESS_INDEX_READ_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+
 }
 
 static ngf_error _ngf_create_buffer(size_t                 size,
