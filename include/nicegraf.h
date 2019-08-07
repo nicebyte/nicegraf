@@ -1501,7 +1501,7 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder buf,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset);
-void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder buf,
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  const ngf_uniform_buffer src,
                                  ngf_uniform_buffer dst,
                                  size_t size,

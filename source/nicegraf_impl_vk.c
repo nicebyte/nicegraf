@@ -33,12 +33,12 @@
 // Do not change the relative order of this block, the Volk header include
 // directive and the VMA header include directive.
 #if defined(_WIN32)||defined(_WIN64)
-  #define   WIN32_LEAN_AND_MEAN
-  #include <windows.h>
   #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateWin32SurfaceKHR
   #define   VK_USE_PLATFORM_WIN32_KHR
+  #define   WIN32_LEAN_AND_MEAN
+  #include <windows.h>
 #elif defined(__ANDROID__)
   #define   VK_SURFACE_EXT             "VK_KHR_android_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
@@ -122,6 +122,7 @@ typedef struct ngf_cmd_buffer_t {
 } ngf_cmd_buffer_t;
 
 typedef struct {
+  VmaAllocator  parent_allocator;
   VkBuffer      vkbuf;
   VmaAllocation alloc;
   size_t        size;
@@ -157,8 +158,7 @@ typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
- _NGF_DARRAY_OF(VkBuffer)              retire_buffers;
- _NGF_DARRAY_OF(VmaAllocation)         retire_allocs;
+ _NGF_DARRAY_OF(_ngf_buffer)     retire_buffers;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -1166,7 +1166,6 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
-    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_allocs, 8);
     ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1302,11 +1301,12 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                   NULL);
   }
   for (uint32_t a = 0;
-       a < _NGF_DARRAY_SIZE(frame_res->retire_allocs);
+       a < _NGF_DARRAY_SIZE(frame_res->retire_buffers);
      ++a) {
-    vmaDestroyBuffer(CURRENT_CONTEXT->allocator,
-                    _NGF_DARRAY_AT(frame_res->retire_buffers, a),
-                    _NGF_DARRAY_AT(frame_res->retire_allocs, a));
+    _ngf_buffer *b = &(_NGF_DARRAY_AT(frame_res->retire_buffers, a));
+    vmaDestroyBuffer(b->parent_allocator,
+                     b->vkbuf,
+                     b->alloc);
   }
   _NGF_DARRAY_CLEAR(frame_res->submitted_gfx_cmds);
   _NGF_DARRAY_CLEAR(frame_res->submitted_xfer_cmds);
@@ -1318,7 +1318,6 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_buffers);
-  _NGF_DARRAY_CLEAR(frame_res->retire_allocs);
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -2422,12 +2421,12 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder       enc,
 
 }
 
-void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder       enc,
-                                 const ngf_index_buffer src,
-                                 ngf_index_buffer       dst,
-                                 size_t                 size,
-                                 size_t                 src_offset,
-                                 size_t                 dst_offset) {
+void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder         enc,
+                                 const ngf_uniform_buffer src,
+                                 ngf_uniform_buffer       dst,
+                                 size_t                   size,
+                                 size_t                   src_offset,
+                                 size_t                   dst_offset) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   assert(buf);
   _ngf_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
@@ -2446,7 +2445,8 @@ static ngf_error _ngf_create_buffer(size_t                 size,
                                     uint32_t               vma_usage_flags,
                                     VkMemoryPropertyFlags  vk_mem_flags,
                                     VkBuffer              *vk_buffer,
-                                    VmaAllocation         *vma_alloc) {
+                                    VmaAllocation         *vma_alloc,
+                                    VmaAllocator          *vma_allocator) {
    const VkBufferCreateInfo buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
@@ -2474,7 +2474,7 @@ static ngf_error _ngf_create_buffer(size_t                 size,
                                       vk_buffer,
                                       vma_alloc,
                                       NULL);
-
+  *vma_allocator = CURRENT_CONTEXT->allocator;
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
@@ -2526,7 +2526,8 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
     vma_usage_flags,
     vk_mem_flags,
    &buf->data.vkbuf,
-   &buf->data.alloc);
+   &buf->data.alloc,
+   &buf->data.parent_allocator);
 
   if (err != NGF_ERROR_OK) {
     NGF_FREE(buf);
@@ -2540,9 +2541,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
   if (buffer) {
     _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
-                       buffer->data.vkbuf);
-    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
-                       buffer->data.alloc);
+                       buffer->data);
     NGF_FREE(buffer);
   }
 }
@@ -2590,7 +2589,8 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
     vma_usage_flags,
     vk_mem_flags,
    &buf->data.vkbuf,
-   &buf->data.alloc);
+   &buf->data.alloc,
+   &buf->data.parent_allocator);
 
   if (err != NGF_ERROR_OK) {
     NGF_FREE(buf);
@@ -2603,9 +2603,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
 void ngf_destroy_index_buffer(ngf_index_buffer buffer) {
   if (buffer) {
     _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
-                       buffer->data.vkbuf);
-    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
-                       buffer->data.alloc);
+                       buffer->data);
     NGF_FREE(buffer);
   }
 }
@@ -2653,7 +2651,8 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
     vma_usage_flags,
     vk_mem_flags,
    &buf->data.vkbuf,
-   &buf->data.alloc);
+   &buf->data.alloc,
+   &buf->data.parent_allocator);
 
   if (err != NGF_ERROR_OK) {
     NGF_FREE(buf);
@@ -2666,9 +2665,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
 void ngf_destroy_uniform_buffer(ngf_uniform_buffer buffer) {
   if (buffer) {
     _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
-                       buffer->data.vkbuf);
-    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_allocs,
-                       buffer->data.alloc);
+                       buffer->data);
     NGF_FREE(buffer);
   }
 }
