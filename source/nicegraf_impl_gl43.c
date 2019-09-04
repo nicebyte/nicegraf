@@ -1248,6 +1248,7 @@ ngf_error ngf_default_render_target(
       default_color_attachment->clear = *clear_color;
     }
     default_render_target->nattachments = 1u;
+    default_render_target->ndraw_buffers = 1u;
     if (CURRENT_CONTEXT->has_depth) {
       ngf_attachment *default_depth_attachment =
           &default_render_target->attachment_infos[1];
@@ -2282,8 +2283,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
           glDepthMask(GL_TRUE);
-          glDrawBuffers((GLsizei)active_rt->ndraw_buffers,
-                         active_rt->draw_buffers);
+          if (active_rt->ndraw_buffers > 1u) {
+            glDrawBuffers((GLsizei)active_rt->ndraw_buffers,
+                           active_rt->draw_buffers);
+          }
           for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
             const ngf_attachment *attachment = &active_rt->attachment_infos[a];
             if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
