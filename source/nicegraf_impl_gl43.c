@@ -2282,8 +2282,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
           glDepthMask(GL_TRUE);
-          glDrawBuffers((GLsizei)active_rt->ndraw_buffers,
-                         active_rt->draw_buffers);
+          if (active_rt->ndraw_buffers > 0u) {
+            glDrawBuffers((GLsizei)active_rt->ndraw_buffers,
+                           active_rt->draw_buffers);
+          }
           for (uint32_t a = 0u; a < active_rt->nattachments; ++a) {
             const ngf_attachment *attachment = &active_rt->attachment_infos[a];
             if (attachment->load_op == NGF_LOAD_OP_CLEAR) {
