@@ -380,7 +380,8 @@ public:
       const uint32_t frames) {
     const ngf_buffer_info buffer_info = {
       ALIGNED_SIZE * frames,
-      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE
+      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+      0
     };
     ngf::uniform_buffer buf;
     ngf_error err = buf.initialize(buffer_info);
@@ -480,7 +481,8 @@ public:
                          size_t           target_offset) {
     ngf_buffer_info staging_buffer_info {
       source_size,
-      NGF_BUFFER_STORAGE_HOST_WRITEABLE
+      NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+      NGF_BUFFER_USAGE_XFER_SRC
     };
     T staging_buffer;
     ngf_error err = staging_buffer.initialize(staging_buffer_info);
