@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.14.0)
 project(nicegraf)
 
 set(EGL_NO_GLEW ON)
@@ -61,7 +61,7 @@ if (APPLE)
   set(NICEGRAF_COMPILE_OPTS ${NICEGRAF_COMPILE_OPTS} "--std=c++17" "-fobjc-arc")
   find_library(APPLE_METAL Metal)
   find_library(APPLE_QUARTZ_CORE QuartzCore)
-  if(DEFINED IOS_PLATFORM)
+  if(${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
   find_library(APPLE_KIT UIKit)
   else()
   find_library(APPLE_KIT AppKit)
