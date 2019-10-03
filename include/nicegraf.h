@@ -186,7 +186,7 @@ typedef enum ngf_stage_type {
  */
 typedef struct ngf_shader_stage_info {
   ngf_stage_type type; /**< Stage type (vert/frag/etc.) */
-  const char *content; /**< May be text or binary, depending on the backend.*/
+  const void *content; /**< May be text or binary, depending on the backend.*/
   uint32_t content_length; /**< Number of bytes in the content buffer. */
   const char *debug_name; /**< Optional name, will appear in debug logs,
                                may be NULL.*/
