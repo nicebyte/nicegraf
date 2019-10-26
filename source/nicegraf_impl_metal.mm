@@ -39,7 +39,6 @@ using _NGF_VIEW_TYPE = NSView;
 using _NGF_VIEW_TYPE = UIView;
 #endif
 
-
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // could be bound at the same time.
 // This is required to work around a discrepancy between nicegraf's and Metal's
@@ -424,6 +423,7 @@ struct ngf_context_t {
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
   id<MTLCommandBuffer> pending_cmd_buffer = nil;
+  dispatch_semaphore_t frame_sync_sem = nil;
 };
 
 NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
@@ -562,6 +562,8 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
 }
 
 ngf_error ngf_begin_frame() {
+  dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem,
+                          DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
   return (!CURRENT_CONTEXT->frame.color_drawable)
            ? NGF_ERROR_NO_FRAME
@@ -569,13 +571,19 @@ ngf_error ngf_begin_frame() {
 }
 
 ngf_error ngf_end_frame() {
+  ngf_context ctx = CURRENT_CONTEXT;
   if(CURRENT_CONTEXT->frame.color_drawable &&
      CURRENT_CONTEXT->pending_cmd_buffer) {
+    [CURRENT_CONTEXT->pending_cmd_buffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
+      dispatch_semaphore_signal(ctx->frame_sync_sem);
+    }];
     [CURRENT_CONTEXT->pending_cmd_buffer
        presentDrawable:CURRENT_CONTEXT->frame.color_drawable];
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->frame = _ngf_swapchain::frame{};
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
+  } else {
+    dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
   return NGF_ERROR_OK;
 }
@@ -661,6 +669,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     if (err != NGF_ERROR_OK) return err;
   }
  
+  ctx->frame_sync_sem =
+      dispatch_semaphore_create(ctx->swapchain_info.capacity_hint);
   *result = ctx.release(); 
   return NGF_ERROR_OK;
 }
