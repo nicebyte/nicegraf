@@ -177,7 +177,9 @@ typedef enum {
 #else
 #define ATOMIC_INT uint32_t
 #endif
-#define interlocked_inc(v) __sync_add_and_fetch(x, 1)
+#define interlocked_inc(v)      (__sync_add_and_fetch(v, 1))
+#define interlocked_post_inc(v) (__sync_fetch_and_add(v, 1))
+#define interlocked_read(v)     (__sync_add_and_fetch(v, 0))
 #endif
 
 #ifdef __cplusplus
