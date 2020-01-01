@@ -98,7 +98,7 @@ struct ngf_shader_stage_t {
   GLenum glstagebit;
 
   char *source_code;
-  uint32_t source_code_size;
+  GLint source_code_size;
 };
 
 struct ngf_attrib_buffer_t {
@@ -660,7 +660,7 @@ ngf_error _ngf_check_link_status(GLuint program, const char *debug_name) {
       // See previous comment about debug callback.
       GLint info_log_length = 0;
       glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc(info_log_length + 1);
+      char *info_log = malloc((size_t)info_log_length + 1u);
       info_log[info_log_length] = '\0';
       glGetProgramInfoLog(program, info_log_length, &info_log_length,
                           info_log);
@@ -708,7 +708,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   // contain the rest of the shader code.
   // If no specialization is being done, the second chunk will contain the rest
   // of the shader code, and there will be no third chunk.
-  const uint32_t nsource_chunks = 2u + (spec_info == NULL ? 0u : 1u);
+  const GLsizei nsource_chunks = 2 + (spec_info == NULL ? 0 : 1);
   const char *source_chunks[3];
   GLint source_chunk_lengths[3];
   
@@ -783,8 +783,8 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
   }
 
   // Final source chunk - rest of the shader code.
-  source_chunks[nsource_chunks - 1u] = rest_of_source;
-  source_chunk_lengths[nsource_chunks - 1u] = source_len -
+  source_chunks[nsource_chunks - 1] = rest_of_source;
+  source_chunk_lengths[nsource_chunks - 1] = source_len -
                                               (GLint)(rest_of_source - source);
 
   // Compile the shader.
@@ -803,7 +803,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       // one of the build steps anyways...
       GLint info_log_length = 0;
       glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc(info_log_length + 1);
+      char *info_log = malloc((size_t)info_log_length + 1u);
       info_log[info_log_length] = '\0';
       glGetShaderInfoLog(shader, info_log_length, &info_log_length, info_log);
       if (debug_name) {
@@ -873,7 +873,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   } else { // Set binary.
     stage->glprogram = glCreateProgram();
     glProgramBinary(stage->glprogram, info->binary_format,
-                    info->content, info->content_length);
+                    info->content, (GLsizei)info->content_length);
     err = _ngf_check_link_status(stage->glprogram, info->debug_name);
     if (err != NGF_ERROR_OK) { goto ngf_create_shader_stage_cleanup; }
   }
@@ -909,7 +909,7 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage != NULL) {
     glDeleteProgram(stage->glprogram);
     if (stage->source_code != NULL) {
-      NGF_FREEN(stage->source_code, stage->source_code_size);
+      NGF_FREEN(stage->source_code, (size_t)stage->source_code_size);
     }
     NGF_FREE(stage);
   }
@@ -984,7 +984,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     const ngf_vertex_attrib_desc *attrib = &(input->attribs[a]);
     glEnableVertexAttribArray(attrib->location);
     glVertexAttribFormat(attrib->location,
-                         attrib->size,
+                         (GLint)attrib->size,
                          get_gl_type(attrib->type),
                          attrib->normalized,
                          attrib->offset);
