@@ -699,7 +699,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
         present_queue_info
     };
     const uint32_t num_queue_infos =
-        1u + (same_gfx_and_present ? 1u : 0u) + (same_gfx_and_xfer ? 1u : 0u);
+        1u + (same_gfx_and_present ? 0u : 1u) + (same_gfx_and_xfer ? 0u : 1u);
     const char *device_exts[] = { "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
