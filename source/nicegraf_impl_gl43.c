@@ -1111,37 +1111,37 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     if (image->bind_point == GL_TEXTURE_2D ||
         image->bind_point == GL_TEXTURE_CUBE_MAP) {
       glTexStorage2D(image->bind_point,
-                     info->nmips,
+                     (GLsizei)info->nmips,
                      glf.internal_format,
-                     info->extent.width,
-                     info->extent.height);
+                     (GLsizei)info->extent.width,
+                     (GLsizei)info->extent.height);
     } else if (image->bind_point == GL_TEXTURE_2D_ARRAY ||
                image->bind_point == GL_TEXTURE_CUBE_MAP_ARRAY ||
                image->bind_point == GL_TEXTURE_3D) {
       // NOTE: for cube map array textures the "depth" is counted in
       // layer-faces, not layers.
-      const GLsizei depth = info->extent.depth *
+      const GLsizei depth = (GLsizei)info->extent.depth *
           (image->bind_point == GL_TEXTURE_CUBE_MAP_ARRAY ? 6 : 1);
       glTexStorage3D(image->bind_point,
-                     info->nmips,
+                     (GLsizei)info->nmips,
                      glf.internal_format,
-                     info->extent.width,
-                     info->extent.height,
+                     (GLsizei)info->extent.width,
+                     (GLsizei)info->extent.height,
                      depth);
     } else if (image->bind_point == GL_TEXTURE_2D_MULTISAMPLE) {
       glTexStorage2DMultisample(image->bind_point,
-                                info->nsamples,
+                                (GLsizei)info->nsamples,
                                 glf.internal_format,
-                                info->extent.width,
-                                info->extent.height,
+                                (GLsizei)info->extent.width,
+                                (GLsizei)info->extent.height,
                                 GL_TRUE);
     } else if (image->bind_point == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
       glTexStorage3DMultisample(image->bind_point,
-                                info->nsamples,
+                                (GLsizei)info->nsamples,
                                 glf.internal_format,
-                                info->extent.width,
-                                info->extent.height,
-                                info->extent.depth,
+                                (GLsizei)info->extent.width,
+                                (GLsizei)info->extent.height,
+                                (GLsizei)info->extent.depth,
                                 GL_TRUE);
     }
   } else {
@@ -1152,14 +1152,14 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     if (info->nsamples <= 1) {
       glRenderbufferStorage(image->bind_point,
                             glf.internal_format,
-                            info->extent.width,
-                            info->extent.height);
+                            (GLsizei)info->extent.width,
+                            (GLsizei)info->extent.height);
     } else {
       glRenderbufferStorageMultisample(image->bind_point,
-                                       info->nsamples,
+                                       (GLsizei)info->nsamples,
                                        glf.internal_format,
-                                       info->extent.width,
-                                       info->extent.height);
+                                       (GLsizei)info->extent.width,
+                                       (GLsizei)info->extent.height);
     }
   }
   return NGF_ERROR_OK;
@@ -1192,15 +1192,15 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   const GLenum mip_filter = get_gl_filter(info->mip_filter);
   const GLenum min_mip_filter = get_min_mip_filter(min_filter, mip_filter);
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MIN_FILTER,
-                      min_mip_filter);
+                      (GLint)min_mip_filter);
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_MAG_FILTER,
-                      get_gl_filter(info->mag_filter));
+                      (GLint)get_gl_filter(info->mag_filter));
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_S,
-                      get_gl_wrap(info->wrap_s));
+                      (GLint)get_gl_wrap(info->wrap_s));
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_T,
-                      get_gl_wrap(info->wrap_t));
+                      (GLint)get_gl_wrap(info->wrap_t));
   glSamplerParameteri(sampler->glsampler, GL_TEXTURE_WRAP_R,
-                      get_gl_wrap(info->wrap_r));
+                      (GLint)get_gl_wrap(info->wrap_r));
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MIN_LOD, info->lod_min);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_MAX_LOD, info->lod_max);
   glSamplerParameterf(sampler->glsampler, GL_TEXTURE_LOD_BIAS, info->lod_bias);
@@ -1323,13 +1323,13 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       glFramebufferTextureLayer(GL_FRAMEBUFFER,
                                 gl_attachment,
                                 a->image_ref.image->glimage,
-                                a->image_ref.mip_level,
-                                a->image_ref.layer);
+                                (GLint)a->image_ref.mip_level,
+                                (GLint)a->image_ref.layer);
     } else if (!a->image_ref.image->is_renderbuffer) {
       glFramebufferTexture(GL_FRAMEBUFFER,
                            gl_attachment,
                            a->image_ref.image->glimage,
-                           a->image_ref.mip_level);
+                           (GLint)a->image_ref.mip_level);
     } else {
       glBindRenderbuffer(GL_RENDERBUFFER, 0);
       glFramebufferRenderbuffer(GL_FRAMEBUFFER,
@@ -1342,7 +1342,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
 
   GLenum fb_status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
   bool fb_ok = fb_status == GL_FRAMEBUFFER_COMPLETE;
-  glBindFramebuffer(GL_FRAMEBUFFER, old_framebuffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)old_framebuffer);
   if (!fb_ok) {
     err = NGF_ERROR_INCOMPLETE_RENDER_TARGET;
     goto ngf_create_render_target_cleanup;
@@ -1372,14 +1372,14 @@ ngf_error ngf_resolve_render_target(const ngf_render_target src,
   glBindFramebuffer(GL_READ_FRAMEBUFFER, src->framebuffer);
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, dst->framebuffer);
   glBlitFramebuffer(src_rect->x, src_rect->y,
-                    src_rect->x + src_rect->width,
-                    src_rect->y + src_rect->height,
+                    src_rect->x + (GLsizei)src_rect->width,
+                    src_rect->y + (GLsizei)src_rect->height,
                     src_rect->x, src_rect->y,
-                    src_rect->x + src_rect->width,
-                    src_rect->y + src_rect->height,
+                    src_rect->x + (GLsizei)src_rect->width,
+                    src_rect->y + (GLsizei)src_rect->height,
                     GL_COLOR_BUFFER_BIT,
                     GL_NEAREST);
-  glBindFramebuffer(GL_FRAMEBUFFER, prev_fbo);
+  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prev_fbo);
   return NGF_ERROR_OK;
 }
 
@@ -1404,7 +1404,7 @@ GLuint _ngf_create_buffer(GLenum type,
     break;
   }
 
-  glBufferData(type, info->size, NULL, gl_buffer_usage);
+  glBufferData(type, (GLsizeiptr)info->size, NULL, gl_buffer_usage);
 
   return buf;
 }
@@ -1422,7 +1422,8 @@ void* _ngf_buffer_map_range(GLenum bind_target,
   if (flags & NGF_BUFFER_MAP_WRITE_BIT) map_access |= GL_MAP_WRITE_BIT;
   if (flags & NGF_BUFFER_MAP_DISCARD_BIT)
     map_access |= GL_MAP_INVALIDATE_BUFFER_BIT;
-  return glMapBufferRange(bind_target, offset, size, map_access);
+  return glMapBufferRange(bind_target, (GLintptr)offset, (GLsizeiptr)size,
+                          map_access);
 }
 
 void _ngf_buffer_flush_range(GLenum bind_target,
@@ -1431,7 +1432,8 @@ void _ngf_buffer_flush_range(GLenum bind_target,
                              size_t size) {
   // TODO: assert that buffer is mapped.
   glBindBuffer(bind_target, gl_buffer);
-  glFlushMappedBufferRange(bind_target, offset, size);
+  glFlushMappedBufferRange(bind_target, (GLintptr)offset,
+                           (GLsizeiptr)size);
 }
 
 void _ngf_buffer_unmap(GLenum bind_target,
@@ -2015,18 +2017,18 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             glBindProgramPipeline(pipeline->program_pipeline);
             if ((!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
                  force_pipeline_update)) {
-              glViewport(pipeline->viewport.x,
-                         pipeline->viewport.y,
-                         pipeline->viewport.width,
-                         pipeline->viewport.height);
+              glViewport((GLsizei)pipeline->viewport.x,
+                         (GLsizei)pipeline->viewport.y,
+                         (GLsizei)pipeline->viewport.width,
+                         (GLsizei)pipeline->viewport.height);
             }
 
             if ((!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
                   force_pipeline_update)) {
-              glScissor(pipeline->scissor.x,
-                        pipeline->scissor.y,
-                        pipeline->scissor.width,
-                        pipeline->scissor.height);
+              glScissor((GLsizei)pipeline->scissor.x,
+                        (GLsizei)pipeline->scissor.y,
+                        (GLsizei)pipeline->scissor.width,
+                        (GLsizei)pipeline->scissor.height);
             }
 
             const ngf_rasterization_info *rast = &(pipeline->rasterization);
@@ -2117,7 +2119,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glStencilFuncSeparate(
                   GL_FRONT,
                   get_gl_compare(depth_stencil->front_stencil.compare_op),
-                  depth_stencil->front_stencil.reference,
+                  (GLint)depth_stencil->front_stencil.reference,
                   depth_stencil->front_stencil.compare_mask);
                 glStencilOpSeparate(
                   GL_FRONT,
@@ -2129,7 +2131,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glStencilFuncSeparate(
                   GL_BACK,
                   get_gl_compare(depth_stencil->back_stencil.compare_op),
-                  depth_stencil->back_stencil.reference,
+                  (GLint)depth_stencil->back_stencil.reference,
                   depth_stencil->back_stencil.compare_mask);
                 glStencilOpSeparate(
                   GL_BACK,
@@ -2172,15 +2174,15 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         case _NGF_CMD_VIEWPORT:
           glViewport(cmd->viewport.x,
                      cmd->viewport.y,
-                     cmd->viewport.width,
-                     cmd->viewport.height);
+                     (GLsizei)cmd->viewport.width,
+                     (GLsizei)cmd->viewport.height);
             break;
 
         case _NGF_CMD_SCISSOR:
           glScissor(cmd->scissor.x,
                     cmd->scissor.y,
-                    cmd->scissor.width,
-                    cmd->scissor.height);
+                    (GLsizei)cmd->scissor.width,
+                    (GLsizei)cmd->scissor.height);
           break;
 
         case _NGF_CMD_LINE_WIDTH:
@@ -2204,11 +2206,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           glGetIntegerv(GL_STENCIL_BACK_REF, &back_ref);
           glGetIntegerv(GL_STENCIL_REF, &front_ref);
           glStencilFuncSeparate(GL_FRONT,
-                                front_func,
+                                (GLenum)front_func,
                                 front_ref,
                                 cmd->stencil_compare_mask.front);
           glStencilFuncSeparate(GL_BACK,
-                                back_func,
+                                (GLenum)back_func,
                                 back_ref,
                                 cmd->stencil_compare_mask.back);
           break;
@@ -2221,13 +2223,13 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           glGetIntegerv(GL_STENCIL_BACK_VALUE_MASK, &back_mask);
           glGetIntegerv(GL_STENCIL_VALUE_MASK, &front_mask);
           glStencilFuncSeparate(GL_FRONT,
-                                front_func,
-                                cmd->stencil_reference.front,
-                                front_mask);
+                                (GLenum)front_func,
+                                (GLint)cmd->stencil_reference.front,
+                                (GLuint)front_mask);
           glStencilFuncSeparate(GL_BACK,
-                                back_func,
-                                cmd->stencil_reference.back,
-                                back_mask);         
+                                (GLenum)back_func,
+                                (GLint)cmd->stencil_reference.back,
+                                (GLuint)back_mask);         
           break;
         }
 
@@ -2258,7 +2260,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                ++binding) {
             if (bound_pipeline->vert_buf_bindings[binding].binding ==
                 cmd->attrib_buffer_bind_op.binding) {
-              stride = bound_pipeline->vert_buf_bindings[binding].stride;
+              stride =
+                  (GLsizei)bound_pipeline->vert_buf_bindings[binding].stride;
               found_binding = true;
             }
           }
@@ -2292,13 +2295,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               const ngf_clear *clear = &attachment->clear;
               switch (attachment->type) {
               case NGF_ATTACHMENT_COLOR:
-                glClearBufferfv(GL_COLOR, color_clear++, clear->clear_color);
+                glClearBufferfv(GL_COLOR, (GLint)(color_clear++),
+                                clear->clear_color);
                 break;
               case NGF_ATTACHMENT_DEPTH:
                 glClearBufferfv(GL_DEPTH, 0, &clear->clear_depth);
                 break;
               case NGF_ATTACHMENT_STENCIL: {
-                GLint v = clear->clear_stencil;
+                GLint v = (GLint)clear->clear_stencil;
                 glClearBufferiv(GL_STENCIL, 0, &v);
                 break;
               case NGF_ATTACHMENT_DEPTH_STENCIL:
@@ -2359,20 +2363,21 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           }
           if (ndiscarded_attachments > 0u) {
             glInvalidateFramebuffer(GL_FRAMEBUFFER,
-                                    ndiscarded_attachments,
+                                    (GLsizei)ndiscarded_attachments,
                                     gl_attachments);
           }
           break;
         }
         case _NGF_CMD_DRAW:
           if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
-            glDrawArrays(bound_pipeline->primitive_type, cmd->draw.first_element,
-                         cmd->draw.nelements);
+            glDrawArrays(bound_pipeline->primitive_type,
+                         (GLint)cmd->draw.first_element,
+                         (GLsizei)cmd->draw.nelements);
           } else if (!cmd->draw.indexed && cmd->draw.ninstances > 1u) {
             glDrawArraysInstanced(bound_pipeline->primitive_type,
-                                  cmd->draw.first_element,
-                                  cmd->draw.nelements,
-                                  cmd->draw.ninstances);
+                                  (GLint)cmd->draw.first_element,
+                                  (GLsizei)cmd->draw.nelements,
+                                  (GLsizei)cmd->draw.ninstances);
           } else if (cmd->draw.indexed && cmd->draw.ninstances == 1u) {
             assert(CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ||
                    CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT32);
@@ -2380,7 +2385,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
                                                                             : 4;
             glDrawElements(bound_pipeline->primitive_type,
-                           cmd->draw.nelements,
+                           (GLsizei)cmd->draw.nelements,
                            get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
                            (void*)(uintptr_t)(cmd->draw.first_element *
                                               elem_size));
@@ -2391,11 +2396,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 CURRENT_CONTEXT->bound_index_buffer_type == NGF_TYPE_UINT16 ? 2
                                                                             : 4;
             glDrawElementsInstanced(bound_pipeline->primitive_type,
-                                    cmd->draw.nelements,
+                                    (GLsizei)cmd->draw.nelements,
                                     get_gl_type(CURRENT_CONTEXT->bound_index_buffer_type),
                                     (void*)((uintptr_t)(cmd->draw.first_element *
                                                         elem_size)),  
-                                    cmd->draw.ninstances);
+                                    (GLsizei)cmd->draw.ninstances);
           }
           break;
         case _NGF_CMD_COPY:
@@ -2424,27 +2429,27 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                     ? bind_point
                     : get_gl_cubemap_face(img_ref->cubemap_face);
             glTexSubImage2D(real_bind_point,
-                            img_ref->mip_level,
+                            (GLsizei)img_ref->mip_level,
                             offset->x,
                             offset->y,
-                            extent->width,
-                            extent->height,
+                            (GLsizei)extent->width,
+                            (GLsizei)extent->height,
                             img_ref->image->glformat,
                             img_ref->image->gltype,
                             (void*)cmd->write_image.src_data_offset);
           } else {
-            const GLsizei z =
-                bind_point != GL_TEXTURE_CUBE_MAP_ARRAY
-                    ? offset->z
-                    : offset->z * 6 + img_ref->cubemap_face;
+            const GLsizei z = (GLsizei)
+                (bind_point != GL_TEXTURE_CUBE_MAP_ARRAY
+                     ? (uint32_t)offset->z
+                     : (uint32_t)offset->z * 6u + img_ref->cubemap_face);
             glTexSubImage3D(bind_point,
-                            img_ref->mip_level,
+                            (GLint)img_ref->mip_level,
                             offset->x,
                             offset->y,
                             z,
-                            extent->width,
-                            extent->height,
-                            extent->depth,
+                            (GLsizei)extent->width,
+                            (GLsizei)extent->height,
+                            (GLsizei)extent->depth,
                             img_ref->image->glformat,
                             img_ref->image->gltype,
                             (void*)cmd->write_image.src_data_offset);
@@ -2488,12 +2493,13 @@ void ngf_insert_log_message(const char *message) {
     GL_DEBUG_TYPE_MARKER,
     0,
     GL_DEBUG_SEVERITY_NOTIFICATION,
-    (uint32_t)strlen(message),
+    (GLsizei)strlen(message),
     message);
 }
 
 void ngf_begin_debug_group(const char *title) {
-  glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, (uint32_t)strlen(title), title);
+  glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0,
+                   (GLsizei)strlen(title), title);
 }
 
 void ngf_end_debug_group() {
