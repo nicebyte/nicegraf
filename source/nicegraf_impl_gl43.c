@@ -685,7 +685,6 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
                               GLuint *result) {
   ngf_error err = NGF_ERROR_OK;
   *result = GL_NONE;
-  _NGF_FAKE_USE(spec_info);
   GLuint shader = GL_NONE;
 
   // Obtain separate pointers to the first line of input (#version directive)
@@ -745,7 +744,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       // Ptr to spec constant value.
       const uint8_t *data = (uint8_t*)spec_info->value_buffer + spec->offset;
 
-      uint32_t bytes_written = 0u; // bytes written during this iteration.
+      int bytes_written = 0; // bytes written during this iteration.
 
       // Write the #define to the buffer
       #define WRITE_SPEC_DEFINE(format, type) \
@@ -769,9 +768,9 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       }
       #undef WRITE_SPEC_DEFINE
 
-      // Verify that snprintf did not discard any characters (if it did, that
-      // means the written string was too long).
-      if (bytes_written < spec_define_max_size) {
+      // Verify that snprintf did not return an error and did not discard any
+      // characters (if it did, that means the written string was too long).
+      if (bytes_written > 0 && bytes_written < spec_define_max_size) {
         defines_buffer_write_ptr += bytes_written;
       } else {
         err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
