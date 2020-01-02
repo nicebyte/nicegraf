@@ -736,6 +736,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
 static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   assert(swapchain);
   vkDeviceWaitIdle(_vk.device);
+
   for (uint32_t s = 0u;
        swapchain->image_semaphores != NULL && s < swapchain->num_images; ++s) {
     if (swapchain->image_semaphores[s] != VK_NULL_HANDLE) {
@@ -746,6 +747,7 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_semaphores != NULL) {
     NGF_FREEN(swapchain->image_semaphores, swapchain->num_images);
   }
+
   for (uint32_t f = 0u; swapchain->framebuffers && f < swapchain->num_images;
        ++f) {
     vkDestroyFramebuffer(_vk.device, swapchain->framebuffers[f], NULL);
@@ -753,6 +755,7 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->framebuffers != NULL) {
     NGF_FREEN(swapchain->framebuffers, swapchain->num_images);
   }
+
   for (uint32_t v = 0u;
        swapchain->image_views != NULL && v < swapchain->num_images; ++v) {
     vkDestroyImageView(_vk.device, swapchain->image_views[v], NULL);
@@ -760,9 +763,11 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
   if (swapchain->image_views) {
     NGF_FREEN(swapchain->image_views, swapchain->num_images);
   }
+
   if (swapchain->renderpass.vk_handle != VK_NULL_HANDLE) {
     vkDestroyRenderPass(_vk.device, swapchain->renderpass.vk_handle, NULL);
   }
+
   if (swapchain->vk_swapchain != VK_NULL_HANDLE) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
@@ -1557,16 +1562,6 @@ ngf_error ngf_begin_frame() {
   ngf_error err = NGF_ERROR_OK;
   uint32_t fi =
       interlocked_read(&_vk.frame_id) % CURRENT_CONTEXT->max_inflight_frames;
-  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    const VkResult vk_err =
-        vkAcquireNextImageKHR(_vk.device,
-                              CURRENT_CONTEXT->swapchain.vk_swapchain,
-                              UINT64_MAX,
-                              CURRENT_CONTEXT->swapchain.image_semaphores[fi],
-                              VK_NULL_HANDLE,
-                              &CURRENT_CONTEXT->swapchain.image_idx);
-    if (vk_err != VK_SUCCESS) err = NGF_ERROR_BEGIN_FRAME_FAILED;
-  }
   CURRENT_CONTEXT->frame_res[fi].active = true;
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_gfx_cmds);
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_gfx_semaphores);
@@ -1629,22 +1624,35 @@ ngf_error ngf_end_frame() {
     }
   }
 
-  // Submit pending graphics commands (if transfer and graphics are on the
-  // same queue, this will submit transfer commands as well).
-  const VkPipelineStageFlags color_attachment_stage =
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  uint32_t wait_sem_count = 0u;
-  VkSemaphore *wait_sems = NULL;
-  const VkPipelineStageFlags *wait_stage_masks = NULL;
-  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    wait_sem_count = 1u;
-    wait_sems =
-      &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
-    wait_stage_masks = &color_attachment_stage; 
-  }
   const uint32_t nsubmitted_gfx_cmdbuffers =
       _NGF_DARRAY_SIZE(frame_sync->submitted_gfx_cmds);
   if (nsubmitted_gfx_cmdbuffers > 0) {
+    // If present is necessary, acquire a swapchain image before submitting
+    // any graphics commands.
+    const bool needs_present =
+        CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
+    if (needs_present) {
+      vkAcquireNextImageKHR(_vk.device,
+                             CURRENT_CONTEXT->swapchain.vk_swapchain,
+                             UINT64_MAX,
+                             CURRENT_CONTEXT->swapchain.image_semaphores[fi],
+                             VK_NULL_HANDLE,
+                            &CURRENT_CONTEXT->swapchain.image_idx);
+    }
+
+    // Submit pending graphics commands (if transfer and graphics are on the
+    // same queue, this will submit transfer commands as well).
+    const VkPipelineStageFlags color_attachment_stage =
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    uint32_t wait_sem_count = 0u;
+    VkSemaphore *wait_sems = NULL;
+    const VkPipelineStageFlags *wait_stage_masks = NULL;
+    if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
+      wait_sem_count = 1u;
+      wait_sems =
+        &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
+      wait_stage_masks = &color_attachment_stage; 
+    }
     _ngf_submit_commands(_vk.gfx_queue,
                           frame_sync->submitted_gfx_cmds.data,
                           nsubmitted_gfx_cmdbuffers,
@@ -1655,24 +1663,24 @@ ngf_error ngf_end_frame() {
                           nsubmitted_gfx_cmdbuffers,
                           frame_sync->fences[0]);
     frame_sync->nfences++;
-  }
 
-  // Present if necessary.
-  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-    const VkPresentInfoKHR present_info = {
-      .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-      .pNext              = NULL,
-      .waitSemaphoreCount = (uint32_t)_NGF_DARRAY_SIZE(
-                               frame_sync->signal_gfx_semaphores),
-      .pWaitSemaphores    = frame_sync->signal_gfx_semaphores.data,
-      .swapchainCount     = 1,
-      .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
-      .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
-      .pResults           = NULL
-    };
-    const VkResult present_result = vkQueuePresentKHR(_vk.present_queue,
-                                                      &present_info);
-    if (present_result != VK_SUCCESS) err = NGF_ERROR_END_FRAME_FAILED;
+    // Present if necessary.
+    if (needs_present) {
+      const VkPresentInfoKHR present_info = {
+        .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext              = NULL,
+        .waitSemaphoreCount = (uint32_t)_NGF_DARRAY_SIZE(
+            frame_sync->signal_gfx_semaphores),
+        .pWaitSemaphores    = frame_sync->signal_gfx_semaphores.data,
+        .swapchainCount     = 1,
+        .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
+        .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
+        .pResults           = NULL
+      };
+      const VkResult present_result = vkQueuePresentKHR(_vk.present_queue,
+                                                        &present_info);
+      if (present_result != VK_SUCCESS) err = NGF_ERROR_END_FRAME_FAILED;
+    }
   }
 
   // Retire resources.
@@ -1723,8 +1731,9 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   }
 }
 
-ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline *result) {
+ngf_error ngf_create_graphics_pipeline(
+    const ngf_graphics_pipeline_info *info,
+    ngf_graphics_pipeline            *result) {
   assert(info);
   assert(result);
   VkVertexInputBindingDescription *vk_binding_descs = NULL;
