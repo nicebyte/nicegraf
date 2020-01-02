@@ -913,7 +913,7 @@ static ngf_error _ngf_create_swapchain(
         .r = VK_COMPONENT_SWIZZLE_IDENTITY,
         .g = VK_COMPONENT_SWIZZLE_IDENTITY,
         .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .a =VK_COMPONENT_SWIZZLE_IDENTITY
+        .a = VK_COMPONENT_SWIZZLE_IDENTITY
       },
       .subresourceRange = {
         .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -1249,11 +1249,14 @@ ngf_error ngf_resize_context(ngf_context ctx,
 
 void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   if (frame_res->active) {
-    vkWaitForFences(_vk.device,
-                     frame_res->nfences,
-                     frame_res->fences,
-                     true,
-                     1000000u);
+    VkResult wait_status = VK_SUCCESS;
+    do {
+      wait_status = vkWaitForFences(_vk.device,
+                                     frame_res->nfences,
+                                     frame_res->fences,
+                                     VK_TRUE,
+                                     1e+9);
+    } while(wait_status == VK_TIMEOUT);
     vkResetFences(_vk.device, frame_res->nfences,
                    frame_res->fences);
   }
