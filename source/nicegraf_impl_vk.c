@@ -1248,7 +1248,7 @@ ngf_error ngf_resize_context(ngf_context ctx,
 }
 
 void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
-  if (frame_res->active) {
+  if (frame_res->active && frame_res->nfences > 0u) {
     VkResult wait_status = VK_SUCCESS;
     do {
       wait_status = vkWaitForFences(_vk.device,
