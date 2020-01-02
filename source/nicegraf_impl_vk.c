@@ -1330,14 +1330,12 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
 
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
-	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     vkDeviceWaitIdle(_vk.device);
+	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     for (uint32_t f = 0u;
          ctx->frame_res != NULL && f < ctx->max_inflight_frames;
          ++f) {
-      if (ctx->frame_res[f].active) {
-        _ngf_retire_resources(&ctx->frame_res[f]);
-      }
+      _ngf_retire_resources(&ctx->frame_res[f]);
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_gfx_cmds);
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].submitted_xfer_cmds);
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].signal_gfx_semaphores);
