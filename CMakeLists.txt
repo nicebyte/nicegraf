@@ -44,7 +44,8 @@ target_include_directories(ngf_metadata_parser PUBLIC
 add_library(nicegraf_internal
     ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
-    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c)
+    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
+    ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c)
     
 target_include_directories(nicegraf_internal PRIVATE
     ${NICEGRAF_PUBLIC_INCLUDES}
@@ -68,7 +69,7 @@ if (APPLE)
   endif()
   set(NICEGRAF_DEPS ${NICEGRAF_DEPS} ${APPLE_METAL} ${APPLE_QUARTZ_CORE} ${APPLE_KIT})
 else()
-  set(NGF_PLATFORM "GL")
+  set(NGF_PLATFORM "VK")
   if("${NGF_PLATFORM}" STREQUAL "GL")
     set(NICEGRAF_SOURCES
       ${NICEGRAF_SOURCES}
