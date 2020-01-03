@@ -464,9 +464,9 @@ static VkFormat get_vk_vertex_format(ngf_type type, uint32_t size, bool norm) {
   if ((size < 1 || size > 4) || (norm && type > NGF_TYPE_UINT16)) {
    return VK_FORMAT_UNDEFINED;
   } else if (norm) {
-    return normalized_formats[type][size];
+    return normalized_formats[type][size - 1];
   } else {
-    return formats[type][size];
+    return formats[type][size - 1];
   }
 }
 
