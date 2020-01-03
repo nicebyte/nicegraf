@@ -25,6 +25,7 @@
 
 #include "dynamic_array.h"
 #include "nicegraf_internal.h"
+#include "stack_alloc.h"
 
 #include <assert.h>
 #include <string.h>
@@ -158,7 +159,7 @@ typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
- _NGF_DARRAY_OF(_ngf_buffer)     retire_buffers;
+ _NGF_DARRAY_OF(_ngf_buffer)           retire_buffers;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -206,7 +207,18 @@ typedef struct ngf_render_target_t {
   // TODO: non-default render target
 } ngf_render_target_t;
 
-NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
+NGF_THREADLOCAL ngf_context  CURRENT_CONTEXT = NULL;
+
+_ngf_sa* _ngf_tmp_store() {
+  static NGF_THREADLOCAL _ngf_sa *temp_storage = NULL;
+  if (temp_storage == NULL) {
+    const size_t sa_capacity = 1024 * 100; // 100K
+    if (temp_storage == NULL) {
+      temp_storage = _ngf_sa_create(sa_capacity);
+    }
+  }
+  return temp_storage;
+}
 
 static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
   switch(sample_count) {
@@ -1570,6 +1582,10 @@ ngf_error ngf_begin_frame() {
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_xfer_cmds);
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_xfer_semaphores);
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].xfer_cmd_pools);
+  
+  // reset stack allocator.
+  _ngf_sa_reset(_ngf_tmp_store());
+
    return err;
 }
 
@@ -1732,9 +1748,8 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   }
 }
 
-ngf_error ngf_create_graphics_pipeline(
-    const ngf_graphics_pipeline_info *info,
-    ngf_graphics_pipeline            *result) {
+ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
+                                       ngf_graphics_pipeline            *result) {
   assert(info);
   assert(result);
   VkVertexInputBindingDescription *vk_binding_descs = NULL;
@@ -1750,6 +1765,52 @@ ngf_error ngf_create_graphics_pipeline(
     goto ngf_create_graphics_pipeline_cleanup;
   }
 
+  // Build up Vulkan specialization structure, if necessary.
+  VkSpecializationInfo vk_spec_info;
+  const ngf_specialization_info *spec_info = info->spec_info;
+  if (info->spec_info) {
+    vk_spec_info.pData         = spec_info->value_buffer;
+    vk_spec_info.mapEntryCount = spec_info->nspecializations;
+    vk_spec_info.pMapEntries   =
+        _ngf_sa_alloc(_ngf_tmp_store(),
+                      info->spec_info->nspecializations *
+                      sizeof(VkSpecializationMapEntry));
+    
+    size_t total_data_size = 0u;
+    for(int i = 0; i < spec_info->nspecializations; ++i) {
+      VkSpecializationMapEntry *vk_specialization =
+          &vk_spec_info.pMapEntries[i];
+      const ngf_constant_specialization *specialization =
+          &spec_info->specializations[i];
+      vk_specialization->constantID = specialization->constant_id;
+      vk_specialization->offset     = specialization->offset;
+      size_t specialization_size = 0u;
+      switch(specialization->type) {
+      case NGF_TYPE_INT8:
+      case NGF_TYPE_UINT8:
+        specialization_size = 1u;
+        break;
+      case NGF_TYPE_INT16:
+      case NGF_TYPE_UINT16:
+      case NGF_TYPE_HALF_FLOAT:
+        specialization_size = 2u;
+        break;
+      case NGF_TYPE_INT32:
+      case NGF_TYPE_UINT32:
+      case NGF_TYPE_FLOAT:
+        specialization_size = 4u;
+        break;
+      case NGF_TYPE_DOUBLE:
+        specialization_size = 8u;
+        break;
+      default: assert(false);
+      }
+      vk_specialization->size = specialization_size;
+      total_data_size += specialization_size;
+    }
+    vk_spec_info.dataSize = total_data_size;
+  }
+
   // Prepare shader stages.
   VkPipelineShaderStageCreateInfo vk_shader_stages[5];
   assert(NGF_ARRAYSIZE(vk_shader_stages) ==
@@ -1759,14 +1820,15 @@ ngf_error ngf_create_graphics_pipeline(
     goto ngf_create_graphics_pipeline_cleanup;
   }
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
+    const ngf_shader_stage stage = info->shader_stages[s];
     vk_shader_stages[s].sType =
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     vk_shader_stages[s].pNext               = NULL;
     vk_shader_stages[s].flags               = 0u;
-    vk_shader_stages[s].stage               = info->shader_stages[s]->vk_stage_bits;
-    vk_shader_stages[s].module              = info->shader_stages[s]->vk_module;
-    vk_shader_stages[s].pName               = info->shader_stages[s]->entry_point_name,
-    vk_shader_stages[s].pSpecializationInfo = NULL;
+    vk_shader_stages[s].stage               = stage->vk_stage_bits;
+    vk_shader_stages[s].module              = stage->vk_module;
+    vk_shader_stages[s].pName               = stage->entry_point_name,
+    vk_shader_stages[s].pSpecializationInfo = spec_info ? &vk_spec_info : NULL;
   }
 
   // Prepare vertex input.
