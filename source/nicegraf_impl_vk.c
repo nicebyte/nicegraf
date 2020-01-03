@@ -1272,6 +1272,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
     } while(wait_status == VK_TIMEOUT);
     vkResetFences(_vk.device, frame_res->nfences,
                    frame_res->fences);
+    frame_res->nfences = 0;
   }
   frame_res->active = false;
   for (uint32_t s = 0u;
@@ -1623,25 +1624,23 @@ ngf_error ngf_end_frame() {
 
   frame_sync->nfences = 0u;
 
-  // Submit pending transfer commands if we're using separate gfx and xfer
-  // queues.
-  if (_vk.gfx_family_idx != _vk.xfer_family_idx) {
-    const uint32_t nsubmitted_xfer_cmdbuffers =
-      _NGF_DARRAY_SIZE(frame_sync->submitted_xfer_cmds);
-    if (nsubmitted_xfer_cmdbuffers > 0) {
-      _ngf_submit_commands(_vk.xfer_queue,
-                            frame_sync->submitted_xfer_cmds.data,
-                            nsubmitted_xfer_cmdbuffers,
-                            NULL,
-                            NULL,
-                            0u,
-                            frame_sync->signal_xfer_semaphores.data,
-                            nsubmitted_xfer_cmdbuffers,
-                            frame_sync->fences[1]);
-      frame_sync->nfences++;
-    }
+  // Submit pending transfer commands.
+  const uint32_t nsubmitted_xfer_cmdbuffers =
+    _NGF_DARRAY_SIZE(frame_sync->submitted_xfer_cmds);
+  if (nsubmitted_xfer_cmdbuffers > 0) {
+    bool separate_queue = _vk.gfx_family_idx != _vk.xfer_family_idx;
+    _ngf_submit_commands(separate_queue ? _vk.xfer_queue : _vk.gfx_queue,
+                         frame_sync->submitted_xfer_cmds.data,
+                         nsubmitted_xfer_cmdbuffers,
+                         NULL,
+                         NULL,
+                         0u,
+                         frame_sync->signal_xfer_semaphores.data,
+                         nsubmitted_xfer_cmdbuffers,
+                         frame_sync->fences[frame_sync->nfences++]);
   }
 
+  // Submit pending gfx commands & present.
   const uint32_t nsubmitted_gfx_cmdbuffers =
       _NGF_DARRAY_SIZE(frame_sync->submitted_gfx_cmds);
   if (nsubmitted_gfx_cmdbuffers > 0) {
@@ -1658,8 +1657,7 @@ ngf_error ngf_end_frame() {
                             &CURRENT_CONTEXT->swapchain.image_idx);
     }
 
-    // Submit pending graphics commands (if transfer and graphics are on the
-    // same queue, this will submit transfer commands as well).
+    // Submit pending graphics commands.
     const VkPipelineStageFlags color_attachment_stage =
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     uint32_t wait_sem_count = 0u;
@@ -1679,8 +1677,7 @@ ngf_error ngf_end_frame() {
                           wait_sem_count,
                           frame_sync->signal_gfx_semaphores.data,
                           nsubmitted_gfx_cmdbuffers,
-                          frame_sync->fences[0]);
-    frame_sync->nfences++;
+                          frame_sync->fences[frame_sync->nfences++]);
 
     // Present if necessary.
     if (needs_present) {
