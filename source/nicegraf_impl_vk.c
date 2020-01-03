@@ -1189,9 +1189,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       .pNext = NULL,
       .flags = 0u
     };
-    ctx->frame_res[f].nfences =
-      _vk.gfx_family_idx == _vk.xfer_family_idx ? 1u : 2u;
-    for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
+    ctx->frame_res[f].nfences = 0;
+    for (uint32_t i = 0u;
+         i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence);
+         ++i) {
       vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
                              &ctx->frame_res[f].fences[i]);
       if (vk_err != VK_SUCCESS) {
