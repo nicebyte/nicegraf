@@ -167,9 +167,27 @@ typedef struct _ngf_frame_resources {
   bool                                 active;
 } _ngf_frame_resources;
 
+typedef uint32_t  _ngf_desc_count_t[NGF_DESCRIPTOR_TYPE_COUNT];
+
+typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
+
+typedef struct _ngf_desc_pool_t {
+  struct _ngf_desc_pool_t *next;
+  _ngf_desc_superpool     *parent;
+  VkDescriptorPool         vk_pool;
+  _ngf_desc_count_t        capacity;
+  _ngf_desc_count_t        utilization;
+} _ngf_desc_pool_t;
+
+struct _ngf_desc_superpool_t {
+  _ngf_desc_pool_t *active_pool;
+  _ngf_desc_pool_t *freelist;
+};
+
 // API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
  _ngf_frame_resources         *frame_res;
+ _ngf_desc_superpool           desc_superpool;
  _ngf_swapchain                swapchain;
   ngf_swapchain_info           swapchain_info;
   VmaAllocator                 allocator;
@@ -1238,6 +1256,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       _NGF_DARRAY_APPEND(ctx->xfer_cmd_pools, pool);
     }
   }
+
+  // initialize descriptor superpool.
+  ctx->desc_superpool.active_pool = NULL;
+  ctx->desc_superpool.freelist    = NULL;
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
