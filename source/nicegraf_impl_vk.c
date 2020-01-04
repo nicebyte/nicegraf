@@ -114,11 +114,12 @@ typedef struct _ngf_cmd_bundle_t {
 } _ngf_cmd_bundle;
 
 typedef struct ngf_cmd_buffer_t {
-  _NGF_DARRAY_OF(_ngf_cmd_bundle) bundles;        // Finished bundles.
+  ngf_graphics_pipeline           active_pipe;    // Bound pipeline.
+  _NGF_DARRAY_OF(_ngf_cmd_bundle) bundles;        // Bundles that finished
+                                                  // recording.
   _ngf_cmd_bundle                 active_bundle;  // Current bundle.
-  ATOMIC_INT                      frame_id;       // Stores the id of the frame
-                                                  // that the cmd buffer is
-                                                  // intended for.
+  ATOMIC_INT                      frame_id;       // id of the frame that the
+                                                  // cmd buffer is intended for.
   _ngf_cmd_buffer_state           state;
 } ngf_cmd_buffer_t;
 
@@ -1430,6 +1431,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
 
   ngf_cmd_buffer cmd_buf = NGF_ALLOC(ngf_cmd_buffer_t);
   *result = cmd_buf;
+  cmd_buf->active_pipe = NULL;
   if (cmd_buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -2389,6 +2391,7 @@ void ngf_cmd_draw(ngf_render_encoder enc,
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
                                const ngf_graphics_pipeline pipeline) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  buf->active_pipe = pipeline;
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
