@@ -266,8 +266,11 @@ static VkDescriptorType get_vk_descriptor_type(ngf_descriptor_type type) {
 
 static VkShaderStageFlags get_vk_stage_flags(uint32_t flags) {
   VkShaderStageFlags result = 0x0u;
-  if (flags & NGF_STAGE_FRAGMENT) result &= VK_SHADER_STAGE_FRAGMENT_BIT;
-  if (flags & NGF_STAGE_VERTEX) result &= VK_SHADER_STAGE_VERTEX_BIT;
+  if (flags & NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT)
+    result |= VK_SHADER_STAGE_FRAGMENT_BIT;
+  if (flags & NGF_DESCRIPTOR_VERTEX_STAGE_BIT)
+    result |= VK_SHADER_STAGE_VERTEX_BIT;
+  printf("vk stage flags %d\n", result);
   return result;
 }
 
@@ -2058,6 +2061,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   _NGF_DARRAY_RESET(pipeline->vk_descriptor_set_layouts,
                     info->layout->ndescriptor_set_layouts);
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
+    printf("set %d\n", s);
     VkDescriptorSetLayoutBinding *vk_descriptor_bindings =
         NGF_ALLOCN(VkDescriptorSetLayoutBinding,
                    info->layout->descriptor_set_layouts[s].ndescriptors);
@@ -2067,6 +2071,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       VkDescriptorSetLayoutBinding *vk_d = &vk_descriptor_bindings[b];
       const ngf_descriptor_info *d =
           &info->layout->descriptor_set_layouts[s].descriptors[b];
+      printf("binding %d %d %x\n", d->id, d->type, d->stage_flags);
       vk_d->binding         = d->id;
       vk_d->descriptorCount = 1u;
       vk_d->descriptorType  = get_vk_descriptor_type(d->type);
@@ -2080,13 +2085,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       .bindingCount = info->layout->descriptor_set_layouts[s].ndescriptors,
       .pBindings = vk_descriptor_bindings
     };
-    VkDescriptorSetLayout *result_dsl =
-        &_NGF_DARRAY_AT(pipeline->vk_descriptor_set_layouts, s);
+    VkDescriptorSetLayout result_dsl = VK_NULL_HANDLE;
     vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL,
-                                          result_dsl);
+                                         &result_dsl);
+    _NGF_DARRAY_APPEND(pipeline->vk_descriptor_set_layouts, result_dsl);
     NGF_FREEN(vk_descriptor_bindings,
               info->layout->descriptor_set_layouts[s].ndescriptors);
     if (vk_err != VK_SUCCESS) {
+      assert(false);
       // TODO: return error here.
     }
   }
@@ -2094,6 +2100,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Pipeline layout.
   const uint32_t ndescriptor_sets =
       _NGF_DARRAY_SIZE(pipeline->vk_descriptor_set_layouts);
+  printf("%d\n", ndescriptor_sets);
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
     .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
     .pNext                  = NULL,
@@ -2105,6 +2112,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
   vk_err = vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL,
                                   &pipeline->vk_pipeline_layout);
+  assert(vk_err == VK_SUCCESS);
   VkGraphicsPipelineCreateInfo vk_pipeline_info = {
     .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
     .pNext = NULL,
