@@ -168,7 +168,7 @@ typedef struct _ngf_frame_resources {
   bool                                 active;
 } _ngf_frame_resources;
 
-typedef uint32_t  _ngf_desc_count_t[NGF_DESCRIPTOR_TYPE_COUNT];
+typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
 typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
 
@@ -176,8 +176,8 @@ typedef struct _ngf_desc_pool_t {
   struct _ngf_desc_pool_t *next;
   _ngf_desc_superpool     *parent;
   VkDescriptorPool         vk_pool;
-  _ngf_desc_count_t        capacity;
-  _ngf_desc_count_t        utilization;
+  _ngf_desc_count        capacity;
+  _ngf_desc_count        utilization;
 } _ngf_desc_pool_t;
 
 struct _ngf_desc_superpool_t {
@@ -2395,6 +2395,150 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
 }
+
+// helper for allocating a new descriptor pool from the current context's
+// superpool.
+_ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
+  if(CURRENT_CONTEXT->desc_superpool.freelist == NULL) { 
+    // prepare descriptor counts.
+    VkDescriptorPoolSize *vk_pool_sizes =
+        _ngf_sa_alloc(_ngf_tmp_store(),
+                       sizeof(VkDescriptorPoolSize) *
+                       NGF_DESCRIPTOR_TYPE_COUNT);
+    for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+      vk_pool_sizes[i].descriptorCount = capacity[i];
+      vk_pool_sizes[i].type = get_vk_descriptor_type((ngf_descriptor_type)i);
+    }
+
+    // prepare a createinfo structure for the new pool.
+    const VkDescriptorPoolCreateInfo vk_pool_ci = {
+      .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+      .pNext         = NULL,
+      .flags         = 0u,
+      .maxSets       = 100u,
+      .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
+      .pPoolSizes    = vk_pool_sizes
+    };
+
+    // create the new pool.
+    _ngf_desc_pool_t *new_pool =  NGF_ALLOC(_ngf_desc_pool_t);
+    new_pool->next     =  CURRENT_CONTEXT->desc_superpool.freelist;
+    new_pool->parent   = &CURRENT_CONTEXT->desc_superpool;
+    memcpy(new_pool->capacity, capacity, sizeof(new_pool->capacity));
+    memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
+    const VkResult vk_pool_create_result =
+        vkCreateDescriptorPool(_vk.device,
+                               &vk_pool_ci,
+                                NULL,
+                               &new_pool->vk_pool);
+    if (vk_pool_create_result == VK_SUCCESS) {
+      // add the newly created pool to the freelist.
+      CURRENT_CONTEXT->desc_superpool.freelist = new_pool;
+    } else {
+      NGF_FREE(new_pool);
+    }
+  }
+
+  // pop off the next available descriptor pool.
+  _ngf_desc_pool_t *result = CURRENT_CONTEXT->desc_superpool.freelist;
+  if (result) {
+    CURRENT_CONTEXT->desc_superpool.freelist = result->next;
+  }
+
+  return result;
+}
+
+void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
+                                const ngf_resource_bind_op *bind_operations,
+                                uint32_t nbind_operations) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf->active_pipe);
+  const uint32_t ndesc_set_layouts = 
+      _NGF_DARRAY_SIZE(buf->active_pipe->vk_descriptor_set_layouts);
+  VkWriteDescriptorSet *vk_writes =
+      _ngf_sa_alloc(_ngf_tmp_store(), nbind_operations *
+                                      sizeof(VkWriteDescriptorSet));
+  VkDescriptorSet *vk_sets =
+      _ngf_sa_alloc(_ngf_tmp_store(),
+                     sizeof(VkDescriptorSet) * ndesc_set_layouts);
+  memset(vk_sets, VK_NULL_HANDLE,
+         sizeof(VkDescriptorSet) * ndesc_set_layouts);
+  for (int i = 0; i < nbind_operations; ++i) {
+    const ngf_resource_bind_op *bind_op = &bind_operations[i];
+    if (bind_op->target_set >= ndesc_set_layouts) {
+      assert(false);
+      return;
+    }
+    if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
+      if (CURRENT_CONTEXT->desc_superpool.active_pool == NULL) {
+        _ngf_desc_count capacity;
+        for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
+          capacity[i] = 100u;
+        CURRENT_CONTEXT->desc_superpool.active_pool =
+            _ngf_desc_pool_alloc(capacity);
+      }
+      // TODO: check if pool can accomodate the request
+      const VkDescriptorSetAllocateInfo vk_desc_set_info = {
+        .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .pNext              = NULL,
+        .descriptorPool     = CURRENT_CONTEXT->desc_superpool.active_pool->vk_pool,
+        .descriptorSetCount = 1u,
+        .pSetLayouts        = &_NGF_DARRAY_AT(
+                                  buf->active_pipe->vk_descriptor_set_layouts,
+                                  bind_op->target_set)
+      };
+      const VkResult desc_set_alloc_result =
+          vkAllocateDescriptorSets(_vk.device,
+                                   &vk_desc_set_info,
+                                   &vk_sets[bind_op->target_set]);
+      assert(desc_set_alloc_result == VK_SUCCESS);
+    }
+    VkDescriptorSet set =  vk_sets[bind_op->target_set];
+
+    VkWriteDescriptorSet *vk_write = &vk_writes[i];
+
+    vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    vk_write->pNext           = NULL;
+    vk_write->dstSet          = set;
+    vk_write->dstBinding      = bind_op->target_binding;
+    vk_write->descriptorCount = 1u;
+    vk_write->dstArrayElement = 0u;
+    vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
+
+    switch(bind_op->type) {
+    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+      const ngf_uniform_buffer_bind_info *bind_info =
+          &bind_op->info.uniform_buffer;
+      VkDescriptorBufferInfo *vk_bind_info =
+          _ngf_sa_alloc(_ngf_tmp_store(), sizeof(VkDescriptorBufferInfo));
+
+      vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
+      vk_bind_info->offset = bind_info->offset;
+      vk_bind_info->range  = bind_info->range;
+      
+      vk_write->pBufferInfo = vk_bind_info;
+      break;
+    }
+    case NGF_DESCRIPTOR_TEXTURE:
+    case NGF_DESCRIPTOR_SAMPLER:
+    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER:
+    default:
+      assert(false);
+    }
+  }
+  vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
+  for (int s = 0; s < ndesc_set_layouts; ++s) {
+    if (vk_sets[s] != VK_NULL_HANDLE) {
+      vkCmdBindDescriptorSets(buf->active_bundle.vkcmdbuf,
+                              VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              buf->active_pipe->vk_pipeline_layout,
+                              0, 1,
+                              &vk_sets[s],
+                              0, NULL);
+    }
+  }
+}
+
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   const VkViewport viewport = {
