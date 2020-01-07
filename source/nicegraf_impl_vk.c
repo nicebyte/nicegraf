@@ -232,9 +232,7 @@ _ngf_sa* _ngf_tmp_store() {
   static NGF_THREADLOCAL _ngf_sa *temp_storage = NULL;
   if (temp_storage == NULL) {
     const size_t sa_capacity = 1024 * 100; // 100K
-    if (temp_storage == NULL) {
-      temp_storage = _ngf_sa_create(sa_capacity);
-    }
+    temp_storage = _ngf_sa_create(sa_capacity);
   }
   return temp_storage;
 }
