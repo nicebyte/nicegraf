@@ -170,14 +170,19 @@ typedef struct _ngf_frame_resources {
 
 typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
+typedef struct {
+  uint32_t       sets;
+ _ngf_desc_count descriptors;
+} _ngf_desc_pool_capacity;
+
 typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
 
 typedef struct _ngf_desc_pool_t {
   struct _ngf_desc_pool_t *next;
-  _ngf_desc_superpool     *parent;
+ _ngf_desc_superpool      *parent;
   VkDescriptorPool         vk_pool;
-  _ngf_desc_count        capacity;
-  _ngf_desc_count        utilization;
+ _ngf_desc_pool_capacity   capacity;
+ _ngf_desc_pool_capacity   utilization;
 } _ngf_desc_pool_t;
 
 struct _ngf_desc_superpool_t {
@@ -2404,7 +2409,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
 
 // helper for allocating a new descriptor pool from the current context's
 // superpool.
-_ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
+_ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_pool_capacity capacity) {
   if(CURRENT_CONTEXT->desc_superpool.freelist == NULL) { 
     // prepare descriptor counts.
     VkDescriptorPoolSize *vk_pool_sizes =
@@ -2412,7 +2417,7 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
                        sizeof(VkDescriptorPoolSize) *
                        NGF_DESCRIPTOR_TYPE_COUNT);
     for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-      vk_pool_sizes[i].descriptorCount = capacity[i];
+      vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
       vk_pool_sizes[i].type = get_vk_descriptor_type((ngf_descriptor_type)i);
     }
 
@@ -2421,7 +2426,7 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
       .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
       .pNext         = NULL,
       .flags         = 0u,
-      .maxSets       = 100u,
+      .maxSets       = capacity.sets,
       .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
       .pPoolSizes    = vk_pool_sizes
     };
@@ -2430,7 +2435,7 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
     _ngf_desc_pool_t *new_pool =  NGF_ALLOC(_ngf_desc_pool_t);
     new_pool->next     =  CURRENT_CONTEXT->desc_superpool.freelist;
     new_pool->parent   = &CURRENT_CONTEXT->desc_superpool;
-    memcpy(new_pool->capacity, capacity, sizeof(new_pool->capacity));
+    new_pool->capacity =  capacity;
     memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
     const VkResult vk_pool_create_result =
         vkCreateDescriptorPool(_vk.device,
@@ -2457,7 +2462,6 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                 const ngf_resource_bind_op *bind_operations,
                                 uint32_t nbind_operations) {
-  assert(buf);
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   assert(buf->active_pipe);
 
@@ -2479,9 +2483,10 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     }
     if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
       if (CURRENT_CONTEXT->desc_superpool.active_pool == NULL) {
-        _ngf_desc_count capacity;
+        _ngf_desc_pool_capacity capacity;
+        capacity.sets = 100u;
         for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
-          capacity[i] = 100u;
+          capacity.descriptors[i] = 100u;
         CURRENT_CONTEXT->desc_superpool.active_pool =
             _ngf_desc_pool_alloc(capacity);
       }
