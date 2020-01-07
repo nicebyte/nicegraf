@@ -2459,24 +2459,40 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                 const ngf_resource_bind_op *bind_operations,
                                 uint32_t nbind_operations) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+
+  // binding resources requires an active pipeline.
   assert(buf->active_pipe);
 
+  // number of active descriptor set layouts in the pipeline.
   const uint32_t ndesc_set_layouts = 
       _NGF_DARRAY_SIZE(buf->active_pipe->vk_descriptor_set_layouts);
+
+  // allocate an array of descriptor set handles from temporary storage and
+  // set them all to null.
+  const size_t vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
+  VkDescriptorSet *vk_sets = _ngf_sa_alloc(_ngf_tmp_store(), vk_sets_size_bytes);
+  memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
+
+  // allocate an array of vulkan descriptor set writes from
+  // temp storage. 
   VkWriteDescriptorSet *vk_writes =
       _ngf_sa_alloc(_ngf_tmp_store(), nbind_operations *
                                       sizeof(VkWriteDescriptorSet));
-  VkDescriptorSet *vk_sets =
-      _ngf_sa_alloc(_ngf_tmp_store(),
-                     sizeof(VkDescriptorSet) * ndesc_set_layouts);
-  memset(vk_sets, VK_NULL_HANDLE,
-         sizeof(VkDescriptorSet) * ndesc_set_layouts);
+
+  // process each bind operation, constructing a corresponding
+  // vulkan descriptor set write operation.
   for (int i = 0; i < nbind_operations; ++i) {
     const ngf_resource_bind_op *bind_op = &bind_operations[i];
+
+    // ensure that a valid descriptor set is referenced by this
+    // bind operation.
     if (bind_op->target_set >= ndesc_set_layouts) {
       assert(false);
       return;
     }
+
+    // find a descriptor set from vk_sets for this write (allocating a new one
+    // if it hasn't been created yet).
     if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
       if (CURRENT_CONTEXT->desc_superpool.active_pool == NULL) {
         _ngf_desc_pool_capacity capacity;
@@ -2485,8 +2501,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
           capacity.descriptors[i] = 100u;
         CURRENT_CONTEXT->desc_superpool.active_pool =
             _ngf_desc_pool_alloc(capacity);
+      } else {
+        // TODO: check if pool can accomodate the request
       }
-      // TODO: check if pool can accomodate the request
       const VkDescriptorSetAllocateInfo vk_desc_set_info = {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
@@ -2504,6 +2521,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     }
     VkDescriptorSet set =  vk_sets[bind_op->target_set];
 
+    // construct a vulkan descriptor set write corresponding to this bind
+    // operation.
     VkWriteDescriptorSet *vk_write = &vk_writes[i];
 
     vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2531,11 +2550,19 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     case NGF_DESCRIPTOR_TEXTURE:
     case NGF_DESCRIPTOR_SAMPLER:
     case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER:
+      // TODO: handle other descriptor types.
     default:
       assert(false);
     }
   }
+
+  // perform all the vulkan descriptor set write operations to populate the
+  // newly allocated descriptor sets.
   vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
+
+  // bind each of the descriptor sets individually (this ensures that desc.
+  // sets bound for a compatible pipeline earlier in this command buffer
+  // don't get clobbered).
   for (int s = 0; s < ndesc_set_layouts; ++s) {
     if (vk_sets[s] != VK_NULL_HANDLE) {
       vkCmdBindDescriptorSets(buf->active_bundle.vkcmdbuf,
