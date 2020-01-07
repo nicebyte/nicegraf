@@ -142,6 +142,32 @@ typedef struct ngf_uniform_buffer_t {
   _ngf_buffer data;
 } ngf_uniform_buffer_t;
 
+typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
+
+typedef struct {
+  uint32_t       sets;
+ _ngf_desc_count descriptors;
+} _ngf_desc_pool_capacity;
+
+typedef struct {
+ _ngf_desc_count counts;
+} _ngf_desc_set_size;
+
+typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
+
+typedef struct _ngf_desc_pool {
+  struct _ngf_desc_pool *next;
+ _ngf_desc_superpool      *parent;
+  VkDescriptorPool         vk_pool;
+ _ngf_desc_pool_capacity   capacity;
+ _ngf_desc_pool_capacity   utilization;
+} _ngf_desc_pool;
+
+struct _ngf_desc_superpool_t {
+  _ngf_desc_pool *active_pool;
+  _ngf_desc_pool *freelist;
+};
+
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -161,38 +187,13 @@ typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
  _NGF_DARRAY_OF(_ngf_buffer)           retire_buffers;
+ _NGF_DARRAY_OF(_ngf_desc_pool*)       retire_desc_pools;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
   uint32_t                             nfences;
   bool                                 active;
 } _ngf_frame_resources;
-
-typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
-
-typedef struct {
-  uint32_t       sets;
- _ngf_desc_count descriptors;
-} _ngf_desc_pool_capacity;
-
-typedef struct {
- _ngf_desc_count counts;
-} _ngf_desc_set_size;
-
-typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
-
-typedef struct _ngf_desc_pool_t {
-  struct _ngf_desc_pool_t *next;
- _ngf_desc_superpool      *parent;
-  VkDescriptorPool         vk_pool;
- _ngf_desc_pool_capacity   capacity;
- _ngf_desc_pool_capacity   utilization;
-} _ngf_desc_pool_t;
-
-struct _ngf_desc_superpool_t {
-  _ngf_desc_pool_t *active_pool;
-  _ngf_desc_pool_t *freelist;
-};
 
 // API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
@@ -1212,6 +1213,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_desc_pools, 8);
     ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1363,6 +1365,16 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                      b->vkbuf,
                      b->alloc);
   }
+  for (uint32_t p = 0u;
+       p < _NGF_DARRAY_SIZE(frame_res->retire_desc_pools);
+     ++p) {
+    _ngf_desc_pool *pool = _NGF_DARRAY_AT(frame_res->retire_desc_pools, p);
+    vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
+    memset(&pool->utilization, 0, sizeof(pool->utilization));
+    //TODO: synchronization
+    pool->next = pool->parent->freelist;
+    pool->parent->freelist = pool;
+  }
   _NGF_DARRAY_CLEAR(frame_res->submitted_gfx_cmds);
   _NGF_DARRAY_CLEAR(frame_res->submitted_xfer_cmds);
   _NGF_DARRAY_CLEAR(frame_res->signal_gfx_semaphores);
@@ -1373,6 +1385,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_buffers);
+  _NGF_DARRAY_CLEAR(frame_res->retire_desc_pools);
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -2416,7 +2429,13 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
 
 // helper for allocating a new descriptor pool from the current context's
 // superpool.
-_ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_pool_capacity capacity) {
+_ngf_desc_pool* _ngf_desc_pool_alloc() {
+  //TODO: make this tweakable
+  _ngf_desc_pool_capacity capacity;
+  capacity.sets = 100u;
+  for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
+    capacity.descriptors[i] = 100u;
+
   if(CURRENT_CONTEXT->desc_superpool.freelist == NULL) { 
     // prepare descriptor counts.
     VkDescriptorPoolSize *vk_pool_sizes =
@@ -2439,7 +2458,7 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_pool_capacity capacity) {
     };
 
     // create the new pool.
-    _ngf_desc_pool_t *new_pool =  NGF_ALLOC(_ngf_desc_pool_t);
+    _ngf_desc_pool *new_pool =  NGF_ALLOC(_ngf_desc_pool);
     new_pool->next     =  CURRENT_CONTEXT->desc_superpool.freelist;
     new_pool->parent   = &CURRENT_CONTEXT->desc_superpool;
     new_pool->capacity =  capacity;
@@ -2458,7 +2477,7 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_pool_capacity capacity) {
   }
 
   // pop off the next available descriptor pool.
-  _ngf_desc_pool_t *result = CURRENT_CONTEXT->desc_superpool.freelist;
+  _ngf_desc_pool *result = CURRENT_CONTEXT->desc_superpool.freelist;
   if (result) {
     CURRENT_CONTEXT->desc_superpool.freelist = result->next;
   }
@@ -2505,16 +2524,34 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     // find a descriptor set from vk_sets for this write (allocating a new one
     // if it hasn't been created yet).
     if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
+      // this means the descriptor set hasn't been allocated yet.
+
+      // ensure we have an active desriptor pool.
       if (CURRENT_CONTEXT->desc_superpool.active_pool == NULL) {
-        _ngf_desc_pool_capacity capacity;
-        capacity.sets = 100u;
-        for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
-          capacity.descriptors[i] = 100u;
-        CURRENT_CONTEXT->desc_superpool.active_pool =
-            _ngf_desc_pool_alloc(capacity);
-      } else {
-        // TODO: check if pool can accomodate the request
+       CURRENT_CONTEXT->desc_superpool.active_pool = _ngf_desc_pool_alloc();
       }
+      _ngf_desc_pool *active_pool = CURRENT_CONTEXT->desc_superpool.active_pool;
+
+      const _ngf_desc_pool_capacity *a_cap = &(active_pool->capacity);
+      _ngf_desc_pool_capacity       *a_use = &(active_pool->utilization);
+      
+      // ensure the active descriptor pool can service the request.
+      // if not, retire the active pool and get a new one.
+      bool can_fit = true;
+      for (ngf_descriptor_type i = 0;
+           can_fit && i < NGF_DESCRIPTOR_TYPE_COUNT;
+           ++i) {
+        const uint32_t req_size =
+            _NGF_DARRAY_AT(buf->active_pipe->desc_set_sizes,
+                           bind_op->target_set).counts[i];
+        can_fit &= (a_use->descriptors[i] + req_size < a_cap->descriptors[i]);
+      }
+      can_fit &= a_use->sets + 1 < a_cap->sets;
+      if (!can_fit) {
+        CURRENT_CONTEXT->desc_superpool.active_pool = _ngf_desc_pool_alloc();
+      }
+
+      // allocate the new descriptor set from the pool.
       const VkDescriptorSetAllocateInfo vk_desc_set_info = {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
@@ -2529,6 +2566,15 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                    &vk_desc_set_info,
                                    &vk_sets[bind_op->target_set]);
       assert(desc_set_alloc_result == VK_SUCCESS);
+      
+      // update the active pool stats.
+      for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+        const uint32_t req_size =
+          _NGF_DARRAY_AT(buf->active_pipe->desc_set_sizes,
+                         bind_op->target_set).counts[i];
+        active_pool->utilization.descriptors[i] += req_size;
+      }
+      active_pool->utilization.sets++;
     }
     VkDescriptorSet set =  vk_sets[bind_op->target_set];
 
