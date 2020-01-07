@@ -2459,8 +2459,10 @@ _ngf_desc_pool_t* _ngf_desc_pool_alloc(_ngf_desc_count capacity) {
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                 const ngf_resource_bind_op *bind_operations,
                                 uint32_t nbind_operations) {
+  assert(buf);
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   assert(buf->active_pipe);
+
   const uint32_t ndesc_set_layouts = 
       _NGF_DARRAY_SIZE(buf->active_pipe->vk_descriptor_set_layouts);
   VkWriteDescriptorSet *vk_writes =
@@ -2540,7 +2542,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       vkCmdBindDescriptorSets(buf->active_bundle.vkcmdbuf,
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               buf->active_pipe->vk_pipeline_layout,
-                              0, 1,
+                              s,
+                              1,
                               &vk_sets[s],
                               0, NULL);
     }
