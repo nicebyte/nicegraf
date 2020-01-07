@@ -175,6 +175,10 @@ typedef struct {
  _ngf_desc_count descriptors;
 } _ngf_desc_pool_capacity;
 
+typedef struct {
+ _ngf_desc_count counts;
+} _ngf_desc_set_size;
+
 typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
 
 typedef struct _ngf_desc_pool_t {
@@ -213,6 +217,7 @@ typedef struct ngf_shader_stage_t {
 typedef struct ngf_graphics_pipeline_t {
   VkPipeline                           vk_pipeline;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) vk_descriptor_set_layouts;
+ _NGF_DARRAY_OF(_ngf_desc_set_size)    desc_set_sizes;
   VkPipelineLayout                     vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
 
@@ -2062,10 +2067,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Descriptor set layouts.
   _NGF_DARRAY_RESET(pipeline->vk_descriptor_set_layouts,
                     info->layout->ndescriptor_set_layouts);
+  _NGF_DARRAY_RESET(pipeline->desc_set_sizes,
+                    info->layout->ndescriptor_set_layouts);
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
     VkDescriptorSetLayoutBinding *vk_descriptor_bindings =
         NGF_ALLOCN(VkDescriptorSetLayoutBinding,
                    info->layout->descriptor_set_layouts[s].ndescriptors);
+    _ngf_desc_set_size set_size;
+    memset(&set_size, 0, sizeof(set_size));
     for (uint32_t b = 0u;
          b < info->layout->descriptor_set_layouts[s].ndescriptors;
          ++b) {
@@ -2077,6 +2086,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       vk_d->descriptorType  = get_vk_descriptor_type(d->type);
       vk_d->descriptorCount = 1u;
       vk_d->stageFlags      = get_vk_stage_flags(d->stage_flags);
+      set_size.counts[d->type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
       .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -2089,6 +2099,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL,
                                          &result_dsl);
     _NGF_DARRAY_APPEND(pipeline->vk_descriptor_set_layouts, result_dsl);
+    _NGF_DARRAY_APPEND(pipeline->desc_set_sizes, set_size);
     NGF_FREEN(vk_descriptor_bindings,
               info->layout->descriptor_set_layouts[s].ndescriptors);
     if (vk_err != VK_SUCCESS) {
