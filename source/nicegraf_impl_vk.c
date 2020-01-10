@@ -110,17 +110,17 @@ typedef struct _ngf_cmd_bundle_t {
   VkCommandBuffer      vkcmdbuf;
   VkSemaphore          vksem;
   VkCommandPool        vkpool;
-  _ngf_cmd_bundle_type type;
+ _ngf_cmd_bundle_type  type;
 } _ngf_cmd_bundle;
 
 typedef struct ngf_cmd_buffer_t {
   ngf_graphics_pipeline           active_pipe;    // Bound pipeline.
-  _NGF_DARRAY_OF(_ngf_cmd_bundle) bundles;        // Bundles that finished
+ _NGF_DARRAY_OF(_ngf_cmd_bundle)  bundles;        // Bundles that finished
                                                   // recording.
-  _ngf_cmd_bundle                 active_bundle;  // Current bundle.
+ _ngf_cmd_bundle                  active_bundle;  // Current bundle.
   ATOMIC_INT                      frame_id;       // id of the frame that the
                                                   // cmd buffer is intended for.
-  _ngf_cmd_buffer_state           state;
+ _ngf_cmd_buffer_state            state;
 } ngf_cmd_buffer_t;
 
 typedef struct {
@@ -2228,7 +2228,6 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
       usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
   }
-  // TODO: add "written from CPU" usage hint?
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
