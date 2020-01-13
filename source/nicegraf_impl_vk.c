@@ -197,16 +197,16 @@ typedef struct _ngf_frame_resources {
 
 // API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
- _ngf_frame_resources         *frame_res;
- _ngf_desc_superpool           desc_superpool;
- _ngf_swapchain                swapchain;
-  ngf_swapchain_info           swapchain_info;
-  VmaAllocator                 allocator;
- _NGF_DARRAY_OF(VkCommandPool) gfx_cmd_pools;
- _NGF_DARRAY_OF(VkCommandPool) xfer_cmd_pools;
-  VkSurfaceKHR                 surface;
-  uint32_t                     frame_number;
-  uint32_t                     max_inflight_frames;
+ _ngf_frame_resources *frame_res;
+ _ngf_desc_superpool   desc_superpool;
+ _ngf_swapchain        swapchain;
+  ngf_swapchain_info   swapchain_info;
+  VmaAllocator         allocator;
+  VkCommandPool       *gfx_cmd_pools;
+  VkCommandPool       *xfer_cmd_pools;
+  VkSurfaceKHR         surface;
+  uint32_t             frame_number;
+  uint32_t             max_inflight_frames;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -1235,38 +1235,36 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->frame_number = 0u;
 
   // Create command pools.
-  VkCommandPoolCreateInfo gfx_cmd_pool_info = {
+  const VkCommandPoolCreateInfo gfx_cmd_pool_info = {
     .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
     .pNext            = NULL,
     .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
     .queueFamilyIndex = _vk.gfx_family_idx
   };
-  _NGF_DARRAY_RESET(ctx->gfx_cmd_pools, ctx->max_inflight_frames);
+  ctx->gfx_cmd_pools = NGF_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
   for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-    VkCommandPool pool = VK_NULL_HANDLE;
-    vk_err = vkCreateCommandPool(_vk.device, &gfx_cmd_pool_info, NULL, &pool);
+    vk_err = vkCreateCommandPool(_vk.device, &gfx_cmd_pool_info, NULL,
+                                 &ctx->gfx_cmd_pools[p]);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_CONTEXT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
-    _NGF_DARRAY_APPEND(ctx->gfx_cmd_pools, pool);
   }
   if (_vk.gfx_family_idx != _vk.xfer_family_idx) {
-    VkCommandPoolCreateInfo xfer_cmd_pool_info = {
+    const VkCommandPoolCreateInfo xfer_cmd_pool_info = {
       .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
       .pNext = NULL,
       .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
       .queueFamilyIndex = _vk.xfer_family_idx
     };
-    _NGF_DARRAY_RESET(ctx->xfer_cmd_pools, ctx->max_inflight_frames);
+    ctx->xfer_cmd_pools = NGF_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
     for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-      VkCommandPool pool = VK_NULL_HANDLE;
-      vk_err = vkCreateCommandPool(_vk.device, &xfer_cmd_pool_info, NULL, &pool);
+      vk_err = vkCreateCommandPool(_vk.device, &xfer_cmd_pool_info, NULL,
+                                    &ctx->xfer_cmd_pools[p]);
       if (vk_err != VK_SUCCESS) {
         err = NGF_ERROR_CONTEXT_CREATION_FAILED;
         goto ngf_create_context_cleanup;
       }
-      _NGF_DARRAY_APPEND(ctx->xfer_cmd_pools, pool);
     }
   }
 
@@ -1409,21 +1407,21 @@ void ngf_destroy_context(ngf_context ctx) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
     }
-    for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->gfx_cmd_pools); ++p) {
-      VkCommandPool pool = _NGF_DARRAY_AT(ctx->gfx_cmd_pools, p);
+    for (uint32_t p = 0; p < ctx->max_inflight_frames; ++p) {
+      const VkCommandPool pool = ctx->gfx_cmd_pools[p];
       if (pool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(_vk.device, pool, NULL);
       }
     }
-    _NGF_DARRAY_DESTROY(ctx->gfx_cmd_pools);
+    NGF_FREEN(ctx->gfx_cmd_pools, ctx->max_inflight_frames);
     if (_vk.xfer_family_idx != _vk.gfx_family_idx) {
-      for (uint32_t p = 0; p < _NGF_DARRAY_SIZE(ctx->xfer_cmd_pools); ++p) {
-        VkCommandPool pool = _NGF_DARRAY_AT(ctx->xfer_cmd_pools, p);
+      for (uint32_t p = 0; p < ctx->max_inflight_frames; ++p) {
+        const VkCommandPool pool = ctx->xfer_cmd_pools[p];
         if (pool != VK_NULL_HANDLE) {
           vkDestroyCommandPool(_vk.device, pool, NULL);
         }
       }
-      _NGF_DARRAY_DESTROY(ctx->xfer_cmd_pools);
+      NGF_FREEN(ctx->xfer_cmd_pools, ctx->max_inflight_frames);
     }
     _ngf_destroy_swapchain(&ctx->swapchain);
     if (ctx->surface != VK_NULL_HANDLE) {
@@ -1514,8 +1512,8 @@ static ngf_error _ngf_cmd_buffer_start_encoder(ngf_cmd_buffer      cmd_buf,
       cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
   VkCommandPool pool =
     type == _NGF_BUNDLE_RENDERING || _vk.gfx_family_idx == _vk.xfer_family_idx
-        ? _NGF_DARRAY_AT(CURRENT_CONTEXT->gfx_cmd_pools, pool_idx)
-        : _NGF_DARRAY_AT(CURRENT_CONTEXT->xfer_cmd_pools, pool_idx);
+        ? CURRENT_CONTEXT->gfx_cmd_pools[pool_idx]
+        : CURRENT_CONTEXT->xfer_cmd_pools[pool_idx];
   ngf_error err = _ngf_cmd_bundle_create(pool, type, &cmd_buf->active_bundle);
   cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
   return err;
