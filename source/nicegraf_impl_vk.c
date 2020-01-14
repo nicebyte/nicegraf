@@ -173,6 +173,10 @@ typedef struct ngf_pixel_buffer_t {
   _ngf_buffer data;
 } ngf_pixel_buffer_t;
 
+typedef struct ngf_sampler_t {
+  VkSampler vksampler;
+} ngf_sampler_t;
+
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -191,6 +195,7 @@ typedef struct _ngf_frame_resources {
  _NGF_DARRAY_OF(VkPipeline)            retire_pipelines;
  _NGF_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  _NGF_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
+ _NGF_DARRAY_OF(VkSampler)             retire_samplers;
  _NGF_DARRAY_OF(_ngf_buffer)           retire_buffers;
  _NGF_DARRAY_OF(_ngf_desc_superpool*)  retire_desc_superpools;
 
@@ -251,6 +256,33 @@ _ngf_sa* _ngf_tmp_store() {
     temp_storage = _ngf_sa_create(sa_capacity);
   }
   return temp_storage;
+}
+
+static VkFilter get_vk_filter(ngf_sampler_filter filter) {
+  static const VkFilter vkfilters[NGF_FILTER_COUNT] = {
+    VK_FILTER_NEAREST,
+    VK_FILTER_LINEAR
+  };
+  return vkfilters[filter];
+}
+
+static VkSamplerAddressMode get_vk_address_mode(ngf_sampler_wrap_mode mode) {
+  static const VkSamplerAddressMode vkmodes[NGF_WRAP_MODE_COUNT] = {
+    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+    VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
+    VK_SAMPLER_ADDRESS_MODE_REPEAT,
+    VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT
+  };
+  return vkmodes[mode];
+}
+
+static VkSamplerMipmapMode get_vk_mipmode(ngf_sampler_filter filter) {
+   static const VkFilter vkmipmodes[NGF_FILTER_COUNT] = {
+    VK_SAMPLER_MIPMAP_MODE_NEAREST,
+    VK_SAMPLER_MIPMAP_MODE_LINEAR
+  };
+  return vkmipmodes[filter];
+
 }
 
 static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
@@ -1216,6 +1248,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
+    _NGF_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     _NGF_DARRAY_RESET(ctx->frame_res[f].retire_desc_superpools, 8);
     ctx->frame_res[f].active = false;
@@ -1343,6 +1376,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                       _NGF_DARRAY_AT(frame_res->retire_pipelines, p),
                        NULL);
   }
+
   for (uint32_t p = 0u;
        p < _NGF_DARRAY_SIZE(frame_res->retire_pipeline_layouts);
        ++p) {
@@ -1352,6 +1386,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                  p),
                              NULL);
   }
+
   for (uint32_t p = 0u;
        p < _NGF_DARRAY_SIZE(frame_res->retire_dset_layouts);
        ++p) {
@@ -1361,6 +1396,15 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                       p),
                                   NULL);
   }
+
+  for (uint32_t s = 0u;
+       s < _NGF_DARRAY_SIZE(frame_res->retire_samplers);
+     ++s) {
+    vkDestroySampler(_vk.device,
+                     _NGF_DARRAY_AT(frame_res->retire_samplers, s),
+                      NULL);
+  }
+
   for (uint32_t a = 0;
        a < _NGF_DARRAY_SIZE(frame_res->retire_buffers);
      ++a) {
@@ -1388,6 +1432,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   _NGF_DARRAY_CLEAR(frame_res->xfer_cmd_pools);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipelines);
   _NGF_DARRAY_CLEAR(frame_res->retire_dset_layouts);
+  _NGF_DARRAY_CLEAR(frame_res->retire_samplers);
   _NGF_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   _NGF_DARRAY_CLEAR(frame_res->retire_buffers);
   _NGF_DARRAY_CLEAR(frame_res->retire_desc_superpools);
@@ -1410,6 +1455,7 @@ void ngf_destroy_context(ngf_context ctx) {
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
+      _NGF_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
@@ -3078,5 +3124,55 @@ void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
 
 void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) { 
   _ngf_unmap_buffer(buf->data.alloc);
+}
+
+ngf_error ngf_create_sampler(const ngf_sampler_info *info,
+                             ngf_sampler *result) {
+  assert(info);
+  assert(result);
+  ngf_sampler sampler = NGF_ALLOC(ngf_sampler_t);
+  *result = sampler;
+
+  if (sampler == NULL) return NGF_ERROR_OUTOFMEM;
+
+  const VkSamplerCreateInfo vk_sampler_info = {
+    .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+    .pNext                   = NULL,
+    .flags                   = 0u,
+    .magFilter               = get_vk_filter(info->mag_filter),
+    .minFilter               = get_vk_filter(info->min_filter),
+    .mipmapMode              = get_vk_mipmode(info->mip_filter),
+    .addressModeU            = get_vk_address_mode(info->wrap_s),
+    .addressModeV            = get_vk_address_mode(info->wrap_t),
+    .addressModeW            = get_vk_address_mode(info->wrap_r),
+    .mipLodBias              = info->lod_bias,
+    .anisotropyEnable        = info->enable_anisotropy ? VK_TRUE : VK_FALSE,
+    .maxAnisotropy           = info->max_anisotropy,
+    .compareEnable           = VK_FALSE,
+    .compareOp               = VK_COMPARE_OP_ALWAYS,
+    .minLod                  = info->lod_min,
+    .maxLod                  = info->lod_max,
+    .borderColor             = VK_BORDER_COLOR_INT_TRANSPARENT_BLACK,
+    .unnormalizedCoordinates = VK_FALSE
+  };
+  const VkResult vk_sampler_create_result =
+      vkCreateSampler(_vk.device,
+                      &vk_sampler_info,
+                       NULL,
+                      &sampler->vksampler);
+  if (vk_sampler_create_result != VK_SUCCESS) {
+    NGF_FREE(sampler);
+    return NGF_ERROR_INVALID_OPERATION;
+  } else {
+    return NGF_ERROR_OK;
+  }
+}
+
+void ngf_destroy_sampler(ngf_sampler sampler) {
+  if (sampler) {
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_samplers,
+                       sampler->vksampler);
+    NGF_FREE(sampler);
+  }
 }
 
