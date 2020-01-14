@@ -84,8 +84,8 @@ typedef struct _ngf_swapchain {
   VkSemaphore     *image_semaphores;
   VkFramebuffer   *framebuffers;
   VkPresentModeKHR present_mode;
-  uint32_t         num_images; // total number of images in the swapchain.
-  uint32_t         image_idx;  // index of currently acquired image.
+  uint32_t         num_images; // < Total number of images in the swapchain.
+  uint32_t         image_idx;  // < The index of currently acquired image.
   uint32_t         width;
   uint32_t         height;
   struct {
