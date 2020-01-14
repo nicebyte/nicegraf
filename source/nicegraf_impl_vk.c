@@ -116,7 +116,7 @@ typedef struct _ngf_cmd_bundle_t {
 typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
 typedef struct {
-  int32_t       sets;
+  uint32_t       sets;
  _ngf_desc_count descriptors;
 } _ngf_desc_pool_capacity;
 
@@ -1627,7 +1627,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
 
 ngf_error ngf_begin_frame() {
   ngf_error err = NGF_ERROR_OK;
-  uint32_t fi =
+  const ATOMIC_INT fi =
       interlocked_read(&_vk.frame_id) % CURRENT_CONTEXT->max_inflight_frames;
   CURRENT_CONTEXT->frame_res[fi].active = true;
   _NGF_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_gfx_cmds);
@@ -1671,7 +1671,7 @@ ngf_error ngf_end_frame() {
 
   // Obtain the current frame sync structure and increment frame number.
   const ATOMIC_INT frame_id = interlocked_post_inc(&_vk.frame_id);
-  const uint32_t fi = frame_id % CURRENT_CONTEXT->max_inflight_frames;
+  const ATOMIC_INT fi       = frame_id % CURRENT_CONTEXT->max_inflight_frames;
   _ngf_frame_resources *frame_sync = &CURRENT_CONTEXT->frame_res[fi];
 
   frame_sync->nfences = 0u;
@@ -1751,7 +1751,7 @@ ngf_error ngf_end_frame() {
   }
 
   // Retire resources.
-  uint32_t next_fi = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  const ATOMIC_INT next_fi = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
   _ngf_frame_resources *next_frame_sync = &CURRENT_CONTEXT->frame_res[next_fi];
   _ngf_retire_resources(next_frame_sync);
   return err;
@@ -1819,17 +1819,18 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   VkSpecializationInfo vk_spec_info;
   const ngf_specialization_info *spec_info = info->spec_info;
   if (info->spec_info) {
-    vk_spec_info.pData         = spec_info->value_buffer;
-    vk_spec_info.mapEntryCount = spec_info->nspecializations;
-    vk_spec_info.pMapEntries   =
-        _ngf_sa_alloc(_ngf_tmp_store(),
+    VkSpecializationMapEntry *spec_map_entries = _ngf_sa_alloc(_ngf_tmp_store(),
                       info->spec_info->nspecializations *
                       sizeof(VkSpecializationMapEntry));
-    
+
+    vk_spec_info.pData         = spec_info->value_buffer;
+    vk_spec_info.mapEntryCount = spec_info->nspecializations;
+    vk_spec_info.pMapEntries   = spec_map_entries;
+            
     size_t total_data_size = 0u;
     for(int i = 0; i < spec_info->nspecializations; ++i) {
       VkSpecializationMapEntry *vk_specialization =
-          &vk_spec_info.pMapEntries[i];
+          &spec_map_entries[i];
       const ngf_constant_specialization *specialization =
           &spec_info->specializations[i];
       vk_specialization->constantID = specialization->constant_id;
@@ -2553,7 +2554,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
       // The target descriptor set hasn't been allocated yet.
 
-      const int superpool_idx =
+      const ATOMIC_INT superpool_idx =
           _vk.frame_id % (CURRENT_CONTEXT->max_inflight_frames);  
      _ngf_desc_superpool *superpool =
           &CURRENT_CONTEXT->desc_superpools[superpool_idx];
@@ -2636,7 +2637,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   // bind each of the descriptor sets individually (this ensures that desc.
   // sets bound for a compatible pipeline earlier in this command buffer
   // don't get clobbered).
-  for (int s = 0; s < ndesc_set_layouts; ++s) {
+  for (uint32_t s = 0; s < ndesc_set_layouts; ++s) {
     if (vk_sets[s] != VK_NULL_HANDLE) {
       vkCmdBindDescriptorSets(buf->active_bundle.vkcmdbuf,
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
