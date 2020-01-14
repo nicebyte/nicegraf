@@ -169,6 +169,10 @@ typedef struct ngf_uniform_buffer_t {
   _ngf_buffer data;
 } ngf_uniform_buffer_t;
 
+typedef struct ngf_pixel_buffer_t {
+  _ngf_buffer data;
+} ngf_pixel_buffer_t;
+
 // Vulkan resources associated with a given frame.
 typedef struct _ngf_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -3023,4 +3027,56 @@ void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) {
   _ngf_unmap_buffer(buf->data.alloc);
 }
 
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) { _NGF_FAKE_USE(buf);  }
+ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
+                                  ngf_pixel_buffer            *result) {
+  assert(info);
+  assert(result);
+  ngf_pixel_buffer buf = NGF_ALLOC(ngf_pixel_buffer_t);
+  *result = buf;
+
+  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+
+  ngf_error err = _ngf_create_buffer(
+    info->size,
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    VMA_MEMORY_USAGE_CPU_ONLY,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
+   &buf->data.vkbuf,
+   &buf->data.alloc,
+   &buf->data.parent_allocator);
+
+  if (err != NGF_ERROR_OK) {
+    NGF_FREE(buf);
+  } else {
+    buf->data.size = info->size;
+  }
+  return err;
+
+}
+
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
+  if (buf) {
+    _NGF_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_buffers,
+                       buf->data);
+    NGF_FREE(buf);
+  }
+}
+
+void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
+                                 size_t offset,
+                                 size_t size,
+                                 uint32_t flags) {
+  _NGF_FAKE_USE(size, flags);
+  return _ngf_map_buffer(buf->data.alloc, offset);
+}
+
+void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
+                                  size_t offset,
+                                  size_t size) {
+  _ngf_flush_buffer(buf->data.alloc, offset, size);
+}
+
+void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) { 
+  _ngf_unmap_buffer(buf->data.alloc);
+}
+
