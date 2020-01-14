@@ -853,7 +853,6 @@ static ngf_error _ngf_create_swapchain(
   present_modes = NULL;
   }
  
-
   // Check if the requested surface format is valid.
   uint32_t nformats = 0u;
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, NULL);
@@ -2432,86 +2431,9 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
                     pipeline->vk_pipeline);
 }
 
-// helper for allocating a new descriptor pool from the current context's
-// superpool.
-_ngf_desc_pool* _ngf_desc_pool_alloc(_ngf_desc_superpool *superpool) {
-  if(superpool->active_pool == NULL ||
-     superpool->active_pool->next == NULL) { 
-    //TODO: make this tweakable
-    _ngf_desc_pool_capacity capacity;
-    capacity.sets = 100u;
-    for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
-      capacity.descriptors[i] = 100u;
-
-    // prepare descriptor counts.
-    VkDescriptorPoolSize *vk_pool_sizes =
-        _ngf_sa_alloc(_ngf_tmp_store(),
-                       sizeof(VkDescriptorPoolSize) *
-                       NGF_DESCRIPTOR_TYPE_COUNT);
-    for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-      vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
-      vk_pool_sizes[i].type = get_vk_descriptor_type((ngf_descriptor_type)i);
-    }
-
-    // prepare a createinfo structure for the new pool.
-    const VkDescriptorPoolCreateInfo vk_pool_ci = {
-      .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-      .pNext         = NULL,
-      .flags         = 0u,
-      .maxSets       = capacity.sets,
-      .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
-      .pPoolSizes    = vk_pool_sizes
-    };
-
-    // create the new pool.
-    _ngf_desc_pool *new_pool =  NGF_ALLOC(_ngf_desc_pool);
-    new_pool->next     = NULL;
-    new_pool->capacity = capacity;
-    memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
-    const VkResult vk_pool_create_result =
-        vkCreateDescriptorPool(_vk.device,
-                               &vk_pool_ci,
-                                NULL,
-                               &new_pool->vk_pool);
-    if (vk_pool_create_result == VK_SUCCESS) {
-      // add the newly created pool to the freelist.
-      if (superpool->active_pool != NULL) {
-        superpool->active_pool->next = new_pool;
-      } else {
-        superpool->list = new_pool;
-      }
-      superpool->active_pool = new_pool;
-    } else {
-      NGF_FREE(new_pool);
-      return NULL;
-    }
-  } 
-
-  return superpool->active_pool;
-}
-
-bool _ngf_desc_pool_check_capacity(_ngf_desc_pool            *pool,
-                                   const _ngf_desc_set_size  *set_size) {
-  const _ngf_desc_pool_capacity *capacity = &(pool->capacity);
- _ngf_desc_pool_capacity        *usage    = &(pool->utilization);
-  
-  // ensure the active descriptor pool can service the request.
-  // if not, retire the active pool and get a new one.
-  bool result = true;
-  for (ngf_descriptor_type i = 0;
-       result && i < NGF_DESCRIPTOR_TYPE_COUNT;
-     ++i) {
-    usage->descriptors[i] += set_size->counts[i];
-    result &= (usage->descriptors[i] <= capacity->descriptors[i]);
-  }
-  usage->sets++;
-  result &= (usage->sets <= capacity->sets);
-  return result;
-}  
-
-void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
+void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
                                 const ngf_resource_bind_op *bind_operations,
-                                uint32_t nbind_operations) {
+                                uint32_t                    nbind_operations) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
 
   // Binding resources requires an active pipeline.
@@ -2549,7 +2471,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       return;
     }
 
-    // Find a target descriptor set from vk_sets for this write (allocating a
+    // Find a target descriptor set from vk_sets for this write (or allocate a
     // new one if it hasn't been created yet).
     if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
       // The target descriptor set hasn't been allocated yet.
@@ -2560,21 +2482,83 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
           &CURRENT_CONTEXT->desc_superpools[superpool_idx];
      buf->desc_superpool = superpool;
 
-      // Ensure we have an active desriptor pool.
-      if (superpool->active_pool == NULL) {
-       superpool->active_pool = _ngf_desc_pool_alloc(superpool);
+      // Ensure we have an active desriptor pool that is able to service the
+      // request.
+      const bool have_active_pool    = (superpool->active_pool != NULL);
+      bool       fresh_pool_required = !have_active_pool;
+      if (have_active_pool) {
+        // Check if the active descriptor pool can fit the required descriptor
+        // set.
+        const _ngf_desc_set_size *set_size =
+            &_NGF_DARRAY_AT(buf->active_pipe->desc_set_sizes,
+                            bind_op->target_set);
+       _ngf_desc_pool                 *pool     =  superpool->active_pool;
+        const _ngf_desc_pool_capacity *capacity = &pool->capacity;
+       _ngf_desc_pool_capacity        *usage    = &pool->utilization;
+        for (ngf_descriptor_type i = 0;
+            !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
+           ++i) {
+          usage->descriptors[i] += set_size->counts[i];
+          fresh_pool_required |=
+              (usage->descriptors[i] > capacity->descriptors[i]);
+        }
+        usage->sets++;
+        fresh_pool_required |= (usage->sets > capacity->sets);
       }
-      
-      // Ensure the active descriptor pool can service the request.
-      // if not, retire the active pool and get a new one.
-      const _ngf_desc_set_size *set_size =
-        &_NGF_DARRAY_AT(buf->active_pipe->desc_set_sizes, bind_op->target_set);
-      if (!_ngf_desc_pool_check_capacity(superpool->active_pool, set_size)) {
-        superpool->active_pool = _ngf_desc_pool_alloc(superpool);
-        const bool alloc_check_result =
-          _ngf_desc_pool_check_capacity(superpool->active_pool,
-                                        set_size);
-        assert(alloc_check_result);
+      if (fresh_pool_required) {
+        if (!have_active_pool ||
+             superpool->active_pool->next == NULL) {
+          //TODO: make this tweakable
+          _ngf_desc_pool_capacity capacity;
+          capacity.sets = 100u;
+          for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
+            capacity.descriptors[i] = 100u;
+
+          // Prepare descriptor counts.
+          VkDescriptorPoolSize *vk_pool_sizes =
+            _ngf_sa_alloc(_ngf_tmp_store(),
+                sizeof(VkDescriptorPoolSize) *
+                NGF_DESCRIPTOR_TYPE_COUNT);
+          for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+            vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
+            vk_pool_sizes[i].type =
+                get_vk_descriptor_type((ngf_descriptor_type)i);
+          }
+
+          // Prepare a createinfo structure for the new pool.
+          const VkDescriptorPoolCreateInfo vk_pool_ci = {
+            .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .pNext         = NULL,
+            .flags         = 0u,
+            .maxSets       = capacity.sets,
+            .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
+            .pPoolSizes    = vk_pool_sizes
+          };
+
+          // Create the new pool.
+         _ngf_desc_pool *new_pool = NGF_ALLOC(_ngf_desc_pool);
+          new_pool->next     = NULL;
+          new_pool->capacity = capacity;
+          memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
+          const VkResult vk_pool_create_result =
+            vkCreateDescriptorPool(_vk.device,
+                                   &vk_pool_ci,
+                                    NULL,
+                                   &new_pool->vk_pool);
+          if (vk_pool_create_result == VK_SUCCESS) {
+            if (superpool->active_pool != NULL) {
+              superpool->active_pool->next = new_pool;
+            } else {
+              superpool->list = new_pool;
+            }
+            superpool->active_pool = new_pool;
+          } else {
+            NGF_FREE(new_pool);
+            assert(false);
+          }
+        } else {
+          superpool->active_pool = superpool->active_pool->next;
+        }
       }
 
       // Allocate the new descriptor set from the pool.
