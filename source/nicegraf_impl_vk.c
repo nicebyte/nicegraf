@@ -128,7 +128,6 @@ typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
 
 typedef struct _ngf_desc_pool {
   struct _ngf_desc_pool *next;
- _ngf_desc_superpool      *parent;
   VkDescriptorPool         vk_pool;
  _ngf_desc_pool_capacity   capacity;
  _ngf_desc_pool_capacity   utilization;
@@ -2466,7 +2465,6 @@ _ngf_desc_pool* _ngf_desc_pool_alloc(_ngf_desc_superpool *superpool) {
     // create the new pool.
     _ngf_desc_pool *new_pool =  NGF_ALLOC(_ngf_desc_pool);
     new_pool->next     = NULL;
-    new_pool->parent   = superpool;
     new_pool->capacity = capacity;
     memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
     const VkResult vk_pool_create_result =
