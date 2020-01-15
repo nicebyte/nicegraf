@@ -2862,6 +2862,94 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder         enc,
 
 }
 
+void ngf_cmd_write_image(ngf_xfer_encoder       enc,
+                         const ngf_pixel_buffer src,
+                         size_t                 src_offset,
+                         ngf_image_ref          dst,
+                         const ngf_offset3d    *offset,
+                         const ngf_extent3d    *extent) {
+  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf);
+  const VkImageMemoryBarrier pre_xfer_barrier = {
+    .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .pNext               = NULL,
+    .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT, // TODO: handle fb attachments
+    .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED, // TODO: handle partial upload
+    .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .srcQueueFamilyIndex = _vk.gfx_family_idx,
+    .dstQueueFamilyIndex = _vk.xfer_family_idx,
+    .image               = dst.image->vkimg,
+    .subresourceRange    = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel   = dst.mip_level,
+      .levelCount     = 1u,
+      .baseArrayLayer = dst.layer,
+      .layerCount     = 1u
+    }
+  };
+  vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
+                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       0u,
+                       0u, NULL,
+                       0u, NULL,
+                       1u, &pre_xfer_barrier);
+  const VkBufferImageCopy copy_op = {
+    .bufferOffset = src_offset,
+    .bufferRowLength = 0u,
+    .bufferImageHeight = 0u,
+    .imageSubresource = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .mipLevel       = dst.mip_level,
+      .baseArrayLayer = dst.layer,
+      .layerCount     = 1u
+    },
+    .imageOffset = {
+      .x = offset->x,
+      .y = offset->y,
+      .z = offset->z
+    },
+    .imageExtent = {
+      .width  = extent->width,
+      .height = extent->height,
+      .depth  = extent->depth
+    }
+  };
+  vkCmdCopyBufferToImage(buf->active_bundle.vkcmdbuf,
+                         src->data.vkbuf,
+                         dst.image->vkimg,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, // TODO: handle partial upload
+                         1u, &copy_op);
+  const VkImageMemoryBarrier post_xfer_barrier = {
+    .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+    .pNext               = NULL,
+    .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+    .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+    .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, // TODO: handle partial upload
+    .srcQueueFamilyIndex = _vk.xfer_family_idx,
+    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .image               = dst.image->vkimg,
+    .subresourceRange    = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel   = dst.mip_level,
+      .levelCount     = 1u,
+      .baseArrayLayer = dst.layer,
+      .layerCount     = 1u
+    }
+  };
+  vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                       0u,
+                       0u, NULL,
+                       0u, NULL,
+                       1u, &post_xfer_barrier);
+}
+
 static ngf_error _ngf_create_buffer(size_t                 size,
                                     VkBufferUsageFlags     vk_usage_flags,
                                     uint32_t               vma_usage_flags,
