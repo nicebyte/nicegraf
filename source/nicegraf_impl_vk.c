@@ -233,8 +233,9 @@ typedef struct ngf_graphics_pipeline_t {
 } ngf_graphics_pipeline_t;
 
 typedef struct ngf_image_t {
-  VkImage vkimg;
+  VkImage       vkimg;
   VmaAllocation alloc;
+  VkImageView   vkview;
 } ngf_image_t;
 
 typedef struct ngf_render_target_t {
@@ -2286,7 +2287,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
 
   VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-  VkImageCreateInfo vk_image_info = {
+  const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext = NULL,
     .flags = 0u,
@@ -2317,13 +2318,47 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     .pUserData = NULL
   };
 
-  VkResult vkerr;
-  vkerr = vmaCreateImage(CURRENT_CONTEXT->allocator, &vk_image_info,
-                         &vma_alloc_info,
-                         &img->vkimg, &img->alloc, NULL);
-  if (vkerr != VK_SUCCESS) {
-   err = NGF_ERROR_IMAGE_CREATION_FAILED;
-   goto ngf_create_image_cleanup;
+  const VkResult create_image_vkerr = vmaCreateImage(
+      CURRENT_CONTEXT->allocator, &vk_image_info,
+     &vma_alloc_info,
+     &img->vkimg,
+     &img->alloc,
+      NULL);
+
+  if (create_image_vkerr != VK_SUCCESS) {
+    err = NGF_ERROR_IMAGE_CREATION_FAILED;
+    goto ngf_create_image_cleanup;
+  }
+
+  const VkImageViewCreateInfo image_view_info = {
+    .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext      = NULL,
+    .flags      = 0u,
+    .image      = img->vkimg,
+    .viewType   = vk_image_info.imageType,
+    .format     = vk_image_info.format,
+    .components = {
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY
+    },
+    .subresourceRange = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel   = 0u,
+      .levelCount     = vk_image_info.mipLevels,
+      .baseArrayLayer = 0u,
+      .layerCount     = vk_image_info.arrayLayers
+    }
+  };
+  const VkResult create_view_vkerr =
+      vkCreateImageView(_vk.device,
+                        &image_view_info,
+                         NULL,
+                        &img->vkview);
+  if (create_view_vkerr != VK_SUCCESS) {
+    err = NGF_ERROR_IMAGE_CREATION_FAILED;
+    goto ngf_create_image_cleanup;
   }
 
 ngf_create_image_cleanup:
@@ -2336,8 +2371,10 @@ ngf_create_image_cleanup:
 void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
     if (img->vkimg != VK_NULL_HANDLE) {
+      // TODO: retire queue for images
       vmaDestroyImage(CURRENT_CONTEXT->allocator,
                       img->vkimg, img->alloc);
+      vkDestroyImageView(_vk.device, img->vkview, NULL);
     }
   }
 }
