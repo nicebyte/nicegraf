@@ -1642,8 +1642,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         fi != bufs[i]->frame_id) {
       return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
     }
-   _NGF_DARRAY_APPEND(frame_sync_data->retire_desc_superpools,
-                      bufs[i]->desc_superpool);
+    if (bufs[i]->desc_superpool) {
+      _NGF_DARRAY_APPEND(frame_sync_data->retire_desc_superpools,
+                         bufs[i]->desc_superpool);
+    }
     for (uint32_t j = 0; j < _NGF_DARRAY_SIZE(bufs[i]->bundles); ++j) {
       _ngf_cmd_bundle *bundle = &(_NGF_DARRAY_AT(bufs[i]->bundles, j));
       switch (bundle->type) {
