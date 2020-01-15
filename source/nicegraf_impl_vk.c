@@ -628,7 +628,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     volkInitialize(); // Initialize Volk.
 
     const char* const ext_names[] = { // Names of instance-level extensions.
-      "VK_KHR_surface", VK_SURFACE_EXT
+      "VK_KHR_surface", VK_SURFACE_EXT,
     };
 
     VkApplicationInfo app_info = { // Application information.
@@ -780,7 +780,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     };
     const uint32_t num_queue_infos =
         1u + (same_gfx_and_present ? 0u : 1u) + (same_gfx_and_xfer ? 0u : 1u);
-    const char *device_exts[] = { "VK_KHR_swapchain" };
+    const char *device_exts[] = {"VK_KHR_maintenance1", "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext                   = NULL,
@@ -789,7 +789,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
       .pQueueCreateInfos       = queue_infos,
       .enabledLayerCount       = 0,
       .ppEnabledLayerNames     = NULL,
-      .enabledExtensionCount   = 1u,
+      .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
       .ppEnabledExtensionNames = device_exts
     };
     vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
@@ -1996,9 +1996,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Prepare viewport/scissor state.
   VkViewport viewport = {
     .x = (float)info->viewport->x,
-    .y = (float)info->viewport->y,
+    .y = (float)info->viewport->y + (float)info->viewport->height,
     .width = (float)info->viewport->width,
-    .height = (float)info->viewport->height,
+    .height = -(float)info->viewport->height,
     .minDepth = info->depth_stencil->min_depth,
     .maxDepth = info->depth_stencil->max_depth,
   };
@@ -2748,10 +2748,10 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   const VkViewport viewport = {
-    .x        = (float)r->x,
-    .y        = (float)r->y,
-    .width    = (float)r->width,
-    .height   = (float)r->height,
+    .x        =  (float)r->x,
+    .y        =  (float)r->y + (float)r->height,
+    .width    =  (float)r->width,
+    .height   = -(float)r->height,
     .minDepth = 0.0f,  // TODO: add depth parameter
     .maxDepth = 1.0f   // TODO: add max depth parameter
   };
