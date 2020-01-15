@@ -2155,6 +2155,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       vk_d->descriptorType  = get_vk_descriptor_type(d->type);
       vk_d->descriptorCount = 1u;
       vk_d->stageFlags      = get_vk_stage_flags(d->stage_flags);
+      vk_d->pImmutableSamplers = NULL;
       set_size.counts[d->type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
@@ -2711,7 +2712,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
         vk_bind_info->sampler = bind_info->sampler->vksampler;
       }
-      vk_write->pImageInfo = vk_bind_info
+      vk_write->pImageInfo = vk_bind_info;
       break;
     }
        
