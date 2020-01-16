@@ -147,6 +147,7 @@ typedef struct ngf_cmd_buffer_t {
  _ngf_desc_superpool             *desc_superpool; // < The superpool from which
                                                   // the desc pools for this cmd
                                                   // buffer are allocated.
+  ngf_render_target               active_rt;      // < Active render target.
  _ngf_cmd_buffer_state            state;
 } ngf_cmd_buffer_t;
 
@@ -1616,6 +1617,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   cmd_buf->frame_id       =  interlocked_read(&_vk.frame_id);
   cmd_buf->state          = _NGF_CMD_BUFFER_READY;
   cmd_buf->desc_superpool =  NULL;
+  cmd_buf->active_rt      =  NULL;
   return NGF_ERROR_OK;
 }
 
@@ -2490,6 +2492,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
       .extent = render_extent
      }
   };
+  buf->active_rt = target;
   vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
@@ -2760,8 +2763,13 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
 
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  assert(buf->active_rt);
+  const uint32_t target_height =
+      (buf->active_rt->is_default)
+          ? CURRENT_CONTEXT->swapchain_info.height
+          : buf->active_rt->height;
   const VkRect2D scissor_rect = {
-    .offset = {r->x, r->y},
+    .offset = {r->x, ((int32_t)target_height - r->y) - (int32_t)r->height },
     .extent = {r->width, r->height}
   };
   vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
@@ -2773,7 +2781,11 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
                                 uint32_t                offset) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
   VkDeviceSize vkoffset = offset;
-  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->data.vkbuf, &vkoffset);
+  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf,
+                         binding,
+                         1,
+                        &abuf->data.vkbuf,
+                        &vkoffset);
 }
 
 void ngf_cmd_bind_index_buffer(ngf_render_encoder     enc,
