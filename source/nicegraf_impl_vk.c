@@ -241,7 +241,7 @@ typedef struct ngf_image_t {
 
 typedef struct ngf_render_target_t {
   VkRenderPass                render_pass;
- _NGF_DARRAY_OF(VkClearValue) clear_values;
+  VkClearValue                clear_values[2];
   uint32_t                    nclear_values;
   bool                        is_default;
   uint32_t                    width;
@@ -1342,7 +1342,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
                                      frame_res->nfences,
                                      frame_res->fences,
                                      VK_TRUE,
-                                     1e+9);
+                                     0x3B9ACA00ul);
     } while(wait_status == VK_TIMEOUT);
     vkResetFences(_vk.device, frame_res->nfences,
                    frame_res->fences);
@@ -1882,7 +1882,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     vk_spec_info.pMapEntries   = spec_map_entries;
             
     size_t total_data_size = 0u;
-    for(int i = 0; i < spec_info->nspecializations; ++i) {
+    for(size_t i = 0; i < spec_info->nspecializations; ++i) {
       VkSpecializationMapEntry *vk_specialization =
           &spec_map_entries[i];
       const ngf_constant_specialization *specialization =
@@ -2290,8 +2290,6 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     }
   }
 
-  VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
   const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext = NULL,
@@ -2310,7 +2308,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     .queueFamilyIndexCount = 0u,
     .pQueueFamilyIndices = NULL,
-    .initialLayout = layout
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
   };
 
   VmaAllocationCreateInfo vma_alloc_info = {
@@ -2435,8 +2433,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
       goto ngf_default_render_target_cleanup;
     }
     if (clear_color) {
-      _NGF_DARRAY_RESET(rt->clear_values, 2);
-      VkClearValue *vk_clear_color = &_NGF_DARRAY_AT(rt->clear_values, 0);
+      VkClearValue *vk_clear_color = &rt->clear_values[0];
       vk_clear_color->color.float32[0] = clear_color->clear_color[0];
       vk_clear_color->color.float32[1] = clear_color->clear_color[1];
       vk_clear_color->color.float32[2] = clear_color->clear_color[2];
@@ -2485,7 +2482,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
     .pNext           = NULL,
     .framebuffer     = fb,
     .clearValueCount = 1u, // TODO: depth
-    .pClearValues    = target->clear_values.data,
+    .pClearValues    = target->clear_values,
     .renderPass      = target->render_pass,
     .renderArea = {
       .offset = {0u, 0u},
@@ -2554,8 +2551,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
   // Process each bind operation, constructing a corresponding
   // vulkan descriptor set write operation.
-  for (int i = 0; i < nbind_operations; ++i) {
-    const ngf_resource_bind_op *bind_op = &bind_operations[i];
+  for (size_t boi = 0; boi < nbind_operations; ++boi) {
+    const ngf_resource_bind_op *bind_op = &bind_operations[boi];
 
     // Ensure that a valid descriptor set is referenced by this
     // bind operation.
@@ -2674,7 +2671,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
     // Construct a vulkan descriptor set write corresponding to this bind
     // operation.
-    VkWriteDescriptorSet *vk_write = &vk_writes[i];
+    VkWriteDescriptorSet *vk_write = &vk_writes[boi];
 
     vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_write->pNext           = NULL;
