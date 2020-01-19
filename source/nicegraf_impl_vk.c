@@ -2289,6 +2289,17 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
       usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
     }
   }
+   const bool exclusive_sharing = 
+       _vk.gfx_family_idx == _vk.xfer_family_idx;
+   const uint32_t queue_family_indices[] = { 
+      _vk.gfx_family_idx,
+      _vk.xfer_family_idx
+   };
+   const uint32_t nqueue_family_indices =
+      exclusive_sharing ? 1u : 2u;
+   const VkSharingMode sharing_mode =
+      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
+                        : VK_SHARING_MODE_CONCURRENT;
 
   const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -2305,9 +2316,9 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     .arrayLayers = 1u, // TODO: layered images
     .samples =  get_vk_sample_count(info->nsamples),
     .usage = usage_flags,
-    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    .queueFamilyIndexCount = 0u,
-    .pQueueFamilyIndices = NULL,
+    .sharingMode = sharing_mode,
+    .queueFamilyIndexCount = nqueue_family_indices,
+    .pQueueFamilyIndices = queue_family_indices,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
   };
 
@@ -2823,7 +2834,7 @@ static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
     .pNext               =  NULL,
     .buffer              =  dst,
     .srcAccessMask       =  VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask       =  dst_access_mask, //VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+    .dstAccessMask       =  dst_access_mask,
     .srcQueueFamilyIndex = _vk.xfer_family_idx,
     .dstQueueFamilyIndex = _vk.gfx_family_idx,
     .offset              =  dst_offset,
@@ -2905,12 +2916,12 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
   const VkImageMemoryBarrier pre_xfer_barrier = {
     .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext               = NULL,
-    .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT, // TODO: handle fb attachments
+    .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT, 
     .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED, // TODO: handle partial upload
+    .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
     .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    .srcQueueFamilyIndex = _vk.gfx_family_idx,
-    .dstQueueFamilyIndex = _vk.xfer_family_idx,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .image               = dst.image->vkimg,
     .subresourceRange    = {
       .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -2921,8 +2932,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
     }
   };
   vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
-                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
                        0u,
                        0u, NULL,
@@ -2952,17 +2962,17 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
   vkCmdCopyBufferToImage(buf->active_bundle.vkcmdbuf,
                          src->data.vkbuf,
                          dst.image->vkimg,
-                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, // TODO: handle partial upload
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          1u, &copy_op);
   const VkImageMemoryBarrier post_xfer_barrier = {
     .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext               = NULL,
     .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+    .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
     .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-    .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, // TODO: handle partial upload
-    .srcQueueFamilyIndex = _vk.xfer_family_idx,
-    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, 
+    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     .image               = dst.image->vkimg,
     .subresourceRange    = {
       .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -2974,8 +2984,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
   };
   vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
                        0u,
                        0u, NULL,
                        0u, NULL,
@@ -2989,15 +2998,27 @@ static ngf_error _ngf_create_buffer(size_t                 size,
                                     VkBuffer              *vk_buffer,
                                     VmaAllocation         *vma_alloc,
                                     VmaAllocator          *vma_allocator) {
+   const bool exclusive_sharing = 
+       _vk.gfx_family_idx == _vk.xfer_family_idx;
+   const uint32_t queue_family_indices[] = { 
+      _vk.gfx_family_idx,
+      _vk.xfer_family_idx
+   };
+   const uint32_t nqueue_family_indices =
+      exclusive_sharing ? 1u : 2u;
+   const VkSharingMode sharing_mode =
+      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
+                        : VK_SHARING_MODE_CONCURRENT;
+
    const VkBufferCreateInfo buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0u,
     .size                  = size,
     .usage                 = vk_usage_flags,
-    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-    .queueFamilyIndexCount = 0u,
-    .pQueueFamilyIndices   = NULL
+    .sharingMode           = sharing_mode,
+    .queueFamilyIndexCount = nqueue_family_indices,
+    .pQueueFamilyIndices   = queue_family_indices
   };
 
   const VmaAllocationCreateInfo buf_alloc_info = {
