@@ -410,14 +410,15 @@ public:
   ngf_resource_bind_op bind_op_at_current_offset(
       uint32_t set,
       uint32_t binding,
-      size_t   additional_offset = 0) const {
+      size_t   additional_offset = 0,
+      size_t   range = 0) const {
     ngf_resource_bind_op op;
     op.type = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding = binding;
     op.target_set = set;
     op.info.uniform_buffer.buffer = buf_.get();
     op.info.uniform_buffer.offset = current_offset_ + additional_offset;
-    op.info.uniform_buffer.range = ALIGNED_SIZE;
+    op.info.uniform_buffer.range = (range == 0) ? ALIGNED_SIZE : range;
     return op;
   }
 
