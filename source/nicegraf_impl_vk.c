@@ -2264,8 +2264,9 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   }
 }
 
-
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
+ngf_error _ngf_create_image(const ngf_image_info *info,
+                            VkImageUsageFlags usage_flags,
+                            ngf_image *result) {
   assert(info);
   assert(result);
   ngf_error err = NGF_ERROR_OK;
@@ -2275,29 +2276,13 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_image_cleanup;
   }
+  const bool exclusive_sharing = (_vk.gfx_family_idx == _vk.xfer_family_idx);
+  const uint32_t queue_family_indices[] = { _vk.gfx_family_idx,
+                                            _vk.xfer_family_idx
+                                          };
 
-  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
-    usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
-    if (info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
-        info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
-        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
-      usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    } else {
-      usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    }
-  }
-   const bool exclusive_sharing = 
-       _vk.gfx_family_idx == _vk.xfer_family_idx;
-   const uint32_t queue_family_indices[] = { 
-      _vk.gfx_family_idx,
-      _vk.xfer_family_idx
-   };
-   const uint32_t nqueue_family_indices =
-      exclusive_sharing ? 1u : 2u;
-   const VkSharingMode sharing_mode =
+  const uint32_t nqueue_family_indices = exclusive_sharing ? 1u : 2u;
+  const VkSharingMode sharing_mode =
       exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
                         : VK_SHARING_MODE_CONCURRENT;
 
@@ -2380,6 +2365,24 @@ ngf_create_image_cleanup:
     ngf_destroy_image(img);
   }
   return err;
+
+}
+
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
+  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
+    usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  }
+  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
+    if (info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
+        info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
+        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+      usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    } else {
+      usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+  }
+  return _ngf_create_image(info, usage_flags, result);
 }
 
 void ngf_destroy_image(ngf_image img) {
