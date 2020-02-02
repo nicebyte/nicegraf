@@ -853,11 +853,49 @@ static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
 }
+static ngf_error _ngf_create_vk_image_view(VkImage          image,
+                                           VkImageViewType  image_type,
+                                           VkFormat         image_format,
+                                           uint32_t         nmips,
+                                           uint32_t         nlayers,
+                                           VkImageView     *result) {
+  const VkImageViewCreateInfo image_view_info = {
+    .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext      = NULL,
+    .flags      = 0u,
+    .image      = image,
+    .viewType   = image_type,
+    .format     = image_format,
+    .components = {
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY
+    },
+    .subresourceRange = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel   = 0u,
+      .levelCount     = nmips,
+      .baseArrayLayer = 0u,
+      .layerCount     = nlayers
+    }
+  };
+  const VkResult create_view_vkerr =
+      vkCreateImageView(_vk.device,
+                        &image_view_info,
+                         NULL,
+                         result);
+  if (create_view_vkerr != VK_SUCCESS) {
+    return NGF_ERROR_INVALID_OPERATION;
+  } else {
+    return NGF_ERROR_OK;
+  }
+}
 
 static ngf_error _ngf_create_swapchain(
     const ngf_swapchain_info *swapchain_info,
     VkSurfaceKHR surface,
-    _ngf_swapchain *swapchain) {
+   _ngf_swapchain *swapchain) {
   assert(swapchain_info);
   assert(swapchain);
 
@@ -982,30 +1020,13 @@ static ngf_error _ngf_create_swapchain(
     goto _ngf_create_swapchain_cleanup;
   }
   for (uint32_t i = 0u; i < swapchain->num_images; ++i) {
-    const VkImageViewCreateInfo image_view_info = {
-      .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .pNext      = NULL,
-      .flags      = 0u,
-      .image      = swapchain->images[i],
-      .viewType   = VK_IMAGE_VIEW_TYPE_2D,
-      .format     = requested_format,
-      .components = {
-        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .a = VK_COMPONENT_SWIZZLE_IDENTITY
-      },
-      .subresourceRange = {
-        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-        .baseMipLevel   = 0u,
-        .levelCount     = 1u,
-        .baseArrayLayer = 0u,
-        .layerCount     = 1u
-      }
-    };
-    vk_err = vkCreateImageView(_vk.device, &image_view_info, NULL,
-                               &swapchain->image_views[i]);
-    if (vk_err != VK_SUCCESS) {
+    err = _ngf_create_vk_image_view(swapchain->images[i],
+                                    VK_IMAGE_VIEW_TYPE_2D,
+                                    requested_format,
+                                    1u,
+                                    1u,
+                                   &swapchain->image_views[i]);
+    if (err != NGF_ERROR_OK) {
       err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
     }
@@ -2261,45 +2282,6 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
     }
     _NGF_DARRAY_DESTROY(p->vk_descriptor_set_layouts);
     NGF_FREE(p);
-  }
-}
-
-ngf_error _ngf_create_vk_image_view(VkImage      image,
-                                    VkImageType  image_type,
-                                    VkFormat     image_format,
-                                    uint32_t     nmips,
-                                    uint32_t     nlayers,
-                                    VkImageView *result) {
-  const VkImageViewCreateInfo image_view_info = {
-    .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .pNext      = NULL,
-    .flags      = 0u,
-    .image      = image,
-    .viewType   = image_type,
-    .format     = image_format,
-    .components = {
-      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .a = VK_COMPONENT_SWIZZLE_IDENTITY
-    },
-    .subresourceRange = {
-      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel   = 0u,
-      .levelCount     = nmips,
-      .baseArrayLayer = 0u,
-      .layerCount     = nlayers
-    }
-  };
-  const VkResult create_view_vkerr =
-      vkCreateImageView(_vk.device,
-                        &image_view_info,
-                         NULL,
-                         result);
-  if (create_view_vkerr != VK_SUCCESS) {
-    return NGF_ERROR_INVALID_OPERATION;
-  } else {
-    return NGF_ERROR_OK;
   }
 }
 
