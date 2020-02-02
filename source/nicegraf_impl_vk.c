@@ -2835,8 +2835,8 @@ static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
     .buffer              =  dst,
     .srcAccessMask       =  VK_ACCESS_TRANSFER_WRITE_BIT,
     .dstAccessMask       =  dst_access_mask,
-    .srcQueueFamilyIndex = _vk.xfer_family_idx,
-    .dstQueueFamilyIndex = _vk.gfx_family_idx,
+    .srcQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
     .offset              =  dst_offset,
     .size                =  size
   };
