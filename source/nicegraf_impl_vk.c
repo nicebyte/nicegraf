@@ -2264,6 +2264,45 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   }
 }
 
+ngf_error _ngf_create_vk_image_view(VkImage      image,
+                                    VkImageType  image_type,
+                                    VkFormat     image_format,
+                                    uint32_t     nmips,
+                                    uint32_t     nlayers,
+                                    VkImageView *result) {
+  const VkImageViewCreateInfo image_view_info = {
+    .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext      = NULL,
+    .flags      = 0u,
+    .image      = image,
+    .viewType   = image_type,
+    .format     = image_format,
+    .components = {
+      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+      .a = VK_COMPONENT_SWIZZLE_IDENTITY
+    },
+    .subresourceRange = {
+      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+      .baseMipLevel   = 0u,
+      .levelCount     = nmips,
+      .baseArrayLayer = 0u,
+      .layerCount     = nlayers
+    }
+  };
+  const VkResult create_view_vkerr =
+      vkCreateImageView(_vk.device,
+                        &image_view_info,
+                         NULL,
+                         result);
+  if (create_view_vkerr != VK_SUCCESS) {
+    return NGF_ERROR_INVALID_OPERATION;
+  } else {
+    return NGF_ERROR_OK;
+  }
+}
+
 ngf_error _ngf_create_image(const ngf_image_info *info,
                             VkImageUsageFlags usage_flags,
                             ngf_image *result) {
@@ -2328,35 +2367,14 @@ ngf_error _ngf_create_image(const ngf_image_info *info,
     err = NGF_ERROR_IMAGE_CREATION_FAILED;
     goto ngf_create_image_cleanup;
   }
+  err = _ngf_create_vk_image_view(img->vkimg,
+                                  vk_image_info.imageType,
+                                  vk_image_info.format,
+                                  vk_image_info.mipLevels,
+                                  vk_image_info.arrayLayers,
+                                 &img->vkview);
 
-  const VkImageViewCreateInfo image_view_info = {
-    .sType      = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-    .pNext      = NULL,
-    .flags      = 0u,
-    .image      = img->vkimg,
-    .viewType   = vk_image_info.imageType,
-    .format     = vk_image_info.format,
-    .components = {
-      .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-      .a = VK_COMPONENT_SWIZZLE_IDENTITY
-    },
-    .subresourceRange = {
-      .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-      .baseMipLevel   = 0u,
-      .levelCount     = vk_image_info.mipLevels,
-      .baseArrayLayer = 0u,
-      .layerCount     = vk_image_info.arrayLayers
-    }
-  };
-  const VkResult create_view_vkerr =
-      vkCreateImageView(_vk.device,
-                        &image_view_info,
-                         NULL,
-                        &img->vkview);
-  if (create_view_vkerr != VK_SUCCESS) {
-    err = NGF_ERROR_IMAGE_CREATION_FAILED;
+  if (err != NGF_ERROR_OK) {
     goto ngf_create_image_cleanup;
   }
 
