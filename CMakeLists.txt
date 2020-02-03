@@ -83,12 +83,11 @@ else()
     add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
     set(NICEGRAF_SOURCES
       ${NICEGRAF_SOURCES}
-      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/volk)
+      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c
+      ${CMAKE_CURRENT_LIST_DIR}/source/vk_10.c)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
     set(NICEGRAF_DEPS
         ${NICEGRAF_DEPS}
-        volk
         vma)
     if (NOT WIN32)
       set(NICEGRAF_DEPS
