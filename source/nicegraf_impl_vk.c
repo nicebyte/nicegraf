@@ -29,7 +29,6 @@
 
 #include <assert.h>
 #include <string.h>
-#include <stdio.h>
 
 // Determine the correct WSI extension to use for VkSurface creation.
 // Do not change the relative order of this block, the Volk header include
@@ -912,117 +911,6 @@ static ngf_error _ngf_create_vk_image_view(VkImage          image,
     return NGF_ERROR_INVALID_OPERATION;
   } else {
     return NGF_ERROR_OK;
-  }
-}
-
-static ngf_error _ngf_create_image(const ngf_image_info *info,
-                                   VkImageUsageFlags usage_flags,
-                                   ngf_image *result) {
-  assert(info);
-  assert(result);
-  ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(ngf_image_t);
-  ngf_image img = *result;
-  if (img == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
-    goto ngf_create_image_cleanup;
-  }
-  const bool exclusive_sharing = (_vk.gfx_family_idx == _vk.xfer_family_idx);
-  const uint32_t queue_family_indices[] = { _vk.gfx_family_idx,
-                                            _vk.xfer_family_idx
-                                          };
-
-  const uint32_t nqueue_family_indices = exclusive_sharing ? 1u : 2u;
-  const VkSharingMode sharing_mode =
-      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
-                        : VK_SHARING_MODE_CONCURRENT;
-
-  const VkImageCreateInfo vk_image_info = {
-    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-    .pNext = NULL,
-    .flags = 0u,
-    .imageType = get_vk_image_type(info->type),
-    .extent = {
-      .width = info->extent.width,
-      .height = info->extent.height,
-      .depth = info->extent.depth
-    },
-    .format = get_vk_image_format(info->format),
-    .mipLevels = info->nmips,
-    .arrayLayers = 1u, // TODO: layered images
-    .samples =  get_vk_sample_count(info->nsamples),
-    .usage = usage_flags,
-    .sharingMode = sharing_mode,
-    .queueFamilyIndexCount = nqueue_family_indices,
-    .pQueueFamilyIndices = queue_family_indices,
-    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-  };
-
-  VmaAllocationCreateInfo vma_alloc_info = {
-    .flags = 0u,
-    .usage = VMA_MEMORY_USAGE_GPU_ONLY,
-    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    .preferredFlags = 0u,
-    .memoryTypeBits = 0u,
-    .pool = VK_NULL_HANDLE,
-    .pUserData = NULL
-  };
-
-  const VkResult create_image_vkerr = vmaCreateImage(
-      CURRENT_CONTEXT->allocator, &vk_image_info,
-     &vma_alloc_info,
-     &img->vkimg,
-     &img->alloc,
-      NULL);
-
-  if (create_image_vkerr != VK_SUCCESS) {
-    err = NGF_ERROR_IMAGE_CREATION_FAILED;
-    goto ngf_create_image_cleanup;
-  }
-  err = _ngf_create_vk_image_view(img->vkimg,
-                                  vk_image_info.imageType,
-                                  vk_image_info.format,
-                                  vk_image_info.mipLevels,
-                                  vk_image_info.arrayLayers,
-                                 &img->vkview);
-
-  if (err != NGF_ERROR_OK) {
-    goto ngf_create_image_cleanup;
-  }
-
-ngf_create_image_cleanup:
-  if (err != NGF_ERROR_OK) {
-    ngf_destroy_image(img);
-  }
-  return err;
-
-}
-
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
-  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
-    usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
-    if (info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
-        info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
-        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
-      usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    } else {
-      usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    }
-  }
-  return _ngf_create_image(info, usage_flags, result);
-}
-
-void ngf_destroy_image(ngf_image img) {
-  if (img != NULL) {
-    if (img->vkimg != VK_NULL_HANDLE) {
-      // TODO: retire queue for images
-      vmaDestroyImage(CURRENT_CONTEXT->allocator,
-                      img->vkimg, img->alloc);
-      vkDestroyImageView(_vk.device, img->vkview, NULL);
-    }
   }
 }
 
@@ -3387,6 +3275,115 @@ void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
 void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) { 
   _ngf_unmap_buffer(buf->data.alloc);
 }
+
+ngf_error ngf_create_image(const ngf_image_info *info,
+                           ngf_image *result) {
+  assert(info);
+  assert(result);
+
+  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
+    usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+  }
+  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
+    if (info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
+        info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
+        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+      usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    } else {
+      usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    }
+  }
+
+  ngf_error err = NGF_ERROR_OK;
+  *result = NGF_ALLOC(ngf_image_t);
+  ngf_image img = *result;
+  if (img == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_create_image_cleanup;
+  }
+  const bool exclusive_sharing = (_vk.gfx_family_idx == _vk.xfer_family_idx);
+  const uint32_t queue_family_indices[] = { _vk.gfx_family_idx,
+                                            _vk.xfer_family_idx
+                                          };
+
+  const uint32_t nqueue_family_indices = exclusive_sharing ? 1u : 2u;
+  const VkSharingMode sharing_mode =
+      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
+                        : VK_SHARING_MODE_CONCURRENT;
+
+  const VkImageCreateInfo vk_image_info = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u,
+    .imageType = get_vk_image_type(info->type),
+    .extent = {
+      .width = info->extent.width,
+      .height = info->extent.height,
+      .depth = info->extent.depth
+    },
+    .format = get_vk_image_format(info->format),
+    .mipLevels = info->nmips,
+    .arrayLayers = 1u, // TODO: layered images
+    .samples =  get_vk_sample_count(info->nsamples),
+    .usage = usage_flags,
+    .sharingMode = sharing_mode,
+    .queueFamilyIndexCount = nqueue_family_indices,
+    .pQueueFamilyIndices = queue_family_indices,
+    .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+  };
+
+  VmaAllocationCreateInfo vma_alloc_info = {
+    .flags = 0u,
+    .usage = VMA_MEMORY_USAGE_GPU_ONLY,
+    .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    .preferredFlags = 0u,
+    .memoryTypeBits = 0u,
+    .pool = VK_NULL_HANDLE,
+    .pUserData = NULL
+  };
+
+  const VkResult create_image_vkerr = vmaCreateImage(
+      CURRENT_CONTEXT->allocator, &vk_image_info,
+     &vma_alloc_info,
+     &img->vkimg,
+     &img->alloc,
+      NULL);
+
+  if (create_image_vkerr != VK_SUCCESS) {
+    err = NGF_ERROR_IMAGE_CREATION_FAILED;
+    goto ngf_create_image_cleanup;
+  }
+  err = _ngf_create_vk_image_view(img->vkimg,
+                                  vk_image_info.imageType,
+                                  vk_image_info.format,
+                                  vk_image_info.mipLevels,
+                                  vk_image_info.arrayLayers,
+                                 &img->vkview);
+
+  if (err != NGF_ERROR_OK) {
+    goto ngf_create_image_cleanup;
+  }
+
+ngf_create_image_cleanup:
+  if (err != NGF_ERROR_OK) {
+    ngf_destroy_image(img);
+  }
+  return err;
+
+}
+
+void ngf_destroy_image(ngf_image img) {
+  if (img != NULL) {
+    if (img->vkimg != VK_NULL_HANDLE) {
+      // TODO: retire queue for images
+      vmaDestroyImage(CURRENT_CONTEXT->allocator,
+                      img->vkimg, img->alloc);
+      vkDestroyImageView(_vk.device, img->vkview, NULL);
+    }
+  }
+}
+
 
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler *result) {
