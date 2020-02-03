@@ -54,7 +54,7 @@
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateXcbSurfaceKHR
   #define   VK_USE_PLATFORM_XCB_KHR
 #endif
-#include "volk.h"
+#include "vk_10.h"
 #include <vk_mem_alloc.h>
 
 #define _NGF_INVALID_IDX  (~0u)
@@ -635,7 +635,7 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 
 ngf_error ngf_initialize(ngf_device_preference pref) {
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
-    volkInitialize(); // Initialize Volk.
+    vkl_init_loader(); // Initialize the vulkan loader.
 
     const char* const ext_names[] = { // Names of instance-level extensions.
       "VK_KHR_surface", VK_SURFACE_EXT,
@@ -664,7 +664,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
     if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
 
-    volkLoadInstance(_vk.instance); // load instance-level Vulkan functions.
+    vkl_init_instance(_vk.instance); // load instance-level Vulkan functions.
 
     // Obtain a list of available physical devices.
     uint32_t nphysdev = _NGF_MAX_PHYS_DEV;
@@ -806,6 +806,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     if (vk_err != VK_SUCCESS) {
       return NGF_ERROR_INITIALIZATION_FAILED;
     }
+    vkl_init_device(_vk.device);
 
     // Obtain queue handles.
     vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
@@ -813,7 +814,6 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
 
     // Load device-level entry points.
-    volkLoadDevice(_vk.device);
 
     // Initialize frame id.
     _vk.frame_id = 0;
@@ -2648,7 +2648,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           vkAllocateDescriptorSets(_vk.device,
                                    &vk_desc_set_info,
                                    &vk_sets[bind_op->target_set]);
-      assert(desc_set_alloc_result == VK_SUCCESS);
+      if (desc_set_alloc_result != VK_SUCCESS) {
+        exit(1); // TODO
+      }
     }
     VkDescriptorSet set =  vk_sets[bind_op->target_set];
 
@@ -2789,6 +2791,7 @@ static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
                                  size_t               dst_offset,
                                  VkAccessFlags        dst_access_mask,
                                  VkPipelineStageFlags dst_stage_mask) {
+                                 _NGF_FAKE_USE(dst_access_mask, dst_stage_mask);
   const VkBufferCopy copy_region = {
     .srcOffset = src_offset,
     .dstOffset = dst_offset,
@@ -2800,7 +2803,7 @@ static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
                   dst,
                   1u,
                  &copy_region);
-
+/*
   VkBufferMemoryBarrier buf_mem_bar = {
     .sType               =  VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
     .pNext               =  NULL,
@@ -2817,7 +2820,7 @@ static void _ngf_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
                        dst_stage_mask,
                        0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);
+                       1u, &buf_mem_bar, 0, NULL);*/
 
 }
 
