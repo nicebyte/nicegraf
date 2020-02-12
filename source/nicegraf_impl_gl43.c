@@ -2024,8 +2024,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                          (GLsizei)pipeline->viewport.height);
             }
 
-            if ((!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
-                  force_pipeline_update)) {
+            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
+                ((!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
+                   force_pipeline_update))) {
               glScissor((GLsizei)pipeline->scissor.x,
                         (GLsizei)pipeline->scissor.y,
                         (GLsizei)pipeline->scissor.width,
@@ -2183,10 +2184,13 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
 
         case _NGF_CMD_SCISSOR:
-          glScissor(cmd->scissor.x,
-                    cmd->scissor.y,
-                    (GLsizei)cmd->scissor.width,
-                    (GLsizei)cmd->scissor.height);
+          if (!bound_pipeline ||
+               bound_pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) {
+            glScissor(cmd->scissor.x,
+                      cmd->scissor.y,
+                      (GLsizei)cmd->scissor.width,
+                      (GLsizei)cmd->scissor.height);
+          }
           break;
 
         case _NGF_CMD_LINE_WIDTH:
