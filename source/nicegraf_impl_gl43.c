@@ -744,7 +744,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       // Ptr to spec constant value.
       const uint8_t *data = (uint8_t*)spec_info->value_buffer + spec->offset;
 
-      int bytes_written = 0; // bytes written during this iteration.
+      uint32_t bytes_written = 0;  // bytes written during this iteration.
 
       // Write the #define to the buffer
       #define WRITE_SPEC_DEFINE(format, type) \
