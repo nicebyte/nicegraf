@@ -2174,23 +2174,17 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break; }
 
         case _NGF_CMD_VIEWPORT:
-          if (!bound_pipeline ||
-               bound_pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) {
             glViewport(cmd->viewport.x,
                        cmd->viewport.y,
                        (GLsizei)cmd->viewport.width,
                        (GLsizei)cmd->viewport.height);
-          }
           break;
 
         case _NGF_CMD_SCISSOR:
-          if (!bound_pipeline ||
-               bound_pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) {
             glScissor(cmd->scissor.x,
                       cmd->scissor.y,
                       (GLsizei)cmd->scissor.width,
                       (GLsizei)cmd->scissor.height);
-          }
           break;
 
         case _NGF_CMD_LINE_WIDTH:
