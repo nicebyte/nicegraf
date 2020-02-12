@@ -2015,8 +2015,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           if (cached_state->id != pipeline->id || force_pipeline_update) {
             CURRENT_CONTEXT->cached_state.id = pipeline->id;
             glBindProgramPipeline(pipeline->program_pipeline);
-            if ((!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
-                 force_pipeline_update)) {
+            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
+                 ((!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
+                   force_pipeline_update))) {
               glViewport((GLsizei)pipeline->viewport.x,
                          (GLsizei)pipeline->viewport.y,
                          (GLsizei)pipeline->viewport.width,
@@ -2172,11 +2173,13 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break; }
 
         case _NGF_CMD_VIEWPORT:
-          glViewport(cmd->viewport.x,
-                     cmd->viewport.y,
-                     (GLsizei)cmd->viewport.width,
-                     (GLsizei)cmd->viewport.height);
-            break;
+          if (bound_pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) {
+            glViewport(cmd->viewport.x,
+                       cmd->viewport.y,
+                       (GLsizei)cmd->viewport.width,
+                       (GLsizei)cmd->viewport.height);
+          }
+          break;
 
         case _NGF_CMD_SCISSOR:
           glScissor(cmd->scissor.x,
