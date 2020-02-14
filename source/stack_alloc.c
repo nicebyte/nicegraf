@@ -36,7 +36,7 @@ void* _ngf_sa_alloc(_ngf_sa *allocator, size_t nbytes) {
   void           *result             = NULL;
   const ptrdiff_t consumed_capacity  = allocator->ptr - allocator->data;
   const ptrdiff_t available_capacity = allocator->capacity - consumed_capacity;
-  if (available_capacity >= nbytes) {
+  if (available_capacity >= (ptrdiff_t)nbytes) {
     result = allocator->ptr;
     allocator->ptr += nbytes;
   } 
