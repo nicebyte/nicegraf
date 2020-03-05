@@ -72,6 +72,7 @@ struct ngf_graphics_pipeline_t {
 #define _NGF_MAX_DRAW_BUFFERS 5
 
 struct ngf_render_target_t {
+  bool   is_srgb;
   GLuint framebuffer;
   size_t ndraw_buffers;
   GLenum draw_buffers[_NGF_MAX_DRAW_BUFFERS];
@@ -88,6 +89,7 @@ struct ngf_context_t {
   bool force_pipeline_update;
   bool has_swapchain;
   bool has_depth;
+  bool srgb_surface;
   ngf_present_mode present_mode;
   ngf_type bound_index_buffer_type;
 };
@@ -124,6 +126,7 @@ struct ngf_image_t {
   GLenum bind_point;
   bool is_renderbuffer;
   bool is_multisample;
+  bool is_srgb;
   GLenum glformat;
   GLenum gltype;
 };
@@ -572,6 +575,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   }
 
   // Create surface if necessary.
+  ctx->srgb_surface = false;
   if (swapchain_info) {
     const glformat color_format = get_gl_format(swapchain_info->cfmt);
     EGLint egl_surface_attribs[] = {
@@ -582,6 +586,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                                : EGL_GL_COLORSPACE_LINEAR_KHR,
       EGL_NONE
     };
+    ctx->srgb_surface = color_format.srgb;
     ctx->surface = eglCreateWindowSurface(ctx->dpy,
                                           ctx->cfg,
                                           (EGLNativeWindowType)swapchain_info->native_handle,
@@ -1073,6 +1078,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
 
   const glformat glf = get_gl_format(info->format);
   image->glformat = glf.format;
+  image->is_srgb = glf.srgb;
   image->gltype = glf.type;
   image->is_multisample = info->nsamples > 1;
 
@@ -1237,6 +1243,7 @@ ngf_error ngf_default_render_target(
     if (default_render_target == NULL) {
       return NGF_ERROR_OUTOFMEM;
     }
+    default_render_target->is_srgb = CURRENT_CONTEXT->srgb_surface;
     ngf_attachment *default_color_attachment =
         &default_render_target->attachment_infos[0];
     default_color_attachment->type = NGF_ATTACHMENT_COLOR;
@@ -1293,6 +1300,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   glBindFramebuffer(GL_FRAMEBUFFER, render_target->framebuffer);
   size_t ncolor_attachment = 0;
   render_target->nattachments = info->nattachments;
+  render_target->is_srgb = false;
   for (size_t i = 0; i < info->nattachments; ++i) {
     const ngf_attachment *a = &(info->attachments[i]);
     render_target->attachment_infos[i] = *a;
@@ -1303,6 +1311,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
       gl_attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
       assert(draw_buffer < _NGF_MAX_DRAW_BUFFERS);
       render_target->draw_buffers[draw_buffer] = gl_attachment;
+      render_target->is_srgb |= a->image_ref.image->is_srgb;
       break;
     }
     case NGF_ATTACHMENT_DEPTH:
@@ -2284,6 +2293,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         case _NGF_CMD_BEGIN_PASS: {
           active_rt = cmd->begin_pass.target;
           glBindFramebuffer(GL_FRAMEBUFFER, active_rt->framebuffer);
+          if (active_rt->is_srgb) glEnable(GL_FRAMEBUFFER_SRGB);
+          else glDisable(GL_FRAMEBUFFER_SRGB);
           uint32_t color_clear = 0u;
           glDisable(GL_SCISSOR_TEST);
           glDepthMask(GL_TRUE);
