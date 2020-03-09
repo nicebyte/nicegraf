@@ -350,7 +350,7 @@ public:
     }
     if (@available(macOS 10.13, *)) {
       layer_.displaySyncEnabled =
-      (swapchain_info.present_mode == NGF_PRESENTATION_MODE_IMMEDIATE);
+      (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO);
     }
 #endif
     
