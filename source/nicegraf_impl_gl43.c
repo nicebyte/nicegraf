@@ -22,6 +22,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
+#include "dynamic_array.h"
 #include "gl_43_core.h"
 #define EGLAPI // prevent __declspec(dllimport) issue on Windows
 #include "EGL/egl.h"
@@ -80,13 +81,22 @@ struct ngf_render_target_t {
   ngf_attachment attachment_infos[];
 };
 
+typedef struct _ngf_vbuf_binding_info_t {
+  uint32_t binding;
+  GLuint buffer;
+  size_t offset;
+} _ngf_vbuf_binding_info;
+
 struct ngf_context_t {
   EGLDisplay dpy;
   EGLContext ctx;
   EGLConfig cfg;
   EGLSurface surface;
-  struct ngf_graphics_pipeline_t cached_state;
-  bool force_pipeline_update;
+  struct {
+    struct ngf_graphics_pipeline_t pipeline;
+    _NGF_DARRAY_OF(_ngf_vbuf_binding_info) vbuf_table;
+  } cached_state;
+  bool has_bound_pipeline;
   bool has_swapchain;
   bool has_depth;
   bool srgb_surface;
@@ -599,7 +609,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     ctx->surface = EGL_NO_SURFACE;
   }
 
-  ctx->force_pipeline_update = true;
+  ctx->has_bound_pipeline = false;
+  _NGF_DARRAY_RESET(ctx->cached_state.vbuf_table, 10);
 
 ngf_create_context_cleanup:
   if (err_code != NGF_ERROR_OK) {
@@ -653,6 +664,7 @@ void ngf_destroy_context(ngf_context ctx) {
       eglDestroySurface(ctx->dpy, ctx->surface);
     }
     eglTerminate(ctx->dpy);
+    _NGF_DARRAY_DESTROY(ctx->cached_state.vbuf_table);
     NGF_FREE(ctx);
   }
 }
@@ -2005,61 +2017,67 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
 
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   assert(bufs);
-  ngf_graphics_pipeline bound_pipeline =
-      &(CURRENT_CONTEXT->cached_state);
   ngf_render_target active_rt = NULL;
-  for (uint32_t b = 0u; b < nbuffers; ++b) {
-    const ngf_cmd_buffer buf = bufs[b];
+  for (uint32_t buf_i = 0u; buf_i < nbuffers; ++buf_i) {
+    const ngf_cmd_buffer buf = bufs[buf_i];
     for (const _ngf_cmd_block *block = buf->first_cmd_block; block!= NULL;
          block= block->next) {
       for (uint32_t i = 0; i < block->next_cmd_idx; ++i) {
         const _ngf_emulated_cmd *cmd = &block->cmds[i];
         switch (cmd->type) {
         case _NGF_CMD_BIND_PIPELINE: {
-          const ngf_graphics_pipeline cached_state =
-              &CURRENT_CONTEXT->cached_state;
-          const bool force_pipeline_update =
-              CURRENT_CONTEXT->force_pipeline_update;
+          const ngf_graphics_pipeline bound_pipe = 
+            CURRENT_CONTEXT->has_bound_pipeline
+              ? &(CURRENT_CONTEXT->cached_state.pipeline)
+              : NULL;
+
           const ngf_graphics_pipeline pipeline = cmd->pipeline;
-          if (cached_state->id != pipeline->id || force_pipeline_update) {
-            CURRENT_CONTEXT->cached_state.id = pipeline->id;
-            glBindProgramPipeline(pipeline->program_pipeline);
-            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
-                 ((!NGF_STRUCT_EQ(pipeline->viewport, cached_state->viewport) ||
-                   force_pipeline_update))) {
+          if (!bound_pipe || bound_pipe->id != pipeline->id) {
+            // Bind graphics program.
+            if (!bound_pipe ||
+                 bound_pipe->program_pipeline != pipeline->program_pipeline) {
+              glBindProgramPipeline(pipeline->program_pipeline);
+            }
+
+            // Set viewport state.
+            if (!bound_pipe ||
+                !(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
+                 ((!NGF_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport)))) {
               glViewport((GLsizei)pipeline->viewport.x,
                          (GLsizei)pipeline->viewport.y,
                          (GLsizei)pipeline->viewport.width,
                          (GLsizei)pipeline->viewport.height);
             }
 
-            if (!(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
-                ((!NGF_STRUCT_EQ(pipeline->scissor, cached_state->scissor) ||
-                   force_pipeline_update))) {
+            // Set scissor state.
+            if (!bound_pipe ||
+                !(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
+                 ((!NGF_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor)))) {
               glScissor((GLsizei)pipeline->scissor.x,
                         (GLsizei)pipeline->scissor.y,
                         (GLsizei)pipeline->scissor.width,
                         (GLsizei)pipeline->scissor.height);
             }
 
+            // Set rasterizer state.
             const ngf_rasterization_info *rast = &(pipeline->rasterization);
-            const ngf_rasterization_info *cached_rast =
-                &(cached_state->rasterization);
-            if (cached_rast->discard != rast->discard ||
-                force_pipeline_update) {
+            const ngf_rasterization_info *prev_rast =
+                bound_pipe ? &(bound_pipe->rasterization) : NULL;
+            if (!prev_rast ||
+                 prev_rast->discard != rast->discard) {
               if (rast->discard) {
                 glEnable(GL_RASTERIZER_DISCARD);
               } else {
                 glDisable(GL_RASTERIZER_DISCARD);
               }
             }
-            if (cached_rast->polygon_mode != rast->polygon_mode ||
-                force_pipeline_update) {
+            if (!prev_rast ||
+                 prev_rast->polygon_mode != rast->polygon_mode) {
               glPolygonMode(GL_FRONT_AND_BACK,
                             get_gl_poly_mode(rast->polygon_mode));
             }
-            if (cached_rast->cull_mode != rast->cull_mode ||
-                force_pipeline_update) {
+            if (!prev_rast ||
+                prev_rast->cull_mode != rast->cull_mode) {
               if (rast->cull_mode != NGF_CULL_MODE_NONE) {
                 glEnable(GL_CULL_FACE);
                 glCullFace(get_gl_cull_mode(rast->cull_mode));
@@ -2067,18 +2085,19 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glDisable(GL_CULL_FACE);
               }
             }
-            if (cached_rast->front_face != rast->front_face ||
-                force_pipeline_update) {
+            if (!prev_rast ||
+                prev_rast->front_face != rast->front_face) {
               glFrontFace(get_gl_face(rast->front_face));
             }
-            if (cached_rast->line_width != rast->line_width ||
-                force_pipeline_update) {
+            if (!prev_rast ||
+                prev_rast->line_width != rast->line_width) {
               glLineWidth(rast->line_width);
             }
 
-            if (cached_state->multisample.multisample !=
-                pipeline->multisample.multisample ||
-                force_pipeline_update) {
+            // Enable/disable multisampling.
+            if (!bound_pipe ||
+                bound_pipe->multisample.multisample !=
+                pipeline->multisample.multisample) {
               if (pipeline->multisample.multisample) {
                 glEnable(GL_MULTISAMPLE);
               } else {
@@ -2086,9 +2105,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               }
             }
 
-            if (cached_state->multisample.alpha_to_coverage !=
-                    pipeline->multisample.alpha_to_coverage ||
-                force_pipeline_update) {
+            // Enable/disable alpha-to-coverage.
+            if (!bound_pipe ||
+                bound_pipe->multisample.alpha_to_coverage !=
+                    pipeline->multisample.alpha_to_coverage) {
               if (pipeline->multisample.alpha_to_coverage) {
                 glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE);
               } else {
@@ -2096,12 +2116,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               }
             }
 
+            // Set depth/stencil state.
             const ngf_depth_stencil_info *depth_stencil =
                 &(pipeline->depth_stencil);
-            const ngf_depth_stencil_info *cached_depth_stencil =
-                &(cached_state->depth_stencil);
-            if (cached_depth_stencil->depth_test != depth_stencil->depth_test ||
-                force_pipeline_update) {
+            const ngf_depth_stencil_info *prev_depth_stencil =
+                bound_pipe ? &(bound_pipe->depth_stencil) : NULL;
+
+            if (!prev_depth_stencil ||
+                prev_depth_stencil->depth_test != depth_stencil->depth_test) {
               if (depth_stencil->depth_test) {
                 glEnable(GL_DEPTH_TEST);
                 glDepthFunc(get_gl_compare(depth_stencil->depth_compare));
@@ -2109,22 +2131,22 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glDisable(GL_DEPTH_TEST);
               }
             }
-            if (cached_depth_stencil->depth_write !=
-                    depth_stencil->depth_write ||
-                force_pipeline_update) {
+            if (!prev_depth_stencil ||
+                 prev_depth_stencil->depth_write !=
+                 depth_stencil->depth_write) {
               if (depth_stencil->depth_write) {
                 glDepthMask(GL_TRUE);
               } else {
                 glDepthMask(GL_FALSE);
               }
             }
-            if (cached_depth_stencil->stencil_test !=
-                    depth_stencil->stencil_test ||
-                !NGF_STRUCT_EQ(cached_depth_stencil->back_stencil,
+            if (!prev_depth_stencil ||
+                 prev_depth_stencil->stencil_test !=
+                   depth_stencil->stencil_test ||
+                !NGF_STRUCT_EQ(prev_depth_stencil->back_stencil,
                                depth_stencil->back_stencil) ||
-                !NGF_STRUCT_EQ(cached_depth_stencil->front_stencil,
-                               depth_stencil->front_stencil) ||
-                force_pipeline_update) {
+                !NGF_STRUCT_EQ(prev_depth_stencil->front_stencil,
+                               depth_stencil->front_stencil)) {
               if (depth_stencil->stencil_test) {
                 glEnable(GL_STENCIL_TEST);
                 glStencilFuncSeparate(
@@ -2155,17 +2177,20 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glDisable(GL_STENCIL_TEST);
               }
             }
-            if (cached_depth_stencil->min_depth != depth_stencil->min_depth ||
-                cached_depth_stencil->max_depth != depth_stencil->max_depth ||
-                force_pipeline_update) {
+            if (!prev_depth_stencil ||
+                prev_depth_stencil->min_depth != depth_stencil->min_depth ||
+                prev_depth_stencil->max_depth != depth_stencil->max_depth) {
               glDepthRangef(depth_stencil->min_depth, depth_stencil->max_depth);
             }
 
+            // Set blend state.
             const ngf_blend_info *blend = &(pipeline->blend);
-            const ngf_blend_info *cached_blend = &(cached_state->blend);
-            if (cached_blend->enable != blend->enable ||
-                cached_blend->sfactor != blend->sfactor ||
-                cached_blend->dfactor != blend->dfactor || force_pipeline_update) {
+            const ngf_blend_info *prev_blend =
+                bound_pipe ? &(bound_pipe->blend) : NULL;
+            if (!prev_blend ||
+                prev_blend->enable != blend->enable ||
+                prev_blend->sfactor != blend->sfactor ||
+                prev_blend->dfactor != blend->dfactor) {
               if (blend->enable) {
                 glEnable(GL_BLEND);
                 glBlendFunc(get_gl_blendfactor(blend->sfactor),
@@ -2174,11 +2199,39 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 glDisable(GL_BLEND);
               }
             }
-            glBindVertexArray(pipeline->vao);
-            CURRENT_CONTEXT->cached_state = *pipeline;
+
+            // Set vertex input state.
+            if (!bound_pipe ||
+                bound_pipe->vao != pipeline->vao) {
+              glBindVertexArray(pipeline->vao);
+              // Keep the same set of attribute buffers bound despite VAO change.
+              const size_t nvbuf_table_entries =
+                  _NGF_DARRAY_SIZE(CURRENT_CONTEXT->cached_state.vbuf_table);
+              for (size_t e = 0; e < nvbuf_table_entries; ++e) {
+                bool found_binding = false;
+                const _ngf_vbuf_binding_info *vbuf_table_entry =
+                    &_NGF_DARRAY_AT(CURRENT_CONTEXT->cached_state.vbuf_table,
+                                    e);
+                // Update only bindings relevant to this pipeline.
+                for (uint32_t b = 0;
+                     !found_binding && b < pipeline->nvert_buf_bindings;
+                     ++b) {
+                  if (pipeline->vert_buf_bindings[b].binding ==
+                      vbuf_table_entry->binding) {
+                    const GLsizei stride =
+                      (GLsizei)pipeline->vert_buf_bindings[b].stride;
+                    glBindVertexBuffer(vbuf_table_entry->binding,
+                                       vbuf_table_entry->buffer,
+                                       vbuf_table_entry->offset,
+                                       stride);
+                    found_binding = true;
+                  }
+                }
+              }
+            }
+            CURRENT_CONTEXT->cached_state.pipeline = *pipeline;
           }
-          CURRENT_CONTEXT->force_pipeline_update = false;
-          bound_pipeline = pipeline;
+          CURRENT_CONTEXT->has_bound_pipeline = true;
           glEnable(GL_SCISSOR_TEST);
           break; }
 
@@ -2264,23 +2317,60 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
 
         case _NGF_CMD_BIND_ATTRIB_BUFFER: {
-          GLsizei stride = 0;
-          bool found_binding = false;
-          for (uint32_t binding = 0;
-               !found_binding && binding < bound_pipeline->nvert_buf_bindings;
-               ++binding) {
-            if (bound_pipeline->vert_buf_bindings[binding].binding ==
-                cmd->attrib_buffer_bind_op.binding) {
-              stride =
-                  (GLsizei)bound_pipeline->vert_buf_bindings[binding].stride;
-              found_binding = true;
+          const ngf_graphics_pipeline bound_pipeline =
+            CURRENT_CONTEXT->has_bound_pipeline
+              ? &CURRENT_CONTEXT->cached_state.pipeline
+              : NULL;
+
+          // Update the table of bound attrib buffers.
+          const size_t nvbuf_table_entries = _NGF_DARRAY_SIZE(
+              CURRENT_CONTEXT->cached_state.vbuf_table);
+          bool vbuf_table_entry_found = false;
+          for (size_t e = 0;
+               !vbuf_table_entry_found && e < nvbuf_table_entries;
+               ++e) { // Try to find and update vertex buffer table entry.
+            _ngf_vbuf_binding_info *vbuf_table_entry = &_NGF_DARRAY_AT(
+                CURRENT_CONTEXT->cached_state.vbuf_table,
+                e);
+            if (vbuf_table_entry->binding == cmd->attrib_buffer_bind_op.binding) {
+              vbuf_table_entry->buffer =
+                cmd->attrib_buffer_bind_op.buf->glbuffer;
+              vbuf_table_entry->offset =
+                cmd->attrib_buffer_bind_op.offset;
+              vbuf_table_entry_found = true;
             }
           }
-          assert(found_binding);
-          glBindVertexBuffer(cmd->attrib_buffer_bind_op.binding,
-                             cmd->attrib_buffer_bind_op.buf->glbuffer,
-                             cmd->attrib_buffer_bind_op.offset,
-                             stride); 
+          if (!vbuf_table_entry_found) { // Must add new entry.
+            const _ngf_vbuf_binding_info new_entry = {
+              .binding = cmd->attrib_buffer_bind_op.binding,
+              .buffer = cmd->attrib_buffer_bind_op.buf->glbuffer,
+              .offset = cmd->attrib_buffer_bind_op.offset
+            };
+            _NGF_DARRAY_APPEND(CURRENT_CONTEXT->cached_state.vbuf_table,
+                               new_entry);
+          }
+          
+          // Bind the attribute buffer.
+          if (bound_pipeline) {
+            GLsizei stride = 0;
+            bool found_binding = false;
+            for (uint32_t binding = 0;
+                 !found_binding &&
+                 binding < bound_pipeline->nvert_buf_bindings;
+                 ++binding) {
+              if (bound_pipeline->vert_buf_bindings[binding].binding ==
+                  cmd->attrib_buffer_bind_op.binding) {
+                stride =
+                    (GLsizei)bound_pipeline->vert_buf_bindings[binding].stride;
+                found_binding = true;
+              }
+            }
+            assert(found_binding);
+            glBindVertexBuffer(cmd->attrib_buffer_bind_op.binding,
+                               cmd->attrib_buffer_bind_op.buf->glbuffer,
+                               cmd->attrib_buffer_bind_op.offset,
+                               stride);
+          }
           break;
         }
 
@@ -2329,6 +2419,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         }
 
         case _NGF_CMD_END_PASS: {
+          assert(active_rt);
           const uint32_t max_discarded_attachments =
               active_rt->nattachments + 1u; // +1 needed in case we need to
                                             // handle depth/stencil separately.
@@ -2381,7 +2472,12 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           }
           break;
         }
-        case _NGF_CMD_DRAW:
+        case _NGF_CMD_DRAW: {
+          const ngf_graphics_pipeline bound_pipeline =
+            CURRENT_CONTEXT->has_bound_pipeline
+              ? &CURRENT_CONTEXT->cached_state.pipeline
+              : NULL;
+          assert(bound_pipeline);
           if (!cmd->draw.indexed && cmd->draw.ninstances == 1u) {
             glDrawArrays(bound_pipeline->primitive_type,
                          (GLint)cmd->draw.first_element,
@@ -2415,7 +2511,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                                                         elem_size)),  
                                     (GLsizei)cmd->draw.ninstances);
           }
-          break;
+          break; }
         case _NGF_CMD_COPY:
           glBindBuffer(GL_COPY_READ_BUFFER, cmd->copy.src);
           glBindBuffer(GL_COPY_WRITE_BUFFER, cmd->copy.dst);
@@ -2475,7 +2571,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         }
       }
     }
-    _ngf_cmd_buffer_free_cmds(bufs[b]);
+    _ngf_cmd_buffer_free_cmds(bufs[buf_i]);
   }
   return NGF_ERROR_OK;
 }
