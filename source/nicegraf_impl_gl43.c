@@ -95,6 +95,7 @@ struct ngf_context_t {
   struct {
     struct ngf_graphics_pipeline_t pipeline;
     _NGF_DARRAY_OF(_ngf_vbuf_binding_info) vbuf_table;
+     GLuint bound_index_buffer;
   } cached_state;
   bool has_bound_pipeline;
   bool has_swapchain;
@@ -611,6 +612,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
 
   ctx->has_bound_pipeline = false;
   _NGF_DARRAY_RESET(ctx->cached_state.vbuf_table, 10);
+  ctx->cached_state.bound_index_buffer = GL_NONE;
 
 ngf_create_context_cleanup:
   if (err_code != NGF_ERROR_OK) {
@@ -2228,6 +2230,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                   }
                 }
               }
+
+              // Rebind index buffer.
+              glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                           CURRENT_CONTEXT->cached_state.bound_index_buffer);
             }
             CURRENT_CONTEXT->cached_state.pipeline = *pipeline;
           }
@@ -2377,6 +2383,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         case _NGF_CMD_BIND_INDEX_BUFFER:
           glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                        cmd->index_buffer_bind.index_buffer->glbuffer);
+          CURRENT_CONTEXT->cached_state.bound_index_buffer =
+              cmd->index_buffer_bind.index_buffer->glbuffer;
           CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
           break;
 
