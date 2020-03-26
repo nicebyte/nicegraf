@@ -2042,9 +2042,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             }
 
             // Set viewport state.
-            if (!bound_pipe ||
-                !(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_VIEWPORT) &&
-                 ((!NGF_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport)))) {
+            const bool viewport_dynamic = pipeline->dynamic_state_mask &
+                                          NGF_DYNAMIC_STATE_VIEWPORT;
+            if (!viewport_dynamic &&
+                (!bound_pipe ||
+                 !NGF_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport))) {
               glViewport((GLsizei)pipeline->viewport.x,
                          (GLsizei)pipeline->viewport.y,
                          (GLsizei)pipeline->viewport.width,
@@ -2052,9 +2054,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             }
 
             // Set scissor state.
-            if (!bound_pipe ||
-                !(pipeline->dynamic_state_mask & NGF_DYNAMIC_STATE_SCISSOR) &&
-                 ((!NGF_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor)))) {
+            const bool scissor_dynamic = pipeline->dynamic_state_mask &
+                                         NGF_DYNAMIC_STATE_SCISSOR;
+            if (!scissor_dynamic &&
+                (!bound_pipe ||
+                 !NGF_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor))) {
               glScissor((GLsizei)pipeline->scissor.x,
                         (GLsizei)pipeline->scissor.y,
                         (GLsizei)pipeline->scissor.width,
