@@ -1122,7 +1122,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
             ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY
             : GL_TEXTURE_2D_ARRAY;
     } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D &&
-               info->nsamples == 1u) {
+               info->nsamples == 0u) {
       image->bind_point = GL_TEXTURE_3D;
     } else if (info->type == NGF_IMAGE_TYPE_CUBE &&
                info->nsamples == 0u) {
