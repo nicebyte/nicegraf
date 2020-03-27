@@ -95,6 +95,14 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTLPixelFormatRG16Float, 16, 16, 0, 0, 0, 0, false},
     {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16F, unsupported on Metal
     {MTLPixelFormatRGBA16Float, 16, 16, 16, 16, 0, 0, false},
+    {MTLPixelFormatR16Uint, 16, 0, 0, 0, 0, 0, false},
+    {MTLPixelFormatRG16Uint, 16, 16, 0, 0, 0, 0, false},
+    {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16U, unsupported on Metal
+    {MTLPixelFormatRGBA16Uint, 16, 16, 16, 16, 0, 0, false},
+    {MTLPixelFormatR32Uint, 32, 0, 0, 0, 0, 0, false},
+    {MTLPixelFormatRG32Uint, 32, 32, 0, 0, 0, 0, false},
+    {MTLPixelFormatInvalid, 32, 32, 32, 0, 0, 0, false}, // RGB32U, unsupported on Metal
+    {MTLPixelFormatRGBA32Uint, 32, 32, 32, 32, 0, 0, false},
     {MTLPixelFormatDepth32Float, 0, 0, 0, 0, 32, 0, false},
 #if TARGET_OS_OSX
     {MTLPixelFormatDepth16Unorm, 0, 0, 0, 0, 16, 0, false},
