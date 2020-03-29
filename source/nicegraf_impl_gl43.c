@@ -2636,6 +2636,7 @@ void ngf_end_debug_group() {
 }
 
 ngf_error ngf_begin_frame() {
+  glGenBuffers(0, NULL);
   return NGF_ERROR_OK;
 }
 
