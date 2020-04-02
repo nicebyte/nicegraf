@@ -233,16 +233,20 @@ ngf_error _ngf_create_native_binding_map(
             break;
           }
         }
-        assert(combined_list); // TODO: return error
-        mapping->cis_bindings =
+        if (combined_list) {
+          mapping->cis_bindings =
             NGF_ALLOCN(uint32_t, combined_list->ncombined_ids);
-        if (mapping->cis_bindings == NULL) {
-          err = NGF_ERROR_OUTOFMEM;
-          goto _ngf_create_native_binding_map_cleanup;
+          if (mapping->cis_bindings == NULL) {
+            err = NGF_ERROR_OUTOFMEM;
+            goto _ngf_create_native_binding_map_cleanup;
+          }
+          memcpy(mapping->cis_bindings, combined_list->combined_ids,
+            sizeof(uint32_t) * combined_list->ncombined_ids);
+          mapping->ncis_bindings = combined_list->ncombined_ids;
+        } else {
+          mapping->cis_bindings = NULL;
+          mapping->ncis_bindings = 0u;
         }
-        memcpy(mapping->cis_bindings, combined_list->combined_ids,
-               sizeof(uint32_t) * combined_list->ncombined_ids);
-        mapping->ncis_bindings = combined_list->ncombined_ids;
       } else {
         mapping->cis_bindings = NULL;
         mapping->ncis_bindings = 0u;
