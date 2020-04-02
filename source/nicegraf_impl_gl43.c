@@ -420,6 +420,14 @@ static glformat get_gl_format(ngf_image_format f) {
     {GL_RG16F, GL_RG, GL_HALF_FLOAT, 16, 16, 0, 0, 0, 0, false},
     {GL_RGB16F, GL_RGB, GL_HALF_FLOAT, 16, 16, 16, 0, 0, 0, false},
     {GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT, 16, 16, 16, 16, 0, 0, false},
+    {GL_R16UI, GL_RED_INTEGER, GL_UNSIGNED_SHORT, 16, 0, 0, 0, 0, 0, false},
+    {GL_RG16UI, GL_RG_INTEGER, GL_UNSIGNED_SHORT, 16, 16, 0, 0, 0, 0, false},
+    {GL_RGB16UI, GL_RGB_INTEGER, GL_UNSIGNED_SHORT, 16, 16, 16, 0, 0, 0, false},
+    {GL_RGBA16UI, GL_RGBA_INTEGER, GL_UNSIGNED_SHORT, 16, 16, 16, 16, 0, 0, false},
+    {GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 32, 0, 0, 0, 0, 0, false},
+    {GL_RG32UI, GL_RG_INTEGER, GL_UNSIGNED_INT, 32, 32, 0, 0, 0, 0, false},
+    {GL_RGB32UI, GL_RGB_INTEGER, GL_UNSIGNED_INT, 32, 32, 32, 0, 0, 0, false},
+    {GL_RGBA32UI, GL_RGBA_INTEGER, GL_UNSIGNED_INT, 32, 32, 32, 32, 0, 0, false},
     {GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, 0, 0, 0, 0, 32, 0,
      false},
     {GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT, GL_FLOAT, 0, 0, 0, 0, 16, 0,
@@ -1114,7 +1122,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
             ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY
             : GL_TEXTURE_2D_ARRAY;
     } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D &&
-               info->nsamples == 1u) {
+               info->nsamples == 0u) {
       image->bind_point = GL_TEXTURE_3D;
     } else if (info->type == NGF_IMAGE_TYPE_CUBE &&
                info->nsamples == 0u) {
@@ -1439,10 +1447,10 @@ void* _ngf_buffer_map_range(GLenum bind_target,
                             uint32_t flags) {
   // TODO: return NULL if buffer uses private storage.
   glBindBuffer(bind_target, gl_buffer);
-  GLbitfield map_access =
-      GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_FLUSH_EXPLICIT_BIT;
+  GLbitfield map_access = GL_MAP_UNSYNCHRONIZED_BIT;
   if (flags & NGF_BUFFER_MAP_READ_BIT) map_access |= GL_MAP_READ_BIT;
-  if (flags & NGF_BUFFER_MAP_WRITE_BIT) map_access |= GL_MAP_WRITE_BIT;
+  if (flags & NGF_BUFFER_MAP_WRITE_BIT) map_access |= GL_MAP_WRITE_BIT |
+                                                      GL_MAP_FLUSH_EXPLICIT_BIT;
   if (flags & NGF_BUFFER_MAP_DISCARD_BIT)
     map_access |= GL_MAP_INVALIDATE_BUFFER_BIT;
   return glMapBufferRange(bind_target, (GLintptr)offset, (GLsizeiptr)size,
@@ -2628,6 +2636,7 @@ void ngf_end_debug_group() {
 }
 
 ngf_error ngf_begin_frame() {
+  glGenBuffers(0, NULL);
   return NGF_ERROR_OK;
 }
 
