@@ -552,21 +552,20 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
       MTLCopyAllDevicesWithObserver(&dev_observer,
                                     ^(id<MTLDevice> d,
                                       MTLDeviceNotificationName n){});
-  bool found_device = false;
-  for (uint32_t d = 0u; !found_device && d < devices.count; ++d) {
-    MTL_DEVICE = devices[d++];
+  bool found_preferred_device = false;
+  for (uint32_t d = 0u; !found_preferred_device && d < devices.count; ++d) {
+    MTL_DEVICE = devices[d];
     // If the user prefers discrete GPU, do not pick a low-power device.
     // Otherwise, anything will do.
-    found_device = (dev_pref != NGF_DEVICE_PREFERENCE_DISCRETE) ||
-                   !MTL_DEVICE.lowPower;
+    found_preferred_device = (dev_pref != NGF_DEVICE_PREFERENCE_DISCRETE) ||
+                             !MTL_DEVICE.lowPower;
   }
 #else
   // On other targets, simply pick the default device.
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
-  bool found_device = (MTL_DEVICE != nil);
 #endif
 
-  return found_device ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
+  return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
 }
 
 ngf_error ngf_begin_frame() {
