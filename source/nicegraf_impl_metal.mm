@@ -491,24 +491,29 @@ struct ngf_graphics_pipeline_t {
 
 struct ngf_buffer_t {
   id<MTLBuffer> mtl_buffer = nil;
+  size_t mapped_offset = 0;
 };
 
 struct ngf_attrib_buffer_t {
   id<MTLBuffer> mtl_buffer = nil;
+  size_t mapped_offset = 0;
 };
 
 struct ngf_index_buffer_t {
   id<MTLBuffer> mtl_buffer = nil;
+  size_t mapped_offset = 0;
 };
 
 struct ngf_uniform_buffer_t {
   id<MTLBuffer> mtl_buffer = nil;
+  size_t mapped_offset = 0;
   uint32_t current_idx = 0u;
   size_t size = 0u;
 };
 
 struct ngf_pixel_buffer_t {
   id<MTLBuffer> mtl_buffer = nil;
+  size_t mapped_offset = 0;
 };
 
 struct ngf_sampler_t {
@@ -1131,6 +1136,7 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t size,
                                   [[maybe_unused]] uint32_t flags) {
   // TODO: handle discard flag
+  buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
@@ -1139,7 +1145,8 @@ void ngf_attrib_buffer_flush_range(
     [[maybe_unused]] size_t offset,
     [[maybe_unused]] size_t size) {
 #if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
+                                              size)];
 #endif
 }
 
@@ -1158,6 +1165,7 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t size,
                                  [[maybe_unused]] uint32_t flags) {
   // TODO: handle discard flag
+  buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
@@ -1166,7 +1174,8 @@ void ngf_index_buffer_flush_range(
     [[maybe_unused]] size_t offset,
     [[maybe_unused]] size_t size) {
 #if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
+                                              size)];
 #endif
 }
 
@@ -1199,6 +1208,7 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t size,
                                    [[maybe_unused]] uint32_t flags) {
   // TODO: handle discard flag
+  buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
@@ -1206,24 +1216,12 @@ void ngf_uniform_buffer_flush_range([[maybe_unused]] ngf_uniform_buffer buf,
                                     [[maybe_unused]] size_t offset,
                                     [[maybe_unused]] size_t size) {
 #if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
+                                              size)];
 #endif
 }
 
 void ngf_uniform_buffer_unmap([[maybe_unused]] ngf_uniform_buffer buf) {}
-
-ngf_error ngf_write_uniform_buffer(ngf_uniform_buffer buf,
-                                   const void *data, size_t size) {
-  const size_t aligned_size = size + (256u - size % 256u);
-  if (aligned_size != buf->size) {
-    return NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH;
-  }
-  buf->current_idx = (buf->current_idx + 1u) % 3u;
-  const size_t offset = buf->current_idx * buf->size;
-  void *target = (uint8_t*)buf->mtl_buffer.contents + offset;
-  memcpy(target, data, size);
-  return NGF_ERROR_OK;
-}
 
 ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
                                   ngf_pixel_buffer *result) {
@@ -1251,6 +1249,7 @@ void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t size,
                                  [[maybe_unused]] uint32_t flags) {
   // TODO: handle discard flag
+  buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
@@ -1258,7 +1257,8 @@ void ngf_pixel_buffer_flush_range([[maybe_unused]] ngf_pixel_buffer buf,
                                   [[maybe_unused]] size_t offset,
                                   [[maybe_unused]] size_t size) {
 #if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(offset, size)];
+  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
+                                              size)];
 #endif
 }
 
