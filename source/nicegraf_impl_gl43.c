@@ -420,6 +420,7 @@ static glformat get_gl_format(ngf_image_format f) {
     {GL_RG16F, GL_RG, GL_HALF_FLOAT, 16, 16, 0, 0, 0, 0, false},
     {GL_RGB16F, GL_RGB, GL_HALF_FLOAT, 16, 16, 16, 0, 0, 0, false},
     {GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT, 16, 16, 16, 16, 0, 0, false},
+    {GL_R11F_G11F_B10F, GL_RGB, GL_HALF_FLOAT, 11, 11, 10, 0, 0, 0, false},
     {GL_R16UI, GL_RED_INTEGER, GL_UNSIGNED_SHORT, 16, 0, 0, 0, 0, 0, false},
     {GL_RG16UI, GL_RG_INTEGER, GL_UNSIGNED_SHORT, 16, 16, 0, 0, 0, 0, false},
     {GL_RGB16UI, GL_RGB_INTEGER, GL_UNSIGNED_SHORT, 16, 16, 16, 0, 0, 0, false},
