@@ -19,7 +19,7 @@ TEST_CASE("Populate a dynamic array", "[dynarr_populate]") {
   std::vector<point> check_array;
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<> d(0.0, 1.0);
+  std::uniform_real_distribution<float> d(0.0, 1.0);
   _NGF_DARRAY_RESET(pt_array, 100u);
   uint32_t ntests = pt_array.capacity + 1000u;
   for (uint32_t i = 0u; i < ntests; ++i) {
