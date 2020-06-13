@@ -51,3 +51,5 @@ set_target_properties(ngf_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_CURRENT_LIST_DIR}")
 set_target_properties(ngf_tests PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_LIST_DIR}")
+set_target_properties(ngf_tests PROPERTIES
+    CXX_STANDARD 17)
