@@ -498,11 +498,6 @@ typedef struct ngf_buffer_info {
 typedef enum ngf_buffer_map_flags {
   NGF_BUFFER_MAP_READ_BIT  = 0x01, /** < Mapped memory is readable. */
   NGF_BUFFER_MAP_WRITE_BIT = 0x02, /** < Mapped memory is writeable. */
-  /**
-   * When a buffer is mapped with this flag, its previous contents becomes
-   * undefined for any commands submitted after the mapping operation.
-   */
-  NGF_BUFFER_MAP_DISCARD_BIT = 0x04 
 } ngf_buffer_map_flags;
 
 /**
