@@ -1452,8 +1452,6 @@ void* _ngf_buffer_map_range(GLenum bind_target,
   if (flags & NGF_BUFFER_MAP_READ_BIT) map_access |= GL_MAP_READ_BIT;
   if (flags & NGF_BUFFER_MAP_WRITE_BIT) map_access |= GL_MAP_WRITE_BIT |
                                                       GL_MAP_FLUSH_EXPLICIT_BIT;
-  if (flags & NGF_BUFFER_MAP_DISCARD_BIT)
-    map_access |= GL_MAP_INVALIDATE_BUFFER_BIT;
   return glMapBufferRange(bind_target, (GLintptr)offset, (GLsizeiptr)size,
                           map_access);
 }
