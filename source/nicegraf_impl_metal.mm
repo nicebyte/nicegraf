@@ -263,6 +263,24 @@ static MTLStencilOperation get_mtl_stencil_op(ngf_stencil_op op) {
   return stencil_ops[op];
 }
 
+static MTLCullMode get_mtl_culling(ngf_cull_mode c) {
+  static const MTLCullMode cull_modes[NGF_CULL_MODE_COUNT] = {
+    MTLCullModeBack,
+    MTLCullModeFront,
+    MTLCullModeNone, /* Metal has no front + back culling */
+    MTLCullModeNone
+  };
+  return cull_modes[c];
+}
+
+static MTLWinding get_mtl_winding(ngf_front_face_mode w) {
+  static const MTLWinding windings[NGF_FRONT_FACE_COUNT] = {
+    MTLWindingCounterClockwise,
+    MTLWindingClockwise
+  };
+  return windings[w];
+}
+
 static std::optional<MTLTextureType> get_mtl_texture_type(ngf_image_type type,
                                                           uint32_t nlayers) {
   if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1) {
@@ -470,6 +488,8 @@ struct ngf_graphics_pipeline_t {
   uint32_t back_stencil_reference  = 0u;
   
   MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
+  MTLWinding       winding        = MTLWindingCounterClockwise;
+  MTLCullMode      culling        = MTLCullModeBack;
   
  _ngf_native_binding_map   binding_map = nullptr;
   ngf_pipeline_layout_info layout;
@@ -1049,6 +1069,10 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   pipeline->primitive_type = *prim_type;
   
+  // Set winding order and culling mode.
+  pipeline->winding = get_mtl_winding(info->rasterization->front_face);
+  pipeline->culling = get_mtl_culling(info->rasterization->cull_mode);
+  
   // Set up depth and stencil state.
   if (info->depth_stencil->depth_test) {
     auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
@@ -1483,6 +1507,8 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
                                const ngf_graphics_pipeline pipeline) {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
+  [buf->active_rce setCullMode:pipeline->culling];	
+  [buf->active_rce setFrontFacingWinding:pipeline->winding];
   if (pipeline->depth_stencil) {
     [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
   }
