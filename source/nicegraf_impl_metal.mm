@@ -1160,7 +1160,6 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t offset,
                                   size_t size,
                                   [[maybe_unused]] uint32_t flags) {
-  // TODO: handle discard flag
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
@@ -1189,7 +1188,6 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  [[maybe_unused]] uint32_t flags) {
-  // TODO: handle discard flag
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
@@ -1232,7 +1230,6 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t offset,
                                    size_t size,
                                    [[maybe_unused]] uint32_t flags) {
-  // TODO: handle discard flag
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
@@ -1273,7 +1270,6 @@ void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  [[maybe_unused]] uint32_t flags) {
-  // TODO: handle discard flag
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
