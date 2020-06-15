@@ -393,10 +393,7 @@ public:
 
   void write(const T &data) {
     current_offset_ = (frame_) * ALIGNED_SIZE;
-    const uint32_t flags =
-      (current_offset_ == 0u)
-          ? (NGF_BUFFER_MAP_WRITE_BIT | NGF_BUFFER_MAP_DISCARD_BIT)
-          :  NGF_BUFFER_MAP_WRITE_BIT;
+    const uint32_t flags = NGF_BUFFER_MAP_WRITE_BIT;
     void *mapped_buf = ngf_uniform_buffer_map_range(buf_.get(),
                                                     current_offset_,
                                                     ALIGNED_SIZE,
