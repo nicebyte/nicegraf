@@ -25,19 +25,19 @@ SOFTWARE.
 extern "C" {
 #endif
 
-typedef struct _ngf_sa_t {
+typedef struct ngfi_sa_t {
   uint8_t *ptr;
   size_t   capacity;
 #pragma warning(push)
 #pragma warning(disable:4200)
   uint8_t  data[];
 #pragma warning(pop)
-} _ngf_sa;
+} ngfi_sa;
 
 /**
  * creates a new stack allocator with the given capacity.
  */
-_ngf_sa* _ngf_sa_create(size_t capacity);
+ngfi_sa* ngfi_sa_create(size_t capacity);
 
 /**
  * allocates a specified amount of bytes from the given stack allocator
@@ -45,19 +45,19 @@ _ngf_sa* _ngf_sa_create(size_t capacity);
  * if the allocator has no available capacity to accomodate the request,
  * returns a null pointer.
  */
-void* _ngf_sa_alloc(_ngf_sa *allocator, size_t nbytes);
+void* ngfi_sa_alloc(ngfi_sa *allocator, size_t nbytes);
 
 
 /**
  * resets the state of the given stack allocator. capacity is fully restored,
  * all pointers to memory previously allocated are invalidated.
  */
-void _ngf_sa_reset(_ngf_sa *allocator);
+void ngfi_sa_reset(ngfi_sa *allocator);
 
 /**
  * tear down the given stack allocator.
  */
-void _ngf_sa_destroy(_ngf_sa *allocator);
+void ngfi_sa_destroy(ngfi_sa *allocator);
 
 #ifdef __cplusplus
 }

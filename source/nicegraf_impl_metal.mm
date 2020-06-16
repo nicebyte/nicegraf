@@ -491,7 +491,7 @@ struct ngf_graphics_pipeline_t {
   MTLWinding       winding        = MTLWindingCounterClockwise;
   MTLCullMode      culling        = MTLCullModeBack;
   
- _ngf_native_binding_map   binding_map = nullptr;
+  ngfi_native_binding_map   binding_map = nullptr;
   ngf_pipeline_layout_info layout;
 
   ~ngf_graphics_pipeline_t() {
@@ -505,7 +505,7 @@ struct ngf_graphics_pipeline_t {
       }
     }
     if (binding_map) {
-      _ngf_destroy_binding_map(binding_map);
+      ngfi_destroy_binding_map(binding_map);
     }
   }
 };
@@ -1020,7 +1020,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
            descriptor_set_layouts[s].ndescriptors);
   }
   ngf_error ngf_err =
-      _ngf_create_native_binding_map(info->layout,
+       ngfi_create_native_binding_map(info->layout,
                                      nullptr,
                                      nullptr,
                                     &pipeline->binding_map);
@@ -1570,8 +1570,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op &bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
-    const _ngf_native_binding *nb =
-        _ngf_binding_map_lookup(cmd_buf->active_pipe->binding_map,
+    const ngfi_native_binding *nb =
+         ngfi_binding_map_lookup(cmd_buf->active_pipe->binding_map,
                                 bind_op.target_set,
                                 bind_op.target_binding);
     if (nb == nullptr) {
