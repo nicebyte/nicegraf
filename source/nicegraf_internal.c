@@ -31,7 +31,7 @@ void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
 }
 
 void ngf_default_free(void *ptr, size_t s, size_t n) {
-  _NGF_FAKE_USE(s, n);
+  NGFI_FAKE_USE(s, n);
   free(ptr);
 }
 
@@ -68,8 +68,8 @@ struct _ngf_blkalloc_block { // The block itself.
   uint8_t                   data[];
 };
 
-struct _ngf_block_allocator {
- _NGF_DARRAY_OF(uint8_t*)  pools;
+struct ngfi_block_allocator {
+ NGFI_DARRAY_OF(uint8_t*)  pools;
  _ngf_blkalloc_block      *freelist;
   size_t                   block_size;
   uint32_t                 nblocks;
@@ -78,10 +78,10 @@ struct _ngf_block_allocator {
 
 static const uint32_t MARKER_MASK = (1u << 31);
 
-static void _ngf_blkallock_add_pool(_ngf_block_allocator *alloc) {
+static void _ngf_blkallock_add_pool(ngfi_block_allocator *alloc) {
  _ngf_blkalloc_block *old_freelist = alloc->freelist;
   const size_t        pool_size    = alloc->block_size * alloc->nblocks;
-  uint8_t            *pool         = NGF_ALLOCN(uint8_t, pool_size);
+  uint8_t            *pool         = NGFI_ALLOCN(uint8_t, pool_size);
 
   alloc->freelist = (_ngf_blkalloc_block*)pool;
   for (uint32_t b = 0u; b < alloc->nblocks; ++b) {
@@ -93,10 +93,10 @@ static void _ngf_blkallock_add_pool(_ngf_block_allocator *alloc) {
         (b < alloc->nblocks - 1u) ? next_blk : old_freelist;
     blk->header.marker_and_tag = (~MARKER_MASK) & alloc->tag;
   }
-  _NGF_DARRAY_APPEND(alloc->pools, pool);
+  NGFI_DARRAY_APPEND(alloc->pools, pool);
 }
 
-_ngf_block_allocator* _ngf_blkalloc_create(uint32_t requested_block_size,
+ngfi_block_allocator* _ngf_blkalloc_create(uint32_t requested_block_size,
                                            uint32_t nblocks) {
   static NGF_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
@@ -104,7 +104,7 @@ _ngf_block_allocator* _ngf_blkalloc_create(uint32_t requested_block_size,
     next_tag = (~MARKER_MASK) & (threadid << 16);
   }
 
-  _ngf_block_allocator *alloc = NGF_ALLOC(_ngf_block_allocator);
+  ngfi_block_allocator *alloc = NGFI_ALLOC(ngfi_block_allocator);
   if (alloc == NULL) { return NULL; }
 
   const size_t unaligned_block_size =
@@ -116,22 +116,22 @@ _ngf_block_allocator* _ngf_blkalloc_create(uint32_t requested_block_size,
   alloc->block_size = aligned_block_size;
   alloc->nblocks    = nblocks;
   alloc->tag        = next_tag++;
-  _NGF_DARRAY_RESET(alloc->pools, 8u);
+  NGFI_DARRAY_RESET(alloc->pools, 8u);
   alloc->freelist = NULL;
   _ngf_blkallock_add_pool(alloc);
   return alloc;
 }
 
-void _ngf_blkalloc_destroy(_ngf_block_allocator *alloc) {
-  for (uint32_t i = 0u; i < _NGF_DARRAY_SIZE(alloc->pools); ++i) {
-    uint8_t *pool = _NGF_DARRAY_AT(alloc->pools, i);
-    if (pool) { NGF_FREEN(pool, alloc->block_size * alloc->nblocks); }
+void ngfi_blkalloc_destroy(ngfi_block_allocator *alloc) {
+  for (uint32_t i = 0u; i < NGFI_DARRAY_SIZE(alloc->pools); ++i) {
+    uint8_t *pool = NGFI_DARRAY_AT(alloc->pools, i);
+    if (pool) { NGFI_FREEN(pool, alloc->block_size * alloc->nblocks); }
   }
-  _NGF_DARRAY_DESTROY(alloc->pools);
-  NGF_FREE(alloc);
+  NGFI_DARRAY_DESTROY(alloc->pools);
+  NGFI_FREE(alloc);
 }
 
-void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc) {
+void* ngfi_blkalloc_alloc(ngfi_block_allocator *alloc) {
   if (alloc->freelist == NULL) {
     _ngf_blkallock_add_pool(alloc);
   }
@@ -145,9 +145,9 @@ void* _ngf_blkalloc_alloc(_ngf_block_allocator *alloc) {
   return result;
 }
 
-_ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
+ngfi_blkalloc_error _ngf_blkalloc_free(ngfi_block_allocator *alloc,
                                         void *ptr) {
-  _ngf_blkalloc_error result = _NGF_BLK_NO_ERROR;
+  ngfi_blkalloc_error result = NGFI_BLK_NO_ERROR;
   if (ptr != NULL) {
     _ngf_blkalloc_block *blk = 
         (_ngf_blkalloc_block*)((uint8_t*)ptr -
@@ -157,13 +157,13 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
     uint32_t my_tag = alloc->tag;
     uint32_t blk_marker = MARKER_MASK & blk->header.marker_and_tag;
     if (blk_marker == 0u) {
-      result = _NGF_BLK_DOUBLE_FREE;
+      result = NGFI_BLK_DOUBLE_FREE;
     } else if (my_tag == blk_tag) {
       blk->header.next_free = alloc->freelist;
       blk->header.marker_and_tag &= (~MARKER_MASK);
       alloc->freelist = blk;
     } else {
-      result = _NGF_BLK_WRONG_ALLOCATOR;
+      result = NGFI_BLK_WRONG_ALLOCATOR;
     }
 #else
     blk->header.next_free = alloc->freelist;
@@ -173,10 +173,10 @@ _ngf_blkalloc_error _ngf_blkalloc_free(_ngf_block_allocator *alloc,
   return result;
 }
 
-const _ngf_native_binding* _ngf_binding_map_lookup(const _ngf_native_binding_map binding_map,
+const ngfi_native_binding* _ngf_binding_map_lookup(const ngfi_native_binding_map binding_map,
                                                    uint32_t set,
                                                    uint32_t binding) {
-  const _ngf_native_binding *set_map = binding_map[set];
+  const ngfi_native_binding *set_map = binding_map[set];
   uint32_t b_idx = 0u;
   while (set_map[b_idx].ngf_binding_id != binding &&
          set_map[b_idx].ngf_binding_id != (uint32_t)(-1)) ++b_idx;
@@ -186,27 +186,27 @@ const _ngf_native_binding* _ngf_binding_map_lookup(const _ngf_native_binding_map
   return &set_map[b_idx];
 }
 
-ngf_error _ngf_create_native_binding_map(
+ngf_error ngfi_create_native_binding_map(
     const ngf_pipeline_layout_info *layout,
     const ngf_plmd_cis_map *images_to_cis,
     const ngf_plmd_cis_map *samplers_to_cis,
-   _ngf_native_binding_map *result) {
+   ngfi_native_binding_map *result) {
   ngf_error err = NGF_ERROR_OK;
   uint32_t nmap_entries = layout->ndescriptor_set_layouts + 1;
-  _ngf_native_binding_map map =
-      NGF_ALLOCN(_ngf_native_binding*, nmap_entries);
+  ngfi_native_binding_map map =
+      NGFI_ALLOCN(ngfi_native_binding*, nmap_entries);
   *result = map;
   if (map == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto _ngf_create_native_binding_map_cleanup;
   }
   memset(map, 0,
-         sizeof(_ngf_native_binding*) * (nmap_entries));
+         sizeof(ngfi_native_binding*) * (nmap_entries));
   uint32_t total_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
   for (uint32_t set = 0u; set < layout->ndescriptor_set_layouts; ++set) {
     const ngf_descriptor_set_layout_info *set_layout =
         &layout->descriptor_set_layouts[set];
-    map[set] = NGF_ALLOCN(_ngf_native_binding,
+    map[set] = NGFI_ALLOCN(ngfi_native_binding,
                           set_layout->ndescriptors + 1u);
     if (map[set] == NULL) {
       err = NGF_ERROR_OUTOFMEM;
@@ -216,7 +216,7 @@ ngf_error _ngf_create_native_binding_map(
     for (uint32_t b = 0u; b < set_layout->ndescriptors; ++b) {
       const ngf_descriptor_info *desc_info = &set_layout->descriptors[b];
       const ngf_descriptor_type desc_type = desc_info->type;
-      _ngf_native_binding *mapping = &map[set][b];
+      ngfi_native_binding *mapping = &map[set][b];
       mapping->ngf_binding_id = desc_info->id;
       mapping->native_binding_id = total_c[desc_type]++;
       if ((desc_info->type == NGF_DESCRIPTOR_SAMPLER && samplers_to_cis) ||
@@ -235,7 +235,7 @@ ngf_error _ngf_create_native_binding_map(
         }
         if (combined_list) {
           mapping->cis_bindings =
-            NGF_ALLOCN(uint32_t, combined_list->ncombined_ids);
+            NGFI_ALLOCN(uint32_t, combined_list->ncombined_ids);
           if (mapping->cis_bindings == NULL) {
             err = NGF_ERROR_OUTOFMEM;
             goto _ngf_create_native_binding_map_cleanup;
@@ -256,20 +256,20 @@ ngf_error _ngf_create_native_binding_map(
 
 _ngf_create_native_binding_map_cleanup:
   if (err != NGF_ERROR_OK) {
-    _ngf_destroy_binding_map(map);
+    ngfi_destroy_binding_map(map);
   }
   return err;
 }
 
-void _ngf_destroy_binding_map(_ngf_native_binding_map map) {
+void ngfi_destroy_binding_map(ngfi_native_binding_map map) {
   if (map != NULL) {
     for (uint32_t i = 0; map[i] != NULL; ++i) {
-      _ngf_native_binding *set = map[i];
+      ngfi_native_binding *set = map[i];
       if (set->cis_bindings) {
-        NGF_FREEN(set->cis_bindings, set->ncis_bindings);
+        NGFI_FREEN(set->cis_bindings, set->ncis_bindings);
       }
-      NGF_FREE(set);
+      NGFI_FREE(set);
     }
-    NGF_FREE(map);
+    NGFI_FREE(map);
   }
 }

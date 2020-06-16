@@ -65,7 +65,7 @@ struct ngf_graphics_pipeline_t {
   uint32_t nvert_buf_bindings;
   GLenum primitive_type;
   uint32_t ndescriptors_layouts;
-  _ngf_native_binding_map binding_map;
+  ngfi_native_binding_map binding_map;
   GLuint owned_stages[NGF_STAGE_COUNT];
   uint32_t nowned_stages;
 };
@@ -94,7 +94,7 @@ struct ngf_context_t {
   EGLSurface surface;
   struct {
     struct ngf_graphics_pipeline_t pipeline;
-    _NGF_DARRAY_OF(_ngf_vbuf_binding_info) vbuf_table;
+    NGFI_DARRAY_OF(_ngf_vbuf_binding_info) vbuf_table;
      GLuint bound_index_buffer;
   } cached_state;
   bool has_bound_pipeline;
@@ -260,7 +260,7 @@ struct ngf_cmd_buffer_t {
   _ngf_cmd_block *first_cmd_block;
   _ngf_cmd_block *last_cmd_block;
   bool renderpass_active;
-  _ngf_cmd_buffer_state state;
+  ngfi_cmd_buffer_state state;
 };
 #pragma endregion
 
@@ -496,14 +496,14 @@ void GL_APIENTRY ngf_gl_debug_callback(GLenum source,
                                        GLsizei length,
                                        const GLchar* message,
                                        const void* userdata) {
-  _NGF_FAKE_USE(length, severity, source, type, id);
+  NGFI_FAKE_USE(length, severity, source, type, id);
   if (NGF_DEBUG_CALLBACK) {
     NGF_DEBUG_CALLBACK(message, userdata);
   }
 }
 
 ngf_error ngf_initialize(ngf_device_preference dev_pref) {
-  _NGF_FAKE_USE(dev_pref);
+  NGFI_FAKE_USE(dev_pref);
   return NGF_ERROR_OK;
 }
 
@@ -516,7 +516,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   const ngf_swapchain_info *swapchain_info = info->swapchain_info;
   const ngf_context shared = info->shared_context;
 
-  *result = NGF_ALLOC(struct ngf_context_t);
+  *result = NGFI_ALLOC(struct ngf_context_t);
   ngf_context ctx = *result;
   if (ctx == NULL) {
     err_code = NGF_ERROR_OUTOFMEM;
@@ -620,7 +620,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   }
 
   ctx->has_bound_pipeline = false;
-  _NGF_DARRAY_RESET(ctx->cached_state.vbuf_table, 10);
+  NGFI_DARRAY_RESET(ctx->cached_state.vbuf_table, 10);
   ctx->cached_state.bound_index_buffer = GL_NONE;
 
 ngf_create_context_cleanup:
@@ -634,12 +634,12 @@ ngf_create_context_cleanup:
 ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t new_width,
                              uint32_t new_height) {
-  _NGF_FAKE_USE(ctx, new_width, new_height);
+  NGFI_FAKE_USE(ctx, new_width, new_height);
   return NGF_ERROR_OK;
 }
 
 NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
-NGF_THREADLOCAL _ngf_block_allocator *COMMAND_POOL = NULL;
+NGF_THREADLOCAL ngfi_block_allocator *COMMAND_POOL = NULL;
 
 ngf_error ngf_set_context(ngf_context ctx) {
   assert(ctx);
@@ -675,8 +675,8 @@ void ngf_destroy_context(ngf_context ctx) {
       eglDestroySurface(ctx->dpy, ctx->surface);
     }
     eglTerminate(ctx->dpy);
-    _NGF_DARRAY_DESTROY(ctx->cached_state.vbuf_table);
-    NGF_FREE(ctx);
+    NGFI_DARRAY_DESTROY(ctx->cached_state.vbuf_table);
+    NGFI_FREE(ctx);
   }
 }
 
@@ -694,7 +694,7 @@ ngf_error _ngf_check_link_status(GLuint program, const char *debug_name) {
                           info_log);
       if (debug_name) {
         char msg[100];
-        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error linking %s",
+        snprintf(msg, NGFI_ARRAYSIZE(msg) - 1, "Error linking %s",
                  debug_name);
         NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
       }
@@ -754,10 +754,10 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
         "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx";
 
     // Allocate enough space to hold all the #defines.
-    const uint32_t spec_define_max_size = NGF_ARRAYSIZE(spec_define_template);
+    const uint32_t spec_define_max_size = NGFI_ARRAYSIZE(spec_define_template);
     const uint32_t defines_buffer_size =
         spec_define_max_size * spec_info->nspecializations;
-    defines_buffer = NGF_ALLOCN(char, defines_buffer_size);
+    defines_buffer = NGFI_ALLOCN(char, defines_buffer_size);
     if (defines_buffer == NULL) {
       err = NGF_ERROR_OUTOFMEM;
       goto _ngf_compile_shader_cleanup;
@@ -836,7 +836,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       glGetShaderInfoLog(shader, info_log_length, &info_log_length, info_log);
       if (debug_name) {
         char msg[100];
-        snprintf(msg, NGF_ARRAYSIZE(msg) - 1, "Error compiling %s",
+        snprintf(msg, NGFI_ARRAYSIZE(msg) - 1, "Error compiling %s",
                  debug_name);
         NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
       }
@@ -861,7 +861,7 @@ _ngf_compile_shader_cleanup:
     glDeleteShader(shader);
   }
   if (defines_buffer != NULL) {
-    NGF_FREEN(defines_buffer, spec_info->nspecializations);
+    NGFI_FREEN(defines_buffer, spec_info->nspecializations);
   }
   if (err != NGF_ERROR_OK && *result != GL_NONE) {
     glDeleteProgram(*result);
@@ -875,7 +875,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   assert(result);
   ngf_error err = NGF_ERROR_OK;
   ngf_shader_stage stage = NULL;
-  *result = NGF_ALLOC(struct ngf_shader_stage_t);
+  *result = NGFI_ALLOC(struct ngf_shader_stage_t);
   stage = *result;
   if (stage == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -887,7 +887,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   stage->source_code_size = 0u;
   // Save off the source code in case we need to recompile for pipelines
   // doing specialization.
-  stage->source_code = NGF_ALLOCN(char, info->content_length);
+  stage->source_code = NGFI_ALLOCN(char, info->content_length);
   if (stage->source_code == NULL) {
     err = NGF_ERROR_OUTOFMEM;
     goto ngf_create_shader_stage_cleanup;
@@ -908,9 +908,9 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage != NULL) {
     glDeleteProgram(stage->glprogram);
     if (stage->source_code != NULL) {
-      NGF_FREEN(stage->source_code, (size_t)stage->source_code_size);
+      NGFI_FREEN(stage->source_code, (size_t)stage->source_code_size);
     }
-    NGF_FREE(stage);
+    NGFI_FREE(stage);
   }
 }
 
@@ -930,7 +930,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   static uint32_t global_id = 0;
   ngf_error err = NGF_ERROR_OK;
 
-  *result = NGF_ALLOC(struct ngf_graphics_pipeline_t);
+  *result = NGFI_ALLOC(struct ngf_graphics_pipeline_t);
   ngf_graphics_pipeline pipeline = *result;
   if (pipeline == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -951,7 +951,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->nvert_buf_bindings = input->nvert_buf_bindings;
   if (input->nvert_buf_bindings > 0) {
     ngf_vertex_buf_binding_desc *vert_buf_bindings =
-        NGF_ALLOCN(ngf_vertex_buf_binding_desc,
+        NGFI_ALLOCN(ngf_vertex_buf_binding_desc,
                    input->nvert_buf_bindings);
     pipeline->vert_buf_bindings = vert_buf_bindings;
     if (pipeline->vert_buf_bindings == NULL) {
@@ -968,7 +968,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Create a map of NGF -> OpenGL resource bindings.
   const ngf_pipeline_layout_info *pipeline_layout = info->layout;
   pipeline->ndescriptors_layouts = pipeline_layout->ndescriptor_set_layouts;
-  err = _ngf_create_native_binding_map(pipeline_layout,
+  err = ngfi_create_native_binding_map(pipeline_layout,
                                        info->image_to_combined_map,
                                        info->sampler_to_combined_map,
                                        &pipeline->binding_map);
@@ -998,7 +998,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
 
   // Create and configure the program pipeline object with the provided
   // shader stages.
-  if (info->nshader_stages >= NGF_ARRAYSIZE(info->shader_stages)) {
+  if (info->nshader_stages >= NGFI_ARRAYSIZE(info->shader_stages)) {
     err = NGF_ERROR_OUT_OF_BOUNDS;
     goto ngf_create_pipeline_cleanup;
   }
@@ -1048,15 +1048,15 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) {
   if (pipeline) {
     if (pipeline->nvert_buf_bindings > 0 &&
         pipeline->vert_buf_bindings) {
-      NGF_FREEN(pipeline->vert_buf_bindings, pipeline->nvert_buf_bindings);
+      NGFI_FREEN(pipeline->vert_buf_bindings, pipeline->nvert_buf_bindings);
     }
-    _ngf_destroy_binding_map(pipeline->binding_map);
+    ngfi_destroy_binding_map(pipeline->binding_map);
     glDeleteProgramPipelines(1, &pipeline->program_pipeline);
     glDeleteVertexArrays(1, &pipeline->vao);
     for (uint32_t s = 0u; s < pipeline->nowned_stages; ++s) {
       glDeleteProgram(pipeline->owned_stages[s]);
     }
-    NGF_FREEN(pipeline, 1);
+    NGFI_FREEN(pipeline, 1);
   }
 }
 
@@ -1064,7 +1064,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   assert(info);
   assert(result);
 
-  *result = NGF_ALLOC(struct ngf_image_t);
+  *result = NGFI_ALLOC(struct ngf_image_t);
   ngf_image image = *result;
   if (image == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1172,7 +1172,7 @@ void ngf_destroy_image(ngf_image image) {
     } else {
       glDeleteRenderbuffers(1, &(image->glimage));
     }
-    NGF_FREE(image);
+    NGFI_FREE(image);
   }
 }
 
@@ -1181,7 +1181,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   assert(info);
   assert(result);
 
-  *result = NGF_ALLOC(struct ngf_sampler_t);
+  *result = NGFI_ALLOC(struct ngf_sampler_t);
   ngf_sampler sampler = *result;
   if (sampler == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1216,7 +1216,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
 void ngf_destroy_sampler(ngf_sampler sampler) {
   assert(sampler);
   glDeleteSamplers(1, &(sampler->glsampler));
-  NGF_FREE(sampler);
+  NGFI_FREE(sampler);
 }
 
 ngf_error ngf_default_render_target(
@@ -1230,7 +1230,7 @@ ngf_error ngf_default_render_target(
   assert(result);
   if (CURRENT_CONTEXT->has_swapchain) {
     ngf_render_target default_render_target =
-      (ngf_render_target)NGF_ALLOCN(uint8_t,
+      (ngf_render_target)NGFI_ALLOCN(uint8_t,
                                     offsetof(struct ngf_render_target_t,
                                              attachment_infos) +
                                      3u * sizeof(ngf_attachment));
@@ -1277,7 +1277,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   assert(info->nattachments < 7);
 
   ngf_error err = NGF_ERROR_OK;
-  *result = (ngf_render_target) NGF_ALLOCN(uint8_t,
+  *result = (ngf_render_target) NGFI_ALLOCN(uint8_t,
                                            offsetof(struct ngf_render_target_t,
                                                     attachment_infos) +
                                               sizeof(ngf_attachment) *
@@ -1363,7 +1363,7 @@ void ngf_destroy_render_target(ngf_render_target render_target) {
     if (render_target->framebuffer != 0) {
       glDeleteFramebuffers(1, &(render_target->framebuffer));
     }
-    NGF_FREE(render_target);
+    NGFI_FREE(render_target);
   }
 }
 
@@ -1448,7 +1448,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer *result) {
   assert(info);
   assert(result);
-  *result = NGF_ALLOC(struct ngf_attrib_buffer_t);
+  *result = NGFI_ALLOC(struct ngf_attrib_buffer_t);
   ngf_attrib_buffer buf = *result;
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1460,7 +1460,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) {
   if (buf != NULL) {
     glDeleteBuffers(1u, &buf->glbuffer);
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1491,7 +1491,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                   ngf_index_buffer *result) {
   assert(info);
   assert(result);
-  *result = NGF_ALLOC(struct ngf_index_buffer_t);
+  *result = NGFI_ALLOC(struct ngf_index_buffer_t);
   ngf_index_buffer buf = *result;
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1503,7 +1503,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
 void ngf_destroy_index_buffer(ngf_index_buffer buf) {
   if (buf != NULL) {
     glDeleteBuffers(1u, &buf->glbuffer);
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1534,7 +1534,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer *result) {
   assert(info);
   assert(result);
-  *result = NGF_ALLOC(struct ngf_uniform_buffer_t);
+  *result = NGFI_ALLOC(struct ngf_uniform_buffer_t);
   ngf_uniform_buffer buf = *result;
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1546,7 +1546,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
 void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) {
   if (buf != NULL) {
     glDeleteBuffers(1u, &buf->glbuffer);
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1579,7 +1579,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
                                   ngf_pixel_buffer *result) {
   assert(info);
   assert(result);
-  *result = NGF_ALLOC(struct ngf_pixel_buffer_t);
+  *result = NGFI_ALLOC(struct ngf_pixel_buffer_t);
   ngf_pixel_buffer buf = *result;
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
@@ -1623,25 +1623,25 @@ void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) {
 void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
   if (buf != NULL) {
     glDeleteBuffers(1, &buf->glbuffer);
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
                                 ngf_cmd_buffer *result) {
-  _NGF_FAKE_USE(info);
+  NGFI_FAKE_USE(info);
   assert(result);
   if (COMMAND_POOL == NULL) {
     COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_cmd_block), 100);
   }
   ngf_error err = NGF_ERROR_OK;
-  *result = NGF_ALLOC(struct ngf_cmd_buffer_t);
+  *result = NGFI_ALLOC(struct ngf_cmd_buffer_t);
   ngf_cmd_buffer buf = *result;
   if (buf == NULL) {
     err = NGF_ERROR_OUTOFMEM;
   }
   buf->first_cmd_block = buf->last_cmd_block = NULL;
-  buf->state = _NGF_CMD_BUFFER_READY;
+  buf->state = NGFI_CMD_BUFFER_READY;
   buf->renderpass_active = false;
   return err;
 }
@@ -1661,23 +1661,23 @@ void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer buf) {
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
   if (buf != NULL) {
     _ngf_cmd_buffer_free_cmds(buf);
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   assert(buf);
-  if (buf->state != _NGF_CMD_BUFFER_READY) {
+  if (buf->state != NGFI_CMD_BUFFER_READY) {
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
   ngf_error err = NGF_ERROR_OK;
   if (buf->first_cmd_block != NULL) {
     _ngf_cmd_buffer_free_cmds(buf);
   }
-  buf->first_cmd_block = _ngf_blkalloc_alloc(COMMAND_POOL);
+  buf->first_cmd_block = ngfi_blkalloc_alloc(COMMAND_POOL);
   if (buf->first_cmd_block == NULL) {
     err = NGF_ERROR_OUTOFMEM;
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   } else {
     buf->first_cmd_block->next_cmd_idx = 0u;
     buf->first_cmd_block->next = NULL;
@@ -1688,7 +1688,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
 }
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
                                       ngf_render_encoder *enc) {
-  if (buf->state != _NGF_CMD_BUFFER_READY) {
+  if (buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
@@ -1698,7 +1698,7 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
                                     ngf_xfer_encoder *enc) {
-  if (buf->state != _NGF_CMD_BUFFER_READY) {
+  if (buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
@@ -1722,7 +1722,7 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
 #define _NGF_NEWCMD(enc, cmd) {\
   ngf_cmd_buffer buf = (ngf_cmd_buffer)(void*)enc.__handle; \
   if (buf->last_cmd_block->next_cmd_idx == _NGF_CMDS_PER_CMD_BLOCK) { \
-    buf->last_cmd_block->next = _ngf_blkalloc_alloc(COMMAND_POOL); \
+    buf->last_cmd_block->next = ngfi_blkalloc_alloc(COMMAND_POOL); \
     buf->last_cmd_block = buf->last_cmd_block->next; \
     buf->last_cmd_block->next = NULL; \
     buf->last_cmd_block->next_cmd_idx = 0u; \
@@ -1805,7 +1805,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   ngf_cmd_buffer cmdbuf = (ngf_cmd_buffer)enc.__handle;
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op *bind_op = &bind_ops[o];
-    const _ngf_native_binding *native_binding =
+    const ngfi_native_binding *native_binding =
         _ngf_binding_map_lookup(cmdbuf->bound_pipeline->binding_map,
                                 bind_op->target_set,
                                 bind_op->target_binding);
@@ -2024,7 +2024,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                                           NGF_DYNAMIC_STATE_VIEWPORT;
             if (!viewport_dynamic &&
                 (!bound_pipe ||
-                 !NGF_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport))) {
+                 !NGFI_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport))) {
               glViewport((GLsizei)pipeline->viewport.x,
                          (GLsizei)pipeline->viewport.y,
                          (GLsizei)pipeline->viewport.width,
@@ -2036,7 +2036,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                                          NGF_DYNAMIC_STATE_SCISSOR;
             if (!scissor_dynamic &&
                 (!bound_pipe ||
-                 !NGF_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor))) {
+                 !NGFI_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor))) {
               glScissor((GLsizei)pipeline->scissor.x,
                         (GLsizei)pipeline->scissor.y,
                         (GLsizei)pipeline->scissor.width,
@@ -2127,9 +2127,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             if (!prev_depth_stencil ||
                  prev_depth_stencil->stencil_test !=
                    depth_stencil->stencil_test ||
-                !NGF_STRUCT_EQ(prev_depth_stencil->back_stencil,
+                !NGFI_STRUCT_EQ(prev_depth_stencil->back_stencil,
                                depth_stencil->back_stencil) ||
-                !NGF_STRUCT_EQ(prev_depth_stencil->front_stencil,
+                !NGFI_STRUCT_EQ(prev_depth_stencil->front_stencil,
                                depth_stencil->front_stencil)) {
               if (depth_stencil->stencil_test) {
                 glEnable(GL_STENCIL_TEST);
@@ -2190,11 +2190,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               glBindVertexArray(pipeline->vao);
               // Keep the same set of attribute buffers bound despite VAO change.
               const size_t nvbuf_table_entries =
-                  _NGF_DARRAY_SIZE(CURRENT_CONTEXT->cached_state.vbuf_table);
+                  NGFI_DARRAY_SIZE(CURRENT_CONTEXT->cached_state.vbuf_table);
               for (size_t e = 0; e < nvbuf_table_entries; ++e) {
                 bool found_binding = false;
                 const _ngf_vbuf_binding_info *vbuf_table_entry =
-                    &_NGF_DARRAY_AT(CURRENT_CONTEXT->cached_state.vbuf_table,
+                    &NGFI_DARRAY_AT(CURRENT_CONTEXT->cached_state.vbuf_table,
                                     e);
                 // Update only bindings relevant to this pipeline.
                 for (uint32_t b = 0;
@@ -2311,13 +2311,13 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               : NULL;
 
           // Update the table of bound attrib buffers.
-          const size_t nvbuf_table_entries = _NGF_DARRAY_SIZE(
+          const size_t nvbuf_table_entries = NGFI_DARRAY_SIZE(
               CURRENT_CONTEXT->cached_state.vbuf_table);
           bool vbuf_table_entry_found = false;
           for (size_t e = 0;
                !vbuf_table_entry_found && e < nvbuf_table_entries;
                ++e) { // Try to find and update vertex buffer table entry.
-            _ngf_vbuf_binding_info *vbuf_table_entry = &_NGF_DARRAY_AT(
+            _ngf_vbuf_binding_info *vbuf_table_entry = &NGFI_DARRAY_AT(
                 CURRENT_CONTEXT->cached_state.vbuf_table,
                 e);
             if (vbuf_table_entry->binding == cmd->attrib_buffer_bind_op.binding) {
@@ -2334,7 +2334,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               .buffer = cmd->attrib_buffer_bind_op.buf->glbuffer,
               .offset = cmd->attrib_buffer_bind_op.offset
             };
-            _NGF_DARRAY_APPEND(CURRENT_CONTEXT->cached_state.vbuf_table,
+            NGFI_DARRAY_APPEND(CURRENT_CONTEXT->cached_state.vbuf_table,
                                new_entry);
           }
           
