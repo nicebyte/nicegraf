@@ -464,7 +464,7 @@ struct ngf_render_target_t {
 };
 
 struct ngf_cmd_buffer_t {
-  _ngf_cmd_buffer_state state = _NGF_CMD_BUFFER_READY;
+  ngfi_cmd_buffer_state state = NGFI_CMD_BUFFER_READY;
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
   id<MTLBlitCommandEncoder> active_bce = nil;
@@ -500,7 +500,7 @@ struct ngf_graphics_pipeline_t {
          s < layout.ndescriptor_set_layouts;
          ++s) {
       if (layout.descriptor_set_layouts[s].descriptors != nullptr) {
-        NGF_FREEN(layout.descriptor_set_layouts[s].descriptors,
+        NGFI_FREEN(layout.descriptor_set_layouts[s].descriptors,
                   layout.descriptor_set_layouts[s].ndescriptors);
       }
     }
@@ -566,7 +566,7 @@ private:
 
 #define _NGF_NURSERY(type, name) \
 _ngf_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
-    name(NGF_ALLOC(ngf_##type##_t));
+    name(NGFI_ALLOC(ngf_##type##_t));
 
 #pragma mark ngf_function_implementations
 
@@ -712,7 +712,7 @@ void ngf_destroy_context(ngf_context ctx) {
   // TODO: unset current context
   assert(ctx);
   ctx->~ngf_context_t();
-  NGF_FREE(ctx);
+  NGFI_FREE(ctx);
 }
 
 ngf_error ngf_resize_context(ngf_context ctx,
@@ -785,7 +785,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
 void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage != nullptr) {
     stage->~ngf_shader_stage_t();
-    NGF_FREE(stage);
+    NGFI_FREE(stage);
   }
 }
 
@@ -856,7 +856,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
 void ngf_destroy_render_target(ngf_render_target rt) {
   if (rt != nullptr) {
     rt->~ngf_render_target_t();
-    NGF_FREE(rt);
+    NGFI_FREE(rt);
   }
 }
 
@@ -999,7 +999,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->layout.ndescriptor_set_layouts =
       info->layout->ndescriptor_set_layouts;
   ngf_descriptor_set_layout_info *descriptor_set_layouts =
-      NGF_ALLOCN(ngf_descriptor_set_layout_info,
+      NGFI_ALLOCN(ngf_descriptor_set_layout_info,
                  info->layout->ndescriptor_set_layouts);
   pipeline->layout.descriptor_set_layouts = descriptor_set_layouts;
   if (pipeline->layout.descriptor_set_layouts == nullptr) {
@@ -1011,7 +1011,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     descriptor_set_layouts[s].ndescriptors =
         info->layout->descriptor_set_layouts[s].ndescriptors;
     ngf_descriptor_info *descriptors  =
-        NGF_ALLOCN(ngf_descriptor_info, descriptor_set_layouts->ndescriptors);
+        NGFI_ALLOCN(ngf_descriptor_info, descriptor_set_layouts->ndescriptors);
     descriptor_set_layouts[s].descriptors = descriptors;
     if (descriptors == nullptr) return NGF_ERROR_OUTOFMEM;
     memcpy(descriptors,
@@ -1074,7 +1074,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) {
   if (pipe != nullptr) {
     pipe->~ngf_graphics_pipeline_t();
-    NGF_FREE(pipe);
+    NGFI_FREE(pipe);
   }
 }
 
@@ -1121,7 +1121,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) {
   if (buf != nullptr) {
     buf->~ngf_attrib_buffer_t();
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1176,7 +1176,7 @@ void ngf_index_buffer_unmap([[maybe_unused]] ngf_index_buffer buf) {}
 void ngf_destroy_index_buffer(ngf_index_buffer buf) {
   if (buf != nullptr) {
     buf->~ngf_index_buffer_t();
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1191,7 +1191,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
 void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) {
   if (buf != nullptr) {
     buf->~ngf_uniform_buffer_t();
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1231,7 +1231,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
 void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
   if (buf != nullptr) {
     buf->~ngf_pixel_buffer_t();
-    NGF_FREE(buf);
+    NGFI_FREE(buf);
   }
 }
 
@@ -1283,7 +1283,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
 void ngf_destroy_sampler(ngf_sampler sampler) {
   if (sampler) {
     sampler->~ngf_sampler_t();
-    NGF_FREE(sampler);
+    NGFI_FREE(sampler);
   }
 }
 
@@ -1346,14 +1346,14 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
 void ngf_destroy_image(ngf_image image) {
   if (image != nullptr) {
     image->~ngf_image_t();
-    NGF_FREE(image);
+    NGFI_FREE(image);
   }
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
   if (cmd_buffer != nullptr) {
     cmd_buffer->~ngf_cmd_buffer_t();
-    NGF_FREE(cmd_buffer);
+    NGFI_FREE(cmd_buffer);
   }
 }
 
@@ -1363,7 +1363,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
   cmd_buffer->active_rce = nil;
   cmd_buffer->active_bce = nil;
-  cmd_buffer->state = _NGF_CMD_BUFFER_READY;
+  cmd_buffer->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
@@ -1379,56 +1379,56 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
       CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
     }
     cmd_buffers[b]->mtl_cmd_buffer = nil;
-    cmd_buffers[b]->state =  _NGF_CMD_BUFFER_SUBMITTED;
+    cmd_buffers[b]->state =  NGFI_CMD_BUFFER_SUBMITTED;
   }
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
                                       ngf_render_encoder *enc) {
-  if (cmd_buf->state != _NGF_CMD_BUFFER_READY) {
+  if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
-  cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
+  cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
   enc->__handle = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if(cmd_buf->state != _NGF_CMD_BUFFER_RECORDING) {
+  if(cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
   if (cmd_buf->active_rce){
     [cmd_buf->active_rce endEncoding];
     cmd_buf->active_rce = nil;
   }
-  cmd_buf->state = _NGF_CMD_BUFFER_READY;
+  cmd_buf->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
                                     ngf_xfer_encoder *enc) {
-  if (cmd_buf->state != _NGF_CMD_BUFFER_READY) {
+  if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
-  cmd_buf->state = _NGF_CMD_BUFFER_RECORDING;
+  cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
   enc->__handle = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if (cmd_buf->state != _NGF_CMD_BUFFER_RECORDING) {
+  if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
   }
   if (cmd_buf->active_bce) {
     [cmd_buf->active_bce endEncoding];
     cmd_buf->active_bce = nil;
   }
-  cmd_buf->state = _NGF_CMD_BUFFER_READY;
+  cmd_buf->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
@@ -1571,7 +1571,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     const ngf_resource_bind_op &bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
     const ngfi_native_binding *nb =
-         ngfi_binding_map_lookup(cmd_buf->active_pipe->binding_map,
+         _ngf_binding_map_lookup(cmd_buf->active_pipe->binding_map,
                                 bind_op.target_set,
                                 bind_op.target_binding);
     if (nb == nullptr) {
