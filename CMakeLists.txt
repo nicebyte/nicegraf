@@ -61,14 +61,14 @@ ngf_lib_target(NAME nicegraf_internal
                     ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c
                DEPS ngf_metadata_parser)
 
-# Common dependencies used by nicegraf on all platforms.
-set(NICEGRAF_COMMON_DEPS nicegraf_internal ngf_metadata_parser)
-
 # nicegraf utility library.
 ngf_lib_target(NAME nicegraf_util
            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_util.c
            DEPS nicegraf_internal)
+
+# Common dependencies used by nicegraf on all platforms.
+set(NICEGRAF_COMMON_DEPS nicegraf_internal ngf_metadata_parser)
 
 if (APPLE)
   # Find apple-specific system libs.
