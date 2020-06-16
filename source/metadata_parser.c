@@ -33,8 +33,8 @@
 #endif
 
 static const ngf_plmd_alloc_callbacks stdlib_alloc = {
-  .alloc = malloc,
-  .free = free
+  .allocate = malloc,
+  .deallocate = free
 };
 
 struct ngf_plmd {
@@ -51,7 +51,7 @@ static ngf_plmd_error _create_cis_map(uint8_t *ptr,
                                   ngf_plmd_cis_map *map) {
   assert(ptr);
   map->nentries = *(uint32_t*)ptr;
-  map->entries = cb->alloc(map->nentries * sizeof(ngf_plmd_cis_map_entry*));
+  map->entries = cb->allocate(map->nentries * sizeof(ngf_plmd_cis_map_entry*));
   if (map->entries == NULL) {
     return NGF_PLMD_ERROR_OUTOFMEM;
   }
@@ -90,7 +90,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
                                                        // blocks in the buffer.
 
   // Allocate space for the result.
-  meta = alloc_cb->alloc(sizeof(ngf_plmd));
+  meta = alloc_cb->allocate(sizeof(ngf_plmd));
   if (result == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -99,7 +99,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
   *result = meta;
 
   // Create a copy of the metadata buffer.
-  meta->raw_data = alloc_cb->alloc(buf_size);
+  meta->raw_data = alloc_cb->allocate(buf_size);
   if (meta->raw_data == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -149,7 +149,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
       &meta->raw_data[header->pipeline_layout_offset];
   const uint32_t nsets = *(const uint32_t*)pipeline_layout_ptr;
   meta->layout.ndescriptor_sets = nsets;
-  meta->layout.set_layouts = alloc_cb->alloc(sizeof(void*) * nsets);
+  meta->layout.set_layouts = alloc_cb->allocate(sizeof(void*) * nsets);
   if (meta->layout.set_layouts == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -175,7 +175,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
   meta->user.nentries = 
       *(uint32_t*)&meta->raw_data[header->user_metadata_offset];
   meta->user.entries =
-      alloc_cb->alloc(sizeof(ngf_plmd_user_entry) * meta->user.nentries);
+      alloc_cb->allocate(sizeof(ngf_plmd_user_entry) * meta->user.nentries);
   if (meta->user.entries == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -206,21 +206,21 @@ void ngf_plmd_destroy(ngf_plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb) {
   }
   if (m != NULL) {
     if (m->raw_data != NULL) {
-      alloc_cb->free(m->raw_data);
+      alloc_cb->deallocate(m->raw_data);
     }
     if (m->layout.set_layouts != NULL) {
-      alloc_cb->free((void*)m->layout.set_layouts);
+      alloc_cb->deallocate((void*)m->layout.set_layouts);
     }
     if (m->images_to_cis_map.entries != NULL) {
-      alloc_cb->free((void*)m->images_to_cis_map.entries);
+      alloc_cb->deallocate((void*)m->images_to_cis_map.entries);
     }
     if (m->samplers_to_cis_map.entries != NULL) {
-      alloc_cb->free((void*)m->samplers_to_cis_map.entries);
+      alloc_cb->deallocate((void*)m->samplers_to_cis_map.entries);
     }
     if (m->user.entries != NULL) {
-      alloc_cb->free((void*)m->user.entries);
+      alloc_cb->deallocate((void*)m->user.entries);
     }
-    alloc_cb->free(m);
+    alloc_cb->deallocate(m);
   }
 }
 
