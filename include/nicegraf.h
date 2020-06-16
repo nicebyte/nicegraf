@@ -80,17 +80,6 @@ typedef enum ngf_error {
   NGF_ERROR_CONTEXT_ALREADY_CURRENT,
   NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
 
-  /** Specialization parameters were passed for a pipeline that uses shader
-   stages created from binaries on a backend that does not support
-   specialization constants natively. */
-  NGF_ERROR_CANNOT_SPECIALIZE_SHADER_STAGE_BINARY,
-
-  /** The specified binary format is not supported by the system.*/
-  NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT,
-
-  /** Current backend does not support reading back shader stage binaries.*/
-  NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY,
-
   /** Current context has no default render target*/
   NGF_ERROR_NO_DEFAULT_RENDER_TARGET,
 
@@ -190,54 +179,26 @@ typedef struct ngf_shader_stage_info {
   uint32_t content_length; /**< Number of bytes in the content buffer. */
   const char *debug_name; /**< Optional name, will appear in debug logs,
                                may be NULL.*/
-  bool is_binary; /**< Indicates whether `content` is the source code, or a
-                       binary blob. Backends that only support binaries (e.g.
-                       Vulkan) ignore this flag. */
-
   /** 
    * Entry point name for this shader stage. On platforms that have fixed
    * entry point names (GL), this field gets ignored.
    */
   const char *entry_point_name;
-
-  /** 
-   * Indicates the binary format.The value is backend-specific:
-   *   - On Vulkan, it should always be 0;
-   *   - On Metal, 0 indicates a macOS binary, 1 indicates an iOS binary;
-   *   - On OpenGL, it should be whatever `ngf_get_binary_shader_stage`
-   *     returned when reading back the binary.
-   */
-  uint32_t binary_format;
 } ngf_shader_stage_info;
 
 /**
  * A programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
- * data. In general, there are two kinds of blobs - text and binary.
- * Backends may support either or both.
+ * data.
  *
- * Text blobs require a compilation step which may produce compile errors.
- * The detailed information about compile errors is reported via the debug
- * callback mechanism.
+ * On platforms that require a compilation step, details about compile errors
+ * are reported via the debug callback mechanism.
  * 
  * On some back-ends, the full compile/link step may be repeated during 
- * pipeline * creation (if using constant specialization). This does not apply
+ * pipeline creation (if using constant specialization). This does not apply
  * to back-ends that support specialization natively with no extensions (i.e.
  * Vulkan and Metal).
- *
- * Binary blobs have a notion of format, which is backend-specific. For
- * example, Metal binaries may come in iOS or macOS flavors.
- *
- * Some backends allow you to obtain the binary representation of the shader
- * stage even if it was specified using a text blob. If this binary is cached,
- * compilation can be skipped during the next run. Keep in mind that OpenGL
- * binaries are not transferable across machines.
- *
- * Note that on back-ends that do not support constant specialization natively
- * (i.e. OpenGL), it is impossible to specialize constants for a shader stage
- * that was created from a binary - it only works if the source code is
- * available.
  */
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
@@ -1135,29 +1096,6 @@ void ngf_debug_message_callback(void *userdata,
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                   ngf_shader_stage *result);
 
-/**
- * Obtain the size (in bytes) of the shader stage's corresponding binary.
- * 
- * @param stage The stage to obtain the size of.
- * @param size Result will be written here.
- */
-ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage stage,
-                                           size_t *size);
-
-/**
- * Obtain the shader stage's binary.
- * 
- * @param stage The stage to obtain the binary for.
- * @param buf_size Maximum amount of bytes to write into `buffer`.
- * @param buffer A pointer to the beginning of the buffer into which the bytes
- *  will be written. The buffer must be able to store at least `buf_size`
- *  bytes.
- * @param format A backend-specific format code will be written here (see
- *   comments for `ngf_shader_stage_info`.
- */
- ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage stage,
-                                       size_t buf_size, void *buffer,
-                                       uint32_t *format);
 /**
  * Detsroys a given shader stage.
  */

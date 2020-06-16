@@ -885,53 +885,24 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   stage->glstagebit = get_gl_shader_stage_bit(info->type);
   stage->source_code = NULL;
   stage->source_code_size = 0u;
-  if (!info->is_binary) { // Compile from source.
-    // Save off the source code in case we need to recompile for pipelines
-    // doing specialization.
-    stage->source_code = NGF_ALLOCN(char, info->content_length);
-    if (stage->source_code == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
-      goto ngf_create_shader_stage_cleanup;
-    }
-    stage->source_code_size = (GLint)info->content_length;
-    strncpy(stage->source_code, info->content, info->content_length);
-    err = _ngf_compile_shader(stage->source_code, stage->source_code_size,
-                              info->debug_name, stage->gltype, NULL,
-                              &stage->glprogram);
-  } else { // Set binary.
-    stage->glprogram = glCreateProgram();
-    glProgramBinary(stage->glprogram, info->binary_format,
-                    info->content, (GLsizei)info->content_length);
-    err = _ngf_check_link_status(stage->glprogram, info->debug_name);
-    if (err != NGF_ERROR_OK) { goto ngf_create_shader_stage_cleanup; }
+  // Save off the source code in case we need to recompile for pipelines
+  // doing specialization.
+  stage->source_code = NGF_ALLOCN(char, info->content_length);
+  if (stage->source_code == NULL) {
+    err = NGF_ERROR_OUTOFMEM;
+    goto ngf_create_shader_stage_cleanup;
   }
-
+  stage->source_code_size = (GLint)info->content_length;
+  strncpy(stage->source_code, info->content, info->content_length);
+  err = _ngf_compile_shader(stage->source_code, stage->source_code_size,
+                            info->debug_name, stage->gltype, NULL,
+                            &stage->glprogram);
 ngf_create_shader_stage_cleanup:
   if (err != NGF_ERROR_OK) {
     ngf_destroy_shader_stage(stage);
   }
   return err;
 }
-
-ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage stage,
-                                           size_t *size) {
-  GLint result = 0;
-  glGetProgramiv(stage->glprogram, GL_PROGRAM_BINARY_LENGTH, &result);
-  *size = (size_t)result;
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage stage,
-                                      size_t buf_size,
-                                      void *buffer,
-                                      uint32_t *format) {
-  GLenum format_enum = GL_NONE;
-  glGetProgramBinary(stage->glprogram, (GLsizei)buf_size, NULL,
-                     &format_enum, buffer);
-  *format =(uint32_t)format_enum;
-  return NGF_ERROR_OK;
-}
-
 
 void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage != NULL) {
@@ -1055,7 +1026,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                            info->shader_stages[s]->glstagebit,
                            pipeline->owned_stages[s]);
       } else {
-        err = NGF_ERROR_CANNOT_SPECIALIZE_SHADER_STAGE_BINARY;
+        err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
       }
     }   
   }
