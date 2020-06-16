@@ -171,8 +171,8 @@ typedef enum ngf_plmd_error {
 } ngf_plmd_error;
 
 typedef struct ngf_plmd_alloc_callbacks {
-  void* (*alloc)(size_t);
-  void  (*free)(void*);
+  void* (*allocate)(size_t);
+  void  (*deallocate)(void*);
 } ngf_plmd_alloc_callbacks;
 
 ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
