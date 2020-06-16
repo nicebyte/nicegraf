@@ -28,7 +28,10 @@ extern "C" {
 typedef struct _ngf_sa_t {
   uint8_t *ptr;
   size_t   capacity;
+#pragma warning(push)
+#pragma warning(disable:4200)
   uint8_t  data[];
+#pragma warning(pop)
 } _ngf_sa;
 
 /**
