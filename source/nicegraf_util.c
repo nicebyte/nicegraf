@@ -125,8 +125,8 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
   ngf_error err = NGF_ERROR_OK;
   result->ndescriptor_set_layouts = 1u;
   ngf_descriptor_set_layout_info *dsl =
-      NGF_ALLOC(ngf_descriptor_set_layout_info);
-  ngf_descriptor_info *desc_copy = NGF_ALLOCN(ngf_descriptor_info, ndesc);
+      NGFI_ALLOC(ngf_descriptor_set_layout_info);
+  ngf_descriptor_info *desc_copy = NGFI_ALLOCN(ngf_descriptor_info, ndesc);
   memcpy(desc_copy, desc, ndesc * sizeof(ngf_descriptor_info));
   dsl->descriptors = desc_copy;
   dsl->ndescriptors = ndesc;
@@ -167,7 +167,7 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
 
   ngf_error err = NGF_ERROR_OK;
   ngf_descriptor_set_layout_info *descriptor_set_layout_infos = NULL;
-  descriptor_set_layout_infos = NGF_ALLOCN(ngf_descriptor_set_layout_info,
+  descriptor_set_layout_infos = NGFI_ALLOCN(ngf_descriptor_set_layout_info,
                                            layout_metadata->ndescriptor_sets);
   if (descriptor_set_layout_infos == NULL) {
     err = NGF_ERROR_OUTOFMEM;
@@ -191,7 +191,7 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
     set_layout_info->ndescriptors =
         layout_metadata->set_layouts[set]->ndescriptors;
     ngf_descriptor_info *descriptors =
-        NGF_ALLOCN(ngf_descriptor_info, set_layout_info->ndescriptors);
+        NGFI_ALLOCN(ngf_descriptor_info, set_layout_info->ndescriptors);
     set_layout_info->descriptors = descriptors;
     if (set_layout_info->descriptors == NULL) {
       err = NGF_ERROR_OUTOFMEM;
