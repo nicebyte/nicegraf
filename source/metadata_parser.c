@@ -32,10 +32,20 @@
   #include <arpa/inet.h>
 #endif
 
+#ifdef _MSC_VER
+  #pragma warning(push)
+  // address of dllimport is not static, identity not guaranteed
+  #pragma warning(disable:4232)
+#endif
+
 static const ngf_plmd_alloc_callbacks stdlib_alloc = {
   .allocate = malloc,
   .deallocate = free
 };
+
+#ifdef _MSC_VER
+  #pragma warning( pop )
+#endif
 
 struct ngf_plmd {
   uint8_t *raw_data;
