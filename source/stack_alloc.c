@@ -35,7 +35,7 @@ void* ngfi_sa_alloc(ngfi_sa *allocator, size_t nbytes) {
   assert(allocator);
   void           *result             = NULL;
   const ptrdiff_t consumed_capacity  = allocator->ptr - allocator->data;
-  const ptrdiff_t available_capacity = allocator->capacity - consumed_capacity;
+  const ptrdiff_t available_capacity = (ptrdiff_t)allocator->capacity - consumed_capacity;
   if (available_capacity >= (ptrdiff_t)nbytes) {
     result = allocator->ptr;
     allocator->ptr += nbytes;
