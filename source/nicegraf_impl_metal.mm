@@ -748,41 +748,20 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   stage->type = info->type;
 
   // Create a MTLLibrary for this stage.
-  if (!info->is_binary) { // Either compile from source...
-    NSString *source = [[NSString alloc] initWithBytes:info->content
-                                 length:info->content_length
-                                 encoding:NSUTF8StringEncoding];
-    MTLCompileOptions *opts = [MTLCompileOptions new];
-    NSError *err = nil;
-    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithSource:source
-                                  options:opts
-                                  error:&err];
-    if (!stage->func_lib) {
-      // TODO: call debug callback with error message here.
-      NSLog(@"%@\n", err);
-      return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;    
-    }
-  } else { // ...or set binary.
-#if TARGET_OS_OSX
-    uint32_t required_format = 0u;
-#else
-    uint32_t required_format = 1u;
-#endif
-    if (info->binary_format != required_format) {
-      return NGF_ERROR_SHADER_STAGE_INVALID_BINARY_FORMAT;
-    }
-    dispatch_data_t libdata = dispatch_data_create(info->content,
-                                                   info->content_length,
-                                                   dispatch_get_main_queue(),
-                                                   ^{});
-    NSError *err;
-    stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithData:libdata
-                                               error:&err];
-    if (!stage->func_lib) {
-      return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
-    }
+  NSString *source = [[NSString alloc] initWithBytes:info->content
+                               length:info->content_length
+                               encoding:NSUTF8StringEncoding];
+  MTLCompileOptions *opts = [MTLCompileOptions new];
+  NSError *err = nil;
+  stage->func_lib = [CURRENT_CONTEXT->device newLibraryWithSource:source
+                                options:opts
+                                error:&err];
+  if (!stage->func_lib) {
+    // TODO: call debug callback with error message here.
+    NSLog(@"%@\n", err);
+    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
   }
-
+  
   // Set debug name.
   if (info->debug_name != nullptr) {
     stage->func_lib.label = [[NSString alloc]
@@ -808,16 +787,6 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
     stage->~ngf_shader_stage_t();
     NGF_FREE(stage);
   }
-}
-
-ngf_error ngf_get_binary_shader_stage(const ngf_shader_stage_info *info,
-                                      ngf_shader_stage **result) {
-  return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
-}
-
-ngf_error ngf_get_binary_shader_stage_size(const ngf_shader_stage *stage,
-                                           size_t *size) {
-  return NGF_ERROR_CANNOT_READ_BACK_SHADER_STAGE_BINARY;
 }
 
 void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
