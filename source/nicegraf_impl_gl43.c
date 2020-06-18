@@ -70,22 +70,22 @@ struct ngf_graphics_pipeline_t {
   uint32_t nowned_stages;
 };
 
-#define _NGF_MAX_DRAW_BUFFERS 5
+#define NGFGL_MAX_DRAW_BUFFERS 5
 
 struct ngf_render_target_t {
   bool   is_srgb;
   GLuint framebuffer;
   size_t ndraw_buffers;
-  GLenum draw_buffers[_NGF_MAX_DRAW_BUFFERS];
+  GLenum draw_buffers[NGFGL_MAX_DRAW_BUFFERS];
   uint32_t nattachments;
   ngf_attachment attachment_infos[];
 };
 
-typedef struct _ngf_vbuf_binding_info_t {
+typedef struct ngfgl_vbuf_binding_info_t {
   uint32_t binding;
   GLuint buffer;
   size_t offset;
-} _ngf_vbuf_binding_info;
+} ngfgl_vbuf_binding_info;
 
 struct ngf_context_t {
   EGLDisplay dpy;
@@ -94,7 +94,7 @@ struct ngf_context_t {
   EGLSurface surface;
   struct {
     struct ngf_graphics_pipeline_t pipeline;
-    NGFI_DARRAY_OF(_ngf_vbuf_binding_info) vbuf_table;
+    NGFI_DARRAY_OF(ngfgl_vbuf_binding_info) vbuf_table;
      GLuint bound_index_buffer;
   } cached_state;
   bool has_bound_pipeline;
@@ -153,30 +153,30 @@ struct ngf_pass {
 };
 
 typedef enum {
-  _NGF_CMD_BIND_PIPELINE,
-  _NGF_CMD_BEGIN_PASS,
-  _NGF_CMD_END_PASS,
-  _NGF_CMD_VIEWPORT,
-  _NGF_CMD_SCISSOR,
-  _NGF_CMD_LINE_WIDTH,
-  _NGF_CMD_BLEND_CONSTANTS,
-  _NGF_CMD_STENCIL_REFERENCE,
-  _NGF_CMD_STENCIL_WRITE_MASK,
-  _NGF_CMD_STENCIL_COMPARE_MASK,
-  _NGF_CMD_BIND_UNIFORM_BUFFER,
-  _NGF_CMD_BIND_TEXTURE,
-  _NGF_CMD_BIND_SAMPLER,
-  _NGF_CMD_BIND_ATTRIB_BUFFER,
-  _NGF_CMD_BIND_INDEX_BUFFER,
-  _NGF_CMD_DRAW,
-  _NGF_CMD_DRAW_INDEXED,
-  _NGF_CMD_COPY,
-  _NGF_CMD_WRITE_IMAGE,
-  _NGF_CMD_NONE
-} _ngf_emulated_cmd_type;
+  NGFGL_CMD_BIND_PIPELINE,
+  NGFGL_CMD_BEGIN_PASS,
+  NGFGL_CMD_END_PASS,
+  NGFGL_CMD_VIEWPORT,
+  NGFGL_CMD_SCISSOR,
+  NGFGL_CMD_LINE_WIDTH,
+  NGFGL_CMD_BLEND_CONSTANTS,
+  NGFGL_CMD_STENCIL_REFERENCE,
+  NGFGL_CMD_STENCIL_WRITE_MASK,
+  NGFGL_CMD_STENCIL_COMPARE_MASK,
+  NGFGL_CMD_BIND_UNIFORM_BUFFER,
+  NGFGL_CMD_BIND_TEXTURE,
+  NGFGL_CMD_BIND_SAMPLER,
+  NGFGL_CMD_BIND_ATTRIB_BUFFER,
+  NGFGL_CMD_BIND_INDEX_BUFFER,
+  NGFGL_CMD_DRAW,
+  NGFGL_CMD_DRAW_INDEXED,
+  NGFGL_CMD_COPY,
+  NGFGL_CMD_WRITE_IMAGE,
+  NGFGL_CMD_NONE
+} ngfgl_emulated_cmd_type;
 
-typedef struct _ngf_emulated_cmd {
-  _ngf_emulated_cmd_type type;
+typedef struct ngfgl_emulated_cmd {
+  ngfgl_emulated_cmd_type type;
   union {
     ngf_graphics_pipeline pipeline;
     ngf_irect2d viewport;
@@ -245,20 +245,20 @@ typedef struct _ngf_emulated_cmd {
       ngf_extent3d dimensions;
     } write_image;
   };
-} _ngf_emulated_cmd;
+} ngfgl_emulated_cmd;
 
-#define _NGF_CMDS_PER_CMD_BLOCK  16u
+#define NGFGL_CMDS_PER_CMD_BLOCK  16u
 
-typedef struct _ngf_cmd_block {
-   struct _ngf_cmd_block *next;
-  _ngf_emulated_cmd       cmds[_NGF_CMDS_PER_CMD_BLOCK];
-   uint32_t               next_cmd_idx;
-} _ngf_cmd_block;
+typedef struct ngfgl_cmd_block {
+  struct ngfgl_cmd_block *next;
+  ngfgl_emulated_cmd      cmds[NGFGL_CMDS_PER_CMD_BLOCK];
+  uint32_t                next_cmd_idx;
+} ngfgl_cmd_block;
 
 struct ngf_cmd_buffer_t {
   ngf_graphics_pipeline bound_pipeline;
-  _ngf_cmd_block *first_cmd_block;
-  _ngf_cmd_block *last_cmd_block;
+  ngfgl_cmd_block *first_cmd_block;
+  ngfgl_cmd_block *last_cmd_block;
   bool renderpass_active;
   ngfi_cmd_buffer_state state;
 };
@@ -680,7 +680,7 @@ void ngf_destroy_context(ngf_context ctx) {
   }
 }
 
-ngf_error _ngf_check_link_status(GLuint program, const char *debug_name) {
+ngf_error ngfgl_check_link_status(GLuint program, const char *debug_name) {
   GLint link_status;
   glGetProgramiv(program, GL_LINK_STATUS, &link_status);
   if (link_status != GL_TRUE) {
@@ -706,7 +706,7 @@ ngf_error _ngf_check_link_status(GLuint program, const char *debug_name) {
   return NGF_ERROR_OK;
 }
 
-ngf_error _ngf_compile_shader(const char *source, GLint source_len,
+ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
                               const char *debug_name,
                               GLenum stage,
                               const ngf_specialization_info *spec_info,
@@ -760,7 +760,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
     defines_buffer = NGFI_ALLOCN(char, defines_buffer_size);
     if (defines_buffer == NULL) {
       err = NGF_ERROR_OUTOFMEM;
-      goto _ngf_compile_shader_cleanup;
+      goto ngfgl_compile_shader_cleanup;
     }
 
     // Generate a #define for each specialization entry.
@@ -802,7 +802,7 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
         defines_buffer_write_ptr += bytes_written;
       } else {
         err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
-        goto _ngf_compile_shader_cleanup;
+        goto ngfgl_compile_shader_cleanup;
       }
     }
     source_chunks[1] = defines_buffer;
@@ -844,19 +844,19 @@ ngf_error _ngf_compile_shader(const char *source, GLint source_len,
       free(info_log);
     }
     err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
-    goto _ngf_compile_shader_cleanup;
+    goto ngfgl_compile_shader_cleanup;
   }
   *result = glCreateProgram();
   glProgramParameteri(*result, GL_PROGRAM_SEPARABLE, GL_TRUE);
   glAttachShader(*result, shader);
   glLinkProgram(*result);
   glDetachShader(*result, shader);
-  err = _ngf_check_link_status(*result, debug_name);
+  err = ngfgl_check_link_status(*result, debug_name);
   if (err != NGF_ERROR_OK) {
-    goto _ngf_compile_shader_cleanup;
+    goto ngfgl_compile_shader_cleanup;
   }
 
-_ngf_compile_shader_cleanup:
+ngfgl_compile_shader_cleanup:
   if (shader != GL_NONE) {
     glDeleteShader(shader);
   }
@@ -894,7 +894,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   }
   stage->source_code_size = (GLint)info->content_length;
   strncpy(stage->source_code, info->content, info->content_length);
-  err = _ngf_compile_shader(stage->source_code, stage->source_code_size,
+  err = ngfgl_compile_shader(stage->source_code, stage->source_code_size,
                             info->debug_name, stage->gltype, NULL,
                             &stage->glprogram);
 ngf_create_shader_stage_cleanup:
@@ -1014,7 +1014,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     for (size_t s = 0; err == NGF_ERROR_OK && s < info->nshader_stages; ++s) {
       if (info->shader_stages[s]->source_code != NULL) {
         err =
-            _ngf_compile_shader(info->shader_stages[s]->source_code,
+            ngfgl_compile_shader(info->shader_stages[s]->source_code,
                                 info->shader_stages[s]->source_code_size,
                                 "",
                                 info->shader_stages[s]->gltype,
@@ -1303,7 +1303,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
     case NGF_ATTACHMENT_COLOR: {
       size_t draw_buffer = ncolor_attachment;
       gl_attachment = (GLenum)(GL_COLOR_ATTACHMENT0 + (ncolor_attachment++));
-      assert(draw_buffer < _NGF_MAX_DRAW_BUFFERS);
+      assert(draw_buffer < NGFGL_MAX_DRAW_BUFFERS);
       render_target->draw_buffers[draw_buffer] = gl_attachment;
       render_target->is_srgb |= a->image_ref.image->is_srgb;
       break;
@@ -1386,7 +1386,7 @@ ngf_error ngf_resolve_render_target(const ngf_render_target src,
   return NGF_ERROR_OK;
 }
 
-GLuint _ngf_create_buffer(GLenum type,
+GLuint ngfgl_create_buffer(GLenum type,
                           const ngf_buffer_info *info) {
   assert(type == GL_ARRAY_BUFFER ||
          type == GL_ELEMENT_ARRAY_BUFFER ||
@@ -1412,7 +1412,7 @@ GLuint _ngf_create_buffer(GLenum type,
   return buf;
 }
 
-void* _ngf_buffer_map_range(GLenum bind_target,
+void* ngfgl_buffer_map_range(GLenum bind_target,
                             GLuint gl_buffer,
                             size_t offset,
                             size_t size,
@@ -1427,17 +1427,17 @@ void* _ngf_buffer_map_range(GLenum bind_target,
                           map_access);
 }
 
-void _ngf_buffer_flush_range(GLenum bind_target,
-                             GLuint gl_buffer,
-                             size_t offset,
-                             size_t size) {
+void ngfgl_buffer_flush_range(GLenum bind_target,
+                              GLuint gl_buffer,
+                              size_t offset,
+                              size_t size) {
   // TODO: assert that buffer is mapped.
   glBindBuffer(bind_target, gl_buffer);
   glFlushMappedBufferRange(bind_target, (GLintptr)offset,
                            (GLsizeiptr)size);
 }
 
-void _ngf_buffer_unmap(GLenum bind_target,
+void ngfgl_buffer_unmap(GLenum bind_target,
                        GLuint gl_buffer) {
   // TODO: assert that buffer is mapped.
   glBindBuffer(bind_target, gl_buffer);
@@ -1453,7 +1453,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->glbuffer = _ngf_create_buffer(GL_ARRAY_BUFFER, info);
+  buf->glbuffer = ngfgl_create_buffer(GL_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
 }
 
@@ -1468,7 +1468,7 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t offset,
                                   size_t size,
                                   uint32_t flags) {
-  return _ngf_buffer_map_range(GL_ARRAY_BUFFER,
+  return ngfgl_buffer_map_range(GL_ARRAY_BUFFER,
                                buf->glbuffer,
                                offset,
                                size,
@@ -1478,13 +1478,13 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
                                    size_t size) {
-  _ngf_buffer_flush_range(GL_ARRAY_BUFFER,
+  ngfgl_buffer_flush_range(GL_ARRAY_BUFFER,
                           buf->glbuffer,
                           offset, size);
 }
 
 void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
-  _ngf_buffer_unmap(GL_ARRAY_BUFFER, buf->glbuffer);
+  ngfgl_buffer_unmap(GL_ARRAY_BUFFER, buf->glbuffer);
 }
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
@@ -1496,7 +1496,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->glbuffer = _ngf_create_buffer(GL_ELEMENT_ARRAY_BUFFER, info);
+  buf->glbuffer = ngfgl_create_buffer(GL_ELEMENT_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
 }
 
@@ -1511,7 +1511,7 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  uint32_t flags) {
-  return _ngf_buffer_map_range(GL_ELEMENT_ARRAY_BUFFER,
+  return ngfgl_buffer_map_range(GL_ELEMENT_ARRAY_BUFFER,
                                buf->glbuffer,
                                offset,
                                size,
@@ -1521,13 +1521,13 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
 void ngf_index_buffer_flush_range(ngf_index_buffer buf,
                                    size_t offset,
                                    size_t size) {
-  _ngf_buffer_flush_range(GL_ELEMENT_ARRAY_BUFFER,
+  ngfgl_buffer_flush_range(GL_ELEMENT_ARRAY_BUFFER,
                           buf->glbuffer,
                           offset, size);
 }
 
 void ngf_index_buffer_unmap(ngf_index_buffer buf) {
-  _ngf_buffer_unmap(GL_ELEMENT_ARRAY_BUFFER, buf->glbuffer);
+  ngfgl_buffer_unmap(GL_ELEMENT_ARRAY_BUFFER, buf->glbuffer);
 }
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
@@ -1539,7 +1539,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   if (buf == NULL) {
     return NGF_ERROR_OUTOFMEM;
   }
-  buf->glbuffer = _ngf_create_buffer(GL_UNIFORM_BUFFER, info);
+  buf->glbuffer = ngfgl_create_buffer(GL_UNIFORM_BUFFER, info);
   return NGF_ERROR_OK;
 }
 
@@ -1554,7 +1554,7 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t offset,
                                    size_t size,
                                    uint32_t flags) {
-  return _ngf_buffer_map_range(GL_UNIFORM_BUFFER,
+  return ngfgl_buffer_map_range(GL_UNIFORM_BUFFER,
                                buf->glbuffer,
                                offset,
                                size,
@@ -1564,14 +1564,14 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
 void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf,
                                     size_t offset,
                                     size_t size) {
-  _ngf_buffer_flush_range(GL_UNIFORM_BUFFER,
+  ngfgl_buffer_flush_range(GL_UNIFORM_BUFFER,
                           buf->glbuffer,
                           offset,
                           size);
 }
 
 void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) {
-  _ngf_buffer_unmap(GL_UNIFORM_BUFFER,
+  ngfgl_buffer_unmap(GL_UNIFORM_BUFFER,
                     buf->glbuffer);
 }
 
@@ -1592,7 +1592,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
     break;
   default: assert(false);
   }
-  buf->glbuffer = _ngf_create_buffer(GL_PIXEL_UNPACK_BUFFER, &buf_info);
+  buf->glbuffer = ngfgl_create_buffer(GL_PIXEL_UNPACK_BUFFER, &buf_info);
   return NGF_ERROR_OK;
 }
 
@@ -1600,7 +1600,7 @@ void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t offset,
                                  size_t size,
                                  uint32_t flags) {
-  return _ngf_buffer_map_range(GL_PIXEL_UNPACK_BUFFER,
+  return ngfgl_buffer_map_range(GL_PIXEL_UNPACK_BUFFER,
                                buf->glbuffer,
                                offset,
                                size,
@@ -1610,14 +1610,14 @@ void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
 void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
                                   size_t offset,
                                   size_t size) {
-  _ngf_buffer_flush_range(GL_PIXEL_UNPACK_BUFFER,
+  ngfgl_buffer_flush_range(GL_PIXEL_UNPACK_BUFFER,
                           buf->glbuffer,
                           offset,
                           size);
 }
 
 void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) {
-  _ngf_buffer_unmap(GL_PIXEL_UNPACK_BUFFER, buf->glbuffer);
+  ngfgl_buffer_unmap(GL_PIXEL_UNPACK_BUFFER, buf->glbuffer);
 }
 
 void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
@@ -1632,7 +1632,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   NGFI_FAKE_USE(info);
   assert(result);
   if (COMMAND_POOL == NULL) {
-    COMMAND_POOL = ngfi_blkalloc_create(sizeof(_ngf_cmd_block), 100);
+    COMMAND_POOL = ngfi_blkalloc_create(sizeof(ngfgl_cmd_block), 100);
   }
   ngf_error err = NGF_ERROR_OK;
   *result = NGFI_ALLOC(struct ngf_cmd_buffer_t);
@@ -1646,12 +1646,12 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   return err;
 }
 
-void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer buf) {
+void ngfgl_cmd_buffer_free_cmds(ngf_cmd_buffer buf) {
   const bool has_first_cmd = buf->first_cmd_block != NULL;
   const bool has_last_cmd = buf->last_cmd_block != NULL;
   assert(!(has_first_cmd ^ has_last_cmd));
   if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
-    for (_ngf_cmd_block *c = buf->first_cmd_block; c != NULL; c = c->next) {
+    for (ngfgl_cmd_block *c = buf->first_cmd_block; c != NULL; c = c->next) {
       ngfi_blkalloc_free(COMMAND_POOL, c);
     }
   }
@@ -1660,7 +1660,7 @@ void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer buf) {
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
   if (buf != NULL) {
-    _ngf_cmd_buffer_free_cmds(buf);
+    ngfgl_cmd_buffer_free_cmds(buf);
     NGFI_FREE(buf);
   }
 }
@@ -1672,7 +1672,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   }
   ngf_error err = NGF_ERROR_OK;
   if (buf->first_cmd_block != NULL) {
-    _ngf_cmd_buffer_free_cmds(buf);
+    ngfgl_cmd_buffer_free_cmds(buf);
   }
   buf->first_cmd_block = ngfi_blkalloc_alloc(COMMAND_POOL);
   if (buf->first_cmd_block == NULL) {
@@ -1719,9 +1719,9 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
   return NGF_ERROR_OK;
 }
 
-#define _NGF_NEWCMD(enc, cmd) {\
+#define NGFGL_NEWCMD(enc, cmd) {\
   ngf_cmd_buffer buf = (ngf_cmd_buffer)(void*)enc.__handle; \
-  if (buf->last_cmd_block->next_cmd_idx == _NGF_CMDS_PER_CMD_BLOCK) { \
+  if (buf->last_cmd_block->next_cmd_idx == NGFGL_CMDS_PER_CMD_BLOCK) { \
     buf->last_cmd_block->next = ngfi_blkalloc_alloc(COMMAND_POOL); \
     buf->last_cmd_block = buf->last_cmd_block->next; \
     buf->last_cmd_block->next = NULL; \
@@ -1734,67 +1734,67 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
                                const ngf_graphics_pipeline pipeline) {
 
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_BIND_PIPELINE;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_BIND_PIPELINE;
   cmd->pipeline = pipeline;
   ((ngf_cmd_buffer)enc.__handle)->bound_pipeline = pipeline;
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *viewport) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_VIEWPORT;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_VIEWPORT;
   cmd->viewport = *viewport;
 }
 
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *scissor) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_SCISSOR;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_SCISSOR;
   cmd->scissor = *scissor;
 }
 
 void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front,
                                uint32_t back) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_STENCIL_REFERENCE;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_STENCIL_REFERENCE;
   cmd->stencil_reference.front = front;
   cmd->stencil_reference.back = back;
 }
 
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front,
                                   uint32_t back) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_STENCIL_COMPARE_MASK;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_STENCIL_COMPARE_MASK;
   cmd->stencil_compare_mask.front = front;
   cmd->stencil_compare_mask.back = back;
 }
 
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front,
                                 uint32_t back) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_STENCIL_WRITE_MASK;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_STENCIL_WRITE_MASK;
   cmd->stencil_write_mask.front = front;
   cmd->stencil_write_mask.back = back;
 }
 
 void ngf_cmd_line_width(ngf_render_encoder enc, float line_width) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_LINE_WIDTH;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_LINE_WIDTH;
   cmd->line_width = line_width;
 }
 
 void ngf_cmd_blend_factors(ngf_render_encoder enc,
                            ngf_blend_factor sfactor,
                            ngf_blend_factor dfactor) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_BLEND_CONSTANTS;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_BLEND_CONSTANTS;
   cmd->blend_factors.sfactor = sfactor;
   cmd->blend_factors.dfactor = dfactor;
 }
@@ -1822,9 +1822,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     }
     switch (bind_op->type) {
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-      _ngf_emulated_cmd *uniform_buffer_bind_cmd = NULL;
-      _NGF_NEWCMD(enc, uniform_buffer_bind_cmd);
-      uniform_buffer_bind_cmd->type = _NGF_CMD_BIND_UNIFORM_BUFFER;
+      ngfgl_emulated_cmd *uniform_buffer_bind_cmd = NULL;
+      NGFGL_NEWCMD(enc, uniform_buffer_bind_cmd);
+      uniform_buffer_bind_cmd->type = NGFGL_CMD_BIND_UNIFORM_BUFFER;
       uniform_buffer_bind_cmd->uniform_buffer_bind_op.buffer =
           bind_op->info.uniform_buffer.buffer->glbuffer;
       uniform_buffer_bind_cmd->uniform_buffer_bind_op.index =
@@ -1837,9 +1837,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     }
     case NGF_DESCRIPTOR_TEXTURE: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
-        _ngf_emulated_cmd *texture_bind_cmd = NULL;
-        _NGF_NEWCMD(enc, texture_bind_cmd);
-        texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
+        ngfgl_emulated_cmd *texture_bind_cmd = NULL;
+        NGFGL_NEWCMD(enc, texture_bind_cmd);
+        texture_bind_cmd->type = NGFGL_CMD_BIND_TEXTURE;
         texture_bind_cmd->texture_bind_op.texture =
             bind_op->info.image_sampler.image_subresource.image;
         texture_bind_cmd->texture_bind_op.unit =
@@ -1849,9 +1849,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     }
     case NGF_DESCRIPTOR_SAMPLER: {
       for (uint32_t c = 0u; c < native_binding->ncis_bindings; ++c) {
-        _ngf_emulated_cmd *sampler_bind_cmd = NULL;
-        _NGF_NEWCMD(enc, sampler_bind_cmd);
-        sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
+        ngfgl_emulated_cmd *sampler_bind_cmd = NULL;
+        NGFGL_NEWCMD(enc, sampler_bind_cmd);
+        sampler_bind_cmd->type = NGFGL_CMD_BIND_SAMPLER;
         sampler_bind_cmd->sampler_bind_op.sampler =
             bind_op->info.image_sampler.sampler;
         sampler_bind_cmd->sampler_bind_op.unit =
@@ -1860,16 +1860,16 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       break;
     }
     case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
-      _ngf_emulated_cmd *texture_bind_cmd = NULL;
-      _NGF_NEWCMD(enc, texture_bind_cmd);
-      texture_bind_cmd->type = _NGF_CMD_BIND_TEXTURE;
+      ngfgl_emulated_cmd *texture_bind_cmd = NULL;
+      NGFGL_NEWCMD(enc, texture_bind_cmd);
+      texture_bind_cmd->type = NGFGL_CMD_BIND_TEXTURE;
       texture_bind_cmd->texture_bind_op.texture =
         bind_op->info.image_sampler.image_subresource.image;
       texture_bind_cmd->texture_bind_op.unit =
         native_binding->native_binding_id;
-      _ngf_emulated_cmd *sampler_bind_cmd = NULL;
-      _NGF_NEWCMD(enc, sampler_bind_cmd);
-      sampler_bind_cmd->type = _NGF_CMD_BIND_SAMPLER;
+      ngfgl_emulated_cmd *sampler_bind_cmd = NULL;
+      NGFGL_NEWCMD(enc, sampler_bind_cmd);
+      sampler_bind_cmd->type = NGFGL_CMD_BIND_SAMPLER;
       sampler_bind_cmd->sampler_bind_op.sampler =
           bind_op->info.image_sampler.sampler;
       sampler_bind_cmd->sampler_bind_op.unit =
@@ -1885,9 +1885,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
 void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
                                 const ngf_attrib_buffer vbuf,
                                 uint32_t binding, uint32_t offset) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_BIND_ATTRIB_BUFFER;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_BIND_ATTRIB_BUFFER;
   cmd->attrib_buffer_bind_op.binding = binding;
   cmd->attrib_buffer_bind_op.buf = vbuf;
   cmd->attrib_buffer_bind_op.offset = offset;
@@ -1896,49 +1896,49 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
 void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
                                const ngf_index_buffer idxbuf,
                                ngf_type index_type) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_BIND_INDEX_BUFFER;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_BIND_INDEX_BUFFER;
   cmd->index_buffer_bind.index_buffer = idxbuf;
   cmd->index_buffer_bind.type = index_type;
 }
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_BEGIN_PASS;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_BEGIN_PASS;
   cmd->begin_pass.target = target;
   ((ngf_cmd_buffer)enc.__handle)->renderpass_active = true;
 }
 
 void ngf_cmd_end_pass(ngf_render_encoder enc) {
   ((ngf_cmd_buffer)enc.__handle)->renderpass_active = false;
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_END_PASS;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_END_PASS;
 }
 
 void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
                   uint32_t first_element, uint32_t nelements,
                   uint32_t ninstances) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_DRAW;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_DRAW;
   cmd->draw.first_element = first_element;
   cmd->draw.nelements = nelements;
   cmd->draw.ninstances = ninstances;
   cmd->draw.indexed = indexed;
 }
 
-void _ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
+void ngfgl_cmd_copy_buffer(ngf_xfer_encoder enc,
                           GLuint src,
                           GLuint dst,
                           size_t size,
                           size_t src_offset,
                           size_t dst_offset) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_COPY;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_COPY;
   cmd->copy.src = src;
   cmd->copy.dst = dst;
   cmd->copy.size = size;
@@ -1953,9 +1953,9 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
                          const ngf_extent3d *extent) {
-  _ngf_emulated_cmd *cmd = NULL;
-  _NGF_NEWCMD(enc, cmd);
-  cmd->type = _NGF_CMD_WRITE_IMAGE;
+  ngfgl_emulated_cmd *cmd = NULL;
+  NGFGL_NEWCMD(enc, cmd);
+  cmd->type = NGFGL_CMD_WRITE_IMAGE;
   cmd->write_image.src_pbuffer = src->glbuffer;
   cmd->write_image.src_data_offset = src_offset;
   cmd->write_image.dst_image_ref = dst;
@@ -1971,7 +1971,7 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
+  ngfgl_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
 }
 
@@ -1981,7 +1981,7 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
+  ngfgl_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
  }
 
@@ -1991,7 +1991,7 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
+  ngfgl_cmd_copy_buffer(enc, src->glbuffer, dst->glbuffer,
                        size, src_offset, dst_offset);
  }
 
@@ -2000,12 +2000,12 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   ngf_render_target active_rt = NULL;
   for (uint32_t buf_i = 0u; buf_i < nbuffers; ++buf_i) {
     const ngf_cmd_buffer buf = bufs[buf_i];
-    for (const _ngf_cmd_block *block = buf->first_cmd_block; block!= NULL;
+    for (const ngfgl_cmd_block *block = buf->first_cmd_block; block!= NULL;
          block= block->next) {
       for (uint32_t i = 0; i < block->next_cmd_idx; ++i) {
-        const _ngf_emulated_cmd *cmd = &block->cmds[i];
+        const ngfgl_emulated_cmd *cmd = &block->cmds[i];
         switch (cmd->type) {
-        case _NGF_CMD_BIND_PIPELINE: {
+        case NGFGL_CMD_BIND_PIPELINE: {
           const ngf_graphics_pipeline bound_pipe = 
             CURRENT_CONTEXT->has_bound_pipeline
               ? &(CURRENT_CONTEXT->cached_state.pipeline)
@@ -2193,7 +2193,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                   NGFI_DARRAY_SIZE(CURRENT_CONTEXT->cached_state.vbuf_table);
               for (size_t e = 0; e < nvbuf_table_entries; ++e) {
                 bool found_binding = false;
-                const _ngf_vbuf_binding_info *vbuf_table_entry =
+                const ngfgl_vbuf_binding_info *vbuf_table_entry =
                     &NGFI_DARRAY_AT(CURRENT_CONTEXT->cached_state.vbuf_table,
                                     e);
                 // Update only bindings relevant to this pipeline.
@@ -2223,35 +2223,35 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           glEnable(GL_SCISSOR_TEST);
           break; }
 
-        case _NGF_CMD_VIEWPORT:
+        case NGFGL_CMD_VIEWPORT:
             glViewport(cmd->viewport.x,
                        cmd->viewport.y,
                        (GLsizei)cmd->viewport.width,
                        (GLsizei)cmd->viewport.height);
           break;
 
-        case _NGF_CMD_SCISSOR:
+        case NGFGL_CMD_SCISSOR:
             glScissor(cmd->scissor.x,
                       cmd->scissor.y,
                       (GLsizei)cmd->scissor.width,
                       (GLsizei)cmd->scissor.height);
           break;
 
-        case _NGF_CMD_LINE_WIDTH:
+        case NGFGL_CMD_LINE_WIDTH:
           glLineWidth(cmd->line_width);
           break;
 
-        case _NGF_CMD_BLEND_CONSTANTS:
+        case NGFGL_CMD_BLEND_CONSTANTS:
           glBlendFunc(cmd->blend_factors.sfactor,
                       cmd->blend_factors.dfactor);
           break;
 
-        case _NGF_CMD_STENCIL_WRITE_MASK:
+        case NGFGL_CMD_STENCIL_WRITE_MASK:
           glStencilMaskSeparate(GL_FRONT, cmd->stencil_write_mask.front);
           glStencilMaskSeparate(GL_BACK, cmd->stencil_write_mask.back);
           break;
 
-        case _NGF_CMD_STENCIL_COMPARE_MASK: {
+        case NGFGL_CMD_STENCIL_COMPARE_MASK: {
           GLint back_func, front_func, front_ref, back_ref;
           glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
           glGetIntegerv(GL_STENCIL_FUNC, &front_func);
@@ -2268,7 +2268,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
         }
 
-        case _NGF_CMD_STENCIL_REFERENCE: {
+        case NGFGL_CMD_STENCIL_REFERENCE: {
           GLint back_func, front_func, front_mask, back_mask;
           glGetIntegerv(GL_STENCIL_BACK_FUNC, &back_func);
           glGetIntegerv(GL_STENCIL_FUNC, &front_func);
@@ -2285,7 +2285,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
         }
 
-        case _NGF_CMD_BIND_UNIFORM_BUFFER:
+        case NGFGL_CMD_BIND_UNIFORM_BUFFER:
           glBindBufferRange(GL_UNIFORM_BUFFER,
                             cmd->uniform_buffer_bind_op.index,
                             cmd->uniform_buffer_bind_op.buffer,
@@ -2293,18 +2293,18 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                             cmd->uniform_buffer_bind_op.range);
           break;
 
-        case _NGF_CMD_BIND_TEXTURE:
+        case NGFGL_CMD_BIND_TEXTURE:
           glActiveTexture(GL_TEXTURE0 + cmd->texture_bind_op.unit);
           glBindTexture(cmd->texture_bind_op.texture->bind_point,
                         cmd->texture_bind_op.texture->glimage);
           break;
 
-        case _NGF_CMD_BIND_SAMPLER:
+        case NGFGL_CMD_BIND_SAMPLER:
           glBindSampler(cmd->sampler_bind_op.unit,
                         cmd->sampler_bind_op.sampler->glsampler);
           break;
 
-        case _NGF_CMD_BIND_ATTRIB_BUFFER: {
+        case NGFGL_CMD_BIND_ATTRIB_BUFFER: {
           const ngf_graphics_pipeline bound_pipeline =
             CURRENT_CONTEXT->has_bound_pipeline
               ? &CURRENT_CONTEXT->cached_state.pipeline
@@ -2317,7 +2317,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           for (size_t e = 0;
                !vbuf_table_entry_found && e < nvbuf_table_entries;
                ++e) { // Try to find and update vertex buffer table entry.
-            _ngf_vbuf_binding_info *vbuf_table_entry = &NGFI_DARRAY_AT(
+            ngfgl_vbuf_binding_info *vbuf_table_entry = &NGFI_DARRAY_AT(
                 CURRENT_CONTEXT->cached_state.vbuf_table,
                 e);
             if (vbuf_table_entry->binding == cmd->attrib_buffer_bind_op.binding) {
@@ -2329,7 +2329,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             }
           }
           if (!vbuf_table_entry_found) { // Must add new entry.
-            const _ngf_vbuf_binding_info new_entry = {
+            const ngfgl_vbuf_binding_info new_entry = {
               .binding = cmd->attrib_buffer_bind_op.binding,
               .buffer = cmd->attrib_buffer_bind_op.buf->glbuffer,
               .offset = cmd->attrib_buffer_bind_op.offset
@@ -2362,7 +2362,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
         }
 
-        case _NGF_CMD_BIND_INDEX_BUFFER:
+        case NGFGL_CMD_BIND_INDEX_BUFFER:
           glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
                        cmd->index_buffer_bind.index_buffer->glbuffer);
           CURRENT_CONTEXT->cached_state.bound_index_buffer =
@@ -2370,7 +2370,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           CURRENT_CONTEXT->bound_index_buffer_type = cmd->index_buffer_bind.type;
           break;
 
-        case _NGF_CMD_BEGIN_PASS: {
+        case NGFGL_CMD_BEGIN_PASS: {
           active_rt = cmd->begin_pass.target;
           glBindFramebuffer(GL_FRAMEBUFFER, active_rt->framebuffer);
           if (active_rt->is_srgb) glEnable(GL_FRAMEBUFFER_SRGB);
@@ -2408,7 +2408,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           break;
         }
 
-        case _NGF_CMD_END_PASS: {
+        case NGFGL_CMD_END_PASS: {
           assert(active_rt);
           const uint32_t max_discarded_attachments =
               active_rt->nattachments + 1u; // +1 needed in case we need to
@@ -2462,7 +2462,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
           }
           break;
         }
-        case _NGF_CMD_DRAW: {
+        case NGFGL_CMD_DRAW: {
           const ngf_graphics_pipeline bound_pipeline =
             CURRENT_CONTEXT->has_bound_pipeline
               ? &CURRENT_CONTEXT->cached_state.pipeline
@@ -2502,7 +2502,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                                     (GLsizei)cmd->draw.ninstances);
           }
           break; }
-        case _NGF_CMD_COPY:
+        case NGFGL_CMD_COPY:
           glBindBuffer(GL_COPY_READ_BUFFER, cmd->copy.src);
           glBindBuffer(GL_COPY_WRITE_BUFFER, cmd->copy.dst);
           glCopyBufferSubData(GL_COPY_READ_BUFFER,
@@ -2511,7 +2511,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                               (GLintptr)cmd->copy.dst_offset,
                               (GLsizei)cmd->copy.size);
           break;
-        case _NGF_CMD_WRITE_IMAGE: {
+        case NGFGL_CMD_WRITE_IMAGE: {
           const ngf_image_ref *img_ref = &cmd->write_image.dst_image_ref;
           const ngf_offset3d *offset = &cmd->write_image.offset;
           const ngf_extent3d *extent = &cmd->write_image.dimensions;
@@ -2561,7 +2561,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
         }
       }
     }
-    _ngf_cmd_buffer_free_cmds(bufs[buf_i]);
+    ngfgl_cmd_buffer_free_cmds(bufs[buf_i]);
   }
   return NGF_ERROR_OK;
 }
