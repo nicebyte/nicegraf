@@ -39,17 +39,17 @@ typedef CONDITION_VARIABLE pthread_cond_t;
 #define pthread_cond_init(c, a)  (InitializeConditionVariable(c))
 #define pthread_cond_wait(c, m)  (SleepConditionVariableCS(c, m, INFINITE))
 #define pthread_cond_signal(c)   (WakeConditionVariable(c))
-#define _ngf_cur_thread_id()     (GetCurrentThreadId())
+#define ngfi_cur_thread_id()     (GetCurrentThreadId())
 #define pthread_cond_destroy(c)
 #else
 #define NGF_THREADLOCAL __thread
 #include <pthread.h>
 #if defined(__APPLE__)
-#define _ngf_cur_thread_id() pthread_mach_thread_np(pthread_self())
+#define ngfi_cur_thread_id() pthread_mach_thread_np(pthread_self())
 #else
 #include <unistd.h>
 #include <sys/syscall.h>
-#define _ngf_cur_thread_id() syscall(SYS_gettid)
+#define ngfi_cur_thread_id() syscall(SYS_gettid)
 #endif
 #endif
 
@@ -87,7 +87,7 @@ typedef struct ngfi_block_allocator ngfi_block_allocator;
 
 // Creates a new block allocator with a given fixed `block_size` and a given
 // initial capacity of `nblocks`.
-ngfi_block_allocator* _ngf_blkalloc_create(uint32_t block_size,
+ngfi_block_allocator* ngfi_blkalloc_create(uint32_t block_size,
                                            uint32_t nblocks);
 
 // Destroys the given block allocator. All unfreed pointers obtained from the
@@ -105,7 +105,7 @@ typedef enum {
 
 // Returns the given block to the allocator.
 // Freeing a NULL pointer does nothing.
-ngfi_blkalloc_error _ngf_blkalloc_free(ngfi_block_allocator *alloc, void *ptr);
+ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator *alloc, void *ptr);
 
 // For fixing unreferenced parameter warnings.
 #if defined(__GNUC__) && !defined(__clang__)
@@ -143,7 +143,7 @@ ngf_error ngfi_create_native_binding_map(
 
 void ngfi_destroy_binding_map(ngfi_native_binding_map map);
   
-const ngfi_native_binding* _ngf_binding_map_lookup(
+const ngfi_native_binding* ngfi_binding_map_lookup(
     const ngfi_native_binding_map map,
     uint32_t set,
     uint32_t binding);
