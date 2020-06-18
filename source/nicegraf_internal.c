@@ -96,11 +96,11 @@ static void _ngf_blkallock_add_pool(ngfi_block_allocator *alloc) {
   NGFI_DARRAY_APPEND(alloc->pools, pool);
 }
 
-ngfi_block_allocator* _ngf_blkalloc_create(uint32_t requested_block_size,
+ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size,
                                            uint32_t nblocks) {
   static NGF_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
-    uint32_t threadid = (uint32_t)_ngf_cur_thread_id();
+    uint32_t threadid = (uint32_t)ngfi_cur_thread_id();
     next_tag = (~MARKER_MASK) & (threadid << 16);
   }
 
@@ -145,7 +145,7 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator *alloc) {
   return result;
 }
 
-ngfi_blkalloc_error _ngf_blkalloc_free(ngfi_block_allocator *alloc,
+ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator *alloc,
                                         void *ptr) {
   ngfi_blkalloc_error result = NGFI_BLK_NO_ERROR;
   if (ptr != NULL) {
@@ -173,7 +173,7 @@ ngfi_blkalloc_error _ngf_blkalloc_free(ngfi_block_allocator *alloc,
   return result;
 }
 
-const ngfi_native_binding* _ngf_binding_map_lookup(const ngfi_native_binding_map binding_map,
+const ngfi_native_binding* ngfi_binding_map_lookup(const ngfi_native_binding_map binding_map,
                                                    uint32_t set,
                                                    uint32_t binding) {
   const ngfi_native_binding *set_map = binding_map[set];

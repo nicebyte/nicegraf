@@ -1571,7 +1571,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     const ngf_resource_bind_op &bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
     const ngfi_native_binding *nb =
-         _ngf_binding_map_lookup(cmd_buf->active_pipe->binding_map,
+         ngfi_binding_map_lookup(cmd_buf->active_pipe->binding_map,
                                 bind_op.target_set,
                                 bind_op.target_binding);
     if (nb == nullptr) {

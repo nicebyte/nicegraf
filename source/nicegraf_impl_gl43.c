@@ -1632,7 +1632,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   NGFI_FAKE_USE(info);
   assert(result);
   if (COMMAND_POOL == NULL) {
-    COMMAND_POOL = _ngf_blkalloc_create(sizeof(_ngf_cmd_block), 100);
+    COMMAND_POOL = ngfi_blkalloc_create(sizeof(_ngf_cmd_block), 100);
   }
   ngf_error err = NGF_ERROR_OK;
   *result = NGFI_ALLOC(struct ngf_cmd_buffer_t);
@@ -1652,7 +1652,7 @@ void _ngf_cmd_buffer_free_cmds(ngf_cmd_buffer buf) {
   assert(!(has_first_cmd ^ has_last_cmd));
   if (has_first_cmd && has_last_cmd && COMMAND_POOL != NULL) {
     for (_ngf_cmd_block *c = buf->first_cmd_block; c != NULL; c = c->next) {
-      _ngf_blkalloc_free(COMMAND_POOL, c);
+      ngfi_blkalloc_free(COMMAND_POOL, c);
     }
   }
   buf->first_cmd_block = buf->last_cmd_block = NULL;
@@ -1806,7 +1806,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op *bind_op = &bind_ops[o];
     const ngfi_native_binding *native_binding =
-        _ngf_binding_map_lookup(cmdbuf->bound_pipeline->binding_map,
+        ngfi_binding_map_lookup(cmdbuf->bound_pipeline->binding_map,
                                 bind_op->target_set,
                                 bind_op->target_binding);
     if (native_binding == NULL) {
