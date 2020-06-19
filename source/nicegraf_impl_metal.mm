@@ -33,7 +33,7 @@
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
-using _NGF_VIEW_TYPE = NSView;
+using NGFMTL_VIEW_TYPE = NSView;
 #else
 #import <UIKit/UIKit.h>
 using _NGF_VIEW_TYPE = UIView;
@@ -331,16 +331,16 @@ static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
 }
 
 // Manages the final presentation surfaces.
-class _ngf_swapchain {
+class ngfmtl_swapchain {
 public:
   struct frame {
     id<CAMetalDrawable> color_drawable = nil;
     id<MTLTexture>      depth_texture  = nil;
   };
   
-  _ngf_swapchain() = default;
-  _ngf_swapchain(_ngf_swapchain &&other) { *this = std::move(other); }
-  _ngf_swapchain& operator=(_ngf_swapchain &&other) {
+  ngfmtl_swapchain() = default;
+  ngfmtl_swapchain(ngfmtl_swapchain &&other) { *this = std::move(other); }
+  ngfmtl_swapchain& operator=(ngfmtl_swapchain &&other) {
     layer_        = other.layer_;
     other.layer_  = nil;
     depth_images_ = std::move(other.depth_images_);
@@ -351,8 +351,8 @@ public:
   }
   
   // Delete copy ctor and copy assignment to make this type move-only.
-  _ngf_swapchain& operator=(const _ngf_swapchain&) = delete;
-  _ngf_swapchain(const _ngf_swapchain&) = delete;
+  ngfmtl_swapchain& operator=(const ngfmtl_swapchain&) = delete;
+  ngfmtl_swapchain(const ngfmtl_swapchain&) = delete;
   
   ngf_error initialize(const ngf_swapchain_info &swapchain_info,
                        id<MTLDevice>             device) {
@@ -382,7 +382,7 @@ public:
 #endif
     
     // Associate the newly created Metal layer with the user-provided View.
-    _NGF_VIEW_TYPE *view=
+    NGFMTL_VIEW_TYPE *view=
         CFBridgingRelease((void*)swapchain_info.native_handle);
 #if TARGET_OS_OSX
     [view setLayer:layer_];
@@ -444,8 +444,8 @@ private:
 
 struct ngf_context_t {
   id<MTLDevice> device = nil;
-  _ngf_swapchain swapchain;
-  _ngf_swapchain::frame frame;
+  ngfmtl_swapchain swapchain;
+  ngfmtl_swapchain::frame frame;
   id<MTLCommandQueue> queue = nil;
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
@@ -547,12 +547,12 @@ struct ngf_image_t {
 };
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
-class _ngf_object_nursery {
+class ngfmtl_object_nursery {
 public:
-  explicit _ngf_object_nursery(NgfObjType *memory) : ptr_(memory) {
+  explicit ngfmtl_object_nursery(NgfObjType *memory) : ptr_(memory) {
     new(memory) NgfObjType();
   }
-  ~_ngf_object_nursery() { if(ptr_ != nullptr) { Dtor(ptr_); } }
+  ~ngfmtl_object_nursery() { if(ptr_ != nullptr) { Dtor(ptr_); } }
   NgfObjType* operator->() { return ptr_; }
   NgfObjType* release() {
     NgfObjType *tmp = ptr_;
@@ -564,8 +564,8 @@ private:
   NgfObjType *ptr_;
 };
 
-#define _NGF_NURSERY(type, name) \
-_ngf_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
+#define NGFMTL_NURSERY(type, name) \
+ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
     name(NGFI_ALLOC(ngf_##type##_t));
 
 #pragma mark ngf_function_implementations
@@ -613,7 +613,7 @@ ngf_error ngf_end_frame() {
     [CURRENT_CONTEXT->pending_cmd_buffer
        presentDrawable:CURRENT_CONTEXT->frame.color_drawable];
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
-    CURRENT_CONTEXT->frame = _ngf_swapchain::frame{};
+    CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame{};
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
@@ -631,7 +631,7 @@ ngf_error ngf_default_render_target(
     ngf_render_target     *result) {
   assert(result);
   if (CURRENT_CONTEXT->swapchain) {
-    _NGF_NURSERY(render_target, rt);
+    NGFMTL_NURSERY(render_target, rt);
     rt->is_default = true;
     rt->ncolor_attachments = 1u;
     rt->pass_descriptor = [MTLRenderPassDescriptor new];
@@ -684,7 +684,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                              ngf_context *result) {
   assert(info);
   assert(result);
-  _NGF_NURSERY(context, ctx);
+  NGFMTL_NURSERY(context, ctx);
   if (!ctx) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -740,7 +740,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   assert(info);
   assert(result);
  
-  _NGF_NURSERY(shader_stage, stage);
+  NGFMTL_NURSERY(shader_stage, stage);
   if (!stage) {
     return NGF_ERROR_OUTOFMEM;
   }
@@ -802,7 +802,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
                                    ngf_render_target *result) {
   assert(info);
   assert(result);
-  _NGF_NURSERY(render_target, rt);
+  NGFMTL_NURSERY(render_target, rt);
   rt->pass_descriptor = [MTLRenderPassDescriptor new];
   rt->is_default = false;
   uint32_t color_attachment_idx = 0u;
@@ -860,9 +860,9 @@ void ngf_destroy_render_target(ngf_render_target rt) {
   }
 }
 
-id<MTLFunction> _ngf_get_shader_main(id<MTLLibrary> func_lib,
-                                     const char *entry_point_name,
-                                     MTLFunctionConstantValues *spec_consts) {
+id<MTLFunction> ngfmtl_get_shader_main(id<MTLLibrary> func_lib,
+                                       const char *entry_point_name,
+                                       MTLFunctionConstantValues *spec_consts) {
   NSError *err = nil;
   NSString *ns_entry_point_name =
       [NSString stringWithUTF8String:entry_point_name]; 
@@ -873,7 +873,7 @@ id<MTLFunction> _ngf_get_shader_main(id<MTLLibrary> func_lib,
                                      error:&err];
 }
 
-MTLStencilDescriptor* _ngf_create_stencil_descriptor(const ngf_stencil_info &info) {
+MTLStencilDescriptor* ngfmtl_create_stencil_descriptor(const ngf_stencil_info &info) {
   auto *result = [MTLStencilDescriptor new];
   result.stencilCompareFunction = get_mtl_compare_function(info.compare_op);
   result.stencilFailureOperation = get_mtl_stencil_op(info.fail_op);
@@ -952,12 +952,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
       mtl_pipe_desc.vertexFunction =
-          _ngf_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
+          ngfmtl_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
                                spec_consts);
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc.fragmentFunction);
       mtl_pipe_desc.fragmentFunction =
-          _ngf_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
+          ngfmtl_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(),
                                spec_consts);
     }
   }
@@ -995,7 +995,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
   }
   
-  _NGF_NURSERY(graphics_pipeline, pipeline);
+  NGFMTL_NURSERY(graphics_pipeline, pipeline);
   pipeline->layout.ndescriptor_set_layouts =
       info->layout->ndescriptor_set_layouts;
   ngf_descriptor_set_layout_info *descriptor_set_layouts =
@@ -1050,9 +1050,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         get_mtl_compare_function(depth_stencil_info.depth_compare);
     mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
     mtl_depth_stencil_desc.backFaceStencil =
-        _ngf_create_stencil_descriptor(depth_stencil_info.back_stencil);
+        ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
     mtl_depth_stencil_desc.frontFaceStencil =
-        _ngf_create_stencil_descriptor(depth_stencil_info.front_stencil);
+        ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
     pipeline->front_stencil_reference =
         depth_stencil_info.front_stencil.reference;
     pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
@@ -1078,7 +1078,7 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) {
   }
 }
 
-id<MTLBuffer> _ngf_create_buffer(const ngf_buffer_info &info) {
+id<MTLBuffer> ngfmtl_create_buffer(const ngf_buffer_info &info) {
   MTLResourceOptions options = 0u;
   MTLResourceOptions managed_storage = 0u;
 #if TARGET_OS_OSX
@@ -1112,8 +1112,8 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer,
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
                                    ngf_attrib_buffer *result) {
-  _NGF_NURSERY(attrib_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer(*info);
+  NGFMTL_NURSERY(attrib_buffer, buf);
+  buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1147,8 +1147,8 @@ void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer buf) {}
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
                                   ngf_index_buffer *result) {
-  _NGF_NURSERY(index_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer(*info);
+  NGFMTL_NURSERY(index_buffer, buf);
+  buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1182,8 +1182,8 @@ void ngf_destroy_index_buffer(ngf_index_buffer buf) {
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
                                     ngf_uniform_buffer *result) {
-  _NGF_NURSERY(uniform_buffer, buf);
-  buf->mtl_buffer = _ngf_create_buffer(*info);
+  NGFMTL_NURSERY(uniform_buffer, buf);
+  buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1218,12 +1218,12 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
                                   ngf_pixel_buffer *result) {
   assert(info);
   assert(result);
-  _NGF_NURSERY(pixel_buffer, buf);
+  NGFMTL_NURSERY(pixel_buffer, buf);
   ngf_buffer_info bufinfo = {
     info->size,
     NGF_BUFFER_STORAGE_HOST_WRITEABLE
   };
-  buf->mtl_buffer = _ngf_create_buffer(bufinfo);
+  buf->mtl_buffer = ngfmtl_create_buffer(bufinfo);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
@@ -1273,7 +1273,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   // TODO unmipped images
   sampler_desc.lodMinClamp = info->lod_min;
   sampler_desc.lodMaxClamp = info->lod_max;
-  _NGF_NURSERY(sampler, sampler);
+  NGFMTL_NURSERY(sampler, sampler);
   sampler->sampler =
       [CURRENT_CONTEXT->device newSamplerStateWithDescriptor:sampler_desc];
   *result = sampler.release();
@@ -1289,7 +1289,7 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
                                 ngf_cmd_buffer *result) {
-  _NGF_NURSERY(cmd_buffer, cmd_buffer);
+  NGFMTL_NURSERY(cmd_buffer, cmd_buffer);
   *result = cmd_buffer.release();
   return NGF_ERROR_OK;
 }
@@ -1335,7 +1335,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   default:
       assert(false);
   }
-  _NGF_NURSERY(image, image);
+  NGFMTL_NURSERY(image, image);
   image->texture =
       [CURRENT_CONTEXT->device newTextureWithDescriptor:mtl_img_desc];
   image->format = info->format;
@@ -1667,7 +1667,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   }
 }
 
-void _ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
+void ngfmtl_cmd_copy_buffer(ngf_xfer_encoder enc,
                           id<MTLBuffer> src, id<MTLBuffer> dst,
                           size_t size, size_t src_offset, size_t dst_offset) {
   auto buf = (ngf_cmd_buffer)enc.__handle;
@@ -1685,7 +1685,7 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 size_t size,
                                 size_t src_offset,
                                 size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
@@ -1695,7 +1695,7 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
                                size_t size,
                                size_t src_offset,
                                size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
@@ -1705,7 +1705,7 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  size_t size,
                                  size_t src_offset,
                                  size_t dst_offset) {
-  _ngf_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
+  ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
 
