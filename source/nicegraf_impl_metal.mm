@@ -76,7 +76,7 @@ struct mtl_format {
 };
 
 static MTLBlendFactor get_mtl_blend_factor(ngf_blend_factor f) {
-  static constexpr MTLBlendFactor factors[] = {
+  static constexpr MTLBlendFactor factors[NGF_BLEND_FACTOR_COUNT] = {
     MTLBlendFactorZero,
     MTLBlendFactorOne,
     MTLBlendFactorSourceColor,
@@ -93,6 +93,17 @@ static MTLBlendFactor get_mtl_blend_factor(ngf_blend_factor f) {
     MTLBlendFactorOneMinusBlendAlpha
   };
   return factors[f];
+}
+
+static MTLBlendOperation get_mtl_blend_operation(ngf_blend_op op) {
+  static constexpr MTLBlendOperation ops[NGF_BLEND_OP_COUNT] = {
+    MTLBlendOperationAdd,
+    MTLBlendOperationSubtract,
+    MTLBlendOperationReverseSubtract,
+    MTLBlendOperationMin,
+    MTLBlendOperationMax
+  };
+  return ops[op];
 }
 
 static mtl_format get_mtl_pixel_format(ngf_image_format f) {
@@ -510,6 +521,7 @@ struct ngf_graphics_pipeline_t {
   MTLPrimitiveType primitive_type = MTLPrimitiveTypeTriangle;
   MTLWinding       winding        = MTLWindingCounterClockwise;
   MTLCullMode      culling        = MTLCullModeBack;
+  float            blend_color[4] {0};
   
   ngfi_native_binding_map   binding_map = nullptr;
   ngf_pipeline_layout_info layout;
@@ -922,13 +934,17 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     }
     mtl_pipe_desc.colorAttachments[ca].blendingEnabled = info->blend->enable;
     mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor =
-      get_mtl_blend_factor(info->blend->sfactor);
+      get_mtl_blend_factor(info->blend->src_color_blend_factor);
     mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor =
-      get_mtl_blend_factor(info->blend->dfactor);
+      get_mtl_blend_factor(info->blend->dst_color_blend_factor);
     mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor =
-      get_mtl_blend_factor(info->blend->sfactor);
+      get_mtl_blend_factor(info->blend->src_alpha_blend_factor);
     mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor =
-      get_mtl_blend_factor(info->blend->dfactor);
+      get_mtl_blend_factor(info->blend->dst_alpha_blend_factor);
+    mtl_pipe_desc.colorAttachments[ca].rgbBlendOperation =
+      get_mtl_blend_operation(info->blend->blend_op_color);
+    mtl_pipe_desc.colorAttachments[ca].alphaBlendOperation =
+      get_mtl_blend_operation(info->blend->blend_op_alpha);
   }
 
   if (compatible_rt.pass_descriptor.depthAttachment.texture) {
@@ -1019,6 +1035,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
+  memcpy(pipeline->blend_color,
+         info->blend->blend_color,
+         sizeof(pipeline->blend_color));
   pipeline->layout.ndescriptor_set_layouts =
       info->layout->ndescriptor_set_layouts;
   ngf_descriptor_set_layout_info *descriptor_set_layouts =
@@ -1497,6 +1516,10 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
   [buf->active_rce setCullMode:pipeline->culling];	
   [buf->active_rce setFrontFacingWinding:pipeline->winding];
+  [buf->active_rce setBlendColorRed:pipeline->blend_color[0]
+                              green:pipeline->blend_color[1]
+                               blue:pipeline->blend_color[2]
+                              alpha:pipeline->blend_color[3]];
   if (pipeline->depth_stencil) {
     [buf->active_rce setDepthStencilState:pipeline->depth_stencil];
   }
@@ -1777,7 +1800,6 @@ PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
-PLACEHOLDER_CMD(blend_factors, ngf_blend_factor, ngf_blend_factor)
 
 void ngf_debug_message_callback(void *userdata,
                                 void (*callback)(const char*, const void*)) {
