@@ -75,6 +75,26 @@ struct mtl_format {
   const bool    srgb;
 };
 
+static MTLBlendFactor get_mtl_blend_factor(ngf_blend_factor f) {
+  static constexpr MTLBlendFactor factors[] = {
+    MTLBlendFactorZero,
+    MTLBlendFactorOne,
+    MTLBlendFactorSourceColor,
+    MTLBlendFactorOneMinusSourceColor,
+    MTLBlendFactorDestinationColor,
+    MTLBlendFactorOneMinusDestinationColor,
+    MTLBlendFactorSourceAlpha,
+    MTLBlendFactorOneMinusSourceAlpha,
+    MTLBlendFactorDestinationAlpha,
+    MTLBlendFactorOneMinusDestinationAlpha,
+    MTLBlendFactorBlendColor,
+    MTLBlendFactorOneMinusBlendColor,
+    MTLBlendFactorBlendAlpha,
+    MTLBlendFactorOneMinusBlendAlpha
+  };
+  return factors[f];
+}
+
 static mtl_format get_mtl_pixel_format(ngf_image_format f) {
   static const mtl_format formats[NGF_IMAGE_FORMAT_COUNT] = {
     {MTLPixelFormatR8Unorm, 8, 0, 0, 0, 0, 0, false},
@@ -900,12 +920,15 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       mtl_pipe_desc.colorAttachments[ca].pixelFormat =
         compatible_rt.pass_descriptor.colorAttachments[ca].texture.pixelFormat;
     }
-    // TODO set up blending correctly
     mtl_pipe_desc.colorAttachments[ca].blendingEnabled = info->blend->enable;
-    mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor = MTLBlendFactorSourceAlpha;
-    mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor = MTLBlendFactorSourceAlpha;
-    mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor =
+      get_mtl_blend_factor(info->blend->sfactor);
+    mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor =
+      get_mtl_blend_factor(info->blend->dfactor);
+    mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor =
+      get_mtl_blend_factor(info->blend->sfactor);
+    mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor =
+      get_mtl_blend_factor(info->blend->dfactor);
   }
 
   if (compatible_rt.pass_descriptor.depthAttachment.texture) {
