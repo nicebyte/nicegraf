@@ -36,7 +36,7 @@
 using NGFMTL_VIEW_TYPE = NSView;
 #else
 #import <UIKit/UIKit.h>
-using _NGF_VIEW_TYPE = UIView;
+using NGFMTL_VIEW_TYPE = UIView;
 #endif
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
