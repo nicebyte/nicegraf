@@ -304,9 +304,6 @@ typedef struct ngf_depth_stencil_info {
 
 /**
  * Blend factors.
- * Result of blend is computed as source*sfactor + dest*dfactor
- * Where `source` is the incoming value, `dest` is the value already in the
- * frame buffer, and `sfactor` and `dfactor` are one of these values. 
  */
 typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ZERO = 0,
@@ -327,12 +324,37 @@ typedef enum ngf_blend_factor {
 } ngf_blend_factor;
 
 /**
+ * Blend operations.
+ */
+typedef enum ngf_blend_op {
+  NGF_BLEND_OP_ADD,
+  NGF_BLEND_OP_SUB,
+  NGF_BLEND_OP_REV_SUB,
+  NGF_BLEND_OP_MIN,
+  NGF_BLEND_OP_MAX,
+  NGF_BLEND_OP_COUNT
+} ngf_blend_op;
+
+/**
  * Pipeline's blend state description.
+ * The result of blend is computed for color and alpha separately,
+ * according to the following equation:
+ *  source*sfactor OP dest*dfactor
+ * Where:
+ *  - `source` is the incoming value, `dest` is the value already in the frame
+ *     buffer.
+ *  - `OP` is one of the supported blend operations.
+ *  - `sfactor` and `dfactor` are one of the supported blend factors.
  */
 typedef struct ngf_blend_info {
-  bool enable; /**< Enable blending.*/
-  ngf_blend_factor sfactor; /**< Source factor.*/
-  ngf_blend_factor dfactor; /**< Destination factor.*/
+  bool enable;                             /**< Enable blending.*/
+  ngf_blend_op     blend_op_color;         /**< Blend operation to perform for color. */
+  ngf_blend_op     blend_op_alpha;         /**< Blend operation to perform for alpha. */
+  ngf_blend_factor src_color_blend_factor; /**< Source blend factor for color. */
+  ngf_blend_factor dst_color_blend_factor; /**< Destination blend factor for color. */
+  ngf_blend_factor src_alpha_blend_factor; /**< Source blend factor for alpha. */
+  ngf_blend_factor dst_alpha_blend_factor; /**< Destination blend factor for alpha. */
+  float            blend_color[4];         /**< Blend color. */
 } ngf_blend_info;
 
 /**
@@ -1414,9 +1436,6 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front,
 void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front,
                                 uint32_t back);
 void ngf_cmd_line_width(ngf_render_encoder buf, float line_width);
-void ngf_cmd_blend_factors(ngf_render_encoder buf,
-                           ngf_blend_factor sfactor,
-                           ngf_blend_factor dfactor);
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder buf,
                                 const ngf_resource_bind_op *bind_operations,
                                 uint32_t nbind_operations);

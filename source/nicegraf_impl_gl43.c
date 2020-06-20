@@ -183,10 +183,6 @@ typedef struct ngfgl_emulated_cmd {
     ngf_irect2d scissor;
     float line_width;
     struct {
-      ngf_blend_factor sfactor;
-      ngf_blend_factor dfactor;
-    } blend_factors;
-    struct {
       uint32_t front;
       uint32_t back;
     } stencil_reference;
@@ -356,7 +352,7 @@ static GLenum get_gl_stencil_op(ngf_stencil_op op) {
   return o[(size_t)(op)];
 }
 
-static GLenum get_gl_blendfactor(ngf_blend_factor f) {
+static GLenum get_gl_blend_factor(ngf_blend_factor f) {
   static const GLenum factor[NGF_BLEND_FACTOR_COUNT] = {
     GL_ZERO,
     GL_ONE,
@@ -374,6 +370,17 @@ static GLenum get_gl_blendfactor(ngf_blend_factor f) {
     GL_ONE_MINUS_CONSTANT_ALPHA
   };
   return factor[(size_t)(f)];
+}
+
+static GLenum get_gl_blend_op(ngf_blend_op op) {
+  static const GLenum ops[NGF_BLEND_OP_COUNT] = {
+    GL_FUNC_ADD,
+    GL_FUNC_SUBTRACT,
+    GL_FUNC_REVERSE_SUBTRACT,
+    GL_MIN,
+    GL_MAX
+  };
+  return ops[op];
 }
 
 static GLenum get_gl_primitive_type(ngf_primitive_type p) {
@@ -1789,16 +1796,6 @@ void ngf_cmd_line_width(ngf_render_encoder enc, float line_width) {
   cmd->line_width = line_width;
 }
 
-void ngf_cmd_blend_factors(ngf_render_encoder enc,
-                           ngf_blend_factor sfactor,
-                           ngf_blend_factor dfactor) {
-  ngfgl_emulated_cmd *cmd = NULL;
-  NGFGL_NEWCMD(enc, cmd);
-  cmd->type = NGFGL_CMD_BLEND_CONSTANTS;
-  cmd->blend_factors.sfactor = sfactor;
-  cmd->blend_factors.dfactor = dfactor;
-}
-
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                 const ngf_resource_bind_op *bind_ops,
                                 uint32_t nbind_ops) {
@@ -2171,14 +2168,21 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             const ngf_blend_info *blend = &(pipeline->blend);
             const ngf_blend_info *prev_blend =
                 bound_pipe ? &(bound_pipe->blend) : NULL;
-            if (!prev_blend ||
-                prev_blend->enable != blend->enable ||
-                prev_blend->sfactor != blend->sfactor ||
-                prev_blend->dfactor != blend->dfactor) {
+            if (!prev_blend || memcmp(blend, prev_blend, sizeof(ngf_blend_info))) {
               if (blend->enable) {
                 glEnable(GL_BLEND);
-                glBlendFunc(get_gl_blendfactor(blend->sfactor),
-                            get_gl_blendfactor(blend->dfactor));
+                glBlendEquationSeparate(get_gl_blend_factor(blend->blend_op_color),
+                                        get_gl_blend_factor(blend->blend_op_alpha));
+                glBlendFuncSeparate(get_gl_blend_factor(blend->src_color_blend_factor),
+                                    get_gl_blend_factor(blend->dst_color_blend_factor),
+                                    get_gl_blend_factor(blend->src_alpha_blend_factor),
+                                    get_gl_blend_factor(blend->dst_alpha_blend_factor));
+                glBlendEquationSeparate(get_gl_blend_op(blend->blend_op_color),
+                                        get_gl_blend_op(blend->blend_op_alpha));
+                glBlendColor(blend->blend_color[0],
+                             blend->blend_color[1],
+                             blend->blend_color[2],
+                             blend->blend_color[3]);
               } else {
                 glDisable(GL_BLEND);
               }
@@ -2239,11 +2243,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
 
         case NGFGL_CMD_LINE_WIDTH:
           glLineWidth(cmd->line_width);
-          break;
-
-        case NGFGL_CMD_BLEND_CONSTANTS:
-          glBlendFunc(cmd->blend_factors.sfactor,
-                      cmd->blend_factors.dfactor);
           break;
 
         case NGFGL_CMD_STENCIL_WRITE_MASK:
