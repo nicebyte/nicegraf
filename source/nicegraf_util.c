@@ -36,11 +36,8 @@ SOFTWARE.
 void ngf_util_create_default_graphics_pipeline_data(
     const ngf_irect2d *window_size,
     ngf_util_graphics_pipeline_data *result) {
-  ngf_blend_info bi = {
-    .enable = false,
-    .sfactor = NGF_BLEND_FACTOR_ONE,
-    .dfactor = NGF_BLEND_FACTOR_ZERO
-  };
+  ngf_blend_info bi;
+  bi.enable = false;
   result->blend_info = bi;
   ngf_stencil_info default_stencil = {
     .fail_op = NGF_STENCIL_OP_KEEP,
