@@ -376,7 +376,7 @@ static VkAttachmentStoreOp get_vk_store_op(ngf_attachment_store_op op) {
 }
 
 static VkBlendFactor get_vk_blend_factor(ngf_blend_factor f) {
-  VkBlendFactor factors[NGF_BLEND_FACTOR_COUNT] = {
+  static const VkBlendFactor factors[NGF_BLEND_FACTOR_COUNT] = {
     VK_BLEND_FACTOR_ZERO,
     VK_BLEND_FACTOR_ONE,
     VK_BLEND_FACTOR_SRC_COLOR,
@@ -395,8 +395,19 @@ static VkBlendFactor get_vk_blend_factor(ngf_blend_factor f) {
   return factors[f];
 }
 
+static VkBlendOp get_vk_blend_op(ngf_blend_op op) {
+  static const VkBlendOp ops[NGF_BLEND_OP_COUNT] = {
+    VK_BLEND_OP_ADD,
+    VK_BLEND_OP_SUBTRACT,
+    VK_BLEND_OP_REVERSE_SUBTRACT,
+    VK_BLEND_OP_MIN,
+    VK_BLEND_OP_MAX
+  };
+  return ops[op];
+}
+
 static VkFormat get_vk_image_format(ngf_image_format f) {
-  static VkFormat formats[NGF_IMAGE_FORMAT_COUNT] = {
+  static const VkFormat formats[NGF_IMAGE_FORMAT_COUNT] = {
     VK_FORMAT_R8_UNORM,
     VK_FORMAT_R8G8_UNORM,
     VK_FORMAT_R8G8B8_UNORM,
@@ -2193,12 +2204,12 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Prepare blend state.
   VkPipelineColorBlendAttachmentState attachment_blend_state = {
     .blendEnable = info->blend->enable,
-    .srcColorBlendFactor = get_vk_blend_factor(info->blend->sfactor),
-    .dstColorBlendFactor = get_vk_blend_factor(info->blend->dfactor),
-    .colorBlendOp = VK_BLEND_OP_ADD,
-    .srcAlphaBlendFactor = get_vk_blend_factor(info->blend->sfactor),
-    .dstAlphaBlendFactor = get_vk_blend_factor(info->blend->dfactor),
-    .alphaBlendOp = VK_BLEND_OP_ADD,
+    .srcColorBlendFactor = get_vk_blend_factor(info->blend->src_color_blend_factor),
+    .dstColorBlendFactor = get_vk_blend_factor(info->blend->dst_color_blend_factor),
+    .colorBlendOp = get_vk_blend_factor(info->blend->blend_op_color),
+    .srcAlphaBlendFactor = get_vk_blend_factor(info->blend->src_alpha_blend_factor),
+    .dstAlphaBlendFactor = get_vk_blend_factor(info->blend->dst_alpha_blend_factor),
+    .alphaBlendOp = get_vk_blend_factor(info->blend->blend_op_alpha),
     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | //TODO: set color write mask
                       VK_COLOR_COMPONENT_G_BIT |
                       VK_COLOR_COMPONENT_B_BIT |
