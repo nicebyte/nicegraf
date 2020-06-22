@@ -41,7 +41,60 @@ extern "C" {
 #ifdef _MSC_VER
 #pragma region ngf_type_declarations
 #endif
-    
+
+/**
+ * Device hints.
+ * TODO: API for choosing device explicitly.
+ */
+typedef enum ngf_device_preference {
+  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete GPU. */
+  NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
+  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No GPU preference. */
+} ngf_device_preference;
+
+/**
+ * Verbosity levels for the diagnostic message log.
+ */
+typedef enum ngf_diagnostic_log_verbosity {
+  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT, /**< Normal level, reports only severe errors. */
+  NGF_DIAGNOSTICS_VERBOSITY_DETAILED /**< Recommended for debug builds, may induce perf overhead. */
+} ngf_diagnostic_log_verbosity;
+
+/**
+ * Type of a diagnostic log entry.
+ */
+typedef enum ngf_diagnostic_message_type {
+  NGF_DIAGNOSTIC_INFO, /**< Informational message, not actionalble. */
+  NGF_DIAGNOSTIC_WARNING, /**< Message warns of a potential issue with an API call. */
+  NGF_DIAGNOSTIC_ERROR /**< Message provides details of an API call failure. */
+} ngf_diagnostic_message_type;
+
+/**
+ * Detailed information about errors may vary from platform to platform.
+ * nicegraf reports errors through a combination of generic return codes and detailed
+ * human-readable information passed to a user-provided callback function.
+ * The callback function must accept the diagnostic message type, a printf-style
+ * format string, and an arbitrary number of arguments specifying the data for the 
+ * format-string.
+ */
+typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, const char*, ...);
+
+/**
+ * Diagnostic configuration.
+ */
+typedef struct ngf_diagnostic_info {
+  ngf_diagnostic_log_verbosity verbosity;
+  ngf_diagnostic_callback callback;
+} ngf_diagnostic_info;
+
+/**
+ * nicegraf initialization parameters.
+ */
+typedef struct ngf_init_info {
+  ngf_device_preference device_pref; /**< Which type of device to prefer. */
+  ngf_diagnostic_info diag_info;     /**< Diagnostic log configuration. */
+} ngf_init_info;
+
 /**
  * Error codes.
  *
@@ -112,16 +165,6 @@ typedef enum ngf_error {
   NGF_ERROR_INVALID_OPERATION
   /*..add new errors above this line */
 } ngf_error ;
-
-/**
- * Device hints.
- * TODO: API for choosing device explicitly.
- */
-typedef enum ngf_device_preference {
-  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete GPU. */
-  NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
-  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No GPU preference. */
-} ngf_device_preference;
 
 /**
  * Possible present modes.
@@ -1096,7 +1139,15 @@ typedef struct ngf_index_buffer_t* ngf_index_buffer;
 
 #pragma region ngf_function_declarations
 #endif
-    
+
+/**
+ * Initialize Nicegraf.
+ * @param dev_pref specifies what type of GPU to prefer. Note that this setting
+ *  might be ignored, depending on the backend.
+ * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
+ */
+ngf_error ngf_initialize(ngf_device_preference dev_pref);
+
 /**
  * Set the memory allocation callbacks that the library will use for its
  * internal needs.
@@ -1474,13 +1525,6 @@ void ngf_cmd_write_image(ngf_xfer_encoder buf,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
                          const ngf_extent3d *extent);
-/**
- * Initialize Nicegraf.
- * @param dev_pref specifies what type of GPU to prefer. Note that this setting
- *  might be ignored, depending on the backend.
- * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
- */
-ngf_error ngf_initialize(ngf_device_preference dev_pref);
 
 /**
  * Create a new Nicegraf context. Creates a new Nicegraf context that
