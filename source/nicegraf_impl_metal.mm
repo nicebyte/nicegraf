@@ -602,7 +602,7 @@ ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
 
 #pragma mark ngf_function_implementations
 
-ngf_error ngf_initialize(ngf_device_preference dev_pref) {
+ngf_error ngf_initialize(const ngf_init_info *init_info) {
 #if TARGET_OS_OSX
   // On macOS, try picking a device in accordance with user's preferences.
   id<NSObject> dev_observer = nil;
@@ -611,6 +611,7 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref) {
                                     ^(id<MTLDevice> d,
                                       MTLDeviceNotificationName n){});
   bool found_preferred_device = false;
+  const ngf_device_preference dev_pref = init_info->device_pref;
   for (uint32_t d = 0u; !found_preferred_device && d < devices.count; ++d) {
     MTL_DEVICE = devices[d];
     // If the user prefers discrete GPU, do not pick a low-power device.
