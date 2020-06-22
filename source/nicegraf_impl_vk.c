@@ -2204,12 +2204,18 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Prepare blend state.
   VkPipelineColorBlendAttachmentState attachment_blend_state = {
     .blendEnable = info->blend->enable,
-    .srcColorBlendFactor = get_vk_blend_factor(info->blend->src_color_blend_factor),
-    .dstColorBlendFactor = get_vk_blend_factor(info->blend->dst_color_blend_factor),
-    .colorBlendOp = get_vk_blend_factor(info->blend->blend_op_color),
-    .srcAlphaBlendFactor = get_vk_blend_factor(info->blend->src_alpha_blend_factor),
-    .dstAlphaBlendFactor = get_vk_blend_factor(info->blend->dst_alpha_blend_factor),
-    .alphaBlendOp = get_vk_blend_factor(info->blend->blend_op_alpha),
+    .srcColorBlendFactor = 
+	    info->blend->enable ? get_vk_blend_factor(info->blend->src_color_blend_factor) : VK_BLEND_FACTOR_ONE,
+    .dstColorBlendFactor =
+	    info->blend->enable ? get_vk_blend_factor(info->blend->dst_color_blend_factor) : VK_BLEND_FACTOR_ZERO,
+    .colorBlendOp =
+	    info->blend->enable ? get_vk_blend_factor(info->blend->blend_op_color) : VK_BLEND_OP_ADD,
+    .srcAlphaBlendFactor =
+	    info->blend->enable ? get_vk_blend_factor(info->blend->src_alpha_blend_factor) : VK_BLEND_FACTOR_ONE,
+    .dstAlphaBlendFactor =
+	    info->blend->enable ? get_vk_blend_factor(info->blend->dst_alpha_blend_factor) : VK_BLEND_FACTOR_ZERO,
+    .alphaBlendOp =
+	    info->blend->enable ? get_vk_blend_factor(info->blend->blend_op_alpha) : VK_BLEND_OP_ADD,
     .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | //TODO: set color write mask
                       VK_COLOR_COMPONENT_G_BIT |
                       VK_COLOR_COMPONENT_B_BIT |
