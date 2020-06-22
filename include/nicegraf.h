@@ -73,25 +73,31 @@ typedef enum ngf_diagnostic_message_type {
  * Detailed information about errors may vary from platform to platform.
  * nicegraf reports errors through a combination of generic return codes and detailed
  * human-readable information passed to a user-provided callback function.
- * The callback function must accept the diagnostic message type, a printf-style
- * format string, and an arbitrary number of arguments specifying the data for the 
- * format-string.
+ * The callback function must accept the diagnostic message type, an arbitrary void pointer
+ * (which the user may specify), a printf-style format string, and an arbitrary number of
+ * arguments specifying the data for the format-string.
  */
-typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, const char*, ...);
+typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, const char*, ...);
 
 /**
  * Diagnostic configuration.
  */
 typedef struct ngf_diagnostic_info {
-  ngf_diagnostic_log_verbosity verbosity;
-  ngf_diagnostic_callback callback;
+  ngf_diagnostic_log_verbosity verbosity; /**< Diagnostic log verbosity. */
+  void                        *userdata; /**< Arbitrary pointer that will
+                                                   be passed as-is to the 
+                                                   callback. */
+  ngf_diagnostic_callback      callback; /**< Pointer to the diagnostic
+                                                   message callback function.*/
 } ngf_diagnostic_info;
 
 /**
  * nicegraf initialization parameters.
  */
 typedef struct ngf_init_info {
-  ngf_device_preference device_pref; /**< Which type of device to prefer. */
+  ngf_device_preference device_pref; /**< Which type of device to prefer.
+                                          May be ignored, depending on the backend.
+                                      */
   ngf_diagnostic_info diag_info;     /**< Diagnostic log configuration. */
 } ngf_init_info;
 
@@ -1036,7 +1042,6 @@ typedef struct ngf_context_info {
    * Can be NULL.
    */
   const ngf_context shared_context;
-  bool debug; /**< Whether to enable debug features. */
 } ngf_context_info;
 
 typedef struct ngf_cmd_buffer_info {
@@ -1142,11 +1147,10 @@ typedef struct ngf_index_buffer_t* ngf_index_buffer;
 
 /**
  * Initialize Nicegraf.
- * @param dev_pref specifies what type of GPU to prefer. Note that this setting
- *  might be ignored, depending on the backend.
+ * @param init_info Initialization parameters.
  * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
  */
-ngf_error ngf_initialize(ngf_device_preference dev_pref);
+ngf_error ngf_initialize(const ngf_init_info *init_info);
 
 /**
  * Set the memory allocation callbacks that the library will use for its
@@ -1154,9 +1158,6 @@ ngf_error ngf_initialize(ngf_device_preference dev_pref);
  * By default, stdlib's malloc and free are used.
  */
 void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks);
-
-void ngf_debug_message_callback(void *userdata,
-                                void (*callback)(const char*, const void*));
 
 /**
  * Create a shader stage from its description.

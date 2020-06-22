@@ -182,6 +182,12 @@ typedef enum {
 #define interlocked_read(v)     (__sync_add_and_fetch(v, 0))
 #endif
 
+// Invoke diagnostic message callback directly.
+#define NGFI_DIAG_MSG(level, fmt, ...) \
+if (ngfi_diag_info.callback) { \
+  ngfi_diag_info.callback(level, ngfi_diag_info.userdata, fmt, __VA_ARGS__); \
+}
+
 #ifdef __cplusplus
 }
 #endif
