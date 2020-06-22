@@ -653,7 +653,7 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 #endif
 }
 
-ngf_error ngf_initialize(ngf_device_preference pref) {
+ngf_error ngf_initialize(const ngf_init_info *init_info) {
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
     vkl_init_loader(); // Initialize the vulkan loader.
 
@@ -695,6 +695,7 @@ ngf_error ngf_initialize(ngf_device_preference pref) {
     // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
     uint32_t best_device_index = _NGF_INVALID_IDX;
+    const ngf_device_preference pref = init_info->device_pref;
     for (uint32_t i = 0; i < nphysdev; ++i) {
       VkPhysicalDeviceProperties dev_props;
       vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
@@ -2453,13 +2454,6 @@ ngf_default_render_target_cleanup:
     ngf_destroy_render_target(rt);
   }
   return err;
-}
-
-void ngf_debug_message_callback(void *userdata,
-                                void(*callback)(const char*, const void*)) {
-  // TODO: implement
-  NGFI_FAKE_USE(userdata);
-  NGFI_FAKE_USE(callback);
 }
 
 #define _ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
