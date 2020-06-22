@@ -36,7 +36,7 @@
 using NGFMTL_VIEW_TYPE = NSView;
 #else
 #import <UIKit/UIKit.h>
-using _NGF_VIEW_TYPE = UIView;
+using NGFMTL_VIEW_TYPE = UIView;
 #endif
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
@@ -933,18 +933,20 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         compatible_rt.pass_descriptor.colorAttachments[ca].texture.pixelFormat;
     }
     mtl_pipe_desc.colorAttachments[ca].blendingEnabled = info->blend->enable;
-    mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor =
-      get_mtl_blend_factor(info->blend->src_color_blend_factor);
-    mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor =
-      get_mtl_blend_factor(info->blend->dst_color_blend_factor);
-    mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor =
-      get_mtl_blend_factor(info->blend->src_alpha_blend_factor);
-    mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor =
-      get_mtl_blend_factor(info->blend->dst_alpha_blend_factor);
-    mtl_pipe_desc.colorAttachments[ca].rgbBlendOperation =
-      get_mtl_blend_operation(info->blend->blend_op_color);
-    mtl_pipe_desc.colorAttachments[ca].alphaBlendOperation =
-      get_mtl_blend_operation(info->blend->blend_op_alpha);
+    if (info->blend->enable) {
+      mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor =
+        get_mtl_blend_factor(info->blend->src_color_blend_factor);
+      mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor =
+        get_mtl_blend_factor(info->blend->dst_color_blend_factor);
+      mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor =
+        get_mtl_blend_factor(info->blend->src_alpha_blend_factor);
+      mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor =
+        get_mtl_blend_factor(info->blend->dst_alpha_blend_factor);
+      mtl_pipe_desc.colorAttachments[ca].rgbBlendOperation =
+        get_mtl_blend_operation(info->blend->blend_op_color);
+      mtl_pipe_desc.colorAttachments[ca].alphaBlendOperation =
+        get_mtl_blend_operation(info->blend->blend_op_alpha);
+    }
   }
 
   if (compatible_rt.pass_descriptor.depthAttachment.texture) {
