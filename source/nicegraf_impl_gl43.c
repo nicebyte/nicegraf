@@ -493,24 +493,28 @@ static GLenum get_gl_cubemap_face(ngf_cubemap_face face) {
 
 #pragma endregion
 
-void (*NGF_DEBUG_CALLBACK)(const char *message, const void *userdata) = NULL;
-void *NGF_DEBUG_USERDATA = NULL;
+static ngf_diagnostic_info ngfi_diag_info = {
+  .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  .userdata  = NULL,
+  .callback  = NULL
+};
 
-void GL_APIENTRY ngf_gl_debug_callback(GLenum source,
-                                       GLenum type,
-                                       GLuint id,
-                                       GLenum severity,
-                                       GLsizei length,
-                                       const GLchar* message,
-                                       const void* userdata) {
-  NGFI_FAKE_USE(length, severity, source, type, id);
-  if (NGF_DEBUG_CALLBACK) {
-    NGF_DEBUG_CALLBACK(message, userdata);
+static void GL_APIENTRY ngfgl_debug_message_callback(
+  GLenum source,
+  GLenum type,
+  GLuint id,
+  GLenum severity,
+  GLsizei length,
+  const GLchar* message,
+  const void* userdata) {
+  NGFI_FAKE_USE(length, severity, source, type, id, userdata);
+  if (ngfi_diag_info.callback) {
+    ngfi_diag_info.callback(NGF_DIAGNOSTIC_ERROR, ngfi_diag_info.userdata, message);
   }
 }
 
-ngf_error ngf_initialize(ngf_device_preference dev_pref) {
-  NGFI_FAKE_USE(dev_pref);
+ngf_error ngf_initialize(const ngf_init_info *init_info) {
+  ngfi_diag_info = init_info->diag_info;
   return NGF_ERROR_OK;
 }
 
@@ -585,7 +589,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->has_depth = (swapchain_info->dfmt != NGF_IMAGE_FORMAT_UNDEFINED);
 
   // Create context with chosen config.
-  EGLint is_debug = info->debug;
+  EGLint is_debug = (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
   EGLint context_attribs[] = {
     EGL_CONTEXT_MAJOR_VERSION, 4,
     EGL_CONTEXT_MINOR_VERSION, 3,
@@ -668,7 +672,19 @@ ngf_error ngf_set_context(ngf_context ctx) {
       eglSwapInterval(ctx->dpy, 0);
     }
   }
-  if (result) glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+  if (result) {
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    if (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED) {
+      glEnable(GL_DEBUG_OUTPUT);
+      glDebugMessageControl(GL_DONT_CARE,
+                            GL_DONT_CARE,
+                            GL_DONT_CARE,
+                            0,
+                            NULL,
+                            GL_TRUE);
+      glDebugMessageCallback(ngfgl_debug_message_callback, NULL);
+    }
+  }
 
   return result ? NGF_ERROR_OK : NGF_ERROR_INVALID_CONTEXT;
 }
@@ -691,23 +707,18 @@ ngf_error ngfgl_check_link_status(GLuint program, const char *debug_name) {
   GLint link_status;
   glGetProgramiv(program, GL_LINK_STATUS, &link_status);
   if (link_status != GL_TRUE) {
-    if (NGF_DEBUG_CALLBACK) {
-      // See previous comment about debug callback.
-      GLint info_log_length = 0;
-      glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc((size_t)info_log_length + 1u);
-      info_log[info_log_length] = '\0';
-      glGetProgramInfoLog(program, info_log_length, &info_log_length,
-                          info_log);
-      if (debug_name) {
-        char msg[100];
-        snprintf(msg, NGFI_ARRAYSIZE(msg) - 1, "Error linking %s",
-                 debug_name);
-        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
-      }
-      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
-      free(info_log);
+    // See previous comment about debug callback.
+    GLint info_log_length = 0;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &info_log_length);
+    char *info_log = malloc((size_t)info_log_length + 1u);
+    info_log[info_log_length] = '\0';
+    glGetProgramInfoLog(program, info_log_length, &info_log_length,
+                        info_log);
+    if (debug_name) {
+      NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, "Error linking %s", debug_name);
     }
+    NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, info_log);
+    free(info_log);
     return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
   }
   return NGF_ERROR_OK;
@@ -829,27 +840,22 @@ ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
   GLint compile_status;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &compile_status);
   if (compile_status != GL_TRUE) {
-    if (NGF_DEBUG_CALLBACK) {
-      // Note: theoretically, the OpenGL debug callback extension should
-      // invoke the debug callback on shader compilation failure.
-      // In practice, it varies between vendors, so we just force-call the
-      // debug callback here to make sure it is always invoked. Sadness...
-      // You should probably be validating your shaders through glslang as
-      // one of the build steps anyways...
-      GLint info_log_length = 0;
-      glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_log_length);
-      char *info_log = malloc((size_t)info_log_length + 1u);
-      info_log[info_log_length] = '\0';
-      glGetShaderInfoLog(shader, info_log_length, &info_log_length, info_log);
-      if (debug_name) {
-        char msg[100];
-        snprintf(msg, NGFI_ARRAYSIZE(msg) - 1, "Error compiling %s",
-                 debug_name);
-        NGF_DEBUG_CALLBACK(msg, NGF_DEBUG_USERDATA);
-      }
-      NGF_DEBUG_CALLBACK(info_log, NGF_DEBUG_USERDATA);
-      free(info_log);
+    // Note: theoretically, the OpenGL debug callback extension should
+    // invoke the debug callback on shader compilation failure.
+    // In practice, it varies between vendors, so we just force-call the
+    // debug callback here to make sure it is always invoked. Sadness...
+    // You should probably be validating your shaders through glslang as
+    // one of the build steps anyways...
+    GLint info_log_length = 0;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_log_length);
+    char *info_log = malloc((size_t)info_log_length + 1u);
+    info_log[info_log_length] = '\0';
+    glGetShaderInfoLog(shader, info_log_length, &info_log_length, info_log);
+    if (debug_name) {
+      NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, "Error compiling %s", debug_name);
     }
+    NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, info_log);
+    free(info_log);
     err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
     goto ngfgl_compile_shader_cleanup;
   }
@@ -1808,13 +1814,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                 bind_op->target_binding);
     if (native_binding == NULL) {
       static const char *err_msg = "invalid binding id";
-      ngf_gl_debug_callback(GL_DEBUG_SOURCE_OTHER,
-                            GL_DEBUG_TYPE_ERROR,
-                            0,
-                            GL_DEBUG_SEVERITY_HIGH,
-                            (GLsizei)strlen(err_msg),
-                            err_msg,
-                            NULL);
+      NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, "Invalid binding id");
       continue;
     }
     switch (bind_op->type) {
@@ -2568,40 +2568,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
 void ngf_finish() {
   glFlush();
   glFinish();
-}
-
-void ngf_debug_message_callback(void *userdata,
-                                void(*callback)(const char*, const void*)) {
-
-  glDebugMessageControl(GL_DONT_CARE,
-                        GL_DONT_CARE,
-                        GL_DONT_CARE,
-                        0,
-                        NULL,
-                        GL_TRUE);
-  glEnable(GL_DEBUG_OUTPUT);
-  NGF_DEBUG_CALLBACK = callback;
-  NGF_DEBUG_USERDATA = userdata;
-  glDebugMessageCallback(ngf_gl_debug_callback, userdata);
-}
-
-void ngf_insert_log_message(const char *message) {
-  glDebugMessageInsert(
-    GL_DEBUG_SOURCE_APPLICATION,
-    GL_DEBUG_TYPE_MARKER,
-    0,
-    GL_DEBUG_SEVERITY_NOTIFICATION,
-    (GLsizei)strlen(message),
-    message);
-}
-
-void ngf_begin_debug_group(const char *title) {
-  glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0,
-                   (GLsizei)strlen(title), title);
-}
-
-void ngf_end_debug_group() {
-  glPopDebugGroup();
 }
 
 ngf_error ngf_begin_frame() {
