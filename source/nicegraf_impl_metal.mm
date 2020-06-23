@@ -602,8 +602,23 @@ ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
 
 #pragma mark ngf_function_implementations
 
+static ngf_diagnostic_info ngfi_diag_info = {
+  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  nullptr,
+  nullptr
+};
+
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
+  ngfi_diag_info = init_info->diag_info;
 #if TARGET_OS_OSX
+  // Try setting environment variable to enable Metal API validation if
+  // necessary.
+  if (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED) {
+    if (setenv("METAL_DEVICE_WRAPPER_TYPE", "1", 1)) {
+      NGFI_DIAG_WARNING("Could not enable detailed diagnostic log");
+    }
+  }
+  
   // On macOS, try picking a device in accordance with user's preferences.
   id<NSObject> dev_observer = nil;
   const NSArray<id<MTLDevice>> *devices =
