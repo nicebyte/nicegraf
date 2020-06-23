@@ -509,7 +509,18 @@ static void GL_APIENTRY ngfgl_debug_message_callback(
   const void* userdata) {
   NGFI_FAKE_USE(length, severity, source, type, id, userdata);
   if (ngfi_diag_info.callback) {
-    ngfi_diag_info.callback(NGF_DIAGNOSTIC_ERROR, ngfi_diag_info.userdata, message);
+    ngf_diagnostic_message_type ngf_msg_type;
+    switch (ngf_msg_type) {
+    case GL_DEBUG_SEVERITY_NOTIFICATION:
+      ngf_msg_type = NGF_DIAGNOSTIC_INFO;
+      break;
+    case GL_DEBUG_SEVERITY_LOW:
+      ngf_msg_type = NGF_DIAGNOSTIC_WARNING;
+      break;
+    default:
+      ngf_msg_type = NGF_DIAGNOSTIC_ERROR;
+    }
+    ngfi_diag_info.callback(ngf_msg_type, ngfi_diag_info.userdata, message);
   }
 }
 
