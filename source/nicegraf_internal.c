@@ -197,7 +197,7 @@ ngf_error ngfi_create_native_binding_map(
       NGFI_ALLOCN(ngfi_native_binding*, nmap_entries);
   *result = map;
   if (map == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto _ngf_create_native_binding_map_cleanup;
   }
   memset(map, 0,
@@ -209,7 +209,7 @@ ngf_error ngfi_create_native_binding_map(
     map[set] = NGFI_ALLOCN(ngfi_native_binding,
                           set_layout->ndescriptors + 1u);
     if (map[set] == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
+      err = NGF_ERROR_OUT_OF_MEM;
       goto _ngf_create_native_binding_map_cleanup;
     }
     map[set][set_layout->ndescriptors].ngf_binding_id = (uint32_t)(-1);
@@ -237,7 +237,7 @@ ngf_error ngfi_create_native_binding_map(
           mapping->cis_bindings =
             NGFI_ALLOCN(uint32_t, combined_list->ncombined_ids);
           if (mapping->cis_bindings == NULL) {
-            err = NGF_ERROR_OUTOFMEM;
+            err = NGF_ERROR_OUT_OF_MEM;
             goto _ngf_create_native_binding_map_cleanup;
           }
           memcpy(mapping->cis_bindings, combined_list->combined_ids,
