@@ -109,65 +109,12 @@ typedef struct ngf_init_info {
  */
 typedef enum ngf_error {
   NGF_ERROR_OK = 0, /**< No error, operation finished successfully. */
-  NGF_ERROR_OUTOFMEM, /**< Host memory allocation failed. */
-  NGF_ERROR_FAILED_TO_CREATE_PIPELINE,
-  NGF_ERROR_INCOMPLETE_PIPELINE, /**< Some information required to create
-                                      a pipeline object was not provided.*/
-  NGF_ERROR_IMAGE_CREATION_FAILED,
-  NGF_ERROR_CREATE_SHADER_STAGE_FAILED, /**< On certain back-ends this means
-                                             that compiling or linking code for
-                                             a shader stage has failed.*/
-  NGF_ERROR_INVALID_BINDING,
-  NGF_ERROR_INVALID_INDEX_BUFFER_BINDING,
-  NGF_ERROR_INVALID_VERTEX_BUFFER_BINDING,
-  NGF_ERROR_INCOMPLETE_RENDER_TARGET, /**< Render target didn't have all the
-                                           necessary attachments, or some
-                                           attachments were invalid. */
-  NGF_ERROR_INVALID_RESOURCE_SET_BINDING,
-  NGF_ERROR_CONTEXT_CREATION_FAILED,
-  NGF_ERROR_INVALID_CONTEXT,
-  NGF_ERROR_SWAPCHAIN_CREATION_FAILED,
-  NGF_ERROR_INVALID_SURFACE_FORMAT,
-  NGF_ERROR_INITIALIZATION_FAILED,
-  NGF_ERROR_SURFACE_CREATION_FAILED,
-  NGF_ERROR_CANT_SHARE_CONTEXT,
-  NGF_ERROR_BEGIN_FRAME_FAILED,
-  NGF_ERROR_END_FRAME_FAILED,
-  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
-                               bounds access. */
-
-  NGF_ERROR_CONTEXT_ALREADY_CURRENT,
-  NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT,
-
-  /** Current context has no default render target*/
-  NGF_ERROR_NO_DEFAULT_RENDER_TARGET,
-
-  /** Failed to acquire frame from the swapchain.*/
-  NGF_ERROR_NO_FRAME,
-
-  /** There was an attempt to write too little or too much data into a uniform
-      buffer. */
-  NGF_ERROR_UNIFORM_BUFFER_SIZE_MISMATCH,
-
-  /** Indicates that the given image format is not supported by the active
-      backend.*/
-  NGF_ERROR_INVALID_IMAGE_FORMAT,
-
-  /** Indicates that the given image format is not a valid depth format for
-      the active backend.*/
-  NGF_ERROR_INVALID_DEPTH_FORMAT,
-
-  /** Given vertex attribute format is not supported by the active backend.*/
-  NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT,
-  
-  /** Given sampler address mode is not supported by the active backend. */
-  NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE,
-
-  NGF_ERROR_RENDER_TARGET_CREATION_FAILED,
-
-  /** The command buffer is in an invalid state. */
-  NGF_ERROR_COMMAND_BUFFER_INVALID_STATE,
-
+  NGF_ERROR_OUT_OF_MEM, /**< Host memory allocation failed. */
+  NGF_ERROR_OBJECT_CREATION_FAILED,
+  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of                               bounds access. */
+  NGF_ERROR_INVALID_FORMAT,
+  NGF_ERROR_INVALID_SIZE,
+  NGF_ERROR_INVALID_ENUM,
   NGF_ERROR_INVALID_OPERATION
   /*..add new errors above this line */
 } ngf_error ;

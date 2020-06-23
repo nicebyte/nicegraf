@@ -530,7 +530,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   *result = NGFI_ALLOC(struct ngf_context_t);
   ngf_context ctx = *result;
   if (ctx == NULL) {
-    err_code = NGF_ERROR_OUTOFMEM;
+    err_code = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_context_cleanup;
   }
 
@@ -540,7 +540,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   assert(ctx->dpy != EGL_NO_DISPLAY);
   int egl_maj, egl_min;
   if (eglInitialize(ctx->dpy, &egl_maj, &egl_min) == EGL_FALSE) {
-    err_code = NGF_ERROR_CONTEXT_CREATION_FAILED;
+    NGFI_DIAG_ERROR("Failed to initialize EGL, EGL error: %d", eglGetError());
+    err_code = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
 
@@ -583,7 +584,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   config_attribs[a++] = EGL_NONE;
   EGLint num = 0;
   if(!eglChooseConfig(ctx->dpy, config_attribs, &ctx->cfg, 1, &num)) {
-    err_code = NGF_ERROR_CONTEXT_CREATION_FAILED;
+    NGFI_DIAG_ERROR("Failed to choose EGL config, EGL error: %d", eglGetError());
+    err_code = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
   ctx->has_depth = (swapchain_info->dfmt != NGF_IMAGE_FORMAT_UNDEFINED);
@@ -601,7 +603,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->ctx =
     eglCreateContext(ctx->dpy, ctx->cfg, egl_shared, context_attribs);
   if (ctx->ctx == EGL_NO_CONTEXT) {
-    err_code = NGF_ERROR_CONTEXT_CREATION_FAILED;
+    NGFI_DIAG_ERROR("Failed create EGL context, EGL error: %d", eglGetError());
+    err_code = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
 
@@ -623,7 +626,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                           (EGLNativeWindowType)swapchain_info->native_handle,
                                           egl_surface_attribs);
     if (ctx->surface == EGL_NO_SURFACE) {
-      err_code = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      NGFI_DIAG_ERROR("Failed to create EGL window surface, EGL error: %d", eglGetError());
+      err_code = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
   } else {
@@ -655,24 +659,24 @@ NGF_THREADLOCAL ngfi_block_allocator *COMMAND_POOL = NULL;
 ngf_error ngf_set_context(ngf_context ctx) {
   assert(ctx);
   if (CURRENT_CONTEXT == ctx) {
-    return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
+    NGFI_DIAG_WARNING("Attempt to set a context that is already current on the calling thread.");
+    return NGF_ERROR_OK;
   }
   if (CURRENT_CONTEXT && (CURRENT_CONTEXT != ctx)) {
-    return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
+    NGFI_DIAG_ERROR("Attempt to set a context when the calling thread already has a current context.");
+    return NGF_ERROR_INVALID_OPERATION;
   }
 
   bool result = eglMakeCurrent(ctx->dpy, ctx->surface, ctx->surface, ctx->ctx);
   if (result) {
     CURRENT_CONTEXT = ctx;
-  }
-  if (ctx->has_swapchain) {
-    if (ctx->present_mode == NGF_PRESENTATION_MODE_FIFO) {
-      eglSwapInterval(ctx->dpy, 1);
-    } else {
-      eglSwapInterval(ctx->dpy, 0);
+    if (ctx->has_swapchain) {
+      if (ctx->present_mode == NGF_PRESENTATION_MODE_FIFO) {
+        eglSwapInterval(ctx->dpy, 1);
+      } else {
+        eglSwapInterval(ctx->dpy, 0);
+      }
     }
-  }
-  if (result) {
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     if (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED) {
       glEnable(GL_DEBUG_OUTPUT);
@@ -684,9 +688,11 @@ ngf_error ngf_set_context(ngf_context ctx) {
                             GL_TRUE);
       glDebugMessageCallback(ngfgl_debug_message_callback, NULL);
     }
+    return NGF_ERROR_OK;
+  } else {
+    NGFI_DIAG_ERROR("Failed to make EGL context current, EGL error: %d", eglGetError());
+    return NGF_ERROR_INVALID_OPERATION;
   }
-
-  return result ? NGF_ERROR_OK : NGF_ERROR_INVALID_CONTEXT;
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -719,7 +725,7 @@ ngf_error ngfgl_check_link_status(GLuint program, const char *debug_name) {
     }
     NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, info_log);
     free(info_log);
-    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   return NGF_ERROR_OK;
 }
@@ -739,7 +745,8 @@ ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
   const char *first_line = source;
   while (*first_line != '#' && first_line - source < source_len) first_line++;
   if (strncmp(first_line, "#version", 8u)) {
-    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    NGFI_DIAG_ERROR("First line in GL shader must specify GLSL version");
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   const char *rest_of_source = first_line;
   while(*(rest_of_source++) != '\n' &&
@@ -777,7 +784,7 @@ ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
         spec_define_max_size * spec_info->nspecializations;
     defines_buffer = NGFI_ALLOCN(char, defines_buffer_size);
     if (defines_buffer == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
+      err = NGF_ERROR_OUT_OF_MEM;
       goto ngfgl_compile_shader_cleanup;
     }
 
@@ -819,7 +826,7 @@ ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
       if (bytes_written > 0 && bytes_written < spec_define_max_size) {
         defines_buffer_write_ptr += bytes_written;
       } else {
-        err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngfgl_compile_shader_cleanup;
       }
     }
@@ -856,7 +863,7 @@ ngf_error ngfgl_compile_shader(const char *source, GLint source_len,
     }
     NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, info_log);
     free(info_log);
-    err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngfgl_compile_shader_cleanup;
   }
   *result = glCreateProgram();
@@ -891,7 +898,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   *result = NGFI_ALLOC(struct ngf_shader_stage_t);
   stage = *result;
   if (stage == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_shader_stage_cleanup;
   }
   stage->gltype = gl_shader_stage(info->type);
@@ -902,7 +909,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   // doing specialization.
   stage->source_code = NGFI_ALLOCN(char, info->content_length);
   if (stage->source_code == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_shader_stage_cleanup;
   }
   stage->source_code_size = (GLint)info->content_length;
@@ -946,7 +953,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   *result = NGFI_ALLOC(struct ngf_graphics_pipeline_t);
   ngf_graphics_pipeline pipeline = *result;
   if (pipeline == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_pipeline_cleanup;
   }
 
@@ -968,7 +975,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                    input->nvert_buf_bindings);
     pipeline->vert_buf_bindings = vert_buf_bindings;
     if (pipeline->vert_buf_bindings == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
+      err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_create_pipeline_cleanup;
     }
     memcpy(vert_buf_bindings,
@@ -1039,7 +1046,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                            info->shader_stages[s]->glstagebit,
                            pipeline->owned_stages[s]);
       } else {
-        err = NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
       }
     }   
   }
@@ -1080,7 +1087,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   *result = NGFI_ALLOC(struct ngf_image_t);
   ngf_image image = *result;
   if (image == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
 
   const glformat glf = get_gl_format(info->format);
@@ -1116,7 +1123,8 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
           : GL_TEXTURE_CUBE_MAP;
     } else {
       ngf_destroy_image(image);
-      return NGF_ERROR_IMAGE_CREATION_FAILED;
+      NGFI_DIAG_ERROR("Can't create an image with specified properties.");
+      return NGF_ERROR_OBJECT_CREATION_FAILED;
     }
  
     glGenTextures(1, &(image->glimage));
@@ -1197,7 +1205,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   *result = NGFI_ALLOC(struct ngf_sampler_t);
   ngf_sampler sampler = *result;
   if (sampler == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   
   glGenSamplers(1, &(sampler->glsampler));
@@ -1248,7 +1256,7 @@ ngf_error ngf_default_render_target(
                                              attachment_infos) +
                                      3u * sizeof(ngf_attachment));
     if (default_render_target == NULL) {
-      return NGF_ERROR_OUTOFMEM;
+      return NGF_ERROR_OUT_OF_MEM;
     }
     default_render_target->is_srgb = CURRENT_CONTEXT->srgb_surface;
     ngf_attachment *default_color_attachment =
@@ -1277,7 +1285,8 @@ ngf_error ngf_default_render_target(
     default_render_target->framebuffer = 0;
     *result = default_render_target;
   } else {
-    return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;
+    NGFI_DIAG_ERROR("Current context cannot provide a default render target");
+    return NGF_ERROR_INVALID_OPERATION;
   }
   return NGF_ERROR_OK;
 }
@@ -1297,7 +1306,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
                                               info->nattachments);
   ngf_render_target render_target = *result;
   if (render_target == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_render_target_cleanup;
   }
 
@@ -1360,7 +1369,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   bool fb_ok = fb_status == GL_FRAMEBUFFER_COMPLETE;
   glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)old_framebuffer);
   if (!fb_ok) {
-    err = NGF_ERROR_INCOMPLETE_RENDER_TARGET;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_render_target_cleanup;
   }
 
@@ -1464,7 +1473,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   *result = NGFI_ALLOC(struct ngf_attrib_buffer_t);
   ngf_attrib_buffer buf = *result;
   if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   buf->glbuffer = ngfgl_create_buffer(GL_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
@@ -1507,7 +1516,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
   *result = NGFI_ALLOC(struct ngf_index_buffer_t);
   ngf_index_buffer buf = *result;
   if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   buf->glbuffer = ngfgl_create_buffer(GL_ELEMENT_ARRAY_BUFFER, info);
   return NGF_ERROR_OK;
@@ -1550,7 +1559,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   *result = NGFI_ALLOC(struct ngf_uniform_buffer_t);
   ngf_uniform_buffer buf = *result;
   if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   buf->glbuffer = ngfgl_create_buffer(GL_UNIFORM_BUFFER, info);
   return NGF_ERROR_OK;
@@ -1595,7 +1604,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
   *result = NGFI_ALLOC(struct ngf_pixel_buffer_t);
   ngf_pixel_buffer buf = *result;
   if (buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   ngf_buffer_info buf_info;
   buf_info.size = info->size;
@@ -1651,7 +1660,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   *result = NGFI_ALLOC(struct ngf_cmd_buffer_t);
   ngf_cmd_buffer buf = *result;
   if (buf == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
   }
   buf->first_cmd_block = buf->last_cmd_block = NULL;
   buf->state = NGFI_CMD_BUFFER_READY;
@@ -1681,7 +1690,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   assert(buf);
   if (buf->state != NGFI_CMD_BUFFER_READY) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_ERROR("Command buffer is not in READY state, and cannot be started.");
+    return NGF_ERROR_INVALID_OPERATION;
   }
   ngf_error err = NGF_ERROR_OK;
   if (buf->first_cmd_block != NULL) {
@@ -1689,7 +1699,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   }
   buf->first_cmd_block = ngfi_blkalloc_alloc(COMMAND_POOL);
   if (buf->first_cmd_block == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     NGFI_FREE(buf);
   } else {
     buf->first_cmd_block->next_cmd_idx = 0u;
@@ -1703,7 +1713,8 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
                                       ngf_render_encoder *enc) {
   if (buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_ERROR("Command buffer is not in READY state, can't start a new encoder.");
+    return NGF_ERROR_INVALID_OPERATION;
   }
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
@@ -1713,7 +1724,8 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
                                     ngf_xfer_encoder *enc) {
   if (buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_ERROR("Command buffer is not in READY state, can't start a new encoder.");
+    return NGF_ERROR_INVALID_OPERATION;
   }
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
@@ -1721,7 +1733,7 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   if (((ngf_cmd_buffer)enc.__handle)->renderpass_active) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    return NGF_ERROR_INVALID_OPERATION;
   }
   enc.__handle = 0u;
   return NGF_ERROR_OK;
@@ -2578,5 +2590,5 @@ ngf_error ngf_begin_frame() {
 ngf_error ngf_end_frame() {
   return eglSwapBuffers(CURRENT_CONTEXT->dpy, CURRENT_CONTEXT->surface)
       ? NGF_ERROR_OK
-      : NGF_ERROR_END_FRAME_FAILED;
+      : NGF_ERROR_INVALID_OPERATION;
 }
