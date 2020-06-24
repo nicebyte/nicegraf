@@ -62,6 +62,12 @@ static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 // one.
 id<MTLDevice> MTL_DEVICE = nil;
 
+static ngf_diagnostic_info ngfi_diag_info = {
+  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  nullptr,
+  nullptr
+};
+
 #pragma mark ngf_enum_maps
 
 struct mtl_format {
@@ -395,7 +401,8 @@ public:
     const MTLPixelFormat pixel_format =
         get_mtl_pixel_format(swapchain_info.cfmt).format;
     if (pixel_format == MTLPixelFormatInvalid) {
-      return NGF_ERROR_INVALID_IMAGE_FORMAT;
+      NGFI_DIAG_ERROR("Image format not supported by Metal backend");
+      return NGF_ERROR_INVALID_FORMAT;
     }
     layer_ = [CAMetalLayer layer];
     layer_.device = device;
@@ -602,12 +609,6 @@ ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
 
 #pragma mark ngf_function_implementations
 
-static ngf_diagnostic_info ngfi_diag_info = {
-  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
-  nullptr,
-  nullptr
-};
-
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
   ngfi_diag_info = init_info->diag_info;
 #if TARGET_OS_OSX
@@ -639,7 +640,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
 #endif
 
-  return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INITIALIZATION_FAILED;
+  return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 ngf_error ngf_begin_frame() {
@@ -647,7 +648,7 @@ ngf_error ngf_begin_frame() {
                           DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
   return (!CURRENT_CONTEXT->frame.color_drawable)
-           ? NGF_ERROR_NO_FRAME
+           ? NGF_ERROR_INVALID_OPERATION
            : NGF_ERROR_OK;
 }
 
@@ -724,7 +725,8 @@ ngf_error ngf_default_render_target(
     *result = rt.release();
     return NGF_ERROR_OK;
   } else {
-    return NGF_ERROR_NO_DEFAULT_RENDER_TARGET;;
+    NGFI_DIAG_ERROR("Current context provides no default render target");
+    return NGF_ERROR_INVALID_OPERATION;
   }
 }
 
@@ -734,7 +736,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   assert(result);
   NGFMTL_NURSERY(context, ctx);
   if (!ctx) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
 
   ctx->device = MTL_DEVICE;
@@ -773,10 +775,14 @@ ngf_error ngf_resize_context(ngf_context ctx,
 }
 
 ngf_error ngf_set_context(ngf_context ctx) {
-  if(CURRENT_CONTEXT != NULL) {
-    return NGF_ERROR_CALLER_HAS_CURRENT_CONTEXT;
-  } else if (ctx->is_current) {
-    return NGF_ERROR_CONTEXT_ALREADY_CURRENT;
+  if(CURRENT_CONTEXT == ctx) {
+    NGFI_DIAG_WARNING("Attempt to set a context that is already "
+                      "current on the calling thread");
+    return NGF_ERROR_OK;
+  } else if (CURRENT_CONTEXT) {
+    NGFI_DIAG_ERROR("Attempt to set a context when the calling thread "
+                   "already has a current context.")
+    return NGF_ERROR_INVALID_OPERATION;
   }
   CURRENT_CONTEXT = ctx;
   ctx->is_current = true;
@@ -790,7 +796,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
  
   NGFMTL_NURSERY(shader_stage, stage);
   if (!stage) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   
   stage->type = info->type;
@@ -805,9 +811,8 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
                                 options:opts
                                 error:&err];
   if (!stage->func_lib) {
-    // TODO: call debug callback with error message here.
-    NSLog(@"%@\n", err);
-    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   
   // Set debug name.
@@ -993,7 +998,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
           &info->spec_info->specializations[s];
       MTLDataType type = get_mtl_type(spec->type);
       if (type == MTLDataTypeNone) {
-        return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+        return NGF_ERROR_OBJECT_CREATION_FAILED;
       }
       void *write_ptr =
           ((uint8_t*)info->spec_info->value_buffer + spec->offset);
@@ -1032,7 +1037,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                              attr_info.size,
                                              attr_info.normalized);
     if (attr_desc.format == MTLVertexFormatInvalid) {
-      return NGF_ERROR_INVALID_VERTEX_ATTRIB_FORMAT;
+      NGFI_DIAG_ERROR("Vertex attrib format not supported by Metal backend.");
+      return NGF_ERROR_INVALID_FORMAT;
     }
   }
   for (uint32_t b = 0u; b < vertex_input_info.nvert_buf_bindings; ++b) {
@@ -1049,7 +1055,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       get_mtl_primitive_topology_class(info->primitive_type);
   if (mtl_pipe_desc.inputPrimitiveTopology ==
       MTLPrimitiveTopologyClassUnspecified) {
-    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
@@ -1063,7 +1069,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                  info->layout->ndescriptor_set_layouts);
   pipeline->layout.descriptor_set_layouts = descriptor_set_layouts;
   if (pipeline->layout.descriptor_set_layouts == nullptr) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   memset(pipeline->layout.descriptor_set_layouts, 0,
          sizeof(ngf_descriptor_set_layout_info));
@@ -1073,7 +1079,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     ngf_descriptor_info *descriptors  =
         NGFI_ALLOCN(ngf_descriptor_info, descriptor_set_layouts->ndescriptors);
     descriptor_set_layouts[s].descriptors = descriptors;
-    if (descriptors == nullptr) return NGF_ERROR_OUTOFMEM;
+    if (descriptors == nullptr) return NGF_ERROR_OUT_OF_MEM;
     memcpy(descriptors,
            info->layout->descriptor_set_layouts[s].descriptors,
            sizeof(ngf_descriptor_info) *
@@ -1085,7 +1091,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                      nullptr,
                                     &pipeline->binding_map);
   if (ngf_err != NGF_ERROR_OK) {
-    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+    return ngf_err;
   }
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
@@ -1094,7 +1100,9 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   std::optional<MTLPrimitiveType> prim_type =
       get_mtl_primitive_type(info->primitive_type);
   if (!prim_type.has_value()) {
-    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+    NGFI_DIAG_ERROR("Primitive type %d not supported by Metal backend.",
+                     info->primitive_type);
+    return NGF_ERROR_INVALID_ENUM;
   }
   pipeline->primitive_type = *prim_type;
   
@@ -1122,9 +1130,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   
   if (err) {
-    NSLog(@"... [%@]\n", err);
-    // TODO: invoke debug callback
-    return NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+    NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   } else {
     *result = pipeline.release();
     return NGF_ERROR_OK;
@@ -1321,7 +1328,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                                        t = get_mtl_address_mode(info->wrap_t),
                                        r = get_mtl_address_mode(info->wrap_r);
   if (!(s && t && r)) {
-    return NGF_ERROR_INVALID_SAMPLER_ADDRESS_MODE;
+    return NGF_ERROR_INVALID_ENUM;
   }
   sampler_desc.sAddressMode = *s;
   sampler_desc.tAddressMode = *t;
@@ -1359,13 +1366,17 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   
   const MTLPixelFormat fmt = get_mtl_pixel_format(info->format).format;
   if (fmt == MTLPixelFormatInvalid) {
-    return NGF_ERROR_INVALID_IMAGE_FORMAT;
+    NGFI_DIAG_ERROR("Image format %d not supported by Metal backend.",
+                    info->format);
+    return NGF_ERROR_INVALID_FORMAT;
   }
 
   std::optional<MTLTextureType> maybe_texture_type =
       get_mtl_texture_type(info->type, info->extent.depth);
   if (!maybe_texture_type.has_value()) {
-    return NGF_ERROR_INVALID_IMAGE_FORMAT;
+    NGFI_DIAG_ERROR("Image type %d not supported by Metal backend.",
+                    info->type);
+    return NGF_ERROR_INVALID_ENUM;
   }
   mtl_img_desc.textureType      = maybe_texture_type.value();
   mtl_img_desc.pixelFormat      = fmt;
@@ -1448,7 +1459,9 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
                                       ngf_render_encoder *enc) {
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
+                      "cannot be started.")
+    return NGF_ERROR_INVALID_OPERATION;
   }
   cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
   enc->__handle = (uintptr_t)cmd_buf;
@@ -1458,7 +1471,9 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   if(cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
+                      "a render encoder cannot be created for it.")
+    return NGF_ERROR_INVALID_OPERATION;
   }
   if (cmd_buf->active_rce){
     [cmd_buf->active_rce endEncoding];
@@ -1472,7 +1487,9 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
                                     ngf_xfer_encoder *enc) {
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
+                      "a transfer encoder cannot be created for it.")
+    return NGF_ERROR_INVALID_OPERATION;
   }
   cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
   enc->__handle = (uintptr_t)cmd_buf;
@@ -1482,7 +1499,7 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    return NGF_ERROR_INVALID_OPERATION;
   }
   if (cmd_buf->active_bce) {
     [cmd_buf->active_bce endEncoding];
