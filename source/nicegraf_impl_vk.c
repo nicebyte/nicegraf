@@ -670,6 +670,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     const char* const ext_names[] = { // Names of instance-level extensions.
       "VK_KHR_surface", VK_SURFACE_EXT,
+      VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
     VkApplicationInfo app_info = { // Application information.
@@ -688,15 +689,19 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     //TODO: check if validation layers are supported.
 
+    // Enable validation only if detailed verbosity is requested.
+    const bool enable_validation =
+      (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
+
     // Create a Vulkan instance.
     VkInstanceCreateInfo inst_info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = NULL,
       .flags = 0u,
       .pApplicationInfo = &app_info,
-      .enabledLayerCount = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED ? 1u : 0u,
+      .enabledLayerCount = enable_validation ? 1u : 0u,
       .ppEnabledLayerNames = enabled_layers,
-      .enabledExtensionCount = NGFI_ARRAYSIZE(ext_names),
+      .enabledExtensionCount = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
       .ppEnabledExtensionNames = ext_names
     };
     VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
