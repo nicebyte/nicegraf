@@ -662,6 +662,9 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 }
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
+  assert(init_info);
+  ngfi_diag_info = init_info->diag_info;
+
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
     vkl_init_loader(); // Initialize the vulkan loader.
 
@@ -677,6 +680,13 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .engineVersion = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
       .apiVersion = VK_MAKE_VERSION(1, 0, 9)
     };
+    
+    // Names of instance layers to enable.
+    const char* enabled_layers[] = {
+      "VK_LAYER_KHRONOS_VALIDATION"
+    };
+
+    //TODO: check if validation layers are supported.
 
     // Create a Vulkan instance.
     VkInstanceCreateInfo inst_info = {
@@ -684,8 +694,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .pNext = NULL,
       .flags = 0u,
       .pApplicationInfo = &app_info,
-      .enabledLayerCount = 0u,
-      .ppEnabledLayerNames = NULL,
+      .enabledLayerCount = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED ? 1u : 0u,
+      .ppEnabledLayerNames = enabled_layers,
       .enabledExtensionCount = NGFI_ARRAYSIZE(ext_names),
       .ppEnabledExtensionNames = ext_names
     };
