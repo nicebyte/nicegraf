@@ -1,5 +1,5 @@
 /**
-Copyright © 2018 nicegraf contributors
+Copyright ï¿½ 2018 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -167,7 +167,7 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
   descriptor_set_layout_infos = NGFI_ALLOCN(ngf_descriptor_set_layout_info,
                                            layout_metadata->ndescriptor_sets);
   if (descriptor_set_layout_infos == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
   }
   memset(descriptor_set_layout_infos, 0,
@@ -178,7 +178,7 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
   result->descriptor_set_layouts = descriptor_set_layout_infos;
   
   if (descriptor_set_layout_infos == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
   }
 
@@ -191,7 +191,7 @@ ngf_error ngf_util_create_pipeline_layout_from_metadata(
         NGFI_ALLOCN(ngf_descriptor_info, set_layout_info->ndescriptors);
     set_layout_info->descriptors = descriptors;
     if (set_layout_info->descriptors == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
+      err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_util_create_pipeline_layout_from_metadata_cleanup;
     }
     const ngf_plmd_descriptor_set_layout *descriptor_set_metadata =
