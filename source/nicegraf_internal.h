@@ -183,14 +183,13 @@ typedef enum {
 #endif
 
 // Invoke diagnostic message callback directly.
-#define VA_ARGS(...) , ##__VA_ARGS__
 #define NGFI_DIAG_MSG(level, fmt, ...) \
 if (ngfi_diag_info.callback) { \
-  ngfi_diag_info.callback(level, ngfi_diag_info.userdata, fmt VA_ARGS(__VA_ARGS__)); \
+  ngfi_diag_info.callback(level, ngfi_diag_info.userdata, fmt,##__VA_ARGS__); \
 }
-#define NGFI_DIAG_INFO(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_INFO, fmt VA_ARGS(__VA_ARGS__))
-#define NGFI_DIAG_WARNING(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_WARNING, fmt VA_ARGS(__VA_ARGS__))
-#define NGFI_DIAG_ERROR(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, fmt VA_ARGS(__VA_ARGS__))
+#define NGFI_DIAG_INFO(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_INFO, fmt,##__VA_ARGS__)
+#define NGFI_DIAG_WARNING(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_WARNING, fmt,##__VA_ARGS__))
+#define NGFI_DIAG_ERROR(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, fmt,##__VA_ARGS__)
 
 #ifdef __cplusplus
 }
