@@ -66,7 +66,7 @@ typedef enum ngf_diagnostic_log_verbosity {
 typedef enum ngf_diagnostic_message_type {
   NGF_DIAGNOSTIC_INFO, /**< Informational message, not actionalble. */
   NGF_DIAGNOSTIC_WARNING, /**< Message warns of a potential issue with an API call. */
-  NGF_DIAGNOSTIC_ERROR /**< Message provides details of an API call failure. */
+  NGF_DIAGNOSTIC_ERROR /**< Message provides details of an API call failure or a severe performance issue. */
 } ngf_diagnostic_message_type;
 
 /**
