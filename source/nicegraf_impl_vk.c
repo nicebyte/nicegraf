@@ -76,6 +76,14 @@ struct {
   ATOMIC_INT       frame_id;
 } _vk;
 
+// Holds diagnostic log configuration.
+static ngf_diagnostic_info ngfi_diag_info = {
+  .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  .userdata  = NULL,
+  .callback  = NULL
+};
+
+
 // Swapchain state.
 typedef struct _ngf_swapchain {
   VkSwapchainKHR   vk_swapchain;
@@ -682,7 +690,10 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .ppEnabledExtensionNames = ext_names
     };
     VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
-    if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
+    if (vk_err != VK_SUCCESS) {
+      NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
+      return NGF_ERROR_OBJECT_CREATION_FAILED;
+    }
 
     vkl_init_instance(_vk.instance); // load instance-level Vulkan functions.
 
@@ -690,7 +701,10 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     uint32_t nphysdev = _NGF_MAX_PHYS_DEV;
     VkPhysicalDevice physdevs[_NGF_MAX_PHYS_DEV];
     vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
-    if (vk_err != VK_SUCCESS) { return NGF_ERROR_CONTEXT_CREATION_FAILED; }
+    if (vk_err != VK_SUCCESS) {
+      NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
+      return NGF_ERROR_INVALID_OPERATION;
+    }
 
     // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
@@ -723,7 +737,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       }
     }
     if (best_device_index == _NGF_INVALID_IDX) {
-      return NGF_ERROR_INITIALIZATION_FAILED;
+      NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
+      return NGF_ERROR_INVALID_OPERATION;
     }
     _vk.phys_dev = physdevs[best_device_index];
 
@@ -770,7 +785,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     if (gfx_family_idx == _NGF_INVALID_IDX ||
       xfer_family_idx == _NGF_INVALID_IDX ||
       present_family_idx == _NGF_INVALID_IDX) {
-      return NGF_ERROR_INITIALIZATION_FAILED;
+      NGFI_DIAG_ERROR("Could not find a suitable queue family.");
+      return NGF_ERROR_INVALID_OPERATION;
     }
     _vk.gfx_family_idx = gfx_family_idx;
     _vk.xfer_family_idx = xfer_family_idx;
@@ -825,7 +841,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     };
     vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
     if (vk_err != VK_SUCCESS) {
-      return NGF_ERROR_INITIALIZATION_FAILED;
+      NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
+      return NGF_ERROR_INVALID_OPERATION;
     }
     vkl_init_device(_vk.device);
 
@@ -988,7 +1005,8 @@ static ngf_error _ngf_create_swapchain(
       found = formats[f].format == requested_format;
     }
     if (!found) {
-      err = NGF_ERROR_INVALID_SURFACE_FORMAT;
+      NGFI_DIAG_ERROR("Invalid swapchain image format requested.");
+      err = NGF_ERROR_INVALID_FORMAT;
       goto _ngf_create_swapchain_cleanup;
     }
   }
@@ -1033,7 +1051,7 @@ static ngf_error _ngf_create_swapchain(
   vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL,
                                 &swapchain->vk_swapchain);
   if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
   }
 
@@ -1041,25 +1059,25 @@ static ngf_error _ngf_create_swapchain(
   vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
                                    &swapchain->num_images, NULL);
   if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
   }
   swapchain->images = NGFI_ALLOCN(VkImage, swapchain->num_images);
   if (swapchain->images == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto _ngf_create_swapchain_cleanup;
   }
   vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain,
                                    &swapchain->num_images, swapchain->images);
   if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
   }
 
   // Create image views for swapchain images.
   swapchain->image_views =  NGFI_ALLOCN(VkImageView, swapchain->num_images);
   if (swapchain->image_views == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto _ngf_create_swapchain_cleanup;
   }
   for (uint32_t i = 0u; i < swapchain->num_images; ++i) {
@@ -1070,7 +1088,7 @@ static ngf_error _ngf_create_swapchain(
                                     1u,
                                    &swapchain->image_views[i]);
     if (err != NGF_ERROR_OK) {
-      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
     }
   }
@@ -1168,14 +1186,14 @@ static ngf_error _ngf_create_swapchain(
   vk_err = vkCreateRenderPass(_vk.device, &swapchain->renderpass.info, NULL,
                               &swapchain->renderpass.vk_handle);
   if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto _ngf_create_swapchain_cleanup;
   }
 
   // Create framebuffers for swapchain images.
   swapchain->framebuffers = NGFI_ALLOCN(VkFramebuffer, swapchain->num_images);
   if (swapchain->framebuffers == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto _ngf_create_swapchain_cleanup;
   }
   for (uint32_t f = 0u; f < swapchain->num_images; ++f) {
@@ -1197,7 +1215,7 @@ static ngf_error _ngf_create_swapchain(
     vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL,
                                  &swapchain->framebuffers[f]);
     if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
     }
   }
@@ -1205,7 +1223,7 @@ static ngf_error _ngf_create_swapchain(
   // Create semaphores to be signaled when a swapchain image becomes available.
   swapchain->image_semaphores = NGFI_ALLOCN(VkSemaphore, swapchain->num_images);
   if (swapchain->image_semaphores == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto _ngf_create_swapchain_cleanup;
   }
   for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
@@ -1217,7 +1235,7 @@ static ngf_error _ngf_create_swapchain(
     vk_err = vkCreateSemaphore(_vk.device, &sem_info, NULL,
                                &swapchain->image_semaphores[s]);
     if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_SWAPCHAIN_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto _ngf_create_swapchain_cleanup;
     }
   }
@@ -1245,7 +1263,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   *result = NGFI_ALLOC(struct ngf_context_t);
   ngf_context ctx = *result;
   if (ctx == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_context_cleanup;
   }
   memset(ctx, 0, sizeof(struct ngf_context_t));
@@ -1313,7 +1331,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     vk_err =
       VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
     if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_SURFACE_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
     VkBool32 surface_supported = false;
@@ -1322,7 +1340,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                                           ctx->surface,
                                          &surface_supported);
     if (!surface_supported) {
-      err = NGF_ERROR_SURFACE_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
 
@@ -1340,7 +1358,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->max_inflight_frames = max_inflight_frames;
   ctx->frame_res = NGFI_ALLOCN(_ngf_frame_resources, max_inflight_frames);
   if (ctx->frame_res == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_context_cleanup;
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
@@ -1375,7 +1393,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       vk_err = vkCreateFence(_vk.device, &fence_info, NULL,
                              &ctx->frame_res[f].fences[i]);
       if (vk_err != VK_SUCCESS) {
-        err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngf_create_context_cleanup;
       }
     }
@@ -1394,7 +1412,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     vk_err = vkCreateCommandPool(_vk.device, &gfx_cmd_pool_info, NULL,
                                  &ctx->gfx_cmd_pools[p]);
     if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+      NGFI_DIAG_ERROR("Failed to create command pools for context.");
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
     }
   }
@@ -1410,7 +1429,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
       vk_err = vkCreateCommandPool(_vk.device, &xfer_cmd_pool_info, NULL,
                                     &ctx->xfer_cmd_pools[p]);
       if (vk_err != VK_SUCCESS) {
-        err = NGF_ERROR_CONTEXT_CREATION_FAILED;
+        NGFI_DIAG_ERROR("Failed to create command pools for context.");
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngf_create_context_cleanup;
       }
     }
@@ -1419,6 +1439,10 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   // initialize descriptor superpools.
   ctx->desc_superpools = NGFI_ALLOCN(_ngf_desc_superpool,
                                      ctx->max_inflight_frames);
+  if (ctx->desc_superpools == NULL) {
+    err = NGF_ERROR_OUT_OF_MEM;
+    goto ngf_create_context_cleanup;
+  }
   memset(ctx->desc_superpools, 0,
          sizeof(_ngf_desc_superpool) * ctx->max_inflight_frames);
 
@@ -1619,7 +1643,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   *result = cmd_buf;
   cmd_buf->active_pipe = NULL;
   if (cmd_buf == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
   NGFI_DARRAY_RESET(cmd_buf->bundles, 3);
   cmd_buf->state = NGFI_CMD_BUFFER_READY;
@@ -1640,7 +1664,7 @@ static ngf_error _ngf_cmd_bundle_create(VkCommandPool        pool,
                                              &vk_cmdbuf_info,
                                              &bundle->vkcmdbuf);
   if (vk_err != VK_SUCCESS) {
-    return NGF_ERROR_OUTOFMEM; // TODO: return appropriate error.
+    return NGF_ERROR_OUT_OF_MEM; // TODO: return appropriate error.
   }
   bundle->vkpool = pool;
   VkCommandBufferBeginInfo cmd_buf_begin = {
@@ -1659,7 +1683,7 @@ static ngf_error _ngf_cmd_bundle_create(VkCommandPool        pool,
   };
   vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
   if (vk_err != VK_SUCCESS) {
-    return NGF_ERROR_OUTOFMEM; // TODO: return appropriate error code
+    return NGF_ERROR_OUT_OF_MEM; // TODO: return appropriate error code
   }
 
   bundle->type = type;
@@ -1671,7 +1695,7 @@ static ngf_error _ngf_cmd_buffer_start_encoder(ngf_cmd_buffer      cmd_buf,
                                               _ngf_cmd_bundle_type type) {
   if (!NGFI_CMD_BUF_RECORDABLE(cmd_buf->state) ||
       cmd_buf->frame_id != interlocked_read(&_vk.frame_id)) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    return NGF_ERROR_INVALID_OPERATION;
   }
   const size_t pool_idx =
       cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
@@ -1698,7 +1722,7 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer    cmd_buf,
 
 static ngf_error _ngf_encoder_end(ngf_cmd_buffer cmd_buf) {
   if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    return NGF_ERROR_INVALID_OPERATION;
   }
   vkEndCommandBuffer(cmd_buf->active_bundle.vkcmdbuf);
   NGFI_DARRAY_APPEND(cmd_buf->bundles, cmd_buf->active_bundle);
@@ -1720,7 +1744,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   // Verify we're in a valid state.
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY &&
       cmd_buf->state != NGFI_CMD_BUFFER_SUBMITTED) {
-    return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+    return NGF_ERROR_INVALID_OPERATION;
   }
   assert(NGFI_DARRAY_SIZE(cmd_buf->bundles) == 0);
   cmd_buf->frame_id       =  interlocked_read(&_vk.frame_id);
@@ -1751,7 +1775,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   for (uint32_t i = 0u; i < nbuffers; ++i) {
     if (bufs[i]->state != NGFI_CMD_BUFFER_AWAITING_SUBMIT ||
         fi != bufs[i]->frame_id) {
-      return NGF_ERROR_COMMAND_BUFFER_INVALID_STATE;
+      return NGF_ERROR_INVALID_OPERATION;
     }
     if (bufs[i]->desc_superpool) {
       NGFI_DARRAY_APPEND(frame_sync_data->retire_desc_superpools,
@@ -1909,7 +1933,7 @@ ngf_error ngf_end_frame() {
       };
       const VkResult present_result = vkQueuePresentKHR(_vk.present_queue,
                                                         &present_info);
-      if (present_result != VK_SUCCESS) err = NGF_ERROR_END_FRAME_FAILED;
+      if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
     }
   }
 
@@ -1928,7 +1952,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   *result = NGFI_ALLOC(ngf_shader_stage_t);
   ngf_shader_stage stage = *result;
   if (stage == NULL) {
-    return NGF_ERROR_OUTOFMEM;
+    return NGF_ERROR_OUT_OF_MEM;
   }
 
   VkShaderModuleCreateInfo vk_sm_info = {
@@ -1942,7 +1966,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
     vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vk_module);
   if (vkerr != VK_SUCCESS) {
     NGFI_FREE(stage);
-    return NGF_ERROR_CREATE_SHADER_STAGE_FAILED;
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   stage->vk_stage_bits           = get_vk_shader_stage(info->type);
   size_t entry_point_name_length = strlen(info->entry_point_name) + 1u;
@@ -1974,7 +1998,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   *result = NGFI_ALLOC(ngf_graphics_pipeline_t);
   ngf_graphics_pipeline pipeline = *result;
   if (pipeline == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_graphics_pipeline_cleanup;
   }
 
@@ -2052,7 +2076,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                info->input_info->nattribs);
 
   if (vk_binding_descs == NULL || vk_attrib_descs == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_graphics_pipeline_cleanup;
   }
 
@@ -2343,7 +2367,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                 &pipeline->vk_pipeline);
 
   if (vkerr != VK_SUCCESS) {
-    err = NGF_ERROR_FAILED_TO_CREATE_PIPELINE;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_graphics_pipeline_cleanup;
   }
 
@@ -2402,7 +2426,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     rt = NGFI_ALLOC(ngf_render_target_t);
     *result = rt;
     if (rt == NULL) {
-      err = NGF_ERROR_OUTOFMEM;
+      err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_default_render_target_cleanup;
     }
     rt->is_default = true;
@@ -2429,7 +2453,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     VkResult vk_err = vkCreateRenderPass(_vk.device, &renderpass_info, NULL,
                                          &rt->render_pass);
     if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_RENDER_TARGET_CREATION_FAILED;
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_default_render_target_cleanup;
     }
     if (clear_color) {
@@ -2446,7 +2470,8 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     rt->width  = swapchain->width;
     rt->height = swapchain->height;
   } else {
-    err = NGF_ERROR_NO_DEFAULT_RENDER_TARGET;
+    NGFI_DIAG_ERROR("Current context cannot provide a default render target.");
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
   }
 
 ngf_default_render_target_cleanup:
@@ -3066,7 +3091,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
   ngf_attrib_buffer buf = NGFI_ALLOC(ngf_attrib_buffer_t);
   *result = buf;
 
-  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+  if (buf == NULL) return NGF_ERROR_OUT_OF_MEM;
 
   const VkBufferUsageFlags vk_usage_flags =
     get_vk_buffer_usage(info->buffer_usage) |
@@ -3129,7 +3154,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
   ngf_index_buffer buf = NGFI_ALLOC(ngf_index_buffer_t);
   *result = buf;
 
-  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+  if (buf == NULL) return NGF_ERROR_OUT_OF_MEM;
 
   const VkBufferUsageFlags vk_usage_flags =
     get_vk_buffer_usage(info->buffer_usage) |
@@ -3191,7 +3216,7 @@ ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
   ngf_uniform_buffer buf = NGFI_ALLOC(ngf_uniform_buffer_t);
   *result = buf;
 
-  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+  if (buf == NULL) return NGF_ERROR_OUT_OF_MEM;
 
   const VkBufferUsageFlags vk_usage_flags =
     get_vk_buffer_usage(info->buffer_usage) |
@@ -3253,7 +3278,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
   ngf_pixel_buffer buf = NGFI_ALLOC(ngf_pixel_buffer_t);
   *result = buf;
 
-  if (buf == NULL) return NGF_ERROR_OUTOFMEM;
+  if (buf == NULL) return NGF_ERROR_OUT_OF_MEM;
 
   ngf_error err = _ngf_create_buffer(
     info->size,
@@ -3322,7 +3347,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
   *result = NGFI_ALLOC(ngf_image_t);
   ngf_image img = *result;
   if (img == NULL) {
-    err = NGF_ERROR_OUTOFMEM;
+    err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_image_cleanup;
   }
   const bool exclusive_sharing = (_vk.gfx_family_idx == _vk.xfer_family_idx);
@@ -3374,7 +3399,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
       NULL);
 
   if (create_image_vkerr != VK_SUCCESS) {
-    err = NGF_ERROR_IMAGE_CREATION_FAILED;
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_image_cleanup;
   }
   err = _ngf_create_vk_image_view(img->vkimg,
@@ -3415,7 +3440,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   ngf_sampler sampler = NGFI_ALLOC(ngf_sampler_t);
   *result = sampler;
 
-  if (sampler == NULL) return NGF_ERROR_OUTOFMEM;
+  if (sampler == NULL) return NGF_ERROR_OUT_OF_MEM;
 
   const VkSamplerCreateInfo vk_sampler_info = {
     .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
