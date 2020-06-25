@@ -98,7 +98,7 @@ static void _ngf_blkallock_add_pool(ngfi_block_allocator *alloc) {
 
 ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size,
                                            uint32_t nblocks) {
-  static NGF_THREADLOCAL uint32_t next_tag = 0u;
+  static NGFI_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
     uint32_t threadid = (uint32_t)ngfi_cur_thread_id();
     next_tag = (~MARKER_MASK) & (threadid << 16);
