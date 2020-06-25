@@ -60,6 +60,8 @@
 #define _NGF_INVALID_IDX  (~0u)
 #define _NGF_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
 
+#pragma region vk_struct_definitions
+
 // Singleton for holding vulkan instance and device handles.
 // This is shared by all contexts.
 struct {
@@ -258,6 +260,8 @@ typedef struct ngf_render_target_t {
   // TODO: non-default render target
 } ngf_render_target_t;
 
+#pragma endregion
+
 NGF_THREADLOCAL ngf_context  CURRENT_CONTEXT = NULL;
 
 ngfi_sa* _ngf_tmp_store() {
@@ -268,6 +272,8 @@ ngfi_sa* _ngf_tmp_store() {
   }
   return temp_storage;
 }
+
+#pragma region vk_enum_maps
 
 static VkFilter get_vk_filter(ngf_sampler_filter filter) {
   static const VkFilter vkfilters[NGF_FILTER_COUNT] = {
@@ -626,12 +632,14 @@ static VkIndexType get_vk_index_type(ngf_type t) {
   }
 }
 
+#pragma endregion
+
 #if defined(XCB_NONE)
 xcb_connection_t *XCB_CONNECTION = NULL;
 xcb_visualid_t    XCB_VISUALID   = { 0 };
 #endif
 
-bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
+bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
                                      uint32_t         queue_family_index) {
 #if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
@@ -828,7 +836,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
       const VkBool32     is_gfx = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
       const VkBool32     is_xfer = (flags & VK_QUEUE_TRANSFER_BIT) != 0;
-      const VkBool32     is_present = _ngf_query_presentation_support(
+      const VkBool32     is_present = ngfvk_query_presentation_support(
         _vk.phys_dev, q);
       if (gfx_family_idx == _NGF_INVALID_IDX && is_gfx) {
         gfx_family_idx = q;
