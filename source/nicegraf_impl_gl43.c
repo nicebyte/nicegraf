@@ -2194,14 +2194,12 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             if (!prev_blend || memcmp(blend, prev_blend, sizeof(ngf_blend_info))) {
               if (blend->enable) {
                 glEnable(GL_BLEND);
-                glBlendEquationSeparate(get_gl_blend_factor(blend->blend_op_color),
-                                        get_gl_blend_factor(blend->blend_op_alpha));
+                glBlendEquationSeparate(get_gl_blend_op(blend->blend_op_color),
+                                        get_gl_blend_op(blend->blend_op_alpha));
                 glBlendFuncSeparate(get_gl_blend_factor(blend->src_color_blend_factor),
                                     get_gl_blend_factor(blend->dst_color_blend_factor),
                                     get_gl_blend_factor(blend->src_alpha_blend_factor),
                                     get_gl_blend_factor(blend->dst_alpha_blend_factor));
-                glBlendEquationSeparate(get_gl_blend_op(blend->blend_op_color),
-                                        get_gl_blend_op(blend->blend_op_alpha));
                 glBlendColor(blend->blend_color[0],
                              blend->blend_color[1],
                              blend->blend_color[2],
