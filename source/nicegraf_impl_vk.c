@@ -31,8 +31,8 @@
 #include <string.h>
 
 // Determine the correct WSI extension to use for VkSurface creation.
-// Do not change the relative order of this block, the Volk header include
-// directive and the VMA header include directive.
+// Do not change the relative order of this #if .. #else block, the vulkan
+// loader (vk_10.h) include directive, and the VMA header include directive.
 #if defined(_WIN32)||defined(_WIN64)
   #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
