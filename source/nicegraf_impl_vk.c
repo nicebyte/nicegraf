@@ -57,8 +57,8 @@
 #include "vk_10.h"
 #include <vk_mem_alloc.h>
 
-#define _NGF_INVALID_IDX  (~0u)
-#define _NGF_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
+#define NGFVK_INVALID_IDX  (~0u)
+#define NGFVK_MAX_PHYS_DEV (64u) // 64 GPUs oughta be enough for everybody.
 
 #pragma region vk_struct_definitions
 
@@ -262,10 +262,10 @@ typedef struct ngf_render_target_t {
 
 #pragma endregion
 
-NGF_THREADLOCAL ngf_context  CURRENT_CONTEXT = NULL;
+NGFI_THREADLOCAL ngf_context  CURRENT_CONTEXT = NULL;
 
-ngfi_sa* _ngf_tmp_store() {
-  static NGF_THREADLOCAL ngfi_sa *temp_storage = NULL;
+ngfi_sa* ngfvk_tmp_store() {
+  static NGFI_THREADLOCAL ngfi_sa *temp_storage = NULL;
   if (temp_storage == NULL) {
     const size_t sa_capacity = 1024 * 100; // 100K
     temp_storage = ngfi_sa_create(sa_capacity);
@@ -768,8 +768,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     }
 
     // Obtain a list of available physical devices.
-    uint32_t nphysdev = _NGF_MAX_PHYS_DEV;
-    VkPhysicalDevice physdevs[_NGF_MAX_PHYS_DEV];
+    uint32_t nphysdev = NGFVK_MAX_PHYS_DEV;
+    VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
     vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
     if (vk_err != VK_SUCCESS) {
       NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
@@ -778,7 +778,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     // Pick a suitable physical device based on user's preference.
     uint32_t best_device_score = 0U;
-    uint32_t best_device_index = _NGF_INVALID_IDX;
+    uint32_t best_device_index = NGFVK_INVALID_IDX;
     const ngf_device_preference pref = init_info->device_pref;
     for (uint32_t i = 0; i < nphysdev; ++i) {
       VkPhysicalDeviceProperties dev_props;
@@ -806,7 +806,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
         best_device_score = score;
       }
     }
-    if (best_device_index == _NGF_INVALID_IDX) {
+    if (best_device_index == NGFVK_INVALID_IDX) {
       NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
       return NGF_ERROR_INVALID_OPERATION;
     }
@@ -829,32 +829,32 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       queue_families);
 
     // Pick suitable queue families for graphics, present and transfer.
-    uint32_t gfx_family_idx = _NGF_INVALID_IDX;
-    uint32_t present_family_idx = _NGF_INVALID_IDX;
-    uint32_t xfer_family_idx = _NGF_INVALID_IDX;
+    uint32_t gfx_family_idx = NGFVK_INVALID_IDX;
+    uint32_t present_family_idx = NGFVK_INVALID_IDX;
+    uint32_t xfer_family_idx = NGFVK_INVALID_IDX;
     for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
       const VkBool32     is_gfx = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
       const VkBool32     is_xfer = (flags & VK_QUEUE_TRANSFER_BIT) != 0;
       const VkBool32     is_present = ngfvk_query_presentation_support(
         _vk.phys_dev, q);
-      if (gfx_family_idx == _NGF_INVALID_IDX && is_gfx) {
+      if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) {
         gfx_family_idx = q;
       }
-      if ((xfer_family_idx == _NGF_INVALID_IDX ||
+      if ((xfer_family_idx == NGFVK_INVALID_IDX ||
         xfer_family_idx == gfx_family_idx) && is_xfer) {
         // Prefer to use different queues for graphics and transfer.
         xfer_family_idx = q;
       }
-      if (present_family_idx == _NGF_INVALID_IDX && is_present == VK_TRUE) {
+      if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
         present_family_idx = q;
       }
     }
     NGFI_FREEN(queue_families, num_queue_families);
     queue_families = NULL;
-    if (gfx_family_idx == _NGF_INVALID_IDX ||
-      xfer_family_idx == _NGF_INVALID_IDX ||
-      present_family_idx == _NGF_INVALID_IDX) {
+    if (gfx_family_idx == NGFVK_INVALID_IDX ||
+      xfer_family_idx == NGFVK_INVALID_IDX ||
+      present_family_idx == NGFVK_INVALID_IDX) {
       NGFI_DIAG_ERROR("Could not find a suitable queue family.");
       return NGF_ERROR_INVALID_OPERATION;
     }
@@ -1895,7 +1895,7 @@ ngf_error ngf_begin_frame() {
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].xfer_cmd_pools);
   
   // reset stack allocator.
-  ngfi_sa_reset(_ngf_tmp_store());
+  ngfi_sa_reset(ngfvk_tmp_store());
 
    return err;
 }
@@ -2076,7 +2076,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   VkSpecializationInfo vk_spec_info;
   const ngf_specialization_info *spec_info = info->spec_info;
   if (info->spec_info) {
-    VkSpecializationMapEntry *spec_map_entries = ngfi_sa_alloc(_ngf_tmp_store(),
+    VkSpecializationMapEntry *spec_map_entries = ngfi_sa_alloc(ngfvk_tmp_store(),
                       info->spec_info->nspecializations *
                       sizeof(VkSpecializationMapEntry));
 
@@ -2633,18 +2633,18 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       NGFI_DARRAY_SIZE(active_pipe->vk_descriptor_set_layouts);
 
   // Reset temp. storage to make sure we have all of it available.
-  ngfi_sa_reset(_ngf_tmp_store());
+  ngfi_sa_reset(ngfvk_tmp_store());
 
   // Allocate an array of descriptor set handles from temporary storage and
   // set them all to null.
   const size_t vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
-  VkDescriptorSet *vk_sets = ngfi_sa_alloc(_ngf_tmp_store(), vk_sets_size_bytes);
+  VkDescriptorSet *vk_sets = ngfi_sa_alloc(ngfvk_tmp_store(), vk_sets_size_bytes);
   memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
 
   // Allocate an array of vulkan descriptor set writes from
   // temp storage. 
   VkWriteDescriptorSet *vk_writes =
-      ngfi_sa_alloc(_ngf_tmp_store(), nbind_operations *
+      ngfi_sa_alloc(ngfvk_tmp_store(), nbind_operations *
                                       sizeof(VkWriteDescriptorSet));
 
   // Process each bind operation, constructing a corresponding
@@ -2704,7 +2704,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
           // Prepare descriptor counts.
           VkDescriptorPoolSize *vk_pool_sizes =
-            ngfi_sa_alloc(_ngf_tmp_store(),
+            ngfi_sa_alloc(ngfvk_tmp_store(),
                 sizeof(VkDescriptorPoolSize) *
                 NGF_DESCRIPTOR_TYPE_COUNT);
           for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
@@ -2786,7 +2786,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       const ngf_uniform_buffer_bind_info *bind_info =
           &bind_op->info.uniform_buffer;
       VkDescriptorBufferInfo *vk_bind_info =
-          ngfi_sa_alloc(_ngf_tmp_store(), sizeof(VkDescriptorBufferInfo));
+          ngfi_sa_alloc(ngfvk_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
       vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
       vk_bind_info->offset = bind_info->offset;
@@ -2801,7 +2801,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       const ngf_image_sampler_bind_info *bind_info =
           &bind_op->info.image_sampler;
       VkDescriptorImageInfo *vk_bind_info =
-          ngfi_sa_alloc(_ngf_tmp_store(), sizeof(VkDescriptorImageInfo));
+          ngfi_sa_alloc(ngfvk_tmp_store(), sizeof(VkDescriptorImageInfo));
       vk_bind_info->imageView   = VK_NULL_HANDLE;
       vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       vk_bind_info->sampler     = VK_NULL_HANDLE;
