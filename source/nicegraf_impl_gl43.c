@@ -2210,8 +2210,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             }
 
             // Set vertex input state.
-            if (!bound_pipe ||
-                bound_pipe->vao != pipeline->vao) {
+            if ((!bound_pipe ||
+                  bound_pipe->vao != pipeline->vao) &&
+                  glIsVertexArray(pipeline->vao)) {
               glBindVertexArray(pipeline->vao);
               // Keep the same set of attribute buffers bound despite VAO change.
               const size_t nvbuf_table_entries =
@@ -2221,6 +2222,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                 const ngfgl_vbuf_binding_info *vbuf_table_entry =
                     &NGFI_DARRAY_AT(CURRENT_CONTEXT->cached_state.vbuf_table,
                                     e);
+                if (!glIsBuffer(vbuf_table_entry->buffer)) {
+                  continue;
+                }
                 // Update only bindings relevant to this pipeline.
                 for (uint32_t b = 0;
                      !found_binding && b < pipeline->nvert_buf_bindings;
@@ -2239,8 +2243,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               }
 
               // Rebind index buffer.
-              glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                           CURRENT_CONTEXT->cached_state.bound_index_buffer);
+              if (glIsBuffer(CURRENT_CONTEXT->cached_state.bound_index_buffer)) {
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                  CURRENT_CONTEXT->cached_state.bound_index_buffer);
+              }
             }
             CURRENT_CONTEXT->cached_state.pipeline = *pipeline;
           }
