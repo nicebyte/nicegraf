@@ -85,7 +85,6 @@ static ngf_diagnostic_info ngfi_diag_info = {
   .callback  = NULL
 };
 
-
 // Swapchain state.
 typedef struct _ngf_swapchain {
   VkSwapchainKHR   vk_swapchain;
@@ -1528,7 +1527,6 @@ ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t    new_height) {
   assert(ctx);
   ngf_error err = NGF_ERROR_OK;
-
   _ngf_destroy_swapchain(&ctx->swapchain);
   ctx->swapchain_info.width  = new_width;
   ctx->swapchain_info.height = new_height;
@@ -1896,6 +1894,18 @@ ngf_error ngf_begin_frame() {
   
   // reset stack allocator.
   ngfi_sa_reset(ngfvk_tmp_store());
+  
+  const bool needs_present =
+    CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
+
+  if (needs_present) {
+    vkAcquireNextImageKHR(_vk.device,
+      CURRENT_CONTEXT->swapchain.vk_swapchain,
+      UINT64_MAX,
+      CURRENT_CONTEXT->swapchain.image_semaphores[fi],
+      VK_NULL_HANDLE,
+      &CURRENT_CONTEXT->swapchain.image_idx);
+  }
 
    return err;
 }
@@ -1957,14 +1967,6 @@ ngf_error ngf_end_frame() {
     // any graphics commands.
     const bool needs_present =
         CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
-    if (needs_present) {
-      vkAcquireNextImageKHR(_vk.device,
-                             CURRENT_CONTEXT->swapchain.vk_swapchain,
-                             UINT64_MAX,
-                             CURRENT_CONTEXT->swapchain.image_semaphores[fi],
-                             VK_NULL_HANDLE,
-                            &CURRENT_CONTEXT->swapchain.image_idx);
-    }
 
     // Submit pending graphics commands.
     const VkPipelineStageFlags color_attachment_stage =
