@@ -166,22 +166,23 @@ typedef struct {
   VkBuffer      vkbuf;
   VmaAllocation alloc;
   size_t        size;
-} _ngf_buffer;
+  size_t        mapped_offset;
+} ngfvk_buffer;
 
 typedef struct ngf_attrib_buffer_t {
-  _ngf_buffer data;
+  ngfvk_buffer data;
 } ngf_attrib_buffer_t;
 
 typedef struct ngf_index_buffer_t {
-  _ngf_buffer data;
+  ngfvk_buffer data;
 } ngf_index_buffer_t;
 
 typedef struct ngf_uniform_buffer_t {
-  _ngf_buffer data;
+  ngfvk_buffer data;
 } ngf_uniform_buffer_t;
 
 typedef struct ngf_pixel_buffer_t {
-  _ngf_buffer data;
+  ngfvk_buffer data;
 } ngf_pixel_buffer_t;
 
 typedef struct ngf_sampler_t {
@@ -207,7 +208,7 @@ typedef struct _ngf_frame_resources {
  NGFI_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
  NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
  NGFI_DARRAY_OF(VkSampler)             retire_samplers;
- NGFI_DARRAY_OF(_ngf_buffer)           retire_buffers;
+ NGFI_DARRAY_OF(ngfvk_buffer)           retire_buffers;
  NGFI_DARRAY_OF(_ngf_desc_superpool*)  retire_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
@@ -1611,7 +1612,7 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   for (uint32_t a = 0;
        a < NGFI_DARRAY_SIZE(frame_res->retire_buffers);
      ++a) {
-    _ngf_buffer *b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
+    ngfvk_buffer *b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
     vmaDestroyBuffer(b->parent_allocator,
                      b->vkbuf,
                      b->alloc);
@@ -3133,27 +3134,28 @@ static ngf_error _ngf_create_buffer(size_t                 size,
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
-static void* _ngf_map_buffer(VmaAllocation alloc, size_t offset) {
+static void* ngfvk_map_buffer(ngfvk_buffer *buf, size_t offset) {
   void* result = NULL;
   VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator,
-                                   alloc,
+                                   buf->alloc,
                                   &result);
+  if (vkresult == VK_SUCCESS) {
+    buf->mapped_offset = offset;
+  }
   return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
 }
 
-static void _ngf_flush_buffer(VmaAllocation alloc,
-                              size_t        offset,
-                              size_t        size) {
-  // TODO: on VK the range offset is relative to the start of buffer,
-  //       but on GL it is relative to the start of the mapped range!
+static void ngfvk_flush_buffer(ngfvk_buffer *buf,
+                               size_t        offset,
+                               size_t        size) {
   vmaFlushAllocation(CURRENT_CONTEXT->allocator,
-                     alloc,
-                     offset,
+                     buf->alloc,
+                     buf->mapped_offset + offset,
                      size);
 }
 
-static void _ngf_unmap_buffer(VmaAllocation alloc) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator, alloc);
+static void ngfvk_unmap_buffer(ngfvk_buffer *buf) {
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc);
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
@@ -3206,17 +3208,17 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t            size,
                                   uint32_t          flags) {
   NGFI_FAKE_USE(size, flags);
-  return _ngf_map_buffer(buf->data.alloc, offset);
+  return ngfvk_map_buffer(&buf->data, offset);
 }
 
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
                                    size_t size) {
-  _ngf_flush_buffer(buf->data.alloc, offset, size);
+  ngfvk_flush_buffer(&buf->data, offset, size);
 }
 
 void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) {
-  _ngf_unmap_buffer(buf->data.alloc);
+  ngfvk_unmap_buffer(&buf->data);
 }
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
@@ -3268,17 +3270,17 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t           size,
                                  uint32_t         flags) {
   NGFI_FAKE_USE(size, flags);
-  return _ngf_map_buffer(buf->data.alloc, offset);
+  return ngfvk_map_buffer(&buf->data, offset);
 }
 
 void ngf_index_buffer_flush_range(ngf_index_buffer buf,
                                   size_t           offset,
                                   size_t           size) {
-  _ngf_flush_buffer(buf->data.alloc, offset, size);
+  ngfvk_flush_buffer(&buf->data, offset, size);
 }
 
 void ngf_index_buffer_unmap(ngf_index_buffer buf) {
-  _ngf_unmap_buffer(buf->data.alloc);
+  ngfvk_unmap_buffer(&buf->data);
 }
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
@@ -3330,17 +3332,17 @@ void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t             size,
                                    uint32_t           flags) {
   NGFI_FAKE_USE(size, flags);
-  return _ngf_map_buffer(buf->data.alloc, offset);
+  return ngfvk_map_buffer(&buf->data, offset);
 }
 
 void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf,
                                     size_t             offset,
                                     size_t             size) {
-  _ngf_flush_buffer(buf->data.alloc, offset, size);
+  ngfvk_flush_buffer(&buf->data, offset, size);
 }
 
 void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) {
-  _ngf_unmap_buffer(buf->data.alloc);
+  ngfvk_unmap_buffer(&buf->data);
 }
 
 ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
@@ -3383,17 +3385,17 @@ void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t size,
                                  uint32_t flags) {
   NGFI_FAKE_USE(size, flags);
-  return _ngf_map_buffer(buf->data.alloc, offset);
+  return ngfvk_map_buffer(&buf->data, offset);
 }
 
 void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
                                   size_t offset,
                                   size_t size) {
-  _ngf_flush_buffer(buf->data.alloc, offset, size);
+  ngfvk_flush_buffer(&buf->data, offset, size);
 }
 
 void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) { 
-  _ngf_unmap_buffer(buf->data.alloc);
+  ngfvk_unmap_buffer(&buf->data);
 }
 
 ngf_error ngf_create_image(const ngf_image_info *info,
