@@ -26,7 +26,7 @@
 
 #include <assert.h>
 #if defined(_WIN32) || defined(_WIN64)
-#define NGF_THREADLOCAL __declspec(thread)
+#define NGFI_THREADLOCAL __declspec(thread)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 // emulate pthread mutexes and condvars
@@ -42,7 +42,7 @@ typedef CONDITION_VARIABLE pthread_cond_t;
 #define ngfi_cur_thread_id()     (GetCurrentThreadId())
 #define pthread_cond_destroy(c)
 #else
-#define NGF_THREADLOCAL __thread
+#define NGFI_THREADLOCAL __thread
 #include <pthread.h>
 #if defined(__APPLE__)
 #define ngfi_cur_thread_id() pthread_mach_thread_np(pthread_self())
