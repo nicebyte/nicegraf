@@ -718,7 +718,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     
     // Names of instance layers to enable.
     const char* enabled_layers[] = {
-      "VK_LAYER_KHRONOS_VALIDATION"
+      "VK_LAYER_KHRONOS_validation"
     };
 
     //TODO: check if validation layers are supported.
