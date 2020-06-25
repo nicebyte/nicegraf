@@ -661,6 +661,32 @@ bool _ngf_query_presentation_support(VkPhysicalDevice phys_dev,
 #endif
 }
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
+  VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+  VkDebugUtilsMessageTypeFlagsEXT type,
+  const VkDebugUtilsMessengerCallbackDataEXT* data,
+  void *userdata) {
+  NGFI_FAKE_USE(type, userdata);
+  ngf_diagnostic_message_type ngf_msg_type;
+  switch(severity) {
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+    ngf_msg_type = NGF_DIAGNOSTIC_INFO;
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+    ngf_msg_type = NGF_DIAGNOSTIC_WARNING;
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+  default:
+    ngf_msg_type = NGF_DIAGNOSTIC_ERROR;
+    break;
+  }
+  if (ngfi_diag_info.callback) {
+    ngfi_diag_info.callback(ngf_msg_type, ngfi_diag_info.userdata, data->pMessage);
+  }
+  return VK_FALSE;
+}
+
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
   assert(init_info);
   ngfi_diag_info = init_info->diag_info;
@@ -709,8 +735,29 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
       return NGF_ERROR_OBJECT_CREATION_FAILED;
     }
-
+    
     vkl_init_instance(_vk.instance); // load instance-level Vulkan functions.
+
+    if (enable_validation) {
+      // Install a debug callback to forward vulkan debug messages to the user.
+      VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext = NULL,
+        .flags = 0u,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = ngfvk_debug_message_callback,
+        .pUserData = NULL
+      };
+      VkDebugUtilsMessengerEXT vk_debug_messenger;
+      vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
+    }
 
     // Obtain a list of available physical devices.
     uint32_t nphysdev = _NGF_MAX_PHYS_DEV;
