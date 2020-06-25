@@ -664,8 +664,8 @@ ngf_error ngf_resize_context(ngf_context ctx,
   return NGF_ERROR_OK;
 }
 
-NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
-NGF_THREADLOCAL ngfi_block_allocator *COMMAND_POOL = NULL;
+NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
+NGFI_THREADLOCAL ngfi_block_allocator *COMMAND_POOL = NULL;
 
 ngf_error ngf_set_context(ngf_context ctx) {
   assert(ctx);

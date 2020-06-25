@@ -491,7 +491,7 @@ struct ngf_context_t {
   dispatch_semaphore_t frame_sync_sem = nil;
 };
 
-NGF_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
+NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
 struct ngf_render_target_t {
   mutable MTLRenderPassDescriptor *pass_descriptor = nil;
