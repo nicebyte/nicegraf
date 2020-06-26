@@ -86,7 +86,7 @@ static ngf_diagnostic_info ngfi_diag_info = {
 };
 
 // Swapchain state.
-typedef struct _ngf_swapchain {
+typedef struct ngfvk_swapchain {
   VkSwapchainKHR   vk_swapchain;
   VkImage         *images;
   VkImageView     *image_views;
@@ -105,60 +105,60 @@ typedef struct _ngf_swapchain {
     VkRenderPassCreateInfo  info;
     VkRenderPass            vk_handle;
   } renderpass;
-} _ngf_swapchain;
+} ngfvk_swapchain;
 
 // Indicates the type of queue that a command bundle is intented for.
-typedef enum _ngf_cmd_bundle_type_t {
+typedef enum {
   _NGF_BUNDLE_RENDERING,
   _NGF_BUNDLE_XFER
-} _ngf_cmd_bundle_type;
+} ngfvk_cmd_bundle_type;
 
 // A "command bundle" consists of a command buffer, a semaphore that is
 // signaled on its completion and a reference to the command buffer's parent
 // pool.
-typedef struct _ngf_cmd_bundle_t {
-  VkCommandBuffer      vkcmdbuf;
-  VkSemaphore          vksem;
-  VkCommandPool        vkpool;
- _ngf_cmd_bundle_type  type;
-} _ngf_cmd_bundle;
+typedef struct {
+  VkCommandBuffer       vkcmdbuf;
+  VkSemaphore           vksem;
+  VkCommandPool         vkpool;
+  ngfvk_cmd_bundle_type type;
+} ngfvk_cmd_bundle;
 
-typedef uint32_t  _ngf_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
+typedef uint32_t  ngfvk_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
 typedef struct {
   uint32_t       sets;
- _ngf_desc_count descriptors;
-} _ngf_desc_pool_capacity;
+  ngfvk_desc_count descriptors;
+} ngfvk_desc_pool_capacity;
 
 typedef struct {
- _ngf_desc_count counts;
-} _ngf_desc_set_size;
+ ngfvk_desc_count counts;
+} ngfvk_desc_set_size;
 
-typedef struct _ngf_desc_superpool_t _ngf_desc_superpool;
+typedef struct ngfvk_desc_superpool_t ngfvk_desc_superpool;
 
-typedef struct _ngf_desc_pool {
-  struct _ngf_desc_pool *next;
+typedef struct ngfvk_desc_pool {
+  struct ngfvk_desc_pool  *next;
   VkDescriptorPool         vk_pool;
- _ngf_desc_pool_capacity   capacity;
- _ngf_desc_pool_capacity   utilization;
-} _ngf_desc_pool;
+  ngfvk_desc_pool_capacity capacity;
+  ngfvk_desc_pool_capacity utilization;
+} ngfvk_desc_pool;
 
-struct _ngf_desc_superpool_t {
-  _ngf_desc_pool *active_pool;
-  _ngf_desc_pool *list;
+struct ngfvk_desc_superpool_t {
+  ngfvk_desc_pool *active_pool;
+  ngfvk_desc_pool *list;
 };
 typedef struct ngf_cmd_buffer_t {
-  ngf_graphics_pipeline           active_pipe;    // < The bound pipeline.
- NGFI_DARRAY_OF(_ngf_cmd_bundle)  bundles;        // < List of bundles that have
-                                                  // finished recording.
- _ngf_cmd_bundle                  active_bundle;  // < The current bundle.
-  ATOMIC_INT                      frame_id;       // < id of the frame that the
+  ngf_graphics_pipeline            active_pipe;    // < The bound pipeline.
+  NGFI_DARRAY_OF(ngfvk_cmd_bundle) bundles;        // < List of bundles that have
+                                                   //   finished recording.
+  ngfvk_cmd_bundle                 active_bundle;  // < The current bundle.
+  ATOMIC_INT                       frame_id;       // < id of the frame that the
                                                   // cmd buffer is intended for.
- _ngf_desc_superpool             *desc_superpool; // < The superpool from which
-                                                  // the desc pools for this cmd
-                                                  // buffer are allocated.
-  ngf_render_target               active_rt;      // < Active render target.
- ngfi_cmd_buffer_state            state;
+  ngfvk_desc_superpool            *desc_superpool; // < The superpool from which
+                                                   //   the desc pools for this cmd
+                                                   //   buffer are allocated.
+  ngf_render_target                active_rt;      // < Active render target.
+  ngfi_cmd_buffer_state            state;
 } ngf_cmd_buffer_t;
 
 typedef struct {
@@ -209,7 +209,7 @@ typedef struct _ngf_frame_resources {
  NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
  NGFI_DARRAY_OF(VkSampler)             retire_samplers;
  NGFI_DARRAY_OF(ngfvk_buffer)           retire_buffers;
- NGFI_DARRAY_OF(_ngf_desc_superpool*)  retire_desc_superpools;
+ NGFI_DARRAY_OF(ngfvk_desc_superpool*)  retire_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -220,12 +220,12 @@ typedef struct _ngf_frame_resources {
 // API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
  _ngf_frame_resources *frame_res;
- _ngf_swapchain        swapchain;
+ ngfvk_swapchain        swapchain;
   ngf_swapchain_info   swapchain_info;
   VmaAllocator         allocator;
   VkCommandPool       *gfx_cmd_pools;
   VkCommandPool       *xfer_cmd_pools;
- _ngf_desc_superpool  *desc_superpools;
+ ngfvk_desc_superpool  *desc_superpools;
   VkSurfaceKHR         surface;
   uint32_t             frame_number;
   uint32_t             max_inflight_frames;
@@ -240,7 +240,7 @@ typedef struct ngf_shader_stage_t {
 typedef struct ngf_graphics_pipeline_t {
   VkPipeline                           vk_pipeline;
  NGFI_DARRAY_OF(VkDescriptorSetLayout) vk_descriptor_set_layouts;
- NGFI_DARRAY_OF(_ngf_desc_set_size)    desc_set_sizes;
+ NGFI_DARRAY_OF(ngfvk_desc_set_size)    desc_set_sizes;
   VkPipelineLayout                     vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
 
@@ -931,7 +931,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
   return NGF_ERROR_OK;
 }
 
-static void _ngf_destroy_swapchain(_ngf_swapchain *swapchain) {
+static void _ngf_destroy_swapchain(ngfvk_swapchain *swapchain) {
   assert(swapchain);
   vkDeviceWaitIdle(_vk.device);
 
@@ -1025,7 +1025,7 @@ static ngf_error _ngf_create_vk_image_view(VkImage          image,
 static ngf_error _ngf_create_swapchain(
     const ngf_swapchain_info *swapchain_info,
     VkSurfaceKHR              surface,
-   _ngf_swapchain            *swapchain) {
+   ngfvk_swapchain            *swapchain) {
   assert(swapchain_info);
   assert(swapchain);
 
@@ -1507,14 +1507,14 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   }
 
   // initialize descriptor superpools.
-  ctx->desc_superpools = NGFI_ALLOCN(_ngf_desc_superpool,
+  ctx->desc_superpools = NGFI_ALLOCN(ngfvk_desc_superpool,
                                      ctx->max_inflight_frames);
   if (ctx->desc_superpools == NULL) {
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_context_cleanup;
   }
   memset(ctx->desc_superpools, 0,
-         sizeof(_ngf_desc_superpool) * ctx->max_inflight_frames);
+         sizeof(ngfvk_desc_superpool) * ctx->max_inflight_frames);
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) {
@@ -1620,9 +1620,9 @@ void _ngf_retire_resources(_ngf_frame_resources *frame_res) {
   for (uint32_t p = 0u;
        p < NGFI_DARRAY_SIZE(frame_res->retire_desc_superpools);
      ++p) {
-    _ngf_desc_superpool *superpool =
+    ngfvk_desc_superpool *superpool =
       NGFI_DARRAY_AT(frame_res->retire_desc_superpools, p);
-    for (_ngf_desc_pool *pool = superpool->list; pool; pool = pool->next) {
+    for (ngfvk_desc_pool *pool = superpool->list; pool; pool = pool->next) {
       vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
       memset(&pool->utilization, 0, sizeof(pool->utilization));
     }
@@ -1720,8 +1720,8 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
 }
 
 static ngf_error _ngf_cmd_bundle_create(VkCommandPool        pool,
-                                        _ngf_cmd_bundle_type type,
-                                        _ngf_cmd_bundle     *bundle) {
+                                        ngfvk_cmd_bundle_type type,
+                                        ngfvk_cmd_bundle     *bundle) {
   VkCommandBufferAllocateInfo vk_cmdbuf_info = {
     .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
     .pNext              = NULL,
@@ -1761,7 +1761,7 @@ static ngf_error _ngf_cmd_bundle_create(VkCommandPool        pool,
 }
 
 static ngf_error _ngf_cmd_buffer_start_encoder(ngf_cmd_buffer      cmd_buf,
-                                              _ngf_cmd_bundle_type type) {
+                                              ngfvk_cmd_bundle_type type) {
   if (!NGFI_CMD_BUF_RECORDABLE(cmd_buf->state) ||
       cmd_buf->frame_id != interlocked_read(&_vk.frame_id)) {
     return NGF_ERROR_INVALID_OPERATION;
@@ -1827,7 +1827,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   assert(buffer);
   const uint32_t nbundles = NGFI_DARRAY_SIZE(buffer->bundles);
   for (uint32_t i = 0u; i < nbundles; ++i) {
-    _ngf_cmd_bundle *bundle = &(NGFI_DARRAY_AT(buffer->bundles, i));
+    ngfvk_cmd_bundle *bundle = &(NGFI_DARRAY_AT(buffer->bundles, i));
     vkFreeCommandBuffers(_vk.device, bundle->vkpool, 1, &bundle->vkcmdbuf);
     vkDestroySemaphore(_vk.device, bundle->vksem, NULL);
   }
@@ -1851,7 +1851,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                          bufs[i]->desc_superpool);
     }
     for (uint32_t j = 0; j < NGFI_DARRAY_SIZE(bufs[i]->bundles); ++j) {
-      _ngf_cmd_bundle *bundle = &(NGFI_DARRAY_AT(bufs[i]->bundles, j));
+      ngfvk_cmd_bundle *bundle = &(NGFI_DARRAY_AT(bufs[i]->bundles, j));
       switch (bundle->type) {
       case _NGF_BUNDLE_RENDERING:
         NGFI_DARRAY_APPEND(frame_sync_data->submitted_gfx_cmds,
@@ -2358,7 +2358,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     VkDescriptorSetLayoutBinding *vk_descriptor_bindings =
         NGFI_ALLOCN(VkDescriptorSetLayoutBinding,
                    info->layout->descriptor_set_layouts[s].ndescriptors);
-    _ngf_desc_set_size set_size;
+    ngfvk_desc_set_size set_size;
     memset(&set_size, 0, sizeof(set_size));
     for (uint32_t b = 0u;
          b < info->layout->descriptor_set_layouts[s].ndescriptors;
@@ -2508,7 +2508,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     const VkAttachmentStoreOp vk_color_store_op = get_vk_store_op(color_store_op);
     const VkAttachmentStoreOp vk_depth_store_op = get_vk_store_op(depth_store_op);
 
-    const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
+    const ngfvk_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
     VkAttachmentDescription attachment_descs[2] = {
       swapchain->renderpass.attachment_descs[0],
       swapchain->renderpass.attachment_descs[1]
@@ -2558,7 +2558,7 @@ ngf_default_render_target_cleanup:
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
   ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
-  const _ngf_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
+  const ngfvk_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
   const VkFramebuffer fb =
       target->is_default
           ? swapchain->framebuffers[swapchain->image_idx]
@@ -2669,7 +2669,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
       const ATOMIC_INT superpool_idx =
           _vk.frame_id % (CURRENT_CONTEXT->max_inflight_frames);  
-     _ngf_desc_superpool *superpool =
+     ngfvk_desc_superpool *superpool =
           &CURRENT_CONTEXT->desc_superpools[superpool_idx];
      buf->desc_superpool = superpool;
 
@@ -2680,12 +2680,12 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       if (have_active_pool) {
         // Check if the active descriptor pool can fit the required descriptor
         // set.
-        const _ngf_desc_set_size *set_size =
+        const ngfvk_desc_set_size *set_size =
             &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes,
                             bind_op->target_set);
-       _ngf_desc_pool                 *pool     =  superpool->active_pool;
-        const _ngf_desc_pool_capacity *capacity = &pool->capacity;
-       _ngf_desc_pool_capacity        *usage    = &pool->utilization;
+       ngfvk_desc_pool                 *pool     =  superpool->active_pool;
+        const ngfvk_desc_pool_capacity *capacity = &pool->capacity;
+       ngfvk_desc_pool_capacity        *usage    = &pool->utilization;
         for (ngf_descriptor_type i = 0;
             !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
            ++i) {
@@ -2700,7 +2700,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
         if (!have_active_pool ||
              superpool->active_pool->next == NULL) {
           //TODO: make this tweakable
-          _ngf_desc_pool_capacity capacity;
+          ngfvk_desc_pool_capacity capacity;
           capacity.sets = 100u;
           for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i)
             capacity.descriptors[i] = 100u;
@@ -2727,7 +2727,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           };
 
           // Create the new pool.
-         _ngf_desc_pool *new_pool = NGFI_ALLOC(_ngf_desc_pool);
+         ngfvk_desc_pool *new_pool = NGFI_ALLOC(ngfvk_desc_pool);
           new_pool->next     = NULL;
           new_pool->capacity = capacity;
           memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
