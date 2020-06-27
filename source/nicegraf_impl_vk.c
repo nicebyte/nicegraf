@@ -610,6 +610,8 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 
 #pragma endregion
 
+// Handler for messages from validation layers, etc.
+// All messages are forwarded to the user-provided debug callback.
 static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
   VkDebugUtilsMessageSeverityFlagBitsEXT severity,
   VkDebugUtilsMessageTypeFlagsEXT type,
