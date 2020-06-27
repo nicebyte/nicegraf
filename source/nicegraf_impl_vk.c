@@ -30,30 +30,6 @@
 #include <assert.h>
 #include <string.h>
 
-// Determine the correct WSI extension to use for VkSurface creation.
-// Do not change the relative order of this #if .. #else block, the vulkan
-// loader (vk_10.h) include directive, and the VMA header include directive.
-#if defined(_WIN32)||defined(_WIN64)
-  #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
-  #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
-  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateWin32SurfaceKHR
-  #define   VK_USE_PLATFORM_WIN32_KHR
-  #define   WIN32_LEAN_AND_MEAN
-  #include <windows.h>
-#elif defined(__ANDROID__)
-  #define   VK_SURFACE_EXT             "VK_KHR_android_surface"
-  #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
-  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateAndroidSurfaceKHR
-  #define   VK_USE_PLATFORM_ANDROID_KHR
-#else
-  #include <xcb/xcb.h>
-  #include <dlfcn.h>
-  #include <X11/Xlib-xcb.h>
-  #define   VK_SURFACE_EXT             "VK_KHR_xcb_surface"
-  #define   VK_CREATE_SURFACE_FN        vkCreateXcbSurfaceKHR
-  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateXcbSurfaceKHR
-  #define   VK_USE_PLATFORM_XCB_KHR
-#endif
 #include "vk_10.h"
 #include <vk_mem_alloc.h>
 

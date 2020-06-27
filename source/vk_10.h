@@ -1,7 +1,29 @@
 #pragma once
 
+#if defined(_WIN32)||defined(_WIN64)
+  #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateWin32SurfaceKHR
+  #define   VK_USE_PLATFORM_WIN32_KHR
+  #define   WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+#elif defined(__ANDROID__)
+  #define   VK_SURFACE_EXT             "VK_KHR_android_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateAndroidSurfaceKHR
+  #define   VK_USE_PLATFORM_ANDROID_KHR
+#else
+  #include <xcb/xcb.h>
+  #include <dlfcn.h>
+  #include <X11/Xlib-xcb.h>
+  #define   VK_SURFACE_EXT             "VK_KHR_xcb_surface"
+  #define   VK_CREATE_SURFACE_FN        vkCreateXcbSurfaceKHR
+  #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateXcbSurfaceKHR
+  #define   VK_USE_PLATFORM_XCB_KHR
+#endif
+
 #define VK_NO_PROTOTYPES
-#define VK_USE_PLATFORM_WIN32_KHR
+#define VK_USE_PLATFORM_WIN32_KHR // TODO: add support for other platforms.
 #include <vulkan/vulkan.h>
 #include <stdbool.h>
 
