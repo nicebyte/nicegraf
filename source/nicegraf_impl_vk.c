@@ -62,7 +62,8 @@
 
 #pragma region vk_struct_definitions
 
-// Singleton for holding vulkan instance and device handles.
+// Singleton for holding vulkan instance, device and
+// queue handles.
 // This is shared by all contexts.
 struct {
   VkInstance       instance;
