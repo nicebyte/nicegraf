@@ -610,12 +610,38 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 
 #pragma endregion
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
+  VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+  VkDebugUtilsMessageTypeFlagsEXT type,
+  const VkDebugUtilsMessengerCallbackDataEXT* data,
+  void *userdata) {
+  NGFI_FAKE_USE(type, userdata);
+  ngf_diagnostic_message_type ngf_msg_type;
+  switch(severity) {
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+    ngf_msg_type = NGF_DIAGNOSTIC_INFO;
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+    ngf_msg_type = NGF_DIAGNOSTIC_WARNING;
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+  default:
+    ngf_msg_type = NGF_DIAGNOSTIC_ERROR;
+    break;
+  }
+  if (ngfi_diag_info.callback) {
+    ngfi_diag_info.callback(ngf_msg_type, ngfi_diag_info.userdata, data->pMessage);
+  }
+  return VK_FALSE;
+}
+
 #if defined(XCB_NONE)
 xcb_connection_t *XCB_CONNECTION = NULL;
 xcb_visualid_t    XCB_VISUALID   = { 0 };
 #endif
 
-bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
+static bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
                                      uint32_t         queue_family_index) {
 #if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
@@ -643,32 +669,6 @@ bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
                                                       XCB_CONNECTION,
                                                       XCB_VISUALID);
 #endif
-}
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
-  VkDebugUtilsMessageSeverityFlagBitsEXT severity,
-  VkDebugUtilsMessageTypeFlagsEXT type,
-  const VkDebugUtilsMessengerCallbackDataEXT* data,
-  void *userdata) {
-  NGFI_FAKE_USE(type, userdata);
-  ngf_diagnostic_message_type ngf_msg_type;
-  switch(severity) {
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
-    ngf_msg_type = NGF_DIAGNOSTIC_INFO;
-    break;
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
-    ngf_msg_type = NGF_DIAGNOSTIC_WARNING;
-    break;
-  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
-  default:
-    ngf_msg_type = NGF_DIAGNOSTIC_ERROR;
-    break;
-  }
-  if (ngfi_diag_info.callback) {
-    ngfi_diag_info.callback(ngf_msg_type, ngfi_diag_info.userdata, data->pMessage);
-  }
-  return VK_FALSE;
 }
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
