@@ -2742,27 +2742,43 @@ static void ngfvk_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
                                   size_t               size,
                                   size_t               src_offset,
                                   size_t               dst_offset,
-                                  VkAccessFlags        dst_access_mask,
-                                  VkPipelineStageFlags dst_stage_mask) {
-                                  NGFI_FAKE_USE(dst_access_mask, dst_stage_mask);
+                                  VkAccessFlags        usage_access_mask,
+                                  VkPipelineStageFlags usage_stage_mask) {
+                                  NGFI_FAKE_USE(usage_access_mask, usage_stage_mask);
   const VkBufferCopy copy_region = {
     .srcOffset = src_offset,
     .dstOffset = dst_offset,
     .size      = size
   };
   
+  VkBufferMemoryBarrier pre_xfer_mem_bar = {
+    .sType               =  VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+    .pNext               =  NULL,
+    .buffer              =  dst,
+    .srcAccessMask       =  usage_access_mask,
+    .dstAccessMask       =  VK_ACCESS_TRANSFER_WRITE_BIT,
+    .srcQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
+    .dstQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
+    .offset              =  dst_offset,
+    .size                =  size
+  };
+  vkCmdPipelineBarrier(vkcmdbuf,
+                       usage_stage_mask,
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       0, 0u, NULL,
+                       1u, &pre_xfer_mem_bar, 0, NULL);
   vkCmdCopyBuffer(vkcmdbuf,
                   src,
                   dst,
                   1u,
                  &copy_region);
-/*
-  VkBufferMemoryBarrier buf_mem_bar = {
+
+  VkBufferMemoryBarrier post_xfer_mem_bar = {
     .sType               =  VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
     .pNext               =  NULL,
     .buffer              =  dst,
     .srcAccessMask       =  VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask       =  dst_access_mask,
+    .dstAccessMask       =  usage_access_mask,
     .srcQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
     .dstQueueFamilyIndex =  VK_QUEUE_FAMILY_IGNORED,
     .offset              =  dst_offset,
@@ -2771,9 +2787,9 @@ static void ngfvk_cmd_copy_buffer(VkCommandBuffer      vkcmdbuf,
 
   vkCmdPipelineBarrier(vkcmdbuf,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       dst_stage_mask,
+                       usage_stage_mask,
                        0, 0u, NULL,
-                       1u, &buf_mem_bar, 0, NULL);*/
+                       1u, &post_xfer_mem_bar, 0, NULL);
 
 }
 
@@ -2844,7 +2860,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
   const VkImageMemoryBarrier pre_xfer_barrier = {
     .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext               = NULL,
-    .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT, 
+    .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT, 
     .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
     .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
     .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -2860,7 +2876,8 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
     }
   };
   vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
                        0u,
                        0u, NULL,
@@ -2896,7 +2913,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
     .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext               = NULL,
     .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-    .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+    .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
     .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
     .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
     .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, 
@@ -2912,7 +2929,8 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
   };
   vkCmdPipelineBarrier(buf->active_bundle.vkcmdbuf,
                        VK_PIPELINE_STAGE_TRANSFER_BIT,
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                       VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
                        0u,
                        0u, NULL,
                        0u, NULL,
