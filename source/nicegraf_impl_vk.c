@@ -675,6 +675,9 @@ static bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
   assert(init_info);
+  if (!init_info) {
+    return NGF_ERROR_INVALID_OPERATION;
+  }
   ngfi_diag_info = init_info->diag_info;
 
   if (_vk.instance == VK_NULL_HANDLE) { // Vulkan not initialized yet.
@@ -685,7 +688,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
-    VkApplicationInfo app_info = { // Application information.
+    const VkApplicationInfo app_info = { // Application information.
       .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
       .pNext = NULL,
       .pApplicationName = NULL, // TODO: allow specifying app name.
@@ -706,7 +709,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
 
     // Create a Vulkan instance.
-    VkInstanceCreateInfo inst_info = {
+    const VkInstanceCreateInfo inst_info = {
       .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
       .pNext = NULL,
       .flags = 0u,
@@ -726,7 +729,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     if (enable_validation) {
       // Install a debug callback to forward vulkan debug messages to the user.
-      VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
+      const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext = NULL,
         .flags = 0u,
@@ -817,7 +820,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
         gfx_family_idx = q;
       }
       if ((xfer_family_idx == NGFVK_INVALID_IDX ||
-        xfer_family_idx == gfx_family_idx) && is_xfer) {
+           xfer_family_idx == gfx_family_idx) && is_xfer) {
         // Prefer to use different queues for graphics and transfer.
         xfer_family_idx = q;
       }
@@ -889,6 +892,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
       return NGF_ERROR_INVALID_OPERATION;
     }
+
+    // Load device-level entry points.
     vkl_init_device(_vk.device);
 
     // Obtain queue handles.
@@ -896,7 +901,6 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     vkGetDeviceQueue(_vk.device, _vk.xfer_family_idx, 0, &_vk.xfer_queue);
     vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
 
-    // Load device-level entry points.
 
     // Initialize frame id.
     _vk.frame_id = 0;
