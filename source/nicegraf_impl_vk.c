@@ -644,7 +644,7 @@ xcb_visualid_t    XCB_VISUALID   = { 0 };
 #endif
 
 static bool ngfvk_query_presentation_support(VkPhysicalDevice phys_dev,
-                                     uint32_t         queue_family_index) {
+                                             uint32_t         queue_family_index) {
 #if defined(_WIN32) || defined(_WIN64)
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev,
                                                         queue_family_index);
