@@ -47,10 +47,8 @@ struct {
   VkDevice         device;
   VkQueue          gfx_queue;
   VkQueue          present_queue;
-  VkQueue          xfer_queue;
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
-  uint32_t         xfer_family_idx;
   ATOMIC_INT       frame_id;
 } _vk;
 
@@ -83,26 +81,10 @@ typedef struct ngfvk_swapchain {
   } renderpass;
 } ngfvk_swapchain;
 
-// Indicates the type of queue that a command bundle is intented for.
-typedef enum {
-   NGFVK_BUNDLE_RENDERING,
-   NGFVK_BUNDLE_XFER
-} ngfvk_cmd_bundle_type;
-
-// A "command bundle" consists of a command buffer, a semaphore that is
-// signaled on its completion and a reference to the command buffer's parent
-// pool.
-typedef struct {
-  VkCommandBuffer       vkcmdbuf;
-  VkSemaphore           vksem;
-  VkCommandPool         vkpool;
-  ngfvk_cmd_bundle_type type;
-} ngfvk_cmd_bundle;
-
 typedef uint32_t  ngfvk_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
 typedef struct {
-  uint32_t       sets;
+  uint32_t         sets;
   ngfvk_desc_count descriptors;
 } ngfvk_desc_pool_capacity;
 
@@ -123,13 +105,21 @@ struct ngfvk_desc_superpool_t {
   ngfvk_desc_pool *active_pool;
   ngfvk_desc_pool *list;
 };
+
+// A "command bundle" consists of a command buffer, a semaphore that is
+// signaled on its completion and a reference to the command buffer's parent
+// pool.
+typedef struct {
+  VkCommandBuffer       vkcmdbuf;
+  VkSemaphore           vksem;
+  VkCommandPool         vkpool;
+} ngfvk_cmd_bundle;
+
 typedef struct ngf_cmd_buffer_t {
-  ngf_graphics_pipeline            active_pipe;    // < The bound pipeline.
-  NGFI_DARRAY_OF(ngfvk_cmd_bundle) bundles;        // < List of bundles that have
-                                                   //   finished recording.
   ngfvk_cmd_bundle                 active_bundle;  // < The current bundle.
+  ngf_graphics_pipeline            active_pipe;    // < The bound pipeline.
   ATOMIC_INT                       frame_id;       // < id of the frame that the
-                                                  // cmd buffer is intended for.
+                                                   //   cmd buffer is intended for.
   ngfvk_desc_superpool            *desc_superpool; // < The superpool from which
                                                    //   the desc pools for this cmd
                                                    //   buffer are allocated.
@@ -169,23 +159,20 @@ typedef struct ngf_sampler_t {
 typedef struct ngfvk_frame_resources {
   // Command buffers submitted to the graphics queue, their
   // associated semaphores and command pools.
- NGFI_DARRAY_OF(VkCommandBuffer)       submitted_gfx_cmds;
- NGFI_DARRAY_OF(VkSemaphore)           signal_gfx_semaphores;
- NGFI_DARRAY_OF(VkCommandPool)         gfx_cmd_pools;
-  
-  // Same for transfer queue.
- NGFI_DARRAY_OF(VkCommandBuffer)       submitted_xfer_cmds;
- NGFI_DARRAY_OF(VkSemaphore)           signal_xfer_semaphores;
- NGFI_DARRAY_OF(VkCommandPool)         xfer_cmd_pools;
+  NGFI_DARRAY_OF(VkCommandBuffer) cmd_bufs;
+  NGFI_DARRAY_OF(VkSemaphore)     cmd_buf_sems;
+  NGFI_DARRAY_OF(VkCommandPool)   cmd_pools;
+
+
 
   // Resources that should be disposed of at some point after this
   // frame's completion.
- NGFI_DARRAY_OF(VkPipeline)            retire_pipelines;
- NGFI_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
- NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
- NGFI_DARRAY_OF(VkSampler)             retire_samplers;
- NGFI_DARRAY_OF(ngfvk_buffer)           retire_buffers;
- NGFI_DARRAY_OF(ngfvk_desc_superpool*)  retire_desc_superpools;
+  NGFI_DARRAY_OF(VkPipeline)            retire_pipelines;
+  NGFI_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
+  NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
+  NGFI_DARRAY_OF(VkSampler)             retire_samplers;
+  NGFI_DARRAY_OF(ngfvk_buffer)          retire_buffers;
+  NGFI_DARRAY_OF(ngfvk_desc_superpool*) retire_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -199,8 +186,7 @@ typedef struct ngf_context_t {
   ngfvk_swapchain        swapchain;
   ngf_swapchain_info     swapchain_info;
   VmaAllocator           allocator;
-  VkCommandPool         *gfx_cmd_pools;
-  VkCommandPool         *xfer_cmd_pools;
+  VkCommandPool         *cmd_pools;
  ngfvk_desc_superpool   *desc_superpools;
   VkSurfaceKHR           surface;
   uint32_t               frame_number;
@@ -798,7 +784,6 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev,
       &num_queue_families,
       NULL);
-    {
     VkQueueFamilyProperties* queue_families =
       NGFI_ALLOCN(VkQueueFamilyProperties, num_queue_families);
     assert(queue_families);
@@ -809,20 +794,13 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     // Pick suitable queue families for graphics, present and transfer.
     uint32_t gfx_family_idx = NGFVK_INVALID_IDX;
     uint32_t present_family_idx = NGFVK_INVALID_IDX;
-    uint32_t xfer_family_idx = NGFVK_INVALID_IDX;
     for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
       const VkQueueFlags flags = queue_families[q].queueFlags;
       const VkBool32     is_gfx = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
-      const VkBool32     is_xfer = (flags & VK_QUEUE_TRANSFER_BIT) != 0;
       const VkBool32     is_present = ngfvk_query_presentation_support(
         _vk.phys_dev, q);
       if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) {
         gfx_family_idx = q;
-      }
-      if ((xfer_family_idx == NGFVK_INVALID_IDX ||
-           xfer_family_idx == gfx_family_idx) && is_xfer) {
-        // Prefer to use different queues for graphics and transfer.
-        xfer_family_idx = q;
       }
       if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
         present_family_idx = q;
@@ -830,16 +808,13 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     }
     NGFI_FREEN(queue_families, num_queue_families);
     queue_families = NULL;
-    if (gfx_family_idx == NGFVK_INVALID_IDX ||
-      xfer_family_idx == NGFVK_INVALID_IDX ||
-      present_family_idx == NGFVK_INVALID_IDX) {
+    if (gfx_family_idx == NGFVK_INVALID_IDX || present_family_idx == NGFVK_INVALID_IDX) {
       NGFI_DIAG_ERROR("Could not find a suitable queue family.");
       return NGF_ERROR_INVALID_OPERATION;
     }
     _vk.gfx_family_idx = gfx_family_idx;
-    _vk.xfer_family_idx = xfer_family_idx;
     _vk.present_family_idx = present_family_idx;
-    }
+    
     // Create logical device.
     const float queue_prio = 1.0f;
     const VkDeviceQueueCreateInfo gfx_queue_info = {
@@ -847,14 +822,6 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .pNext            = NULL,
       .flags            = 0,
       .queueFamilyIndex = _vk.gfx_family_idx,
-      .queueCount       = 1,
-      .pQueuePriorities = &queue_prio
-    };
-    const VkDeviceQueueCreateInfo xfer_queue_info = {
-      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-      .pNext            = NULL,
-      .flags            = 0,
-      .queueFamilyIndex = _vk.xfer_family_idx,
       .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
@@ -866,15 +833,13 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .queueCount       = 1,
       .pQueuePriorities = &queue_prio
     };
-    const bool same_gfx_and_xfer    = _vk.gfx_family_idx == _vk.xfer_family_idx;
     const bool same_gfx_and_present = _vk.gfx_family_idx == _vk.present_family_idx;
     const VkDeviceQueueCreateInfo queue_infos[] = {
         gfx_queue_info,
-        !same_gfx_and_xfer ? xfer_queue_info : present_queue_info,
         present_queue_info
     };
     const uint32_t num_queue_infos =
-        1u + (same_gfx_and_present ? 0u : 1u) + (same_gfx_and_xfer ? 0u : 1u);
+        1u + (same_gfx_and_present ? 0u : 1u);
     const char *device_exts[] = {"VK_KHR_maintenance1", "VK_KHR_swapchain" };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -898,9 +863,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     // Obtain queue handles.
     vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
-    vkGetDeviceQueue(_vk.device, _vk.xfer_family_idx, 0, &_vk.xfer_queue);
     vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
-
 
     // Initialize frame id.
     _vk.frame_id = 0;
@@ -1411,18 +1374,9 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     goto ngf_create_context_cleanup;
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    NGFI_DARRAY_RESET(ctx->frame_res[f].signal_gfx_semaphores,
-                      max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].signal_xfer_semaphores,
-                      max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].gfx_cmd_pools,
-                      max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].submitted_gfx_cmds,
-                      max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].submitted_xfer_cmds,
-                      max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].xfer_cmd_pools,
-                      max_inflight_frames)
+    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_bufs, max_inflight_frames);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_buf_sems, max_inflight_frames);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_pools, max_inflight_frames);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
@@ -1450,38 +1404,20 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   ctx->frame_number = 0u;
 
   // Create command pools.
-  const VkCommandPoolCreateInfo gfx_cmd_pool_info = {
+  const VkCommandPoolCreateInfo cmd_pool_info = {
     .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
     .pNext            = NULL,
-    .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+    .flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
     .queueFamilyIndex = _vk.gfx_family_idx
   };
-  ctx->gfx_cmd_pools = NGFI_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
+  ctx->cmd_pools = NGFI_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
   for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-    vk_err = vkCreateCommandPool(_vk.device, &gfx_cmd_pool_info, NULL,
-                                 &ctx->gfx_cmd_pools[p]);
+    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL,
+                                 &ctx->cmd_pools[p]);
     if (vk_err != VK_SUCCESS) {
       NGFI_DIAG_ERROR("Failed to create command pools for context.");
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_context_cleanup;
-    }
-  }
-  if (_vk.gfx_family_idx != _vk.xfer_family_idx) {
-    const VkCommandPoolCreateInfo xfer_cmd_pool_info = {
-      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .pNext = NULL,
-      .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-      .queueFamilyIndex = _vk.xfer_family_idx
-    };
-    ctx->xfer_cmd_pools = NGFI_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
-    for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-      vk_err = vkCreateCommandPool(_vk.device, &xfer_cmd_pool_info, NULL,
-                                    &ctx->xfer_cmd_pools[p]);
-      if (vk_err != VK_SUCCESS) {
-        NGFI_DIAG_ERROR("Failed to create command pools for context.");
-        err = NGF_ERROR_OBJECT_CREATION_FAILED;
-        goto ngf_create_context_cleanup;
-      }
     }
   }
 
@@ -1506,6 +1442,9 @@ ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t    new_width,
                              uint32_t    new_height) {
   assert(ctx);
+  if (ctx == NULL) {
+    return NGF_ERROR_INVALID_OPERATION;
+  }
   ngf_error err = NGF_ERROR_OK;
   ngfvk_destroy_swapchain(&ctx->swapchain);
   ctx->swapchain_info.width  = new_width;
@@ -1531,25 +1470,15 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
   }
   frame_res->active = false;
   for (uint32_t s = 0u;
-       s < NGFI_DARRAY_SIZE(frame_res->signal_gfx_semaphores);
+       s < NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
        ++s) {
-    VkCommandBuffer vk_cmd_buf =
-        NGFI_DARRAY_AT(frame_res->submitted_gfx_cmds, s);
-    VkSemaphore vk_sem = NGFI_DARRAY_AT(frame_res->signal_gfx_semaphores, s);
-    VkCommandPool vk_cmd_pool = NGFI_DARRAY_AT(frame_res->gfx_cmd_pools, s);
-    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
-    vkDestroySemaphore(_vk.device, vk_sem, NULL);
-  }
-
-  for (uint32_t s = 0u;
-       s < NGFI_DARRAY_SIZE(frame_res->signal_xfer_semaphores);
-       ++s) {
-    VkCommandBuffer vk_cmd_buf =
-        NGFI_DARRAY_AT(frame_res->submitted_xfer_cmds, s);
-    VkSemaphore vk_sem = NGFI_DARRAY_AT(frame_res->signal_xfer_semaphores, s);
-    VkCommandPool vk_cmd_pool = NGFI_DARRAY_AT(frame_res->xfer_cmd_pools, s);
-    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buf);
-    vkDestroySemaphore(_vk.device, vk_sem, NULL);
+    vkFreeCommandBuffers(_vk.device,
+                         NGFI_DARRAY_AT(frame_res->cmd_pools, s),
+                         1u,
+                         &NGFI_DARRAY_AT(frame_res->cmd_bufs, s));
+    vkDestroySemaphore(_vk.device,
+                       NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s),
+                       NULL);
   }
 
   for (uint32_t p = 0u;
@@ -1607,12 +1536,9 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
     }
     superpool->active_pool = superpool->list;
   }
-  NGFI_DARRAY_CLEAR(frame_res->submitted_gfx_cmds);
-  NGFI_DARRAY_CLEAR(frame_res->submitted_xfer_cmds);
-  NGFI_DARRAY_CLEAR(frame_res->signal_gfx_semaphores);
-  NGFI_DARRAY_CLEAR(frame_res->signal_xfer_semaphores);
-  NGFI_DARRAY_CLEAR(frame_res->gfx_cmd_pools);
-  NGFI_DARRAY_CLEAR(frame_res->xfer_cmd_pools);
+  NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
+  NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
+  NGFI_DARRAY_CLEAR(frame_res->cmd_pools);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
   NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
@@ -1628,12 +1554,9 @@ void ngf_destroy_context(ngf_context ctx) {
          ctx->frame_res != NULL && f < ctx->max_inflight_frames;
          ++f) {
       ngfvk_retire_resources(&ctx->frame_res[f]);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].submitted_gfx_cmds);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].submitted_xfer_cmds);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].signal_gfx_semaphores);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].signal_xfer_semaphores);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].gfx_cmd_pools);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].xfer_cmd_pools);
+      NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_bufs);
+      NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_buf_sems);
+      NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_pools);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
@@ -1643,22 +1566,15 @@ void ngf_destroy_context(ngf_context ctx) {
       }
     }
     for (uint32_t p = 0; p < ctx->max_inflight_frames; ++p) {
-      const VkCommandPool pool = ctx->gfx_cmd_pools[p];
+      const VkCommandPool pool = ctx->cmd_pools[p];
       if (pool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(_vk.device, pool, NULL);
       }
     }
-    NGFI_FREEN(ctx->gfx_cmd_pools, ctx->max_inflight_frames);
-    if (_vk.xfer_family_idx != _vk.gfx_family_idx) {
-      for (uint32_t p = 0; p < ctx->max_inflight_frames; ++p) {
-        const VkCommandPool pool = ctx->xfer_cmd_pools[p];
-        if (pool != VK_NULL_HANDLE) {
-          vkDestroyCommandPool(_vk.device, pool, NULL);
-        }
-      }
-      NGFI_FREEN(ctx->xfer_cmd_pools, ctx->max_inflight_frames);
-    }
+    NGFI_FREEN(ctx->cmd_pools, ctx->max_inflight_frames);
+
     // TODO: free descriptor superpools
+
     ngfvk_destroy_swapchain(&ctx->swapchain);
     if (ctx->surface != VK_NULL_HANDLE) {
       vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL);
@@ -1686,18 +1602,16 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   NGFI_FAKE_USE(info);
 
   ngf_cmd_buffer cmd_buf = NGFI_ALLOC(ngf_cmd_buffer_t);
-  *result = cmd_buf;
-  cmd_buf->active_pipe = NULL;
   if (cmd_buf == NULL) {
     return NGF_ERROR_OUT_OF_MEM;
   }
-  NGFI_DARRAY_RESET(cmd_buf->bundles, 3);
+  *result = cmd_buf;
+  cmd_buf->active_pipe = NULL;
   cmd_buf->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
 static ngf_error ngfvk_cmd_bundle_create(VkCommandPool        pool,
-                                         ngfvk_cmd_bundle_type type,
                                          ngfvk_cmd_bundle     *bundle) {
   VkCommandBufferAllocateInfo vk_cmdbuf_info = {
     .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1710,7 +1624,8 @@ static ngf_error ngfvk_cmd_bundle_create(VkCommandPool        pool,
                                              &vk_cmdbuf_info,
                                              &bundle->vkcmdbuf);
   if (vk_err != VK_SUCCESS) {
-    return NGF_ERROR_OUT_OF_MEM; // TODO: return appropriate error.
+    NGFI_DIAG_ERROR("Failed to allocate cmd buffer, VK error: %d", vk_err);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   bundle->vkpool = pool;
   VkCommandBufferBeginInfo cmd_buf_begin = {
@@ -1729,50 +1644,36 @@ static ngf_error ngfvk_cmd_bundle_create(VkCommandPool        pool,
   };
   vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
   if (vk_err != VK_SUCCESS) {
-    return NGF_ERROR_OUT_OF_MEM; // TODO: return appropriate error code
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
-
-  bundle->type = type;
-
   return NGF_ERROR_OK;
 }
 
-static ngf_error ngfvk_cmd_buffer_start_encoder(
-    ngf_cmd_buffer        cmd_buf,
-    ngfvk_cmd_bundle_type type) {
+static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
   if (!NGFI_CMD_BUF_RECORDABLE(cmd_buf->state) ||
       cmd_buf->frame_id != interlocked_read(&_vk.frame_id)) {
     return NGF_ERROR_INVALID_OPERATION;
   }
-  const size_t pool_idx =
-      cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
-  VkCommandPool pool =
-    type == NGFVK_BUNDLE_RENDERING || _vk.gfx_family_idx == _vk.xfer_family_idx
-        ? CURRENT_CONTEXT->gfx_cmd_pools[pool_idx]
-        : CURRENT_CONTEXT->xfer_cmd_pools[pool_idx];
-  ngf_error err = ngfvk_cmd_bundle_create(pool, type, &cmd_buf->active_bundle);
   cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
-  return err;
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer      cmd_buf,
                                       ngf_render_encoder *enc) {
   enc->__handle = (uintptr_t)((void*)cmd_buf);
-  return ngfvk_cmd_buffer_start_encoder(cmd_buf, NGFVK_BUNDLE_RENDERING);
+  return ngfvk_encoder_start(cmd_buf);
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer    cmd_buf,
                                     ngf_xfer_encoder *enc) {
   enc->__handle = (uintptr_t)((void*)cmd_buf);
-  return ngfvk_cmd_buffer_start_encoder(cmd_buf, NGFVK_BUNDLE_XFER);
+  return ngfvk_encoder_start(cmd_buf);
 }
 
 static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
   if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_INVALID_OPERATION;
   }
-  vkEndCommandBuffer(cmd_buf->active_bundle.vkcmdbuf);
-  NGFI_DARRAY_APPEND(cmd_buf->bundles, cmd_buf->active_bundle);
   cmd_buf->state = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
   return NGF_ERROR_OK;
 }
@@ -1793,23 +1694,17 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
       cmd_buf->state != NGFI_CMD_BUFFER_SUBMITTED) {
     return NGF_ERROR_INVALID_OPERATION;
   }
-  assert(NGFI_DARRAY_SIZE(cmd_buf->bundles) == 0);
-  cmd_buf->frame_id       =  interlocked_read(&_vk.frame_id);
+  cmd_buf->frame_id       = interlocked_read(&_vk.frame_id);
   cmd_buf->state          = NGFI_CMD_BUFFER_READY;
-  cmd_buf->desc_superpool =  NULL;
-  cmd_buf->active_rt      =  NULL;
-  return NGF_ERROR_OK;
+  cmd_buf->desc_superpool = NULL;
+  cmd_buf->active_rt      = NULL;
+  const size_t fi = cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
+  return ngfvk_cmd_bundle_create(CURRENT_CONTEXT->cmd_pools[fi],
+                                 &cmd_buf->active_bundle);
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   assert(buffer);
-  const uint32_t nbundles = NGFI_DARRAY_SIZE(buffer->bundles);
-  for (uint32_t i = 0u; i < nbundles; ++i) {
-    ngfvk_cmd_bundle *bundle = &(NGFI_DARRAY_AT(buffer->bundles, i));
-    vkFreeCommandBuffers(_vk.device, bundle->vkpool, 1, &bundle->vkcmdbuf);
-    vkDestroySemaphore(_vk.device, bundle->vksem, NULL);
-  }
-  NGFI_DARRAY_DESTROY(buffer->bundles);
   // TODO: free active bundle.
   NGFI_FREE(buffer);
 }
@@ -1828,32 +1723,13 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
       NGFI_DARRAY_APPEND(frame_sync_data->retire_desc_superpools,
                          bufs[i]->desc_superpool);
     }
-    for (uint32_t j = 0; j < NGFI_DARRAY_SIZE(bufs[i]->bundles); ++j) {
-      ngfvk_cmd_bundle *bundle = &(NGFI_DARRAY_AT(bufs[i]->bundles, j));
-      switch (bundle->type) {
-      case NGFVK_BUNDLE_RENDERING:
-        NGFI_DARRAY_APPEND(frame_sync_data->submitted_gfx_cmds,
-                           bundle->vkcmdbuf);
-        NGFI_DARRAY_APPEND(frame_sync_data->signal_gfx_semaphores,
-                           bundle->vksem);
-        NGFI_DARRAY_APPEND(frame_sync_data->gfx_cmd_pools,
-                           bundle->vkpool);
-        break;
-
-      case NGFVK_BUNDLE_XFER:
-        NGFI_DARRAY_APPEND(frame_sync_data->submitted_xfer_cmds,
-                           bundle->vkcmdbuf);
-        NGFI_DARRAY_APPEND(frame_sync_data->signal_xfer_semaphores,
-                           bundle->vksem);
-        NGFI_DARRAY_APPEND(frame_sync_data->xfer_cmd_pools,
-                           bundle->vkpool);
-        break;
-
-      default:
-        assert(0);
-      }
-    }
-    NGFI_DARRAY_CLEAR(bufs[i]->bundles);
+    vkEndCommandBuffer(bufs[i]->active_bundle.vkcmdbuf);
+    NGFI_DARRAY_APPEND(frame_sync_data->cmd_bufs,
+                       bufs[i]->active_bundle.vkcmdbuf);
+    NGFI_DARRAY_APPEND(frame_sync_data->cmd_pools,
+                       bufs[i]->active_bundle.vkpool);
+    NGFI_DARRAY_APPEND(frame_sync_data->cmd_buf_sems,
+                       bufs[i]->active_bundle.vksem);
     bufs[i]->state = NGFI_CMD_BUFFER_SUBMITTED;
   }
   return NGF_ERROR_OK;
@@ -1864,12 +1740,9 @@ ngf_error ngf_begin_frame() {
   const ATOMIC_INT fi =
       interlocked_read(&_vk.frame_id) % CURRENT_CONTEXT->max_inflight_frames;
   CURRENT_CONTEXT->frame_res[fi].active = true;
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_gfx_cmds);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_gfx_semaphores);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].gfx_cmd_pools);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].submitted_xfer_cmds);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].signal_xfer_semaphores);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].xfer_cmd_pools);
+  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
+  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
+  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_pools);
   
   // reset stack allocator.
   ngfi_sa_reset(ngfvk_tmp_store());
@@ -1922,25 +1795,9 @@ ngf_error ngf_end_frame() {
 
   frame_sync->nfences = 0u;
 
-  // Submit pending transfer commands.
-  const uint32_t nsubmitted_xfer_cmdbuffers =
-    NGFI_DARRAY_SIZE(frame_sync->submitted_xfer_cmds);
-  if (nsubmitted_xfer_cmdbuffers > 0) {
-    bool separate_queue = _vk.gfx_family_idx != _vk.xfer_family_idx;
-    ngfvk_submit_commands(separate_queue ? _vk.xfer_queue : _vk.gfx_queue,
-                         frame_sync->submitted_xfer_cmds.data,
-                         nsubmitted_xfer_cmdbuffers,
-                         NULL,
-                         NULL,
-                         0u,
-                         frame_sync->signal_xfer_semaphores.data,
-                         nsubmitted_xfer_cmdbuffers,
-                         frame_sync->fences[frame_sync->nfences++]);
-  }
-
   // Submit pending gfx commands & present.
   const uint32_t nsubmitted_gfx_cmdbuffers =
-      NGFI_DARRAY_SIZE(frame_sync->submitted_gfx_cmds);
+      NGFI_DARRAY_SIZE(frame_sync->cmd_bufs);
   if (nsubmitted_gfx_cmdbuffers > 0) {
     // If present is necessary, acquire a swapchain image before submitting
     // any graphics commands.
@@ -1960,12 +1817,12 @@ ngf_error ngf_end_frame() {
       wait_stage_masks = &color_attachment_stage; 
     }
     ngfvk_submit_commands(_vk.gfx_queue,
-                          frame_sync->submitted_gfx_cmds.data,
+                          frame_sync->cmd_bufs.data,
                           nsubmitted_gfx_cmdbuffers,
                           wait_stage_masks,
                           wait_sems,
                           wait_sem_count,
-                          frame_sync->signal_gfx_semaphores.data,
+                          frame_sync->cmd_buf_sems.data,
                           nsubmitted_gfx_cmdbuffers,
                           frame_sync->fences[frame_sync->nfences++]);
 
@@ -1975,8 +1832,8 @@ ngf_error ngf_end_frame() {
         .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext              = NULL,
         .waitSemaphoreCount = (uint32_t)NGFI_DARRAY_SIZE(
-            frame_sync->signal_gfx_semaphores),
-        .pWaitSemaphores    = frame_sync->signal_gfx_semaphores.data,
+            frame_sync->cmd_buf_sems),
+        .pWaitSemaphores    = frame_sync->cmd_buf_sems.data,
         .swapchainCount     = 1,
         .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
         .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
@@ -3069,27 +2926,15 @@ static ngf_error ngfvk_create_buffer(size_t                 size,
                                      VkBuffer              *vk_buffer,
                                      VmaAllocation         *vma_alloc,
                                      VmaAllocator          *vma_allocator) {
-   const bool exclusive_sharing = 
-       _vk.gfx_family_idx == _vk.xfer_family_idx;
-   const uint32_t queue_family_indices[] = { 
-      _vk.gfx_family_idx,
-      _vk.xfer_family_idx
-   };
-   const uint32_t nqueue_family_indices =
-      exclusive_sharing ? 1u : 2u;
-   const VkSharingMode sharing_mode =
-      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
-                        : VK_SHARING_MODE_CONCURRENT;
-
    const VkBufferCreateInfo buf_vk_info = {
     .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0u,
     .size                  = size,
     .usage                 = vk_usage_flags,
-    .sharingMode           = sharing_mode,
-    .queueFamilyIndexCount = nqueue_family_indices,
-    .pQueueFamilyIndices   = queue_family_indices
+    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices   = NULL 
   };
 
   const VmaAllocationCreateInfo buf_alloc_info = {
@@ -3402,15 +3247,6 @@ ngf_error ngf_create_image(const ngf_image_info *info,
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_image_cleanup;
   }
-  const bool exclusive_sharing = (_vk.gfx_family_idx == _vk.xfer_family_idx);
-  const uint32_t queue_family_indices[] = { _vk.gfx_family_idx,
-                                            _vk.xfer_family_idx
-                                          };
-
-  const uint32_t nqueue_family_indices = exclusive_sharing ? 1u : 2u;
-  const VkSharingMode sharing_mode =
-      exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE
-                        : VK_SHARING_MODE_CONCURRENT;
 
   const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -3427,9 +3263,9 @@ ngf_error ngf_create_image(const ngf_image_info *info,
     .arrayLayers = 1u, // TODO: layered images
     .samples =  get_vk_sample_count(info->nsamples),
     .usage = usage_flags,
-    .sharingMode = sharing_mode,
-    .queueFamilyIndexCount = nqueue_family_indices,
-    .pQueueFamilyIndices = queue_family_indices,
+    .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    .queueFamilyIndexCount = 0,
+    .pQueueFamilyIndices = NULL,
     .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
   };
 
