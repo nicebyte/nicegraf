@@ -71,7 +71,6 @@ struct {
   VkQueue          gfx_queue;
   VkQueue          present_queue;
   VkQueue          xfer_queue;
-  pthread_mutex_t  ctx_refcount_mut;
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
   uint32_t         xfer_family_idx;
@@ -811,9 +810,6 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       return NGF_ERROR_INVALID_OPERATION;
     }
     _vk.phys_dev = physdevs[best_device_index];
-
-    // Initialize context refcount mutex.
-    pthread_mutex_init(&_vk.ctx_refcount_mut, NULL);
 
     // Obtain a list of queue family properties from the device.
     uint32_t num_queue_families = 0U;
@@ -1645,7 +1641,6 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
     vkDeviceWaitIdle(_vk.device);
-	  pthread_mutex_lock(&_vk.ctx_refcount_mut);
     for (uint32_t f = 0u;
          ctx->frame_res != NULL && f < ctx->max_inflight_frames;
          ++f) {
@@ -1688,7 +1683,6 @@ void ngf_destroy_context(ngf_context ctx) {
     if (ctx->allocator != VK_NULL_HANDLE) {
       vmaDestroyAllocator(ctx->allocator);
     }
-    pthread_mutex_unlock(&_vk.ctx_refcount_mut);
     if (ctx->frame_res != NULL) {
       NGFI_FREEN(ctx->frame_res, ctx->max_inflight_frames);
     }
