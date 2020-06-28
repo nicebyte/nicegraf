@@ -160,7 +160,9 @@ typedef struct ngf_image_t {
   VkImage        vkimg;
   VmaAllocation  alloc;
   VkImageView    vkview;
+  VkFormat       vkformat;
   VmaAllocator   parent_allocator;
+  ngf_extent3d   extent;
 } ngf_image_t;
 
 // Vulkan resources associated with a given frame.
@@ -214,13 +216,13 @@ typedef struct ngf_graphics_pipeline_t {
 } ngf_graphics_pipeline_t;
 
 typedef struct ngf_render_target_t {
-  VkRenderPass                render_pass;
-  VkClearValue                clear_values[2];
-  uint32_t                    nclear_values;
-  bool                        is_default;
-  uint32_t                    width;
-  uint32_t                    height;
-  // TODO: non-default render target
+  VkFramebuffer frame_buffer;            
+  VkRenderPass  render_pass;
+  VkClearValue  clear_values[2];
+  uint32_t      nclear_values;
+  bool          is_default;
+  uint32_t      width;
+  uint32_t      height;
 } ngf_render_target_t;
 
 #pragma endregion
@@ -2348,10 +2350,6 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   }
 }
 
-void ngf_destroy_render_target(ngf_render_target target) {
-  NGFI_FAKE_USE(target);
-  // TODO: implement
-}
 ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
                                     ngf_attachment_load_op depth_load_op,
                                     ngf_attachment_store_op color_store_op,
@@ -2369,11 +2367,12 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
   
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     rt = NGFI_ALLOC(ngf_render_target_t);
-    *result = rt;
     if (rt == NULL) {
       err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_default_render_target_cleanup;
     }
+    *result = rt;
+
     rt->is_default = true;
     const VkAttachmentLoadOp  vk_color_load_op  = get_vk_load_op(color_load_op);
     const VkAttachmentLoadOp  vk_depth_load_op  = get_vk_load_op(depth_load_op);
@@ -2426,6 +2425,136 @@ ngf_default_render_target_cleanup:
   return err;
 }
 
+ngf_error ngf_create_render_target(const ngf_render_target_info* info,
+                                   ngf_render_target* result) {
+  ngf_render_target rt = NGFI_ALLOC(ngf_render_target_t);
+  if (rt == NULL) {
+    return NGF_ERROR_OUT_OF_MEM;
+  }
+  memset(rt, 0, sizeof(ngf_render_target_t));
+  *result = rt;
+  ngf_error err = NGF_ERROR_OK;
+
+  // Create Vulkan attachment descriptions, and attachment references for subpass description.
+  VkAttachmentDescription *vk_attachment_descs =
+    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+  VkAttachmentReference *color_attachment_refs =
+    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+  VkAttachmentReference *depth_stencil_attachment_refs =
+    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+  VkImageView *attachment_views =
+    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkImageView));
+  if (vk_attachment_descs == NULL ||
+      color_attachment_refs == NULL ||
+      depth_stencil_attachment_refs == NULL) {
+    err = NGF_ERROR_OUT_OF_MEM;
+    goto ngf_create_render_target_cleanup;
+  }
+
+  uint32_t ncolor_attachments = 0u, ndepth_stencil_attachments = 0u;
+
+
+  for (uint32_t a = 0u; a < info->nattachments; ++a) {
+    const ngf_attachment *ngf_attachment_desc = &info->attachments[a];
+    VkAttachmentDescription *vk_attachment_desc = &vk_attachment_descs[a];
+    vk_attachment_desc->flags = 0u;
+    vk_attachment_desc->format = ngf_attachment_desc->image_ref.image->vkformat;
+    vk_attachment_desc->samples = VK_SAMPLE_COUNT_1_BIT; // TODO: multisampled render targets
+    vk_attachment_desc->loadOp = get_vk_load_op(ngf_attachment_desc->load_op);
+    vk_attachment_desc->storeOp = get_vk_load_op(ngf_attachment_desc->store_op);
+    vk_attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    vk_attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: set correct layout here.
+    vk_attachment_desc->finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    attachment_views[a] = ngf_attachment_desc->image_ref.image->vkview;
+
+    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
+      VkAttachmentReference *color_ref = &color_attachment_refs[ncolor_attachments++];
+      color_ref->attachment = a;
+      color_ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH) { 
+      VkAttachmentReference *depth_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
+      depth_ref->attachment = a;
+      depth_ref->layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_STENCIL) {
+      VkAttachmentReference *stencil_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
+      stencil_ref->attachment = a;
+      stencil_ref->layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL) {
+      VkAttachmentReference *depth_stencil_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
+      depth_stencil_ref->attachment = a;
+      depth_stencil_ref->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    }
+    // TODO: set clear values
+  }
+
+  rt->width = info->attachments[0].image_ref.image->extent.width;
+  rt->height = info->attachments[0].image_ref.image->extent.height;
+
+  // Subpass description.
+  const VkSubpassDescription subpass_desc = {
+    .flags = 0u,
+    .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+    .inputAttachmentCount = 0u,
+    .pInputAttachments = NULL,
+    .colorAttachmentCount = ncolor_attachments,
+    .pColorAttachments = color_attachment_refs,
+    .pResolveAttachments = NULL, // TODO: multisampled render targets
+    .pDepthStencilAttachment = ndepth_stencil_attachments ? depth_stencil_attachment_refs : NULL, // TODO: allow max 1 depth/stencil attachment
+    .preserveAttachmentCount = 0u,
+    .pPreserveAttachments = NULL
+  };
+
+  // Create a render pass.
+  const VkRenderPassCreateInfo render_pass_info = {
+    .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u,
+    .attachmentCount = info->nattachments,
+    .pAttachments = vk_attachment_descs,
+    .subpassCount = 1u,
+    .pSubpasses = &subpass_desc,
+    .dependencyCount = 0u,
+    .pDependencies = NULL
+  };
+  VkResult vk_err =
+    vkCreateRenderPass(_vk.device, &render_pass_info, NULL, &rt->render_pass);
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_render_target_cleanup;
+  }
+
+  // Create a framebuffer.
+  const VkFramebufferCreateInfo fb_info = {
+    .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u,
+    .renderPass = rt->render_pass,
+    .attachmentCount = info->nattachments,
+    .pAttachments = attachment_views,
+    .width = info->attachments[0].image_ref.image->extent.width,
+    .height = info->attachments[0].image_ref.image->extent.height,
+    .layers = 1u
+  };
+  vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL, &rt->frame_buffer);
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_render_target_cleanup;
+  }
+
+ngf_create_render_target_cleanup:
+  if (err != NGF_ERROR_OK) {
+    ngf_destroy_render_target(rt);
+  }
+  return err;
+}
+
+void ngf_destroy_render_target(ngf_render_target target) {
+  NGFI_FAKE_USE(target);
+  // TODO: implement
+}
+
+
 #define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
@@ -2434,7 +2563,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
   const VkFramebuffer fb =
       target->is_default
           ? swapchain->framebuffers[swapchain->image_idx]
-          : VK_NULL_HANDLE; // TODO: non-default render targets.
+          : target->frame_buffer;
   const VkExtent2D render_extent = {
       target->is_default
         ? CURRENT_CONTEXT->swapchain_info.width
@@ -2444,10 +2573,10 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
         : target->height
   };
   const int clear_value_count = swapchain->depth_image ? 2u : 1u;
-  if (!target->is_default) {
+  //if (!target->is_default) {
     // TODO: set clearValueCount correctly for non-default render targets.
-    abort();
-  }
+    //abort();
+  //}
   const VkRenderPassBeginInfo begin_info = {
     .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .pNext           = NULL,
@@ -3285,7 +3414,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
   assert(info);
   assert(result);
 
-  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT; // TODO: add transfer dst as one of image usage flags
   if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
     usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT;
   }
@@ -3307,6 +3436,9 @@ ngf_error ngf_create_image(const ngf_image_info *info,
     goto ngf_create_image_cleanup;
   }
 
+  img->vkformat = get_vk_image_format(info->format);
+  img->extent = info->extent;
+
   const bool is_cubemap = info->type == NGF_IMAGE_TYPE_CUBE;
   const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -3318,7 +3450,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
       .height = info->extent.height,
       .depth = info->extent.depth
     },
-    .format = get_vk_image_format(info->format),
+    .format = img->vkformat,
     .mipLevels = info->nmips,
     .arrayLayers = !is_cubemap ? 1u : 6u, // TODO: layered images
     .samples =  get_vk_sample_count(info->nsamples),
