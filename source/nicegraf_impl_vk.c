@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright (c) 2019 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
@@ -158,10 +158,10 @@ typedef struct ngf_sampler_t {
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
   // Command buffers submitted to the graphics queue, their
-  // associated semaphores and command pools.
+  // associated semaphores and parent command pool.
   NGFI_DARRAY_OF(VkCommandBuffer) cmd_bufs;
   NGFI_DARRAY_OF(VkSemaphore)     cmd_buf_sems;
-  NGFI_DARRAY_OF(VkCommandPool)   cmd_pools;
+  VkCommandPool                   cmd_pool;
 
 
 
@@ -1376,13 +1376,13 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
     NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_bufs, max_inflight_frames);
     NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_buf_sems, max_inflight_frames);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_pools, max_inflight_frames);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_desc_superpools, 8);
+    ctx->frame_res[f].cmd_pool = VK_NULL_HANDLE;
     ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
       .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
@@ -1469,13 +1469,19 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
     frame_res->nfences = 0;
   }
   frame_res->active = false;
+
+  const size_t nretired_cmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
+
+  if (nretired_cmd_bufs > 0u) {
+    vkFreeCommandBuffers(_vk.device,
+      frame_res->cmd_pool,
+      NGFI_DARRAY_SIZE(frame_res->cmd_bufs),
+      frame_res->cmd_bufs.data);
+    vkResetCommandPool(_vk.device, frame_res->cmd_pool, 0u);
+  }
   for (uint32_t s = 0u;
        s < NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
        ++s) {
-    vkFreeCommandBuffers(_vk.device,
-                         NGFI_DARRAY_AT(frame_res->cmd_pools, s),
-                         1u,
-                         &NGFI_DARRAY_AT(frame_res->cmd_bufs, s));
     vkDestroySemaphore(_vk.device,
                        NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s),
                        NULL);
@@ -1538,7 +1544,6 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
   }
   NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
   NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
-  NGFI_DARRAY_CLEAR(frame_res->cmd_pools);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
   NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
@@ -1556,7 +1561,6 @@ void ngf_destroy_context(ngf_context ctx) {
       ngfvk_retire_resources(&ctx->frame_res[f]);
       NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_bufs);
       NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_buf_sems);
-      NGFI_DARRAY_DESTROY(ctx->frame_res->cmd_pools);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
@@ -1726,8 +1730,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
     vkEndCommandBuffer(bufs[i]->active_bundle.vkcmdbuf);
     NGFI_DARRAY_APPEND(frame_sync_data->cmd_bufs,
                        bufs[i]->active_bundle.vkcmdbuf);
-    NGFI_DARRAY_APPEND(frame_sync_data->cmd_pools,
-                       bufs[i]->active_bundle.vkpool);
     NGFI_DARRAY_APPEND(frame_sync_data->cmd_buf_sems,
                        bufs[i]->active_bundle.vksem);
     bufs[i]->state = NGFI_CMD_BUFFER_SUBMITTED;
@@ -1742,7 +1744,7 @@ ngf_error ngf_begin_frame() {
   CURRENT_CONTEXT->frame_res[fi].active = true;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
-  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_pools);
+  CURRENT_CONTEXT->frame_res[fi].cmd_pool = CURRENT_CONTEXT->cmd_pools[fi];
   
   // reset stack allocator.
   ngfi_sa_reset(ngfvk_tmp_store());
@@ -1809,17 +1811,17 @@ ngf_error ngf_end_frame() {
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     uint32_t wait_sem_count = 0u;
     VkSemaphore *wait_sems = NULL;
-    const VkPipelineStageFlags *wait_stage_masks = NULL;
+    const VkPipelineStageFlags *wait_stage_flags = NULL;
     if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
       wait_sem_count = 1u;
       wait_sems =
         &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
-      wait_stage_masks = &color_attachment_stage; 
+      wait_stage_flags = &color_attachment_stage; 
     }
     ngfvk_submit_commands(_vk.gfx_queue,
                           frame_sync->cmd_bufs.data,
                           nsubmitted_gfx_cmdbuffers,
-                          wait_stage_masks,
+                          wait_stage_flags,
                           wait_sems,
                           wait_sem_count,
                           frame_sync->cmd_buf_sems.data,
