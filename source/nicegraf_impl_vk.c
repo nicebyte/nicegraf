@@ -163,8 +163,6 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkSemaphore)     cmd_buf_sems;
   VkCommandPool                   cmd_pool;
 
-
-
   // Resources that should be disposed of at some point after this
   // frame's completion.
   NGFI_DARRAY_OF(VkPipeline)            retire_pipelines;
@@ -187,7 +185,7 @@ typedef struct ngf_context_t {
   ngf_swapchain_info     swapchain_info;
   VmaAllocator           allocator;
   VkCommandPool         *cmd_pools;
- ngfvk_desc_superpool   *desc_superpools;
+  ngfvk_desc_superpool  *desc_superpools;
   VkSurfaceKHR           surface;
   uint32_t               frame_number;
   uint32_t               max_inflight_frames;
@@ -841,6 +839,9 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     const uint32_t num_queue_infos =
         1u + (same_gfx_and_present ? 0u : 1u);
     const char *device_exts[] = {"VK_KHR_maintenance1", "VK_KHR_swapchain" };
+    const VkPhysicalDeviceFeatures required_features = {
+      .samplerAnisotropy = VK_TRUE
+    };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext                   = NULL,
@@ -849,6 +850,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .pQueueCreateInfos       = queue_infos,
       .enabledLayerCount       = 0,
       .ppEnabledLayerNames     = NULL,
+      .pEnabledFeatures        = &required_features,
       .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
       .ppEnabledExtensionNames = device_exts
     };
@@ -978,7 +980,7 @@ static ngf_error ngfvk_create_swapchain(
   // Check available present modes and fall back on FIFO if the requested
   // present mode is not supported.
   {
-  uint32_t npresent_modes = 0u;;
+  uint32_t npresent_modes = 0u;
   vkGetPhysicalDeviceSurfacePresentModesKHR(_vk.phys_dev, surface,
                                             &npresent_modes, NULL);
   VkPresentModeKHR* present_modes =
