@@ -156,10 +156,11 @@ typedef struct ngf_sampler_t {
 } ngf_sampler_t;
 
 typedef struct ngf_image_t {
-  VkImage       vkimg;
-  VmaAllocation alloc;
-  VkImageView   vkview;
-  VmaAllocator  parent_allocator;
+  ngf_image_type type;
+  VkImage        vkimg;
+  VmaAllocation  alloc;
+  VkImageView    vkview;
+  VmaAllocator   parent_allocator;
 } ngf_image_t;
 
 // Vulkan resources associated with a given frame.
@@ -301,9 +302,28 @@ static VkShaderStageFlags get_vk_stage_flags(uint32_t flags) {
 static VkImageType get_vk_image_type(ngf_image_type t) {
   static const VkImageType types[NGF_IMAGE_TYPE_COUNT] = {
     VK_IMAGE_TYPE_2D,
-    VK_IMAGE_TYPE_3D
+    VK_IMAGE_TYPE_3D,
+    VK_IMAGE_TYPE_2D // In Vulkan cubemaps are treated as array of 2D images.
   };
   return types[t];
+}
+
+static VkImageViewType get_vk_image_view_type(ngf_image_type t, size_t nlayers) {
+  if (t == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1u) {
+    return VK_IMAGE_VIEW_TYPE_2D;
+  } else if (t == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1u) {
+    return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+  } else if (t == NGF_IMAGE_TYPE_IMAGE_3D) {
+    return VK_IMAGE_VIEW_TYPE_3D;
+  } else if (t == NGF_IMAGE_TYPE_CUBE && nlayers == 1u) {
+    return VK_IMAGE_VIEW_TYPE_CUBE;
+  } else if (t == NGF_IMAGE_TYPE_CUBE && nlayers > 1u) {
+    return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+  } else {
+    NGFI_DIAG_ERROR("Invalid image type");
+    assert(false);
+    return VK_IMAGE_TYPE_2D;
+  }
 }
 
 static VkCompareOp get_vk_compare_op(ngf_compare_op op) {
@@ -2406,10 +2426,10 @@ ngf_default_render_target_cleanup:
   return err;
 }
 
-#define _ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
+#define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_swapchain *swapchain = &CURRENT_CONTEXT->swapchain;
   const VkFramebuffer fb =
       target->is_default
@@ -2447,7 +2467,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
 }
 
 void ngf_cmd_end_pass(ngf_render_encoder enc) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
   ngfvk_encoder_end(buf);
 }
@@ -2457,7 +2477,7 @@ void ngf_cmd_draw(ngf_render_encoder enc,
                   uint32_t           first_element,
                   uint32_t           nelements,
                   uint32_t           ninstances) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   if (indexed) {
     vkCmdDrawIndexed(buf->active_bundle.vkcmdbuf, nelements, ninstances, first_element,
                      0u, 0u);
@@ -2468,7 +2488,7 @@ void ngf_cmd_draw(ngf_render_encoder enc,
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
                                const ngf_graphics_pipeline pipeline) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   buf->active_pipe = pipeline;
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
                     pipeline->vk_pipeline);
@@ -2477,7 +2497,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
                                 const ngf_resource_bind_op *bind_operations,
                                 uint32_t                    nbind_operations) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
 
   // Binding resources requires an active pipeline.
   ngf_graphics_pipeline active_pipe = buf->active_pipe;
@@ -2701,7 +2721,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   const VkViewport viewport = {
     .x        =  (float)r->x,
     .y        =  (float)r->y + (float)r->height,
@@ -2714,7 +2734,7 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
 }
 
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf->active_rt);
   const uint32_t target_height =
       (buf->active_rt->is_default)
@@ -2731,7 +2751,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
                                 const ngf_attrib_buffer abuf,
                                 uint32_t                binding,
                                 uint32_t                offset) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   VkDeviceSize vkoffset = offset;
   vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf,
                          binding,
@@ -2743,7 +2763,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder      enc,
 void ngf_cmd_bind_index_buffer(ngf_render_encoder     enc,
                                const ngf_index_buffer ibuf,
                                ngf_type               index_type) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   const VkIndexType idx_type = get_vk_index_type(index_type);
   assert(idx_type == VK_INDEX_TYPE_UINT16 ||
          idx_type == VK_INDEX_TYPE_UINT32);
@@ -2816,7 +2836,7 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder        enc,
                                 size_t                  size,
                                 size_t                  src_offset,
                                 size_t                  dst_offset) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
                        src->data.vkbuf,
@@ -2834,7 +2854,7 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder       enc,
                                size_t                 size,
                                size_t                 src_offset,
                                size_t                 dst_offset) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
                        src->data.vkbuf,
@@ -2853,7 +2873,7 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder         enc,
                                  size_t                   size,
                                  size_t                   src_offset,
                                  size_t                   dst_offset) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_cmd_copy_buffer(buf->active_bundle.vkcmdbuf,
                        src->data.vkbuf,
@@ -2872,8 +2892,12 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
                          ngf_image_ref          dst,
                          const ngf_offset3d    *offset,
                          const ngf_extent3d    *extent) {
-  ngf_cmd_buffer buf = _ENC2CMDBUF(enc);
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
+  const uint32_t dst_layer =
+    dst.image->type == NGF_IMAGE_TYPE_CUBE
+      ? 6u * dst.layer + dst.cubemap_face
+      : dst.layer;
   const VkImageMemoryBarrier pre_xfer_barrier = {
     .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
     .pNext               = NULL,
@@ -2888,7 +2912,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
       .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
       .baseMipLevel   = dst.mip_level,
       .levelCount     = 1u,
-      .baseArrayLayer = dst.layer,
+      .baseArrayLayer = dst_layer,
       .layerCount     = 1u
     }
   };
@@ -2907,7 +2931,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
     .imageSubresource = {
       .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
       .mipLevel       = dst.mip_level,
-      .baseArrayLayer = dst.layer,
+      .baseArrayLayer = dst_layer,
       .layerCount     = 1u
     },
     .imageOffset = {
@@ -2940,7 +2964,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder       enc,
       .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
       .baseMipLevel   = dst.mip_level,
       .levelCount     = 1u,
-      .baseArrayLayer = dst.layer,
+      .baseArrayLayer = dst_layer,
       .layerCount     = 1u
     }
   };
@@ -3283,10 +3307,11 @@ ngf_error ngf_create_image(const ngf_image_info *info,
     goto ngf_create_image_cleanup;
   }
 
+  const bool is_cubemap = info->type == NGF_IMAGE_TYPE_CUBE;
   const VkImageCreateInfo vk_image_info = {
     .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
     .pNext = NULL,
-    .flags = 0u,
+    .flags = is_cubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0u,
     .imageType = get_vk_image_type(info->type),
     .extent = {
       .width = info->extent.width,
@@ -3295,7 +3320,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
     },
     .format = get_vk_image_format(info->format),
     .mipLevels = info->nmips,
-    .arrayLayers = 1u, // TODO: layered images
+    .arrayLayers = !is_cubemap ? 1u : 6u, // TODO: layered images
     .samples =  get_vk_sample_count(info->nsamples),
     .usage = usage_flags,
     .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -3321,13 +3346,14 @@ ngf_error ngf_create_image(const ngf_image_info *info,
      &img->alloc,
       NULL);
   img->parent_allocator = CURRENT_CONTEXT->allocator;
+  img->type = info->type;
 
   if (create_image_vkerr != VK_SUCCESS) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_image_cleanup;
   }
   err = ngfvk_create_vk_image_view(img->vkimg,
-                                  vk_image_info.imageType,
+                                   get_vk_image_view_type(info->type, info->extent.depth),
                                   vk_image_info.format,
                                   vk_image_info.mipLevels,
                                   vk_image_info.arrayLayers,
