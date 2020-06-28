@@ -155,6 +155,13 @@ typedef struct ngf_sampler_t {
   VkSampler vksampler;
 } ngf_sampler_t;
 
+typedef struct ngf_image_t {
+  VkImage       vkimg;
+  VmaAllocation alloc;
+  VkImageView   vkview;
+  VmaAllocator  parent_allocator;
+} ngf_image_t;
+
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -169,6 +176,7 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
   NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
   NGFI_DARRAY_OF(VkSampler)             retire_samplers;
+  NGFI_DARRAY_OF(ngf_image_t)           retire_images;
   NGFI_DARRAY_OF(ngfvk_buffer)          retire_buffers;
   NGFI_DARRAY_OF(ngfvk_desc_superpool*) retire_desc_superpools;
 
@@ -203,12 +211,6 @@ typedef struct ngf_graphics_pipeline_t {
   NGFI_DARRAY_OF(ngfvk_desc_set_size)   desc_set_sizes;
   VkPipelineLayout                      vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
-
-typedef struct ngf_image_t {
-  VkImage       vkimg;
-  VmaAllocation alloc;
-  VkImageView   vkview;
-} ngf_image_t;
 
 typedef struct ngf_render_target_t {
   VkRenderPass                render_pass;
@@ -1382,6 +1384,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_desc_superpools, 8);
     ctx->frame_res[f].cmd_pool = VK_NULL_HANDLE;
@@ -1525,6 +1528,14 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
                       NULL);
   }
 
+  for (uint32_t s = 0u;
+       s < NGFI_DARRAY_SIZE(frame_res->retire_images);
+     ++s) {
+    ngf_image img = &NGFI_DARRAY_AT(frame_res->retire_images, s);
+    vmaDestroyImage(img->parent_allocator, img->vkimg, img->alloc);
+    vkDestroyImageView(_vk.device, img->vkview, NULL);
+  }
+
   for (uint32_t a = 0;
        a < NGFI_DARRAY_SIZE(frame_res->retire_buffers);
      ++a) {
@@ -1549,6 +1560,7 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
   NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
+  NGFI_DARRAY_CLEAR(frame_res->retire_images);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
   NGFI_DARRAY_CLEAR(frame_res->retire_desc_superpools);
@@ -1567,6 +1579,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
@@ -3307,6 +3320,7 @@ ngf_error ngf_create_image(const ngf_image_info *info,
      &img->vkimg,
      &img->alloc,
       NULL);
+  img->parent_allocator = CURRENT_CONTEXT->allocator;
 
   if (create_image_vkerr != VK_SUCCESS) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -3334,10 +3348,8 @@ ngf_create_image_cleanup:
 void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
     if (img->vkimg != VK_NULL_HANDLE) {
-      // TODO: retire queue for images
-      vmaDestroyImage(CURRENT_CONTEXT->allocator,
-                      img->vkimg, img->alloc);
-      vkDestroyImageView(_vk.device, img->vkview, NULL);
+      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_images, *img);
+      NGFI_FREE(img);
     }
   }
 }
