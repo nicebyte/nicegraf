@@ -2464,7 +2464,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     vk_attachment_desc->storeOp = get_vk_load_op(ngf_attachment_desc->store_op);
     vk_attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     vk_attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: set correct layout here.
+    vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     vk_attachment_desc->finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     attachment_views[a] = ngf_attachment_desc->image_ref.image->vkview;
 
@@ -2516,6 +2516,19 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     .pPreserveAttachments = NULL
   };
 
+  // Specify subpass dependencies.
+  VkSubpassDependency subpass_deps[] = {
+    {
+      .srcSubpass = 0u,
+      .dstSubpass = VK_SUBPASS_EXTERNAL,
+      .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      .dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+      .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+      .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+    },
+
+  };
+
   // Create a render pass.
   const VkRenderPassCreateInfo render_pass_info = {
     .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -2525,8 +2538,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     .pAttachments = vk_attachment_descs,
     .subpassCount = 1u,
     .pSubpasses = &subpass_desc,
-    .dependencyCount = 0u,
-    .pDependencies = NULL
+    .dependencyCount = NGFI_ARRAYSIZE(subpass_deps),
+    .pDependencies = subpass_deps
   };
   VkResult vk_err =
     vkCreateRenderPass(_vk.device, &render_pass_info, NULL, &rt->render_pass);
