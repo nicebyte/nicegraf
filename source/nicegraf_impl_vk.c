@@ -2440,19 +2440,19 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
   VkAttachmentReference *color_attachment_refs =
     ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
-  VkAttachmentReference *depth_stencil_attachment_refs =
-    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+  VkAttachmentReference depth_stencil_attachment_ref = {
+    .attachment = VK_ATTACHMENT_UNUSED
+  };
   VkImageView *attachment_views =
     ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkImageView));
   if (vk_attachment_descs == NULL ||
       color_attachment_refs == NULL ||
-      depth_stencil_attachment_refs == NULL) {
+      attachment_views == NULL) {
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_render_target_cleanup;
   }
 
-  uint32_t ncolor_attachments = 0u, ndepth_stencil_attachments = 0u;
-
+  uint32_t ncolor_attachments = 0u;
 
   for (uint32_t a = 0u; a < info->nattachments; ++a) {
     const ngf_attachment *ngf_attachment_desc = &info->attachments[a];
@@ -2472,18 +2472,26 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
       VkAttachmentReference *color_ref = &color_attachment_refs[ncolor_attachments++];
       color_ref->attachment = a;
       color_ref->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH) { 
-      VkAttachmentReference *depth_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
-      depth_ref->attachment = a;
-      depth_ref->layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_STENCIL) {
-      VkAttachmentReference *stencil_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
-      stencil_ref->attachment = a;
-      stencil_ref->layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
-    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL) {
-      VkAttachmentReference *depth_stencil_ref = &depth_stencil_attachment_refs[ndepth_stencil_attachments++];
-      depth_stencil_ref->attachment = a;
-      depth_stencil_ref->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    } else {
+      if (depth_stencil_attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
+        NGFI_DIAG_ERROR("Attempt to specify more than a single depth/stencil attachment.");
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_render_target_cleanup;
+      }
+      depth_stencil_attachment_ref.attachment = a;
+      switch (ngf_attachment_desc->type) {
+      case NGF_ATTACHMENT_DEPTH:
+        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        break;
+      case NGF_ATTACHMENT_STENCIL:
+        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+        break;
+      case NGF_ATTACHMENT_DEPTH_STENCIL:
+        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        break;
+      default:
+        assert(false);
+      }
     }
     // TODO: set clear values
   }
@@ -2500,7 +2508,10 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     .colorAttachmentCount = ncolor_attachments,
     .pColorAttachments = color_attachment_refs,
     .pResolveAttachments = NULL, // TODO: multisampled render targets
-    .pDepthStencilAttachment = ndepth_stencil_attachments ? depth_stencil_attachment_refs : NULL, // TODO: allow max 1 depth/stencil attachment
+    .pDepthStencilAttachment =
+      depth_stencil_attachment_ref.attachment != VK_ATTACHMENT_UNUSED 
+       ? &depth_stencil_attachment_ref
+       : NULL,
     .preserveAttachmentCount = 0u,
     .pPreserveAttachments = NULL
   };
