@@ -2464,7 +2464,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     vk_attachment_desc->storeOp = get_vk_load_op(ngf_attachment_desc->store_op);
     vk_attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     vk_attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: set correct layout here
     vk_attachment_desc->finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     attachment_views[a] = ngf_attachment_desc->image_ref.image->vkview;
 
