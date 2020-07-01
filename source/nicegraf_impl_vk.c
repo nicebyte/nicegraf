@@ -215,10 +215,12 @@ typedef struct ngf_graphics_pipeline_t {
   VkPipelineLayout                      vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
 
+#define NGFVK_MAX_COLOR_ATTACHMENTS 16u
+
 typedef struct ngf_render_target_t {
   VkFramebuffer frame_buffer;            
   VkRenderPass  render_pass;
-  VkClearValue  clear_values[2];
+  VkClearValue  clear_values[NGFVK_MAX_COLOR_ATTACHMENTS];
   uint32_t      nclear_values;
   bool          is_default;
   uint32_t      width;
@@ -1953,7 +1955,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   VkSpecializationInfo vk_spec_info;
   const ngf_specialization_info *spec_info = info->spec_info;
   if (info->spec_info) {
-    VkSpecializationMapEntry *spec_map_entries = ngfi_sa_alloc(ngfvk_tmp_store(),
+    VkSpecializationMapEntry *spec_map_entries =
+        ngfi_sa_alloc(ngfvk_tmp_store(),
                       info->spec_info->nspecializations *
                       sizeof(VkSpecializationMapEntry));
 
@@ -2413,6 +2416,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     }
     rt->width  = swapchain->width;
     rt->height = swapchain->height;
+    rt->nclear_values = CURRENT_CONTEXT->swapchain.depth_image ? 2u : 1u;
   } else {
     NGFI_DIAG_ERROR("Current context cannot provide a default render target.");
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -2452,8 +2456,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     goto ngf_create_render_target_cleanup;
   }
 
+  rt->nclear_values = 0u;
   uint32_t ncolor_attachments = 0u;
-
   for (uint32_t a = 0u; a < info->nattachments; ++a) {
     const ngf_attachment *ngf_attachment_desc = &info->attachments[a];
     VkAttachmentDescription *vk_attachment_desc = &vk_attachment_descs[a];
@@ -2493,7 +2497,16 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
         assert(false);
       }
     }
-    // TODO: set clear values
+
+    VkClearValue *clear_val = &rt->clear_values[rt->nclear_values++];
+    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
+      memcpy(clear_val->color.float32,
+             ngf_attachment_desc->clear.clear_color,
+             sizeof(clear_val->color.float32));
+    } else {
+      clear_val->depthStencil.depth = ngf_attachment_desc->clear.clear_depth;
+      clear_val->depthStencil.stencil = ngf_attachment_desc->clear.clear_stencil;
+    }
   }
 
   rt->width = info->attachments[0].image_ref.image->extent.width;
@@ -2596,11 +2609,9 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
         ? CURRENT_CONTEXT->swapchain_info.height
         : target->height
   };
-  const int clear_value_count = swapchain->depth_image ? 2u : 1u;
-  //if (!target->is_default) {
-    // TODO: set clearValueCount correctly for non-default render targets.
-    //abort();
-  //}
+
+  const int clear_value_count = target->nclear_values;
+
   const VkRenderPassBeginInfo begin_info = {
     .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
     .pNext           = NULL,
