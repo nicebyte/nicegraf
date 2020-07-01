@@ -426,11 +426,11 @@ static VkFormat get_vk_image_format(ngf_image_format f) {
     VK_FORMAT_R16G16_SFLOAT,
     VK_FORMAT_R16G16B16_SFLOAT,
     VK_FORMAT_R16G16B16A16_SFLOAT,
+    VK_FORMAT_B10G11R11_UFLOAT_PACK32,
     VK_FORMAT_R16_UINT,
     VK_FORMAT_R16G16_UINT,
     VK_FORMAT_R16G16B16_UINT,
     VK_FORMAT_R16G16B16A16_UINT,
-    VK_FORMAT_B10G11R11_UFLOAT_PACK32,
     VK_FORMAT_R32_UINT,
     VK_FORMAT_R32G32_UINT,
     VK_FORMAT_R32G32B32_UINT,
@@ -2633,7 +2633,6 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
 void ngf_cmd_end_pass(ngf_render_encoder enc) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
-  ngfvk_encoder_end(buf);
 }
 
 void ngf_cmd_draw(ngf_render_encoder enc,
