@@ -193,6 +193,8 @@ const ngf_plmd_user* ngf_plmd_get_user(const ngf_plmd *m);
 const ngf_plmd_entrypoints* ngf_plmd_get_entrypoints(const ngf_plmd *m);
 const ngf_plmd_header* ngf_plmd_get_header(const ngf_plmd *m);
 
+const char* ngf_plmd_get_error_name(const ngf_plmd_error err);
+
 #if defined(__cplusplus)
 }
 #endif
