@@ -278,3 +278,15 @@ const ngf_plmd_header* ngf_plmd_get_header(const ngf_plmd *m) {
 const ngf_plmd_entrypoints* ngf_plmd_get_entrypoints(const ngf_plmd* m) {
   return &m->entrypoints;
 }
+
+const char* ngf_plmd_get_error_name(const ngf_plmd_error err) {
+  static const char* ngf_plmd_error_names[] = {
+    "OK",
+    "OUTOFMEM",
+    "MAGIC_NUMBER_MISMATCH",
+    "BUFFER_TOO_SMALL",
+    "WEIRD_BUFFER_SIZE",
+    "INVALID_SHADER_STAGE"
+  };
+  return ngf_plmd_error_names[err];
+}
