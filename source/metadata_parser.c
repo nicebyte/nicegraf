@@ -32,10 +32,20 @@
   #include <arpa/inet.h>
 #endif
 
+#ifdef _MSC_VER
+#pragma warning(push)
+ // address of dllimport is not static, identity not guaranteed
+#pragma warning(disable:4232)
+#endif
+
 static const ngf_plmd_alloc_callbacks stdlib_alloc = {
   .alloc = malloc,
   .free = free
 };
+
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 struct ngf_plmd {
   uint8_t *raw_data;
@@ -155,7 +165,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
     entrypoints_ptr += 2u * sizeof(uint32_t);
     const uint32_t size = *(const uint32_t*)entrypoints_ptr;
     entrypoints_ptr += sizeof(uint32_t);
-    const char *name = entrypoints_ptr;
+    const char *name = (const char*)entrypoints_ptr;
     entrypoints_ptr += size * sizeof(uint32_t);
     if (kind == 0) meta->entrypoints.vert_shader_entrypoint = name;
     else if (kind == 1) meta->entrypoints.frag_shader_entrypoint = name;
