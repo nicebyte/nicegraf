@@ -286,7 +286,7 @@ const char* ngf_plmd_get_error_name(const ngf_plmd_error err) {
     "MAGIC_NUMBER_MISMATCH",
     "BUFFER_TOO_SMALL",
     "WEIRD_BUFFER_SIZE",
-    "NGF_PLMD_ERROR_INVALID_SHADER_STAGE"
+    "INVALID_SHADER_STAGE"
   };
   return ngf_plmd_error_names[err];
 }
