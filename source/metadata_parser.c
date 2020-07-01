@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2019 nicegraf contributors
+ * Copyright (c) 2020 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
  * of this software and associated documentation files (the "Software"), to
@@ -32,24 +32,15 @@
   #include <arpa/inet.h>
 #endif
 
-#ifdef _MSC_VER
-  #pragma warning(push)
-  // address of dllimport is not static, identity not guaranteed
-  #pragma warning(disable:4232)
-#endif
-
 static const ngf_plmd_alloc_callbacks stdlib_alloc = {
-  .allocate = malloc,
-  .deallocate = free
+  .alloc = malloc,
+  .free = free
 };
-
-#ifdef _MSC_VER
-  #pragma warning( pop )
-#endif
 
 struct ngf_plmd {
   uint8_t *raw_data;
   const ngf_plmd_header *header;
+  ngf_plmd_entrypoints entrypoints;
   ngf_plmd_layout layout;
   ngf_plmd_cis_map images_to_cis_map;
   ngf_plmd_cis_map samplers_to_cis_map;
@@ -61,7 +52,7 @@ static ngf_plmd_error _create_cis_map(uint8_t *ptr,
                                   ngf_plmd_cis_map *map) {
   assert(ptr);
   map->nentries = *(uint32_t*)ptr;
-  map->entries = cb->allocate(map->nentries * sizeof(ngf_plmd_cis_map_entry*));
+  map->entries = cb->alloc(map->nentries * sizeof(ngf_plmd_cis_map_entry*));
   if (map->entries == NULL) {
     return NGF_PLMD_ERROR_OUTOFMEM;
   }
@@ -75,10 +66,9 @@ static ngf_plmd_error _create_cis_map(uint8_t *ptr,
   return NGF_PLMD_ERROR_OK;
 }
 
-ngf_plmd_error ngf_plmd_load(const void *buf,
-                             size_t buf_size,
-                             const ngf_plmd_alloc_callbacks *alloc_cb,
-                             ngf_plmd **result) {
+ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
+                     const ngf_plmd_alloc_callbacks *alloc_cb,
+                     ngf_plmd **result) {
   static const uint32_t START_OF_RAW_BYTE_BLOCK = 0xffffffff;
   static const uint32_t MAGIC_NUMBER = 0xdeadbeef;
   ngf_plmd_error err = NGF_PLMD_ERROR_OK;
@@ -100,7 +90,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
                                                        // blocks in the buffer.
 
   // Allocate space for the result.
-  meta = alloc_cb->allocate(sizeof(ngf_plmd));
+  meta = alloc_cb->alloc(sizeof(ngf_plmd));
   if (result == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -109,7 +99,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
   *result = meta;
 
   // Create a copy of the metadata buffer.
-  meta->raw_data = alloc_cb->allocate(buf_size);
+  meta->raw_data = alloc_cb->alloc(buf_size);
   if (meta->raw_data == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -146,7 +136,8 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
   }
 
   // Sanity-check offsets in the header.
-  if (header->pipeline_layout_offset >= buf_size ||
+  if (header->entrypoints_offset >= buf_size ||
+      header->pipeline_layout_offset >= buf_size ||
       header->image_to_cis_map_offset >= buf_size ||
       header->sampler_to_cis_map_offset >= buf_size ||
       header->user_metadata_offset >= buf_size) {
@@ -154,12 +145,32 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
     goto ngf_plmd_load_cleanup;
   }
 
+  // Process the entrypoints record.
+  const uint8_t *entrypoints_ptr =
+      &meta->raw_data[header->entrypoints_offset];
+  const uint32_t nentrypoints = *(const uint32_t*)entrypoints_ptr;
+  entrypoints_ptr += sizeof(uint32_t);
+  for (uint32_t ep = 0u; ep < nentrypoints; ++ep) {
+    const uint32_t kind = *(const uint32_t*)entrypoints_ptr;
+    entrypoints_ptr += 2u * sizeof(uint32_t);
+    const uint32_t size = *(const uint32_t*)entrypoints_ptr;
+    entrypoints_ptr += sizeof(uint32_t);
+    const char *name = entrypoints_ptr;
+    entrypoints_ptr += size * sizeof(uint32_t);
+    if (kind == 0) meta->entrypoints.vert_shader_entrypoint = name;
+    else if (kind == 1) meta->entrypoints.frag_shader_entrypoint = name;
+    else {
+      err = NGF_PLMD_ERROR_INVALID_SHADER_STAGE;
+      goto ngf_plmd_load_cleanup;
+    }
+  }
+
   // Process the pipeline layout record.
   const uint8_t *pipeline_layout_ptr =
       &meta->raw_data[header->pipeline_layout_offset];
   const uint32_t nsets = *(const uint32_t*)pipeline_layout_ptr;
   meta->layout.ndescriptor_sets = nsets;
-  meta->layout.set_layouts = alloc_cb->allocate(sizeof(void*) * nsets);
+  meta->layout.set_layouts = alloc_cb->alloc(sizeof(void*) * nsets);
   if (meta->layout.set_layouts == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -185,7 +196,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf,
   meta->user.nentries = 
       *(uint32_t*)&meta->raw_data[header->user_metadata_offset];
   meta->user.entries =
-      alloc_cb->allocate(sizeof(ngf_plmd_user_entry) * meta->user.nentries);
+      alloc_cb->alloc(sizeof(ngf_plmd_user_entry) * meta->user.nentries);
   if (meta->user.entries == NULL) {
     err = NGF_PLMD_ERROR_OUTOFMEM;
     goto ngf_plmd_load_cleanup;
@@ -216,21 +227,21 @@ void ngf_plmd_destroy(ngf_plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb) {
   }
   if (m != NULL) {
     if (m->raw_data != NULL) {
-      alloc_cb->deallocate(m->raw_data);
+      alloc_cb->free(m->raw_data);
     }
     if (m->layout.set_layouts != NULL) {
-      alloc_cb->deallocate((void*)m->layout.set_layouts);
+      alloc_cb->free((void*)m->layout.set_layouts);
     }
     if (m->images_to_cis_map.entries != NULL) {
-      alloc_cb->deallocate((void*)m->images_to_cis_map.entries);
+      alloc_cb->free((void*)m->images_to_cis_map.entries);
     }
     if (m->samplers_to_cis_map.entries != NULL) {
-      alloc_cb->deallocate((void*)m->samplers_to_cis_map.entries);
+      alloc_cb->free((void*)m->samplers_to_cis_map.entries);
     }
     if (m->user.entries != NULL) {
-      alloc_cb->deallocate((void*)m->user.entries);
+      alloc_cb->free((void*)m->user.entries);
     }
-    alloc_cb->deallocate(m);
+    alloc_cb->free(m);
   }
 }
 
@@ -254,13 +265,6 @@ const ngf_plmd_header* ngf_plmd_get_header(const ngf_plmd *m) {
   return m->header;
 }
 
-const char* ngf_plmd_get_error_name(const ngf_plmd_error err) {
-  static const char* ngf_plmd_error_names[] = {
-    "OK",
-    "OUTOFMEM",
-    "MAGIC_NUMBER_MISMATCH",
-    "BUFFER_TOO_SMALL",
-    "WEIRD_BUFFER_SIZE",
-  };
-  return ngf_plmd_error_names[err];
+const ngf_plmd_entrypoints* ngf_plmd_get_entrypoints(const ngf_plmd* m) {
+  return &m->entrypoints;
 }
