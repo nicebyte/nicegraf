@@ -1471,8 +1471,8 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   if(cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
-                      "a render encoder cannot be created for it.")
+    NGFI_DIAG_WARNING("Calling ngf_render_encoder_end on a render encoder "
+                      "that is not active.")
     return NGF_ERROR_INVALID_OPERATION;
   }
   if (cmd_buf->active_rce){
