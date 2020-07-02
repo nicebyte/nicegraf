@@ -696,6 +696,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     const char* const ext_names[] = { // Names of instance-level extensions.
       "VK_KHR_surface", VK_SURFACE_EXT,
+      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
       VK_EXT_DEBUG_UTILS_EXTENSION_NAME
     };
 
@@ -869,12 +870,22 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     const VkPhysicalDeviceFeatures required_features = {
       .samplerAnisotropy = VK_TRUE
     };
-    const VkPhysicalDeviceShaderFloat16Int8Features sf16_features = { // TODO: only enable this if device actually supports it.
+
+    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = { // TODO: only enable this if device actually supports it.
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
       .pNext = NULL,
-      .shaderFloat16 = true,
-      .shaderInt8 = true
+      .shaderFloat16 = false,
+      .shaderInt8 = false
     };
+
+    if (vkGetPhysicalDeviceFeatures2KHR) {
+      VkPhysicalDeviceFeatures2KHR phys_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &sf16_features
+      };
+      vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
+    }
+
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
       .pNext                   = &sf16_features,
