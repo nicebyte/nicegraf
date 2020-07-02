@@ -222,6 +222,7 @@ typedef struct ngf_render_target_t {
   VkRenderPass  render_pass;
   VkClearValue  clear_values[NGFVK_MAX_COLOR_ATTACHMENTS];
   uint32_t      nclear_values;
+  uint32_t      ncolor_attachments;
   bool          is_default;
   uint32_t      width;
   uint32_t      height;
@@ -864,13 +865,19 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     };
     const uint32_t num_queue_infos =
         1u + (same_gfx_and_present ? 0u : 1u);
-    const char *device_exts[] = {"VK_KHR_maintenance1", "VK_KHR_swapchain" };
+    const char *device_exts[] = {"VK_KHR_maintenance1", "VK_KHR_swapchain", "VK_KHR_shader_float16_int8" };
     const VkPhysicalDeviceFeatures required_features = {
       .samplerAnisotropy = VK_TRUE
     };
+    const VkPhysicalDeviceShaderFloat16Int8Features sf16_features = { // TODO: only enable this if device actually supports it.
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+      .pNext = NULL,
+      .shaderFloat16 = true,
+      .shaderInt8 = true
+    };
     const VkDeviceCreateInfo dev_info = {
       .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext                   = NULL,
+      .pNext                   = &sf16_features,
       .flags                   = 0,
       .queueCreateInfoCount    = num_queue_infos,
       .pQueueCreateInfos       = queue_infos,
@@ -2177,7 +2184,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
 
   // Prepare blend state.
-  VkPipelineColorBlendAttachmentState attachment_blend_state = {
+  const VkPipelineColorBlendAttachmentState attachment_blend_state = {
     .blendEnable = info->blend->enable,
     .srcColorBlendFactor = 
 	    info->blend->enable ? get_vk_blend_factor(info->blend->src_color_blend_factor) : VK_BLEND_FACTOR_ONE,
@@ -2197,14 +2204,25 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                       VK_COLOR_COMPONENT_A_BIT
   };
 
+  VkPipelineColorBlendAttachmentState blend_states[16];
+  for( size_t i = 0u; i < 16u; ++i ) {
+    blend_states[i] = attachment_blend_state;
+  }
+
+  if (info->compatible_render_target->ncolor_attachments >= NGFI_ARRAYSIZE(blend_states)) {
+    NGFI_DIAG_ERROR("too many attachments specified");
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_graphics_pipeline_cleanup;
+  }
+
   VkPipelineColorBlendStateCreateInfo color_blend = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
     .pNext = NULL,
     .flags = 0u,
     .logicOpEnable = VK_FALSE,
     .logicOp = VK_LOGIC_OP_SET,
-    .attachmentCount = 1u, // TODO: use number of attachments in renderpass
-    .pAttachments = &attachment_blend_state,
+    .attachmentCount = info->compatible_render_target->ncolor_attachments,
+    .pAttachments = blend_states,
     .blendConstants = { 0.0f, .0f, .0f, .0f }
   };
 
@@ -2417,6 +2435,7 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
     rt->width  = swapchain->width;
     rt->height = swapchain->height;
     rt->nclear_values = CURRENT_CONTEXT->swapchain.depth_image ? 2u : 1u;
+    rt->ncolor_attachments = 1u;
   } else {
     NGFI_DIAG_ERROR("Current context cannot provide a default render target.");
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -2465,7 +2484,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
     vk_attachment_desc->format = ngf_attachment_desc->image_ref.image->vkformat;
     vk_attachment_desc->samples = VK_SAMPLE_COUNT_1_BIT; // TODO: multisampled render targets
     vk_attachment_desc->loadOp = get_vk_load_op(ngf_attachment_desc->load_op);
-    vk_attachment_desc->storeOp = get_vk_load_op(ngf_attachment_desc->store_op);
+    vk_attachment_desc->storeOp = get_vk_store_op(ngf_attachment_desc->store_op);
     vk_attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     vk_attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     vk_attachment_desc->initialLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: set correct layout here
@@ -2485,7 +2504,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
       depth_stencil_attachment_ref.attachment = a;
       switch (ngf_attachment_desc->type) {
       case NGF_ATTACHMENT_DEPTH:
-        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL; // TODO: enable separate depth/stencil layout
         break;
       case NGF_ATTACHMENT_STENCIL:
         depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
@@ -2511,6 +2530,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
 
   rt->width = info->attachments[0].image_ref.image->extent.width;
   rt->height = info->attachments[0].image_ref.image->extent.height;
+  rt->ncolor_attachments = ncolor_attachments;
 
   // Subpass description.
   const VkSubpassDescription subpass_desc = {
@@ -2856,7 +2876,6 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       break;
     }
        
-      // TODO: handle other descriptor types.
     default:
       assert(false);
     }
