@@ -1077,7 +1077,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     descriptor_set_layouts[s].ndescriptors =
         info->layout->descriptor_set_layouts[s].ndescriptors;
     ngf_descriptor_info *descriptors  =
-        NGFI_ALLOCN(ngf_descriptor_info, descriptor_set_layouts->ndescriptors);
+        NGFI_ALLOCN(ngf_descriptor_info, descriptor_set_layouts[s].ndescriptors);
     descriptor_set_layouts[s].descriptors = descriptors;
     if (descriptors == nullptr) return NGF_ERROR_OUT_OF_MEM;
     memcpy(descriptors,
