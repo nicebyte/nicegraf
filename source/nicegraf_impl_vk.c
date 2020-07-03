@@ -178,6 +178,8 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkPipeline)            retire_pipelines;
   NGFI_DARRAY_OF(VkPipelineLayout)      retire_pipeline_layouts;
   NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
+  NGFI_DARRAY_OF(VkFramebuffer)         retire_framebuffers;
+  NGFI_DARRAY_OF(VkRenderPass)          retire_render_passes;
   NGFI_DARRAY_OF(VkSampler)             retire_samplers;
   NGFI_DARRAY_OF(ngf_image_t)           retire_images;
   NGFI_DARRAY_OF(ngfvk_buffer)          retire_buffers;
@@ -1425,6 +1427,8 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_framebuffers, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_render_passes, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
@@ -1562,6 +1566,24 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
                                   NULL);
   }
 
+  for (uint32_t p = 0u;
+       p < NGFI_DARRAY_SIZE(frame_res->retire_framebuffers);
+       ++p) {
+    vkDestroyFramebuffer(_vk.device,
+                         NGFI_DARRAY_AT(frame_res->retire_framebuffers,
+                                        p),
+                         NULL);
+  }
+
+  for (uint32_t p = 0u;
+       p < NGFI_DARRAY_SIZE(frame_res->retire_render_passes);
+       ++p) {
+    vkDestroyRenderPass(_vk.device,
+                         NGFI_DARRAY_AT(frame_res->retire_render_passes,
+                                        p),
+                         NULL);
+  }
+
   for (uint32_t s = 0u;
        s < NGFI_DARRAY_SIZE(frame_res->retire_samplers);
      ++s) {
@@ -1601,6 +1623,8 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
   NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
+  NGFI_DARRAY_CLEAR(frame_res->retire_framebuffers);
+  NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
   NGFI_DARRAY_CLEAR(frame_res->retire_images);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
@@ -1620,6 +1644,8 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_framebuffers);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_render_passes);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
@@ -2618,8 +2644,19 @@ ngf_create_render_target_cleanup:
 }
 
 void ngf_destroy_render_target(ngf_render_target target) {
-  NGFI_FAKE_USE(target);
-  // TODO: implement
+  if(target) {
+    ngfvk_frame_resources *res =
+        &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_number];
+    if(!target->is_default) {
+      if( target->frame_buffer != VK_NULL_HANDLE ) {
+        NGFI_DARRAY_APPEND(res->retire_framebuffers, target->frame_buffer);
+      }
+    }
+    if(target->render_pass != VK_NULL_HANDLE) {
+      NGFI_DARRAY_APPEND(res->retire_render_passes, target->render_pass);
+    }
+    NGFI_FREE(target);
+  }
 }
 
 
