@@ -1709,8 +1709,8 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   return NGF_ERROR_OK;
 }
 
-static ngf_error ngfvk_cmd_bundle_create(VkCommandPool        pool,
-                                         ngfvk_cmd_bundle     *bundle) {
+static ngf_error ngfvk_cmd_bundle_create(VkCommandPool     pool,
+                                         ngfvk_cmd_bundle *bundle) {
   VkCommandBufferAllocateInfo vk_cmdbuf_info = {
     .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
     .pNext              = NULL,
@@ -1803,7 +1803,16 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   assert(buffer);
-  // TODO: free active bundle.
+  if (buffer->active_bundle.vkcmdbuf != VK_NULL_HANDLE) {
+    vkFreeCommandBuffers(
+      _vk.device,
+      buffer->active_bundle.vkpool,
+      1u,
+      &buffer->active_bundle.vkcmdbuf);
+  }
+  if (buffer->active_bundle.vksem != VK_NULL_HANDLE) {
+    vkDestroySemaphore(_vk.device, buffer->active_bundle.vksem, NULL);
+  }
   NGFI_FREE(buffer);
 }
 
@@ -1827,6 +1836,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
     NGFI_DARRAY_APPEND(frame_sync_data->cmd_buf_sems,
                        bufs[i]->active_bundle.vksem);
     bufs[i]->state = NGFI_CMD_BUFFER_SUBMITTED;
+    bufs[i]->active_pipe = VK_NULL_HANDLE;
+    bufs[i]->active_rt = NULL;
+    memset(&bufs[i]->active_bundle, 0, sizeof(bufs[i]->active_bundle));
   }
   return NGF_ERROR_OK;
 }
