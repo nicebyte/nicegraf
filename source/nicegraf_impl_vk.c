@@ -29,6 +29,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "vk_10.h"
 #include <vk_mem_alloc.h>
@@ -717,8 +718,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     //TODO: check if validation layers are supported.
 
     // Enable validation only if detailed verbosity is requested.
-    const bool enable_validation =
-      (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
+    const bool enable_validation = true;
+      //(ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
 
     // Create a Vulkan instance.
     const VkInstanceCreateInfo inst_info = {
@@ -1586,12 +1587,14 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
                      b->vkbuf,
                      b->alloc);
   }
+  NGFI_DIAG_WARNING( "!!!!!!NGF!!!!!!resetting %d desc superpools\n",  NGFI_DARRAY_SIZE(frame_res->retire_desc_superpools));
   for (uint32_t p = 0u;
        p < NGFI_DARRAY_SIZE(frame_res->retire_desc_superpools);
      ++p) {
     ngfvk_desc_superpool *superpool =
       NGFI_DARRAY_AT(frame_res->retire_desc_superpools, p);
     for (ngfvk_desc_pool *pool = superpool->list; pool; pool = pool->next) {
+      NGFI_DIAG_WARNING( "!!!!!!NGF!!!!!!reset pool");
       vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
       memset(&pool->utilization, 0, sizeof(pool->utilization));
     }
@@ -1795,6 +1798,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
 }
 
 ngf_error ngf_begin_frame() {
+  NGFI_DIAG_WARNING( "!!!!!!!!!!!!NGF!!!!!!!!!!!!!!! BEGIN FRAME\n" );
   ngf_error err = NGF_ERROR_OK;
   const ATOMIC_INT fi =
       interlocked_read(&_vk.frame_id) % CURRENT_CONTEXT->max_inflight_frames;
@@ -2745,12 +2749,11 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       // request.
       const bool have_active_pool    = (superpool->active_pool != NULL);
       bool       fresh_pool_required = !have_active_pool;
+      const ngfvk_desc_set_size* set_size =
+          &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes, bind_op->target_set);
       if (have_active_pool) {
         // Check if the active descriptor pool can fit the required descriptor
         // set.
-        const ngfvk_desc_set_size *set_size =
-            &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes,
-                            bind_op->target_set);
        ngfvk_desc_pool                 *pool     =  superpool->active_pool;
         const ngfvk_desc_pool_capacity *capacity = &pool->capacity;
        ngfvk_desc_pool_capacity        *usage    = &pool->utilization;
@@ -2804,10 +2807,12 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
                                     NULL,
                                    &new_pool->vk_pool);
           if (vk_pool_create_result == VK_SUCCESS) {
-            if (superpool->active_pool != NULL) {
+            if (superpool->active_pool != NULL && superpool->active_pool->next == NULL) {
               superpool->active_pool->next = new_pool;
-            } else {
+            } else if (superpool->active_pool == NULL) {
               superpool->list = new_pool;
+            } else { // shouldn't happen
+              assert(false);
             }
             superpool->active_pool = new_pool;
           } else {
@@ -2835,21 +2840,15 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           vkAllocateDescriptorSets(_vk.device,
                                    &vk_desc_set_info,
                                    &vk_sets[bind_op->target_set]);
-
-       ngfvk_desc_pool_capacity        *usage    = &pool->utilization;
-       const ngfvk_desc_set_size *set_size =
-            &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes,
-                            bind_op->target_set);
-        for (ngf_descriptor_type i = 0;
-            !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
-           ++i) {
-          usage->descriptors[ i ] += set_size->counts[i];
-        }
-        usage->sets++;
-
       if (desc_set_alloc_result != VK_SUCCESS) {
         exit(1); // TODO
       }
+
+      // Update usage counters for the active descriptor pool.
+      for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+        pool->utilization.descriptors[ i ] += set_size->counts[i];
+      }
+      pool->utilization.sets++;
     }
     
     // At this point, we have a valid descriptor set in the `vk_sets` array.
@@ -2913,12 +2912,14 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
   // perform all the vulkan descriptor set write operations to populate the
   // newly allocated descriptor sets.
   vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
+  NGFI_DIAG_WARNING( "!!!!!!!!!!!!NGF!!!!!!!!!!!!!!! WROTE %d DESCRIPTORS\n", nbind_operations);
 
   // bind each of the descriptor sets individually (this ensures that desc.
   // sets bound for a compatible pipeline earlier in this command buffer
   // don't get clobbered).
   for (uint32_t s = 0; s < ndesc_set_layouts; ++s) {
     if (vk_sets[s] != VK_NULL_HANDLE) {
+      NGFI_DIAG_WARNING( "!!!!!!!!!!!!NGF!!!!!!!!!!!!!!! BOUND DESC SET %d\n", s);
       vkCmdBindDescriptorSets(buf->active_bundle.vkcmdbuf,
                               VK_PIPELINE_BIND_POINT_GRAPHICS,
                               active_pipe->vk_pipeline_layout,
