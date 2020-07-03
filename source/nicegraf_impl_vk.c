@@ -2897,7 +2897,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
                                    &vk_desc_set_info,
                                    &vk_sets[bind_op->target_set]);
       if (desc_set_alloc_result != VK_SUCCESS) {
-        exit(1); // TODO
+        NGFI_DIAG_WARNING("Failed to bind graphics resources - could not allocate descriptor set. VK error was %d",
+                          desc_set_alloc_result);
+        return;
       }
 
       // Update usage counters for the active descriptor pool.
