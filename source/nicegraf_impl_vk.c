@@ -719,8 +719,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     //TODO: check if validation layers are supported.
 
     // Enable validation only if detailed verbosity is requested.
-    const bool enable_validation = true;
-      //(ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
+    const bool enable_validation =
+      (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
 
     // Create a Vulkan instance.
     const VkInstanceCreateInfo inst_info = {
