@@ -2344,8 +2344,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     NGFI_FREEN(vk_descriptor_bindings,
               info->layout->descriptor_set_layouts[s].ndescriptors);
     if (vk_err != VK_SUCCESS) {
-      assert(false);
-      // TODO: return error here.
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_graphics_pipeline_cleanup;
     }
   }
 
