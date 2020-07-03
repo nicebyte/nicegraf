@@ -183,7 +183,7 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkSampler)             retire_samplers;
   NGFI_DARRAY_OF(ngf_image_t)           retire_images;
   NGFI_DARRAY_OF(ngfvk_buffer)          retire_buffers;
-  NGFI_DARRAY_OF(ngfvk_desc_superpool*) retire_desc_superpools;
+  NGFI_DARRAY_OF(ngfvk_desc_superpool*) reset_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
   VkFence                              fences[2];
@@ -1432,7 +1432,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_desc_superpools, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_superpools, 8);
     ctx->frame_res[f].cmd_pool = VK_NULL_HANDLE;
     ctx->frame_res[f].active = false;
     const VkFenceCreateInfo fence_info = {
@@ -1609,10 +1609,10 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
                      b->alloc);
   }
   for (uint32_t p = 0u;
-       p < NGFI_DARRAY_SIZE(frame_res->retire_desc_superpools);
+       p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools);
      ++p) {
     ngfvk_desc_superpool *superpool =
-      NGFI_DARRAY_AT(frame_res->retire_desc_superpools, p);
+      NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
     for (ngfvk_desc_pool *pool = superpool->list; pool; pool = pool->next) {
       vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
       memset(&pool->utilization, 0, sizeof(pool->utilization));
@@ -1629,7 +1629,7 @@ void ngfvk_retire_resources(ngfvk_frame_resources *frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->retire_images);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
-  NGFI_DARRAY_CLEAR(frame_res->retire_desc_superpools);
+  NGFI_DARRAY_CLEAR(frame_res->reset_desc_superpools);
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -1807,7 +1807,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
       return NGF_ERROR_INVALID_OPERATION;
     }
     if (bufs[i]->desc_superpool) {
-      NGFI_DARRAY_APPEND(frame_sync_data->retire_desc_superpools,
+      NGFI_DARRAY_APPEND(frame_sync_data->reset_desc_superpools,
                          bufs[i]->desc_superpool);
     }
     vkEndCommandBuffer(bufs[i]->active_bundle.vkcmdbuf);
