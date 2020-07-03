@@ -2705,13 +2705,13 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
   ngfi_sa_reset(ngfvk_tmp_store());
 
   // Allocate an array of descriptor set handles from temporary storage and
-  // set them all to null.
+  // set them all to null. As we process bind operations, we'll allocate descriptor
+  // sets and put them into the array as necessary.
   const size_t vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
   VkDescriptorSet *vk_sets = ngfi_sa_alloc(ngfvk_tmp_store(), vk_sets_size_bytes);
   memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
 
-  // Allocate an array of vulkan descriptor set writes from
-  // temp storage. 
+  // Allocate an array of vulkan descriptor set writes from temp storage. 
   VkWriteDescriptorSet *vk_writes =
       ngfi_sa_alloc(ngfvk_tmp_store(), nbind_operations *
                                       sizeof(VkWriteDescriptorSet));
@@ -2724,7 +2724,9 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
     // Ensure that a valid descriptor set is referenced by this
     // bind operation.
     if (bind_op->target_set >= ndesc_set_layouts) {
-      assert(false);
+      NGFI_DIAG_ERROR("invalid descriptor set %d referenced by bind operation (max. allowed is %d)",
+                       bind_op->target_set,
+                       ndesc_set_layouts);
       return;
     }
 
@@ -2755,12 +2757,11 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
         for (ngf_descriptor_type i = 0;
             !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
            ++i) {
-          usage->descriptors[i] += set_size->counts[i];
           fresh_pool_required |=
-              (usage->descriptors[i] > capacity->descriptors[i]);
+              (usage->descriptors[i] + set_size->counts[i] >=
+               capacity->descriptors[i]);
         }
-        usage->sets++;
-        fresh_pool_required |= (usage->sets > capacity->sets);
+        fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
       }
       if (fresh_pool_required) {
         if (!have_active_pool ||
@@ -2793,7 +2794,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           };
 
           // Create the new pool.
-         ngfvk_desc_pool *new_pool = NGFI_ALLOC(ngfvk_desc_pool);
+          ngfvk_desc_pool *new_pool = NGFI_ALLOC(ngfvk_desc_pool);
           new_pool->next     = NULL;
           new_pool->capacity = capacity;
           memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
@@ -2819,10 +2820,12 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       }
 
       // Allocate the new descriptor set from the pool.
+      ngfvk_desc_pool  *pool =  superpool->active_pool;
+
       const VkDescriptorSetAllocateInfo vk_desc_set_info = {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
-        .descriptorPool     = superpool->active_pool->vk_pool,
+        .descriptorPool     = pool->vk_pool,
         .descriptorSetCount = 1u,
         .pSetLayouts        = &NGFI_DARRAY_AT(
                                   active_pipe->vk_descriptor_set_layouts,
@@ -2832,10 +2835,25 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
           vkAllocateDescriptorSets(_vk.device,
                                    &vk_desc_set_info,
                                    &vk_sets[bind_op->target_set]);
+
+       ngfvk_desc_pool_capacity        *usage    = &pool->utilization;
+       const ngfvk_desc_set_size *set_size =
+            &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes,
+                            bind_op->target_set);
+        for (ngf_descriptor_type i = 0;
+            !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
+           ++i) {
+          usage->descriptors[ i ] += set_size->counts[i];
+        }
+        usage->sets++;
+
       if (desc_set_alloc_result != VK_SUCCESS) {
         exit(1); // TODO
       }
     }
+    
+    // At this point, we have a valid descriptor set in the `vk_sets` array.
+    // We'll use it in the write operation corresponding to the current bind_op.
     VkDescriptorSet set =  vk_sets[bind_op->target_set];
 
     // Construct a vulkan descriptor set write corresponding to this bind
