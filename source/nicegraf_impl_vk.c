@@ -1660,7 +1660,18 @@ void ngf_destroy_context(ngf_context ctx) {
     }
     NGFI_FREEN(ctx->cmd_pools, ctx->max_inflight_frames);
 
-    // TODO: free descriptor superpools
+    // Free descriptor superpools.
+    for (size_t p = 0u; p < ctx->max_inflight_frames; ++p) {
+      ngfvk_desc_superpool* sp = &ctx->desc_superpools[p];
+      ngfvk_desc_pool* pool = sp->list;
+      while(pool) {
+        vkDestroyDescriptorPool(_vk.device, pool->vk_pool, NULL);
+        ngfvk_desc_pool* prev_pool = pool;
+        pool = pool->next;
+        NGFI_FREE(prev_pool);
+      }
+    }
+    NGFI_FREEN(ctx->desc_superpools, ctx->max_inflight_frames);
 
     ngfvk_destroy_swapchain(&ctx->swapchain);
     if (ctx->surface != VK_NULL_HANDLE) {
