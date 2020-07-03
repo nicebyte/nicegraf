@@ -873,7 +873,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       .samplerAnisotropy = VK_TRUE
     };
 
-    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = { // TODO: only enable this if device actually supports it.
+    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
       .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
       .pNext = NULL,
       .shaderFloat16 = false,
