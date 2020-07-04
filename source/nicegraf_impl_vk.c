@@ -712,14 +712,27 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     };
     
     // Names of instance layers to enable.
-    const char* enabled_layers[] = {
-      "VK_LAYER_KHRONOS_validation"
+    const char *validation_layer_name =
+      "VK_LAYER_KHRONOS_validation";
+    const char *enabled_layers[] = {
+      validation_layer_name
     };
 
-    //TODO: check if validation layers are supported.
+    // Check if validation layers are supported.
+    uint32_t nlayers = 0u;
+    vkEnumerateInstanceLayerProperties(&nlayers, NULL);
+    VkLayerProperties* layer_props =
+        ngfi_sa_alloc(ngfvk_tmp_store(), nlayers * sizeof(VkLayerProperties));
+    vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
+    bool validation_supported = false;
+    for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
+      validation_supported =
+          (strcmp(validation_layer_name, layer_props[l].layerName) == 0u);
+    }
 
     // Enable validation only if detailed verbosity is requested.
     const bool enable_validation =
+      validation_supported &&
       (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
 
     // Create a Vulkan instance.
