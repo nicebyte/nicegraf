@@ -1,5 +1,6 @@
 #include "vk_10.h"
 
+PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 PFN_vkCreateInstance vkCreateInstance;
 
@@ -167,7 +168,9 @@ bool vkl_init_loader() {
   vkCreateInstance =
     (PFN_vkCreateInstance)vkGetInstanceProcAddr(VK_NULL_HANDLE,
       "vkCreateInstance");
-
+  vkEnumerateInstanceLayerProperties =
+    (PFN_vkEnumerateInstanceLayerProperties)vkGetInstanceProcAddr(VK_NULL_HANDLE,
+        "vkEnumerateInstanceLayerProperties");
   return true;
 }
 
