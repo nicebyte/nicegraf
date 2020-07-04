@@ -31,6 +31,7 @@
 extern "C" {
 #endif
 
+extern PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 extern PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 extern PFN_vkCreateInstance vkCreateInstance;
 
