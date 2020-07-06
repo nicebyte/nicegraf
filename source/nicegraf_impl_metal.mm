@@ -1573,10 +1573,10 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
   if (rt->is_default) {
     viewport.originY = CURRENT_CONTEXT->swapchain_info.height - top;
   } else {
-    viewport.originY = rt->height - top;
+    viewport.originY = top;
   }
   viewport.width = r->width;
-  viewport.height = r->height;
+  viewport.height = (rt->is_default ? 1.0 : -1.0) * r->height;
 
   // TODO: fix
   viewport.znear = 0.0f;
