@@ -1554,8 +1554,18 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
                                const ngf_graphics_pipeline pipeline) {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
-  [buf->active_rce setCullMode:pipeline->culling];	
-  [buf->active_rce setFrontFacingWinding:pipeline->winding];
+  [buf->active_rce setCullMode:pipeline->culling];
+  if (buf->active_rt->is_default) {
+    [buf->active_rce setFrontFacingWinding:pipeline->winding];
+  } else {
+    if (pipeline->winding == MTLWindingClockwise)
+      [buf->active_rce setFrontFacingWinding:MTLWindingCounterClockwise];
+    else if (pipeline->winding == MTLWindingCounterClockwise)
+      [buf->active_rce setFrontFacingWinding:MTLWindingClockwise];
+    else
+      [buf->active_rce setFrontFacingWinding:pipeline->winding];
+  }
+
   [buf->active_rce setBlendColorRed:pipeline->blend_color[0]
                               green:pipeline->blend_color[1]
                                blue:pipeline->blend_color[2]
