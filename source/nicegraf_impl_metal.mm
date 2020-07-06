@@ -1835,8 +1835,3 @@ PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
 PLACEHOLDER_CMD(line_width, float)
-
-void ngf_debug_message_callback(void *userdata,
-                                void (*callback)(const char*, const void*)) {
-  // TODO: implement
-}
