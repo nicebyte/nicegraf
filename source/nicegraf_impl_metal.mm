@@ -479,8 +479,11 @@ private:
 };
 
 #pragma mark ngf_struct_definitions
-
 struct ngf_context_t {
+  ~ngf_context_t() {
+    if (last_cmd_buffer)
+      [last_cmd_buffer waitUntilCompleted];
+  }
   id<MTLDevice> device = nil;
   ngfmtl_swapchain swapchain;
   ngfmtl_swapchain::frame frame;
@@ -488,6 +491,7 @@ struct ngf_context_t {
   bool is_current = false;
   ngf_swapchain_info swapchain_info;
   id<MTLCommandBuffer> pending_cmd_buffer = nil;
+  id<MTLCommandBuffer> last_cmd_buffer = nil;
   dispatch_semaphore_t frame_sync_sem = nil;
 };
 
@@ -663,6 +667,7 @@ ngf_error ngf_end_frame() {
        presentDrawable:CURRENT_CONTEXT->frame.color_drawable];
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame{};
+    CURRENT_CONTEXT->last_cmd_buffer = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
