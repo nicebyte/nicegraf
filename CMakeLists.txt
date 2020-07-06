@@ -27,7 +27,6 @@ project(nicegraf)
 # common across all libs.
 function (ngf_lib_target)
   cmake_parse_arguments(LIB "" "NAME" "SRCS;DEPS;COPTS" ${ARGN})
-  message(WARNING "lib name is ${LIB_NAME}")
   add_library(${LIB_NAME} STATIC ${LIB_SRCS})
   if ( LIB_DEPS )
     target_link_libraries(${LIB_NAME} ${LIB_DEPS})
