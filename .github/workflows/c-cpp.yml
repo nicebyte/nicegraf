@@ -1,0 +1,23 @@
+name: Run tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: make_build_dir
+      run: mkdir -p tests/build
+    - name: run_cmake
+      run: cd tests/build && cmake ..
+    - name: make
+      run:  cd tests/build && make
+    - name: test
+      run: ./tests/ngf_tests
