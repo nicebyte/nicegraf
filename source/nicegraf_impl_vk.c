@@ -210,8 +210,20 @@ typedef struct ngf_shader_stage_t {
   char                  *entry_point_name;
 } ngf_shader_stage_t;
 
+// Vulkan needs to render-to-texture upside-down to maintain a semblance of
+// a consistent coordinate system across different backends. This requires to 
+// flip polygon winding order as well. Since winding/culling are baked into
+// pipeline state, we need two flavors for every pipeline...
+// TODO: use VK_EXT_extended_dynamic_state to set polygon winding dynamically
+// when that extension is more widely supported.
+typedef enum {
+  NGFVK_PIPELINE_FLAVOR_VANILLA = 0u,
+  NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE,
+  NGFVK_PIPELINE_FLAVOR_COUNT
+} ngfvk_pipeline_flavor;
+
 typedef struct ngf_graphics_pipeline_t {
-  VkPipeline                            vk_pipelines[2];
+  VkPipeline                            vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_COUNT];
   NGFI_DARRAY_OF(VkDescriptorSetLayout) vk_descriptor_set_layouts;
   NGFI_DARRAY_OF(ngfvk_desc_set_size)   desc_set_sizes;
   VkPipelineLayout                      vk_pipeline_layout;
@@ -2376,12 +2388,18 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
   vk_err = vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL,
                                   &pipeline->vk_pipeline_layout);
-  assert(vk_err == VK_SUCCESS);
-  for( size_t i = 0u; i < 2u; ++i ) {
-    VkPipelineRasterizationStateCreateInfo r = rasterization;
-    if (i > 0u) {
-      r.frontFace =
-        (r.frontFace == VK_FRONT_FACE_CLOCKWISE)
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_graphics_pipeline_cleanup;
+  }
+
+  // Create all the required pipeline flavors.
+  for( size_t f = 0u; f < NGFVK_PIPELINE_FLAVOR_COUNT; ++f ) {
+    VkPipelineRasterizationStateCreateInfo actual_rasterization = rasterization;
+    if (f == NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE) {
+      // flip winding when rendering to texture.
+      actual_rasterization.frontFace =
+        (actual_rasterization.frontFace == VK_FRONT_FACE_CLOCKWISE)
           ? VK_FRONT_FACE_COUNTER_CLOCKWISE
           : VK_FRONT_FACE_CLOCKWISE;
     }
@@ -2395,7 +2413,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       .pInputAssemblyState = &input_assembly,
       .pTessellationState = &tess,
       .pViewportState = &viewport_state,
-      .pRasterizationState = &r,
+      .pRasterizationState = &actual_rasterization,
       .pMultisampleState = &multisampling,
       .pDepthStencilState = &depth_stencil,
       .pColorBlendState = &color_blend,
@@ -2406,14 +2424,14 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
       .basePipelineHandle = VK_NULL_HANDLE,
       .basePipelineIndex = -1
     };
-    VkResult vkerr =
+    vk_err =
         vkCreateGraphicsPipelines(_vk.device,
                                   VK_NULL_HANDLE,
                                   1u,
                                   &vk_pipeline_info,
                                   NULL,
-                                  &pipeline->vk_pipelines[i]);
-    if (vkerr != VK_SUCCESS) {
+                                  &pipeline->vk_pipeline_flavors[f]);
+    if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_graphics_pipeline_cleanup;
     }
@@ -2433,9 +2451,9 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   if (p != NULL) {
     ngfvk_frame_resources *res =
         &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_number];
-    for(size_t i = 0u; i < NGFI_ARRAYSIZE(p->vk_pipelines); ++i) {
-      if (p->vk_pipelines[i] != VK_NULL_HANDLE) {
-        NGFI_DARRAY_APPEND(res->retire_pipelines, p->vk_pipelines[i]);
+    for(size_t f = 0u; f < NGFVK_PIPELINE_FLAVOR_COUNT; ++f) {
+      if (p->vk_pipeline_flavors[f] != VK_NULL_HANDLE) {
+        NGFI_DARRAY_APPEND(res->retire_pipelines, p->vk_pipeline_flavors[f]);
       }
     }
     if (p->vk_pipeline_layout != VK_NULL_HANDLE) {
@@ -2768,7 +2786,9 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder          enc,
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   buf->active_pipe = pipeline;
   vkCmdBindPipeline(buf->active_bundle.vkcmdbuf, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    buf->active_rt->is_default ? pipeline->vk_pipelines[0] : pipeline->vk_pipelines[1]);
+                    buf->active_rt->is_default
+                        ? pipeline->vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_VANILLA]
+                        : pipeline->vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE]);
 }
 
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
