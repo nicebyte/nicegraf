@@ -1013,11 +1013,21 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   for (size_t a = 0; a < input->nattribs; ++a) {
     const ngf_vertex_attrib_desc *attrib = &(input->attribs[a]);
     glEnableVertexAttribArray(attrib->location);
-    glVertexAttribFormat(attrib->location,
-                         (GLint)attrib->size,
-                         get_gl_type(attrib->type),
-                         attrib->normalized,
-                         attrib->offset);
+    if (attrib->normalized ||
+        attrib->type == NGF_TYPE_FLOAT ||
+        attrib->type == NGF_TYPE_DOUBLE ||
+        attrib->type == NGF_TYPE_HALF_FLOAT) {
+      glVertexAttribFormat(attrib->location,
+                          (GLint)attrib->size,
+                           get_gl_type(attrib->type),
+                           attrib->normalized,
+                           attrib->offset);
+    } else {
+      glVertexAttribIFormat(attrib->location,
+                           (GLint)attrib->size,
+                            get_gl_type(attrib->type),
+                            attrib->offset);
+    }
     glVertexAttribBinding(attrib->location, attrib->binding);
   }
   for (uint32_t b = 0; b < pipeline->nvert_buf_bindings; ++b) {
