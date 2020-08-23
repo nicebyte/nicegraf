@@ -27,7 +27,6 @@ project(nicegraf)
 # common across all libs.
 function (ngf_lib_target)
   cmake_parse_arguments(LIB "" "NAME" "SRCS;DEPS;COPTS" ${ARGN})
-  message(WARNING "lib name is ${LIB_NAME}")
   add_library(${LIB_NAME} STATIC ${LIB_SRCS})
   if ( LIB_DEPS )
     target_link_libraries(${LIB_NAME} ${LIB_DEPS})
@@ -71,20 +70,11 @@ ngf_lib_target(NAME nicegraf_util
 set(NICEGRAF_COMMON_DEPS nicegraf_internal ngf_metadata_parser)
 
 if (APPLE)
-  # Find apple-specific system libs.
-  find_library(APPLE_METAL Metal)
-  find_library(APPLE_QUARTZ_CORE QuartzCore)
-  if(${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
-    find_library(APPLE_KIT UIKit)
-  else()
-    find_library(APPLE_KIT AppKit)
-  endif()
-
   # Nicegraf with Metal backend.
   ngf_lib_target(NAME nicegraf_mtl
                  SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm
-                 DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_QUARTZ_CORE} ${APPLE_KIT}
+                 DEPS ${NICEGRAF_COMMON_DEPS}
                  COPTS "--std=c++17" "-fobjc-arc")
 else()
   # Import the EGL library for context creation.
