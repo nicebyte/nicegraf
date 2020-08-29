@@ -393,14 +393,10 @@ public:
   // Delete copy ctor and copy assignment to make this type move-only.
   ngfmtl_swapchain& operator=(const ngfmtl_swapchain&) = delete;
   ngfmtl_swapchain(const ngfmtl_swapchain&) = delete;
-  
+
   ngf_error initialize(const ngf_swapchain_info &swapchain_info,
                        id<MTLDevice>             device) {
     // Initialize the Metal layer.
-    const CGSize size = {
-      (CGFloat)swapchain_info.width,
-      (CGFloat)swapchain_info.height
-    };
     const MTLPixelFormat pixel_format =
         get_mtl_pixel_format(swapchain_info.cfmt).format;
     if (pixel_format == MTLPixelFormatInvalid) {
@@ -409,7 +405,7 @@ public:
     }
     layer_ = [CAMetalLayer layer];
     layer_.device = device;
-    layer_.drawableSize = size;
+    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
     layer_.pixelFormat = pixel_format;
     layer_.framebufferOnly = YES;
 #if TARGET_OS_OSX
@@ -430,8 +426,8 @@ public:
 #else
     [view.layer addSublayer:layer_];
     [layer_ setContentsScale:view.layer.contentsScale];
-    [layer_ setContentsGravity:kCAGravityCenter];
-    [layer_ setPosition:view.center];
+    [layer_ setContentsGravity:kCAGravityResizeAspect];
+    [layer_ setFrame:view.frame];
 #endif
     CFBridgingRetain(view);
     
@@ -439,12 +435,41 @@ public:
     capacity_ = swapchain_info.capacity_hint;
     
     // Initialize depth attachments if necessary.
+    initialize_depth_attachments(swapchain_info);
+    return NGF_ERROR_OK;
+  }
+
+  ngf_error resize(const ngf_swapchain_info &swapchain_info) {
+    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
+
+    NGFMTL_VIEW_TYPE *view=
+        CFBridgingRelease((void*)swapchain_info.native_handle);
+
+    [layer_ setContentsScale:view.layer.contentsScale];
+    [layer_ setFrame:view.frame];
+
+    CFBridgingRetain(view);
+
+    // ReiInitialize depth attachments if necessary.
+    initialize_depth_attachments(swapchain_info);
+    return NGF_ERROR_OK;
+  }
+  
+  frame next_frame() {
+    img_idx_ = (img_idx_ + 1u) % capacity_;
+    return { [layer_ nextDrawable],
+      depth_images_.get() ? depth_images_[img_idx_] : nil };
+  }
+  operator bool() { return layer_; }
+  
+private:
+  void initialize_depth_attachments(const ngf_swapchain_info &swapchain_info) {
     if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
       depth_images_.reset(
                           new id<MTLTexture>[swapchain_info.capacity_hint]);
       MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.dfmt).format;
       assert(depth_format != MTLPixelFormatInvalid);
-      for (uint32_t i = 0u; i < capacity_; ++i) {
+      for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
         auto *depth_texture_desc            = [MTLTextureDescriptor new];
         depth_texture_desc.textureType      = MTLTextureType2D;
         depth_texture_desc.width            = swapchain_info.width;
@@ -463,18 +488,11 @@ public:
         depth_images_[i] =
             [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
       }
+    } else {
+      depth_images_.reset(nullptr);
     }
-    return NGF_ERROR_OK;
   }
-  
-  frame next_frame() {
-    img_idx_ = (img_idx_ + 1u) % capacity_;
-    return { [layer_ nextDrawable],
-      depth_images_.get() ? depth_images_[img_idx_] : nil };
-  }
-  operator bool() { return layer_; }
-  
-private:
+
   CAMetalLayer                      *layer_    = nil;
   uint32_t                           img_idx_  = 0u;
   uint32_t                           capacity_ = 0u;
@@ -779,7 +797,7 @@ ngf_error ngf_resize_context(ngf_context ctx,
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
-  return ctx->swapchain.initialize(ctx->swapchain_info, ctx->device);
+  return ctx->swapchain.resize(ctx->swapchain_info);
 }
 
 ngf_error ngf_set_context(ngf_context ctx) {
