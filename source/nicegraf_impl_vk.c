@@ -3749,3 +3749,8 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
   }
 }
 
+
+void ngf_finish() {
+ vkDeviceWaitIdle(_vk.device);
+}
+
