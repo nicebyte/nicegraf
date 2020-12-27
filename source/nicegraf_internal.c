@@ -22,6 +22,7 @@
 
 #include "nicegraf_internal.h"
 #include "dynamic_array.h"
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h> 
 
@@ -271,5 +272,37 @@ void ngfi_destroy_binding_map(ngfi_native_binding_map map) {
       NGFI_FREE(set);
     }
     NGFI_FREE(map);
+  }
+}
+
+static struct {
+  ngf_device_capabilities caps;
+  bool initialized;
+  pthread_mutex_t mut;
+} ngfi_device_caps;
+
+void ngfi_device_caps_create() {
+  pthread_mutex_init(&ngfi_device_caps.mut, NULL);
+}
+
+const ngf_device_capabilities* ngfi_device_caps_read() {
+  const ngf_device_capabilities* result =  NULL;
+  pthread_mutex_lock(&ngfi_device_caps.mut);
+  if (ngfi_device_caps.initialized) {
+    result = &ngfi_device_caps.caps;
+  }
+  pthread_mutex_unlock(&ngfi_device_caps.mut);
+  return result;
+}
+
+ngf_device_capabilities* ngfi_device_caps_lock() {
+  pthread_mutex_lock(&ngfi_device_caps.mut);
+  return ngfi_device_caps.initialized ? NULL : &ngfi_device_caps.caps;
+}
+
+void ngfi_device_caps_unlock(ngf_device_capabilities *ptr) {
+  if (ptr == &ngfi_device_caps.caps) {
+    ngfi_device_caps.initialized = true;
+    pthread_mutex_unlock(&ngfi_device_caps.mut);
   }
 }
