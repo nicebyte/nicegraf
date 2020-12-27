@@ -23,7 +23,6 @@
 #endif
 
 #define VK_NO_PROTOTYPES
-#define VK_USE_PLATFORM_WIN32_KHR // TODO: add support for other platforms.
 #include <vulkan/vulkan.h>
 #include <stdbool.h>
 
