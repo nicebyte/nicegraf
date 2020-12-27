@@ -668,7 +668,17 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
 #endif
 
+  ngfi_device_caps_create();
+  ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
+  if (caps_ptr) {
+    caps_ptr->clipspace_z_zero_to_one = true; // always true on metal.
+    ngfi_device_caps_unlock(caps_ptr);
+  }
   return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+}
+
+const ngf_device_capabilities* ngf_get_device_capabilities() {
+  return ngfi_device_caps_read();
 }
 
 ngf_error ngf_begin_frame() {
