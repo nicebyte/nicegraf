@@ -502,6 +502,10 @@ static ngf_diagnostic_info ngfi_diag_info = {
   .callback  = NULL
 };
 
+static ngf_device_capabilities ngfi_device_caps;
+static bool ngfi_device_caps_initialized = false;
+pthread_mutex_t ngfi_device_caps_mu;
+
 static void GL_APIENTRY ngfgl_debug_message_callback(
   GLenum source,
   GLenum type,
@@ -529,6 +533,7 @@ static void GL_APIENTRY ngfgl_debug_message_callback(
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
   ngfi_diag_info = init_info->diag_info;
+  pthread_mutex_init(&ngfi_device_caps_mu, NULL);
   return NGF_ERROR_OK;
 }
 
@@ -702,6 +707,20 @@ ngf_error ngf_set_context(ngf_context ctx) {
                             GL_TRUE);
       glDebugMessageCallback(ngfgl_debug_message_callback, NULL);
     }
+
+    /* Initialize the device capabilities structure if necessary. */
+    pthread_mutex_lock(&ngfi_device_caps_mu);
+    if (!ngfi_device_caps_initialized) {
+      void (*glClipControl)(GLenum, GLenum) =
+        (void (*)(GLenum, GLenum))eglGetProcAddress("glClipControl");
+      if (glClipControl) {
+        glClipControl(0x8CA1/*GL_LOWER_LEFT*/, 0x935F/*GL_ZERO_TO_ONE*/);
+      }
+      ngfi_device_caps.clipspace_z_zero_to_one = (glClipControl != NULL);
+      ngfi_device_caps_initialized = true;
+    }
+    pthread_mutex_unlock(&ngfi_device_caps_mu);
+
     return NGF_ERROR_OK;
   } else {
     NGFI_DIAG_ERROR("Failed to make EGL context current, EGL error: %d", eglGetError());
@@ -721,6 +740,16 @@ void ngf_destroy_context(ngf_context ctx) {
     NGFI_DARRAY_DESTROY(ctx->cached_state.vbuf_table);
     NGFI_FREE(ctx);
   }
+}
+
+const ngf_device_capabilities* ngf_get_device_capabilities() {
+  const ngf_device_capabilities *result = NULL;
+  pthread_mutex_lock(&ngfi_device_caps_mu);
+  if (ngfi_device_caps_initialized) {
+    result = &ngfi_device_caps;
+  }
+  pthread_mutex_unlock(&ngfi_device_caps_mu);
+  return result;
 }
 
 ngf_error ngfgl_check_link_status(GLuint program, const char *debug_name) {
