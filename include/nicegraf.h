@@ -48,10 +48,16 @@ extern "C" {
 typedef struct ngf_device_capabilities {
   /* *
    * This flag is set to `true` if the platform supports [0; 1]
-   * range for clip-space z coordinate. We enforce clip-space
+   * range for the clip-space z coordinate. We enforce clip-space
    * z to be in this range on all platforms that support it.
    */
   bool clipspace_z_zero_to_one;
+
+  /**
+   * When binding uniform buffers, the specified offset must be
+   * a multiple of this number.
+   */
+  size_t uniform_buffer_offset_alignment;
 } ngf_device_capabilities;
 
 /**
