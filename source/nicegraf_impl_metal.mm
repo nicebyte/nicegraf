@@ -672,6 +672,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
   ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
   if (caps_ptr) {
     caps_ptr->clipspace_z_zero_to_one = true; // always true on metal.
+    caps_ptr->uniform_buffer_offset_alignment = 256u;
     ngfi_device_caps_unlock(caps_ptr);
   }
   return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
