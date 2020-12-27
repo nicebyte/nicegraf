@@ -708,14 +708,16 @@ ngf_error ngf_set_context(ngf_context ctx) {
       glDebugMessageCallback(ngfgl_debug_message_callback, NULL);
     }
 
+    /* Check if ARB|EXT_clip_control is present, set clipspace z range to [0; 1] if yes. */
+    void (*glClipControl)(GLenum, GLenum) =
+      (void (*)(GLenum, GLenum))eglGetProcAddress("glClipControl");
+    if (glClipControl) {
+      glClipControl(0x8CA1/*GL_LOWER_LEFT*/, 0x935F/*GL_ZERO_TO_ONE*/);
+    }
+
     /* Initialize the device capabilities structure if necessary. */
     pthread_mutex_lock(&ngfi_device_caps_mu);
     if (!ngfi_device_caps_initialized) {
-      void (*glClipControl)(GLenum, GLenum) =
-        (void (*)(GLenum, GLenum))eglGetProcAddress("glClipControl");
-      if (glClipControl) {
-        glClipControl(0x8CA1/*GL_LOWER_LEFT*/, 0x935F/*GL_ZERO_TO_ONE*/);
-      }
       ngfi_device_caps.clipspace_z_zero_to_one = (glClipControl != NULL);
       ngfi_device_caps_initialized = true;
     }
