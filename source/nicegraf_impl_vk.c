@@ -834,6 +834,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       return NGF_ERROR_INVALID_OPERATION;
     }
     _vk.phys_dev = physdevs[best_device_index];
+    VkPhysicalDeviceProperties phys_dev_properties;
+    vkGetPhysicalDeviceProperties(_vk.phys_dev, &phys_dev_properties);
 
     // Obtain a list of queue family properties from the device.
     uint32_t num_queue_families = 0U;
@@ -944,15 +946,18 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     // Initialize frame id.
     _vk.frame_id = 0;
 
+    ngfi_device_caps_create();
+    ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
+    if (caps_ptr) {
+      caps_ptr->clipspace_z_zero_to_one = true; // always true on Vulkan.
+      caps_ptr->uniform_buffer_offset_alignment =
+        phys_dev_properties.limits.minUniformBufferOffsetAlignment;
+      ngfi_device_caps_unlock(caps_ptr);
+    }
+
     // Done!
   }
 
-  ngfi_device_caps_create();
-  ngf_device_capabilities *caps_ptr = ngfi_device_caps_lock();
-  if (caps_ptr) {
-    caps_ptr->clipspace_z_zero_to_one = true; // always true on Vulkan.
-    ngfi_device_caps_unlock(caps_ptr);
-  }
   return NGF_ERROR_OK;
 }
 
