@@ -191,6 +191,12 @@ if (ngfi_diag_info.callback) { \
 #define NGFI_DIAG_WARNING(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_WARNING, fmt,##__VA_ARGS__)
 #define NGFI_DIAG_ERROR(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, fmt,##__VA_ARGS__)
 
+// Access to device capabilities global structure.
+void ngfi_device_caps_create();
+ngf_device_capabilities* ngfi_device_caps_lock();
+void ngfi_device_caps_unlock(ngf_device_capabilities*);
+const ngf_device_capabilities* ngfi_device_caps_read();
+
 #ifdef __cplusplus
 }
 #endif

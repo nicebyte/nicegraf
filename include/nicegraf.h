@@ -22,7 +22,7 @@
 
 /**
  * @file nicegraf.h
- * @brief Nicegraf declarations.
+ * @brief nicegraf declarations.
  */
 #pragma once
 

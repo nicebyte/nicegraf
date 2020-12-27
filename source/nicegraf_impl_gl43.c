@@ -502,10 +502,6 @@ static ngf_diagnostic_info ngfi_diag_info = {
   .callback  = NULL
 };
 
-static ngf_device_capabilities ngfi_device_caps;
-static bool ngfi_device_caps_initialized = false;
-pthread_mutex_t ngfi_device_caps_mu;
-
 static void GL_APIENTRY ngfgl_debug_message_callback(
   GLenum source,
   GLenum type,
@@ -533,7 +529,7 @@ static void GL_APIENTRY ngfgl_debug_message_callback(
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) {
   ngfi_diag_info = init_info->diag_info;
-  pthread_mutex_init(&ngfi_device_caps_mu, NULL);
+  ngfi_device_caps_create();
   return NGF_ERROR_OK;
 }
 
@@ -716,12 +712,11 @@ ngf_error ngf_set_context(ngf_context ctx) {
     }
 
     /* Initialize the device capabilities structure if necessary. */
-    pthread_mutex_lock(&ngfi_device_caps_mu);
-    if (!ngfi_device_caps_initialized) {
-      ngfi_device_caps.clipspace_z_zero_to_one = (glClipControl != NULL);
-      ngfi_device_caps_initialized = true;
+    ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
+    if (caps_ptr) {
+      caps_ptr->clipspace_z_zero_to_one = (glClipControl != NULL);
+      ngfi_device_caps_unlock(caps_ptr);
     }
-    pthread_mutex_unlock(&ngfi_device_caps_mu);
 
     return NGF_ERROR_OK;
   } else {
@@ -745,13 +740,7 @@ void ngf_destroy_context(ngf_context ctx) {
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities() {
-  const ngf_device_capabilities *result = NULL;
-  pthread_mutex_lock(&ngfi_device_caps_mu);
-  if (ngfi_device_caps_initialized) {
-    result = &ngfi_device_caps;
-  }
-  pthread_mutex_unlock(&ngfi_device_caps_mu);
-  return result;
+  return ngfi_device_caps_read();
 }
 
 ngf_error ngfgl_check_link_status(GLuint program, const char *debug_name) {
