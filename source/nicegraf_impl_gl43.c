@@ -715,6 +715,9 @@ ngf_error ngf_set_context(ngf_context ctx) {
     ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
     if (caps_ptr) {
       caps_ptr->clipspace_z_zero_to_one = (glClipControl != NULL);
+      GLint ubo_offset_alignment = 0;
+      glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &ubo_offset_alignment);
+      caps_ptr->uniform_buffer_offset_alignment = (size_t)ubo_offset_alignment;
       ngfi_device_caps_unlock(caps_ptr);
     }
 
