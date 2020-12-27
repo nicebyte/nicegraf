@@ -43,6 +43,18 @@ extern "C" {
 #endif
 
 /**
+ * Contains information about various device features, limits, etc.
+ */
+typedef struct ngf_device_capabilities {
+  /* *
+   * This flag is set to `true` if the platform supports [0; 1]
+   * range for clip-space z coordinate. We enforce clip-space
+   * z to be in this range on all platforms that support it.
+   */
+  bool clipspace_z_zero_to_one;
+} ngf_device_capabilities;
+
+/**
  * Device hints.
  * TODO: API for choosing device explicitly.
  */
@@ -1096,11 +1108,78 @@ typedef struct ngf_index_buffer_t* ngf_index_buffer;
 #endif
 
 /**
- * Initialize Nicegraf.
+ * Initialize nicegraf.
  * @param init_info Initialization parameters.
  * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
  */
 ngf_error ngf_initialize(const ngf_init_info *init_info);
+
+/**
+ * Create a new nicegraf context. Creates a new Nicegraf context that
+ * can optionally present to a window surface and mutually share objects
+ * (such as images and buffers) with another context.
+ * @param info context configuration
+ * @return Error codes: NGF_ERROR_CANT_SHARE_CONTEXT,
+ *  NGF_ERROR_OUTOFMEM, NGF_ERROR_CONTEXT_CREATION_FAILED,
+ *  NGF_ERROR_SWAPCHAIN_CREATION_FAILED
+ */
+ngf_error ngf_create_context(const ngf_context_info *info,
+                             ngf_context *result);
+
+/**
+ * Destroy a nicegraf context.
+ * @param ctx The context to deallocate.
+ */
+void ngf_destroy_context(ngf_context ctx);
+
+/**
+ * Adjust the size of a context's associated swapchain. This function must be
+ * called every time the swapchain's underlying window is resized.
+ * @param ctx The context to operate on
+ * @param new_width New window width in pixels
+ * @param new_height New window height in pixels
+ * @return Error codes: NGF_ERROR_SWAPCHAIN_CREATION_FAILED, NGF_ERROR_OUTOFMEM
+ */
+ngf_error ngf_resize_context(ngf_context ctx,
+                             uint32_t new_width,
+                             uint32_t new_height);
+
+/**
+ * Set a given nicegraf context as current for the calling thread. All
+ * subsequent rendering operations invoked from the calling thread will affect
+ * the given context.
+ *
+ * Once a context has been set as current on a thread, it cannot be migrated to
+ * another thread.
+ *
+ * @param ctx The context to set as current.
+ */
+ngf_error ngf_set_context(ngf_context ctx);
+
+
+
+/**
+ * Begin a frame of rendering. This functions starts a frame of rendering in
+ * the thread's current context. It acquires an image from the context's
+ * associated swap chain.
+ * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
+ */
+ngf_error ngf_begin_frame();
+
+/**
+ * End a frame of rendering. This function releases the image that was
+ * previously acquired from the current context's associated swapchain by
+ * ngf_begin_frame.
+ * @return Error codes: NGF_ERROR_END_FRAME_FAILED
+ */
+ngf_error ngf_end_frame();
+
+/**
+ * Get a pointer to the device capabilities structure.
+ * @return NULL if no context is present on the calling thread.
+ */
+const ngf_device_capabilities* ngf_get_device_capabilities();
+
 
 /**
  * Set the memory allocation callbacks that the library will use for its
@@ -1477,63 +1556,6 @@ void ngf_cmd_write_image(ngf_xfer_encoder buf,
                          const ngf_offset3d *offset,
                          const ngf_extent3d *extent);
 
-/**
- * Create a new Nicegraf context. Creates a new Nicegraf context that
- * can optionally present to a window surface and mutually share objects
- * (such as images and buffers) with another context.
- * @param info context configuration
- * @return Error codes: NGF_ERROR_CANT_SHARE_CONTEXT,
- *  NGF_ERROR_OUTOFMEM, NGF_ERROR_CONTEXT_CREATION_FAILED,
- *  NGF_ERROR_SWAPCHAIN_CREATION_FAILED
- */
-ngf_error ngf_create_context(const ngf_context_info *info,
-                             ngf_context *result);
-
-/**
- * Destroy a Nicegraf context.
- * @param ctx The context to deallocate.
- */
-void ngf_destroy_context(ngf_context ctx);
-
-/**
- * Adjust the size of a context's associated swapchain. This function must be
- * called every time the swapchain's underlying window is resized.
- * @param ctx The context to operate on
- * @param new_width New window width in pixels
- * @param new_height New window height in pixels
- * @return Error codes: NGF_ERROR_SWAPCHAIN_CREATION_FAILED, NGF_ERROR_OUTOFMEM
- */
-ngf_error ngf_resize_context(ngf_context ctx,
-                             uint32_t new_width,
-                             uint32_t new_height);
-
-/**
- * Set a given Nicegraf context as current for the calling thread. All
- * subsequent rendering operations invoked from the calling thread will affect
- * the given context.
- *
- * Once a context has been set as current on a thread, it cannot be migrated to
- * another thread.
- *
- * @param ctx The context to set as current.
- */
-ngf_error ngf_set_context(ngf_context ctx);
-
-/**
- * Begin a frame of rendering. This functions starts a frame of rendering in
- * the thread's current context. It acquires an image from the context's
- * associated swap chain.
- * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
- */
-ngf_error ngf_begin_frame();
-
-/**
- * End a frame of rendering. This function releases the image that was
- * previously acquired from the current context's associated swapchain by
- * ngf_begin_frame.
- * @return Error codes: NGF_ERROR_END_FRAME_FAILED
- */
-ngf_error ngf_end_frame();
 #ifdef _MSC_VER
 #pragma endregion
 #endif
