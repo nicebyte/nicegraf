@@ -946,7 +946,18 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
 
     // Done!
   }
+
+  ngfi_device_caps_create();
+  ngf_device_capabilities *caps_ptr = ngfi_device_caps_lock();
+  if (caps_ptr) {
+    caps_ptr->clipspace_z_zero_to_one = true; // always true on Vulkan.
+    ngfi_device_caps_unlock(caps_ptr);
+  }
   return NGF_ERROR_OK;
+}
+
+const ngf_device_capabilities* ngf_get_device_capabilities() {
+  return ngfi_device_caps_read();
 }
 
 static void ngfvk_destroy_swapchain(ngfvk_swapchain *swapchain) {
