@@ -1720,6 +1720,9 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   *result = cmd_buf;
   cmd_buf->active_pipe = NULL;
   cmd_buf->state = NGFI_CMD_BUFFER_READY;
+  cmd_buf->active_bundle.vkcmdbuf = VK_NULL_HANDLE;
+  cmd_buf->active_bundle.vkpool   = VK_NULL_HANDLE;
+  cmd_buf->active_bundle.vksem    = VK_NULL_HANDLE;
   return NGF_ERROR_OK;
 }
 
