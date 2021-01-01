@@ -59,6 +59,11 @@ void ngfi_sa_reset(ngfi_sa *allocator);
  */
 void ngfi_sa_destroy(ngfi_sa *allocator);
 
+/**
+ * Per-thread temporary storage based on stack allocator.
+ */
+ngfi_sa* ngfi_tmp_store();
+
 #ifdef __cplusplus
 }
 #endif
