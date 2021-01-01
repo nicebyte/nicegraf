@@ -1517,7 +1517,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder buf,
 void ngf_cmd_bind_index_buffer(ngf_render_encoder     buf,
                                const ngf_index_buffer idxbuf,
                                ngf_type               index_type) NGF_NOEXCEPT;
-void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target);
+void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target) NGF_NOEXCEPT;
 void ngf_cmd_end_pass(ngf_render_encoder buf) NGF_NOEXCEPT;
 void ngf_cmd_draw(ngf_render_encoder buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
