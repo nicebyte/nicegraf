@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2019 nicegraf contributors
+ * Copyright (c) 2021 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
  * of this software and associated documentation files (the "Software"), to
@@ -259,7 +259,6 @@ typedef struct ngf_rasterization_info {
   ngf_polygon_mode polygon_mode; /**< How to draw polygons.*/
   ngf_cull_mode cull_mode; /**< Which polygons to cull.*/
   ngf_front_face_mode front_face; /**< Which winding counts as front-facing.*/
-  float line_width; /**< Width of a line.*/
 } ngf_rasterization_info ;
 
 /**
@@ -886,22 +885,6 @@ typedef struct {
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
-/** 
- * Flags for specifying which aspects of the pipeline are to be configured
- * as dynamic.
- */
-typedef enum ngf_dynamic_state_flags {
-  NGF_DYNAMIC_STATE_VIEWPORT = 0x01,
-  NGF_DYNAMIC_STATE_SCISSOR = 0x02,
-  NGF_DYNAMIC_STATE_LINE_WIDTH = 0x04,
-  NGF_DYNAMIC_STATE_BLEND_CONSTANTS = 0x08,
-  NGF_DYNAMIC_STATE_STENCIL_REFERENCE = 0x10,
-  NGF_DYNAMIC_STATE_STENCIL_COMPARE_MASK = 0x20,
-  NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK = 0x40,
-  NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR = NGF_DYNAMIC_STATE_SCISSOR |
-                                           NGF_DYNAMIC_STATE_VIEWPORT
-} ngf_dynamic_state_flags;
-
 /**
  * Primitive types to use for draw operations.
  * Some back-ends may not support all of the primitive types.
@@ -944,8 +927,6 @@ typedef struct ngf_specialization_info {
 typedef struct ngf_graphics_pipeline_info {
   ngf_shader_stage shader_stages[5];
   uint32_t nshader_stages;
-  const ngf_irect2d *viewport;
-  const ngf_irect2d *scissor;
   const ngf_rasterization_info *rasterization;
   const ngf_multisample_info *multisample;
   const ngf_depth_stencil_info *depth_stencil;
