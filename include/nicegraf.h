@@ -33,6 +33,9 @@
 
 #ifdef __cplusplus
 extern "C" {
+#define NGF_NOEXCEPT noexcept
+#else
+#define NGF_NOEXCEPT
 #endif
 
 #define NGF_VER_MAJ 0
@@ -1118,7 +1121,7 @@ typedef struct ngf_index_buffer_t* ngf_index_buffer;
  * @param init_info Initialization parameters.
  * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
  */
-ngf_error ngf_initialize(const ngf_init_info *init_info);
+ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT;
 
 /**
  * Create a new nicegraf context. Creates a new Nicegraf context that
@@ -1130,13 +1133,13 @@ ngf_error ngf_initialize(const ngf_init_info *init_info);
  *  NGF_ERROR_SWAPCHAIN_CREATION_FAILED
  */
 ngf_error ngf_create_context(const ngf_context_info *info,
-                             ngf_context *result);
+                             ngf_context *result) NGF_NOEXCEPT;
 
 /**
  * Destroy a nicegraf context.
  * @param ctx The context to deallocate.
  */
-void ngf_destroy_context(ngf_context ctx);
+void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT;
 
 /**
  * Adjust the size of a context's associated swapchain. This function must be
@@ -1148,7 +1151,7 @@ void ngf_destroy_context(ngf_context ctx);
  */
 ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t new_width,
-                             uint32_t new_height);
+                             uint32_t new_height) NGF_NOEXCEPT;
 
 /**
  * Set a given nicegraf context as current for the calling thread. All
@@ -1160,7 +1163,7 @@ ngf_error ngf_resize_context(ngf_context ctx,
  *
  * @param ctx The context to set as current.
  */
-ngf_error ngf_set_context(ngf_context ctx);
+ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
 
 
 
@@ -1170,7 +1173,7 @@ ngf_error ngf_set_context(ngf_context ctx);
  * associated swap chain.
  * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
  */
-ngf_error ngf_begin_frame();
+ngf_error ngf_begin_frame() NGF_NOEXCEPT;
 
 /**
  * End a frame of rendering. This function releases the image that was
@@ -1178,13 +1181,13 @@ ngf_error ngf_begin_frame();
  * ngf_begin_frame.
  * @return Error codes: NGF_ERROR_END_FRAME_FAILED
  */
-ngf_error ngf_end_frame();
+ngf_error ngf_end_frame() NGF_NOEXCEPT;
 
 /**
  * Get a pointer to the device capabilities structure.
  * @return NULL if no context is present on the calling thread.
  */
-const ngf_device_capabilities* ngf_get_device_capabilities();
+const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT;
 
 
 /**
@@ -1192,7 +1195,7 @@ const ngf_device_capabilities* ngf_get_device_capabilities();
  * internal needs.
  * By default, stdlib's malloc and free are used.
  */
-void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks);
+void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks) NGF_NOEXCEPT;
 
 /**
  * Create a shader stage from its description.
@@ -1203,46 +1206,46 @@ void ngf_set_allocation_callbacks(const ngf_allocation_callbacks *callbacks);
  * @return 
  */
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
-                                  ngf_shader_stage *result);
+                                  ngf_shader_stage *result) NGF_NOEXCEPT;
 
 /**
  * Detsroys a given shader stage.
  */
-void ngf_destroy_shader_stage(ngf_shader_stage stage);
+void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT;
 
 /**
  * Creates a graphics pipeline object.
  * @param info Configuration for the graphics pipeline.
  */
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline *result);
+                                       ngf_graphics_pipeline *result) NGF_NOEXCEPT;
 
 /**
  * Destroys the given graphics pipeline object.
  */
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p);
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) NGF_NOEXCEPT;
 
 /**
  * Creates a new image object.
  * @param info Configuration of the image.
  */
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result);
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NOEXCEPT;
 
 /**
  * Destroy the given image object.
  */
-void ngf_destroy_image(ngf_image image);
+void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
 
 /**
  * Create a sampler object with the given configuration.
  */
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
-                             ngf_sampler *result);
+                             ngf_sampler *result) NGF_NOEXCEPT;
 
 /**
  * Destroy a given sampler object.
  */
-void ngf_destroy_sampler(ngf_sampler sampler);
+void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 
 /**
  * Obtain a render target associated with the the current context's
@@ -1279,13 +1282,13 @@ ngf_error ngf_default_render_target(ngf_attachment_load_op color_load_op,
                                     ngf_attachment_store_op depth_store_op,
                                     const ngf_clear *clear_color,
                                     const ngf_clear *clear_depth,
-                                    ngf_render_target *result);
+                                    ngf_render_target *result) NGF_NOEXCEPT;
 
 /**
  * Create a new rendertarget with the given configuration.
  */
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
-                                   ngf_render_target *result);
+                                   ngf_render_target *result) NGF_NOEXCEPT;
 
 /**
  * Blit pixels from one render target to another. If the source render target
@@ -1296,12 +1299,12 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
  */
 ngf_error ngf_resolve_render_target(const ngf_render_target src,
                                     ngf_render_target dst,
-                                    const ngf_irect2d *src_rect);
+                                    const ngf_irect2d *src_rect) NGF_NOEXCEPT;
 
 /**
  * Destroy the given render target.
  */
-void ngf_destroy_render_target(ngf_render_target target);
+void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT;
 
 /**
  * Creates a new vertex attribute buffer.
@@ -1309,12 +1312,12 @@ void ngf_destroy_render_target(ngf_render_target target);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer *result);
+                                   ngf_attrib_buffer *result) NGF_NOEXCEPT;
 
 /**
  * Discards the given vertex attribute buffer.
  */
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer);
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * Map a region of a given buffer to host memory.
@@ -1335,7 +1338,7 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer);
 void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t offset,
                                   size_t size,
-                                  uint32_t flags);
+                                  uint32_t flags) NGF_NOEXCEPT;
 /**
  * Ensure that any new data in the mapped range will be visible to subsequently
  * submitted commands.
@@ -1347,14 +1350,14 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
  */
 void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf,
                                    size_t offset,
-                                   size_t size);
+                                   size_t size) NGF_NOEXCEPT;
 
 /**
  * Unmaps a previously mapped buffer. The pointer returned for that buffer
  * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
  * @param buf The buffer that needs to be unmapped.
  */
-void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf);
+void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Creates a new vertex index buffer.
@@ -1362,12 +1365,12 @@ void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer            *result);
+                                  ngf_index_buffer            *result) NGF_NOEXCEPT;
 
 /**
  * Discards the given vertex index buffer.
  */
-void ngf_destroy_index_buffer(ngf_index_buffer buffer);
+void ngf_destroy_index_buffer(ngf_index_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for index buffers.
@@ -1375,18 +1378,18 @@ void ngf_destroy_index_buffer(ngf_index_buffer buffer);
 void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t offset,
                                  size_t size,
-                                 uint32_t flags);
+                                 uint32_t flags) NGF_NOEXCEPT;
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for index buffers.
  */
 void ngf_index_buffer_flush_range(ngf_index_buffer buf,
                                   size_t offset,
-                                  size_t size);
+                                  size_t size) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for index buffers.
  */
-void ngf_index_buffer_unmap(ngf_index_buffer buf);
+void ngf_index_buffer_unmap(ngf_index_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Creates a new uniform buffer.
@@ -1394,12 +1397,12 @@ void ngf_index_buffer_unmap(ngf_index_buffer buf);
  * @param result the new buffer handle will be stored here.
  */
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
-                                    ngf_uniform_buffer *result);
+                                    ngf_uniform_buffer *result) NGF_NOEXCEPT;
 
 /**
  * Discards the given uniform buffer.
  */
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf);
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for uniform buffers.
@@ -1407,18 +1410,18 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf);
 void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t offset,
                                    size_t size,
-                                   uint32_t flags);
+                                   uint32_t flags) NGF_NOEXCEPT;
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for uniform buffers.
  */
 void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf,
                                     size_t offset,
-                                    size_t size);
+                                    size_t size) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for uniform buffers.
  */
-void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf);
+void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Creates a new pixel buffer.
@@ -1426,11 +1429,11 @@ void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf);
  * @param result the new buffer handle will be stored in here.
  */
 ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
-                                  ngf_pixel_buffer *result);
+                                  ngf_pixel_buffer *result) NGF_NOEXCEPT;
 /**
  * Discards a given pixel buffer.
  */
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf);
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_map_range, but for pixel buffers.
@@ -1438,49 +1441,49 @@ void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf);
 void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t offset,
                                  size_t size,
-                                 uint32_t flags);
+                                 uint32_t flags) NGF_NOEXCEPT;
 /**
  * Similar to \ref ngf_attrib_buffer_flush_range, but for pixel buffers.
  */
 void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf,
                                   size_t offset,
-                                  size_t size);
+                                  size_t size) NGF_NOEXCEPT;
 
 /**
  * Similar to \ref ngf_attrib_buffer_unmap, but for pixel buffers.
  */
-void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf);
+void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Wait for all pending rendering commands to complete.
  */
-void ngf_finish();
+void ngf_finish() NGF_NOEXCEPT;
 
 /**
  * Creates a new command buffer that is in the "ready" state.
  */
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
-                                ngf_cmd_buffer *result);
+                                ngf_cmd_buffer *result) NGF_NOEXCEPT;
 
 /**
  * Frees resources associated with the given command buffer.
  * Any work previously submitted via this command buffer will be finished
  * asynchronously.
  */
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer);
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * Erases all the commands previously recorded into the given command buffer.
  * The command buffer is required to be in the "ready" state.
  */
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf);
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Submits the commands recorded in the given command buffers for execution.
  * All command buffers must be in the "ready" state, and will be transitioned
  * to the "submitted" state.
  */
-ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs);
+ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) NGF_NOEXCEPT;
 
 /**
  * Starts a new encoder for rendering commands associated with the given
@@ -1489,7 +1492,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs);
  *            state, will be transitioned to the "recording" state.
  */
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
-                                      ngf_render_encoder *enc);
+                                      ngf_render_encoder *enc) NGF_NOEXCEPT;
 
 /**
  * Starts a new encoder for transfer commands associated with the given 
@@ -1498,69 +1501,70 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
  *            state, will be transitioned to the "recording" state.
  */
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
-                                    ngf_xfer_encoder *enc);
+                                    ngf_xfer_encoder *enc) NGF_NOEXCEPT;
 
 /**
  * Disposes of the given render cmd encoder, transitioning its corresponding
  * command buffer to the "ready" state.
  */
-ngf_error ngf_render_encoder_end(ngf_render_encoder enc);
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT;
 
 /**
  * Disposes of the given transfer cmd encoder, transitioning its corresponding
  * command buffer to the "ready" state.
  */
-ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc);
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT;
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf,
-                               const ngf_graphics_pipeline pipeline);
-void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d *r);
-void ngf_cmd_scissor(ngf_render_encoder buf, const ngf_irect2d *r);
+                               const ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
+void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d *r) NGF_NOEXCEPT;
+void ngf_cmd_scissor(ngf_render_encoder buf, const ngf_irect2d *r) NGF_NOEXCEPT; 
 void ngf_cmd_stencil_reference(ngf_render_encoder buf, uint32_t front,
-                               uint32_t back);
+                               uint32_t back) NGF_NOEXCEPT;
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front,
-                                  uint32_t back);
+                                  uint32_t back) NGF_NOEXCEPT; 
 void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front,
-                                uint32_t back);
-void ngf_cmd_line_width(ngf_render_encoder buf, float line_width);
+                                uint32_t back) NGF_NOEXCEPT;
+void ngf_cmd_line_width(ngf_render_encoder buf, float line_width) NGF_NOEXCEPT;
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder buf,
                                 const ngf_resource_bind_op *bind_operations,
-                                uint32_t nbind_operations);
+                                uint32_t nbind_operations) NGF_NOEXCEPT; 
+
 void ngf_cmd_bind_attrib_buffer(ngf_render_encoder buf,
                                 const ngf_attrib_buffer vbuf,
-                                uint32_t binding, uint32_t offset);
+                                uint32_t binding, uint32_t offset) NGF_NOEXCEPT;
 void ngf_cmd_bind_index_buffer(ngf_render_encoder     buf,
                                const ngf_index_buffer idxbuf,
-                               ngf_type               index_type);
+                               ngf_type               index_type) NGF_NOEXCEPT;
 void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target);
-void ngf_cmd_end_pass(ngf_render_encoder buf);
+void ngf_cmd_end_pass(ngf_render_encoder buf) NGF_NOEXCEPT;
 void ngf_cmd_draw(ngf_render_encoder buf, bool indexed,
                   uint32_t first_element, uint32_t nelements,
-                  uint32_t ninstances);
+                  uint32_t ninstances) NGF_NOEXCEPT;
 void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 const ngf_attrib_buffer src,
                                 ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
-                                size_t dst_offset);
+                                size_t dst_offset) NGF_NOEXCEPT;
 void ngf_cmd_copy_index_buffer(ngf_xfer_encoder buf,
                                const ngf_index_buffer src,
                                ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
-                               size_t dst_offset);
+                               size_t dst_offset) NGF_NOEXCEPT;
 void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  const ngf_uniform_buffer src,
                                  ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
-                                 size_t dst_offset);
+                                 size_t dst_offset) NGF_NOEXCEPT;
 void ngf_cmd_write_image(ngf_xfer_encoder buf,
                          const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
-                         const ngf_extent3d *extent);
+                         const ngf_extent3d *extent) NGF_NOEXCEPT;
 
 #ifdef _MSC_VER
 #pragma endregion
