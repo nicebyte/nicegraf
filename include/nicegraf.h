@@ -132,7 +132,7 @@ typedef enum ngf_error {
   NGF_ERROR_OK = 0, /**< No error, operation finished successfully. */
   NGF_ERROR_OUT_OF_MEM, /**< Host memory allocation failed. */
   NGF_ERROR_OBJECT_CREATION_FAILED,
-  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of                               bounds access. */
+  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of bounds access. */
   NGF_ERROR_INVALID_FORMAT,
   NGF_ERROR_INVALID_SIZE,
   NGF_ERROR_INVALID_ENUM,
