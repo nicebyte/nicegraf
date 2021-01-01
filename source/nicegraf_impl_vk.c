@@ -819,7 +819,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
       &num_queue_families,
       queue_families);
 
-    // Pick suitable queue families for graphics, present and transfer.
+    // Pick suitable queue families for graphics and present.
     uint32_t gfx_family_idx = NGFVK_INVALID_IDX;
     uint32_t present_family_idx = NGFVK_INVALID_IDX;
     for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
