@@ -42,8 +42,6 @@ typedef struct ngf_util_graphics_pipeline_data {
   ngf_vertex_input_info vertex_input_info;
   ngf_multisample_info multisample_info;
   ngf_rasterization_info rasterization_info;
-  ngf_irect2d scissor;
-  ngf_irect2d viewport;
   ngf_specialization_info spec_info;
   ngf_pipeline_layout_info layout_info;
 } ngf_util_graphics_pipeline_data;
