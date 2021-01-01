@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 nicegraf contributors
+ * Copyright (c) 2021 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
  * of this software and associated documentation files (the "Software"), to
@@ -459,27 +459,6 @@ static VkPolygonMode get_vk_polygon_mode(ngf_polygon_mode m) {
     VK_POLYGON_MODE_POINT
   };
   return modes[m];
-}
-
-static VkDynamicState get_vk_dynamic_state(ngf_dynamic_state_flags s) {
-  switch(s) {
-  case NGF_DYNAMIC_STATE_VIEWPORT:
-    return VK_DYNAMIC_STATE_VIEWPORT;
-  case NGF_DYNAMIC_STATE_SCISSOR:
-    return VK_DYNAMIC_STATE_SCISSOR;
-  case NGF_DYNAMIC_STATE_LINE_WIDTH:
-    return VK_DYNAMIC_STATE_LINE_WIDTH;
-  case NGF_DYNAMIC_STATE_BLEND_CONSTANTS:
-    return VK_DYNAMIC_STATE_BLEND_CONSTANTS;
-  case NGF_DYNAMIC_STATE_STENCIL_REFERENCE:
-    return NGF_DYNAMIC_STATE_STENCIL_REFERENCE;
-  case NGF_DYNAMIC_STATE_STENCIL_COMPARE_MASK:
-    return NGF_DYNAMIC_STATE_STENCIL_COMPARE_MASK;
-  case NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK:
-    return NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK;
-  default: assert(false);
-  }
-  return VK_DYNAMIC_STATE_VIEWPORT; // can't be reached
 }
 
 static VkCullModeFlagBits get_vk_cull_mode(ngf_cull_mode m) {
@@ -2181,22 +2160,22 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
 
   // Prepare viewport/scissor state.
-  VkViewport viewport = {
-    .x = (float)info->viewport->x,
-    .y = (float)info->viewport->y + (float)info->viewport->height,
-    .width = (float)info->viewport->width,
-    .height = -(float)info->viewport->height,
-    .minDepth = info->depth_stencil->min_depth,
-    .maxDepth = info->depth_stencil->max_depth,
+  const VkViewport dummy_viewport = {
+    .x = .0f,
+    .y = .0f,
+    .width = .0f,
+    .height = .0f,
+    .minDepth = .0f,
+    .maxDepth = .0f
   };
-  VkRect2D scissor = {
+  const VkRect2D dummy_scissor = {
     .offset = {
-      .x = info->scissor->x,
-      .y = info->scissor->y,
+      .x = 0,
+      .y = 0
     },
     .extent = {
-      .width = info->scissor->width,
-      .height = info->scissor->height,
+      .width = 0,
+      .height = 0
     }
   };
   VkPipelineViewportStateCreateInfo viewport_state = {
@@ -2205,8 +2184,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     .flags = 0u,
     .viewportCount = 1u,
     .scissorCount = 1u,
-    .pViewports = &viewport,
-    .pScissors = &scissor
+    .pViewports = &dummy_viewport,
+    .pScissors = &dummy_scissor
   };
 
   // Prepare rasterization state.
@@ -2224,7 +2203,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     .depthBiasConstantFactor = 0.0f,
     .depthBiasClamp = 0.0f,
     .depthBiasSlopeFactor = 0.0f,
-    .lineWidth = info->rasterization->line_width
+    .lineWidth = 0.0f
   };
 
   // Prepare multisampling.
@@ -2322,15 +2301,13 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   };
 
   // Dynamic state.
-  VkDynamicState dynamic_states[7];
-  uint32_t ndynamic_states = 0u;
-  for (ngf_dynamic_state_flags s = NGF_DYNAMIC_STATE_VIEWPORT;
-       s <= NGF_DYNAMIC_STATE_STENCIL_WRITE_MASK;
-       s = (s << 1u)) {
-    if (info->dynamic_state_mask & s) {
-      dynamic_states[ndynamic_states++] = get_vk_dynamic_state(s);
-    }
-  }
+  const VkDynamicState dynamic_states[] = {
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_SCISSOR,
+    VK_DYNAMIC_STATE_LINE_WIDTH,
+    VK_DYNAMIC_STATE_DEPTH_BOUNDS
+  };
+  const uint32_t ndynamic_states = NGFI_ARRAYSIZE(dynamic_states);
   VkPipelineDynamicStateCreateInfo dynamic_state = {
     .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     .pNext = NULL,
@@ -3043,7 +3020,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
     ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF( enc );
-    const bool is_default_rt = buf->active_rt->is_default;
+    const bool is_default_rt = buf->active_rt ? (buf->active_rt->is_default) : false;
     const VkViewport viewport = {
         .x = (float)r->x,
         .y = is_default_rt ? (float)r->y + (float)r->height :  (float)r->y,
