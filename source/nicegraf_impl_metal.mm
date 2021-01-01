@@ -637,7 +637,7 @@ ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
 
 #pragma mark ngf_function_implementations
 
-ngf_error ngf_initialize(const ngf_init_info *init_info) {
+ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
   ngfi_diag_info = init_info->diag_info;
 #if TARGET_OS_OSX
   // Try setting environment variable to enable Metal API validation if
@@ -678,11 +678,11 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
   return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
-const ngf_device_capabilities* ngf_get_device_capabilities() {
+const ngf_device_capabilities* ngf_get_device_capabilities()  NGF_NOEXCEPT{
   return ngfi_device_caps_read();
 }
 
-ngf_error ngf_begin_frame() {
+ngf_error ngf_begin_frame() NGF_NOEXCEPT {
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem,
                           DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
@@ -691,7 +691,7 @@ ngf_error ngf_begin_frame() {
            : NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame() {
+ngf_error ngf_end_frame() NGF_NOEXCEPT {
   ngf_context ctx = CURRENT_CONTEXT;
   if(CURRENT_CONTEXT->frame.color_drawable &&
      CURRENT_CONTEXT->pending_cmd_buffer) {
@@ -717,7 +717,7 @@ ngf_error ngf_default_render_target(
     ngf_attachment_store_op depth_store_op,
     const ngf_clear        *clear_color,
     const ngf_clear        *clear_depth,
-    ngf_render_target     *result) {
+    ngf_render_target     *result) NGF_NOEXCEPT {
   assert(result);
   if (CURRENT_CONTEXT->swapchain) {
     NGFMTL_NURSERY(render_target, rt);
@@ -771,7 +771,7 @@ ngf_error ngf_default_render_target(
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
-                             ngf_context *result) {
+                             ngf_context *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   NGFMTL_NURSERY(context, ctx);
@@ -798,7 +798,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_context(ngf_context ctx) {
+void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT {
   // TODO: unset current context
   assert(ctx);
   ctx->~ngf_context_t();
@@ -807,14 +807,14 @@ void ngf_destroy_context(ngf_context ctx) {
 
 ngf_error ngf_resize_context(ngf_context ctx,
                              uint32_t new_width,
-                             uint32_t new_height) {
+                             uint32_t new_height) NGF_NOEXCEPT {
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
   return ctx->swapchain.resize(ctx->swapchain_info);
 }
 
-ngf_error ngf_set_context(ngf_context ctx) {
+ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
   if(CURRENT_CONTEXT == ctx) {
     NGFI_DIAG_WARNING("Attempt to set a context that is already "
                       "current on the calling thread");
@@ -830,7 +830,7 @@ ngf_error ngf_set_context(ngf_context ctx) {
 }
 
 ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
-                                  ngf_shader_stage *result) {
+                                  ngf_shader_stage *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
  
@@ -875,7 +875,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_shader_stage(ngf_shader_stage stage) {
+void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT {
   if (stage != nullptr) {
     stage->~ngf_shader_stage_t();
     NGFI_FREE(stage);
@@ -883,7 +883,7 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
 }
 
 void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
-                                const ngf_attachment &info) {
+                                const ngf_attachment &info) NGF_NOEXCEPT {
   attachment.texture     = info.image_ref.image->texture;
   attachment.level       = info.image_ref.mip_level;
   attachment.slice       = info.image_ref.layer;
@@ -892,7 +892,7 @@ void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
 }
 
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
-                                   ngf_render_target *result) {
+                                   ngf_render_target *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   NGFMTL_NURSERY(render_target, rt);
@@ -946,7 +946,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_render_target(ngf_render_target rt) {
+void ngf_destroy_render_target(ngf_render_target rt) NGF_NOEXCEPT {
   if (rt != nullptr) {
     rt->~ngf_render_target_t();
     NGFI_FREE(rt);
@@ -978,7 +978,7 @@ MTLStencilDescriptor* ngfmtl_create_stencil_descriptor(const ngf_stencil_info &i
 }
 
 ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
-                                       ngf_graphics_pipeline *result) {
+                                       ngf_graphics_pipeline *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   
@@ -1178,7 +1178,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
 }
 
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) {
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) NGF_NOEXCEPT {
   if (pipe != nullptr) {
     pipe->~ngf_graphics_pipeline_t();
     NGFI_FREE(pipe);
@@ -1218,14 +1218,14 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer,
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer *result) {
+                                   ngf_attrib_buffer *result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(attrib_buffer, buf);
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) {
+void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) NGF_NOEXCEPT {
   if (buf != nullptr) {
     buf->~ngf_attrib_buffer_t();
     NGFI_FREE(buf);
@@ -1235,7 +1235,7 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) {
 void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
                                   size_t offset,
                                   size_t size,
-                                  [[maybe_unused]] uint32_t flags) {
+                                  [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
@@ -1243,17 +1243,17 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
 void ngf_attrib_buffer_flush_range(
     [[maybe_unused]] ngf_attrib_buffer buf,
     [[maybe_unused]] size_t offset,
-    [[maybe_unused]] size_t size) {
+    [[maybe_unused]] size_t size) NGF_NOEXCEPT {
 #if TARGET_OS_OSX
   [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
                                               size)];
 #endif
 }
 
-void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer buf) {}
+void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer buf) NGF_NOEXCEPT {}
 
 ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer *result) {
+                                  ngf_index_buffer *result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(index_buffer, buf);
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
@@ -1263,7 +1263,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
 void* ngf_index_buffer_map_range(ngf_index_buffer buf,
                                  size_t offset,
                                  size_t size,
-                                 [[maybe_unused]] uint32_t flags) {
+                                 [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
@@ -1271,16 +1271,16 @@ void* ngf_index_buffer_map_range(ngf_index_buffer buf,
 void ngf_index_buffer_flush_range(
     [[maybe_unused]] ngf_index_buffer buf,
     [[maybe_unused]] size_t offset,
-    [[maybe_unused]] size_t size) {
+    [[maybe_unused]] size_t size) NGF_NOEXCEPT {
 #if TARGET_OS_OSX
   [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
                                               size)];
 #endif
 }
 
-void ngf_index_buffer_unmap([[maybe_unused]] ngf_index_buffer buf) {}
+void ngf_index_buffer_unmap([[maybe_unused]] ngf_index_buffer buf) NGF_NOEXCEPT {}
 
-void ngf_destroy_index_buffer(ngf_index_buffer buf) {
+void ngf_destroy_index_buffer(ngf_index_buffer buf) NGF_NOEXCEPT {
   if (buf != nullptr) {
     buf->~ngf_index_buffer_t();
     NGFI_FREE(buf);
@@ -1288,14 +1288,14 @@ void ngf_destroy_index_buffer(ngf_index_buffer buf) {
 }
 
 ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
-                                    ngf_uniform_buffer *result) {
+                                    ngf_uniform_buffer *result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(uniform_buffer, buf);
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) {
+void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) NGF_NOEXCEPT {
   if (buf != nullptr) {
     buf->~ngf_uniform_buffer_t();
     NGFI_FREE(buf);
@@ -1305,24 +1305,24 @@ void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) {
 void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
                                    size_t offset,
                                    size_t size,
-                                   [[maybe_unused]] uint32_t flags) {
+                                   [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
 void ngf_uniform_buffer_flush_range([[maybe_unused]] ngf_uniform_buffer buf,
                                     [[maybe_unused]] size_t offset,
-                                    [[maybe_unused]] size_t size) {
+                                    [[maybe_unused]] size_t size) NGF_NOEXCEPT {
 #if TARGET_OS_OSX
   [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
                                               size)];
 #endif
 }
 
-void ngf_uniform_buffer_unmap([[maybe_unused]] ngf_uniform_buffer buf) {}
+void ngf_uniform_buffer_unmap([[maybe_unused]] ngf_uniform_buffer buf) NGF_NOEXCEPT {}
 
 ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
-                                  ngf_pixel_buffer *result) {
+                                  ngf_pixel_buffer *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   NGFMTL_NURSERY(pixel_buffer, buf);
@@ -1335,7 +1335,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
+void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) NGF_NOEXCEPT {
   if (buf != nullptr) {
     buf->~ngf_pixel_buffer_t();
     NGFI_FREE(buf);
@@ -1345,24 +1345,24 @@ void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
 void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
                                  size_t offset,
                                  size_t size,
-                                 [[maybe_unused]] uint32_t flags) {
+                                 [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
 void ngf_pixel_buffer_flush_range([[maybe_unused]] ngf_pixel_buffer buf,
                                   [[maybe_unused]] size_t offset,
-                                  [[maybe_unused]] size_t size) {
+                                  [[maybe_unused]] size_t size) NGF_NOEXCEPT {
 #if TARGET_OS_OSX
   [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
                                               size)];
 #endif
 }
 
-void ngf_pixel_buffer_unmap([[maybe_unused]] ngf_pixel_buffer buf) {}
+void ngf_pixel_buffer_unmap([[maybe_unused]] ngf_pixel_buffer buf) NGF_NOEXCEPT {}
 
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
-                             ngf_sampler *result) {
+                             ngf_sampler *result) NGF_NOEXCEPT {
   auto *sampler_desc = [MTLSamplerDescriptor new];
   std::optional<MTLSamplerAddressMode> s = get_mtl_address_mode(info->wrap_s),
                                        t = get_mtl_address_mode(info->wrap_t),
@@ -1387,7 +1387,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info *info,
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_sampler(ngf_sampler sampler) {
+void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT {
   if (sampler) {
     sampler->~ngf_sampler_t();
     NGFI_FREE(sampler);
@@ -1395,13 +1395,13 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*,
-                                ngf_cmd_buffer *result) {
+                                ngf_cmd_buffer *result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(cmd_buffer, cmd_buffer);
   *result = cmd_buffer.release();
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
+ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NOEXCEPT {
   auto *mtl_img_desc = [MTLTextureDescriptor new];
   
   const MTLPixelFormat fmt = get_mtl_pixel_format(info->format).format;
@@ -1454,21 +1454,21 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) {
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_image(ngf_image image) {
+void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT {
   if (image != nullptr) {
     image->~ngf_image_t();
     NGFI_FREE(image);
   }
 }
 
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
+void ngf_destroy_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   if (cmd_buffer != nullptr) {
     cmd_buffer->~ngf_cmd_buffer_t();
     NGFI_FREE(cmd_buffer);
   }
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   assert(cmd_buffer);
   cmd_buffer->mtl_cmd_buffer = nil;
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
@@ -1478,7 +1478,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
+ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->pending_cmd_buffer) {
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
@@ -1496,7 +1496,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) {
 }
 
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
-                                      ngf_render_encoder *enc) {
+                                      ngf_render_encoder *enc) NGF_NOEXCEPT {
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     NGFI_DIAG_WARNING("Command buffer is not in READY state and "
@@ -1508,7 +1508,7 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   if(cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
     NGFI_DIAG_WARNING("Calling ngf_render_encoder_end on a render encoder "
@@ -1524,7 +1524,7 @@ ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
-                                    ngf_xfer_encoder *enc) {
+                                    ngf_xfer_encoder *enc) NGF_NOEXCEPT {
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
     enc->__handle = 0u;
     NGFI_DIAG_WARNING("Command buffer is not in READY state and "
@@ -1536,7 +1536,7 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
     return NGF_ERROR_INVALID_OPERATION;
@@ -1550,7 +1550,7 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
 }
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc,
-                        const ngf_render_target rt) {
+                        const ngf_render_target rt) NGF_NOEXCEPT {
   auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
@@ -1578,7 +1578,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc,
   cmd_buffer->active_rt = rt;
 }
 
-void ngf_cmd_end_pass(ngf_render_encoder enc) {
+void ngf_cmd_end_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
   [cmd_buffer->active_rce endEncoding];
   cmd_buffer->active_rce = nil;
@@ -1586,7 +1586,7 @@ void ngf_cmd_end_pass(ngf_render_encoder enc) {
 }
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
-                               const ngf_graphics_pipeline pipeline) {
+                               const ngf_graphics_pipeline pipeline) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
   [buf->active_rce setCullMode:pipeline->culling];
@@ -1614,7 +1614,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
   buf->active_pipe = pipeline;
 }
 
-void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
+void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLViewport viewport;
   viewport.originX = r->x;
@@ -1635,7 +1635,7 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d *r) {
   [buf->active_rce setViewport:viewport];
 }
 
-void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
+void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLScissorRect scissor;
   scissor.x = (NSUInteger)r->x;
@@ -1653,7 +1653,7 @@ void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d *r) {
 
 void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
                   uint32_t first_element, uint32_t nelements,
-                  uint32_t ninstances) {
+                  uint32_t ninstances) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   MTLPrimitiveType prim_type = buf->active_pipe->primitive_type;
   if (!indexed) {
@@ -1679,7 +1679,7 @@ void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
 void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
                                 const ngf_attrib_buffer buf,
                                 uint32_t binding,
-                                uint32_t offset) {
+                                uint32_t offset) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                 offset:offset
@@ -1688,15 +1688,15 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
 
 void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
                                const ngf_index_buffer buf,
-                               ngf_type type) {
+                               ngf_type type) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   cmd_buf->bound_index_buffer = buf->mtl_buffer;
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
 void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
-                            const ngf_resource_bind_op *bind_ops,
-                            uint32_t nbind_ops) {
+                                const ngf_resource_bind_op *bind_ops,
+                                uint32_t nbind_ops) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op &bind_op = bind_ops[o];
@@ -1815,7 +1815,7 @@ void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
                                 ngf_attrib_buffer dst,
                                 size_t size,
                                 size_t src_offset,
-                                size_t dst_offset) {
+                                size_t dst_offset) NGF_NOEXCEPT {
   ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
@@ -1825,7 +1825,7 @@ void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
                                ngf_index_buffer dst,
                                size_t size,
                                size_t src_offset,
-                               size_t dst_offset) {
+                               size_t dst_offset) NGF_NOEXCEPT {
   ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
@@ -1835,7 +1835,7 @@ void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
                                  ngf_uniform_buffer dst,
                                  size_t size,
                                  size_t src_offset,
-                                 size_t dst_offset) {
+                                 size_t dst_offset) NGF_NOEXCEPT {
   ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
@@ -1851,7 +1851,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          size_t src_offset,
                          ngf_image_ref dst,
                          const ngf_offset3d *offset,
-                         const ngf_extent3d *extent) {
+                         const ngf_extent3d *extent) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) {
