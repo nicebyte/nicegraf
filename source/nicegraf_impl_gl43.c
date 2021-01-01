@@ -1,5 +1,5 @@
 ﻿/**
- * Copyright (c) 2019 nicegraf contributors
+ * Copyright (c) 2021 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy 
  * of this software and associated documentation files (the "Software"), to
@@ -54,8 +54,6 @@ struct ngf_graphics_pipeline_t {
   uint32_t id;
   GLuint program_pipeline;
   GLuint vao;
-  ngf_irect2d viewport;
-  ngf_irect2d scissor;
   ngf_rasterization_info rasterization;
   ngf_multisample_info multisample;
   ngf_depth_stencil_info depth_stencil;
@@ -995,8 +993,6 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
 
   // Copy over some state.
-  pipeline->viewport = *(info->viewport);
-  pipeline->scissor = *(info->scissor);
   pipeline->rasterization = *(info->rasterization);
   pipeline->multisample = *(info->multisample);
   pipeline->depth_stencil = *(info->depth_stencil);
@@ -2075,30 +2071,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
               glBindProgramPipeline(pipeline->program_pipeline);
             }
 
-            // Set viewport state.
-            const bool viewport_dynamic = pipeline->dynamic_state_mask &
-                                          NGF_DYNAMIC_STATE_VIEWPORT;
-            if (!viewport_dynamic &&
-                (!bound_pipe ||
-                 !NGFI_STRUCT_EQ(pipeline->viewport, bound_pipe->viewport))) {
-              glViewport((GLsizei)pipeline->viewport.x,
-                         (GLsizei)pipeline->viewport.y,
-                         (GLsizei)pipeline->viewport.width,
-                         (GLsizei)pipeline->viewport.height);
-            }
-
-            // Set scissor state.
-            const bool scissor_dynamic = pipeline->dynamic_state_mask &
-                                         NGF_DYNAMIC_STATE_SCISSOR;
-            if (!scissor_dynamic &&
-                (!bound_pipe ||
-                 !NGFI_STRUCT_EQ(pipeline->scissor, bound_pipe->scissor))) {
-              glScissor((GLsizei)pipeline->scissor.x,
-                        (GLsizei)pipeline->scissor.y,
-                        (GLsizei)pipeline->scissor.width,
-                        (GLsizei)pipeline->scissor.height);
-            }
-
             // Set rasterizer state.
             const ngf_rasterization_info *rast = &(pipeline->rasterization);
             const ngf_rasterization_info *prev_rast =
@@ -2128,10 +2100,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
             if (!prev_rast ||
                 prev_rast->front_face != rast->front_face) {
               glFrontFace(get_gl_face(rast->front_face));
-            }
-            if (!prev_rast ||
-                prev_rast->line_width != rast->line_width) {
-              glLineWidth(rast->line_width);
             }
 
             // Enable/disable multisampling.
