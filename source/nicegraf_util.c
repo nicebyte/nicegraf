@@ -1,5 +1,5 @@
 /**
-Copyright � 2018 nicegraf contributors
+Copyright (c) 2021 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -36,6 +36,7 @@ SOFTWARE.
 void ngf_util_create_default_graphics_pipeline_data(
     const ngf_irect2d *window_size,
     ngf_util_graphics_pipeline_data *result) {
+  NGFI_FAKE_USE(window_size);
   ngf_blend_info bi;
   bi.enable = false;
   result->blend_info = bi;
@@ -73,18 +74,9 @@ void ngf_util_create_default_graphics_pipeline_data(
     .cull_mode = NGF_CULL_MODE_NONE,
     .discard = false,
     .front_face = NGF_FRONT_FACE_COUNTER_CLOCKWISE,
-    .line_width = 1.0f,
     .polygon_mode = NGF_POLYGON_MODE_FILL
   };
   result->rasterization_info = ri;
-  uint32_t dynamic_state_mask = 0u;
-  if (window_size != NULL) {
-    result->scissor = result->viewport = *window_size;
-  } else {
-    const ngf_irect2d empty_region  = {0, 0, 0u, 0u};
-    result->scissor = result->viewport = empty_region;
-    dynamic_state_mask = NGF_DYNAMIC_STATE_VIEWPORT_AND_SCISSOR;
-  }
   ngf_specialization_info spi = {
     .specializations = NULL,
     .nspecializations = 0u,
@@ -99,7 +91,6 @@ void ngf_util_create_default_graphics_pipeline_data(
   ngf_graphics_pipeline_info gpi = {
     .blend = &result->blend_info,
     .depth_stencil = &result->depth_stencil_info,
-    .dynamic_state_mask = dynamic_state_mask,
     .input_info = &result->vertex_input_info,
     .primitive_type = NGF_PRIMITIVE_TYPE_TRIANGLE_LIST,
     .multisample = &result->multisample_info,
@@ -107,8 +98,6 @@ void ngf_util_create_default_graphics_pipeline_data(
     .nshader_stages = 0u,
     .rasterization = &result->rasterization_info,
     .layout = &result->layout_info,
-    .scissor = &result->scissor,
-    .viewport = &result->viewport,
     .spec_info = &result->spec_info
   };
   result->pipeline_info = gpi;
