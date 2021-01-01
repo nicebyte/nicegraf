@@ -246,15 +246,6 @@ typedef struct ngf_render_target_t {
 
 NGFI_THREADLOCAL ngf_context  CURRENT_CONTEXT = NULL;
 
-ngfi_sa* ngfvk_tmp_store() {
-  static NGFI_THREADLOCAL ngfi_sa *temp_storage = NULL;
-  if (temp_storage == NULL) {
-    const size_t sa_capacity = 1024 * 100; // 100K
-    temp_storage = ngfi_sa_create(sa_capacity);
-  }
-  return temp_storage;
-}
-
 #pragma region vk_enum_maps
 
 static VkFilter get_vk_filter(ngf_sampler_filter filter) {
@@ -737,7 +728,7 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) {
     uint32_t nlayers = 0u;
     vkEnumerateInstanceLayerProperties(&nlayers, NULL);
     VkLayerProperties* layer_props =
-        ngfi_sa_alloc(ngfvk_tmp_store(), nlayers * sizeof(VkLayerProperties));
+        ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
     vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
     bool validation_supported = false;
     for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
@@ -1897,7 +1888,7 @@ ngf_error ngf_begin_frame() {
   CURRENT_CONTEXT->frame_res[fi].cmd_pool = CURRENT_CONTEXT->cmd_pools[fi];
   
   // reset stack allocator.
-  ngfi_sa_reset(ngfvk_tmp_store());
+  ngfi_sa_reset(ngfi_tmp_store());
   
   const bool needs_present =
     CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
@@ -2067,7 +2058,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   const ngf_specialization_info *spec_info = info->spec_info;
   if (info->spec_info) {
     VkSpecializationMapEntry *spec_map_entries =
-        ngfi_sa_alloc(ngfvk_tmp_store(),
+        ngfi_sa_alloc(ngfi_tmp_store(),
                       info->spec_info->nspecializations *
                       sizeof(VkSpecializationMapEntry));
 
@@ -2580,14 +2571,14 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info,
 
   // Create Vulkan attachment descriptions, and attachment references for subpass description.
   VkAttachmentDescription *vk_attachment_descs =
-    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+    ngfi_sa_alloc(ngfi_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
   VkAttachmentReference *color_attachment_refs =
-    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
+    ngfi_sa_alloc(ngfi_tmp_store(), info->nattachments * sizeof(VkAttachmentDescription));
   VkAttachmentReference depth_stencil_attachment_ref = {
     .attachment = VK_ATTACHMENT_UNUSED
   };
   VkImageView *attachment_views =
-    ngfi_sa_alloc(ngfvk_tmp_store(), info->nattachments * sizeof(VkImageView));
+    ngfi_sa_alloc(ngfi_tmp_store(), info->nattachments * sizeof(VkImageView));
   if (vk_attachment_descs == NULL ||
       color_attachment_refs == NULL ||
       attachment_views == NULL) {
@@ -2824,18 +2815,18 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       NGFI_DARRAY_SIZE(active_pipe->vk_descriptor_set_layouts);
 
   // Reset temp. storage to make sure we have all of it available.
-  ngfi_sa_reset(ngfvk_tmp_store());
+  ngfi_sa_reset(ngfi_tmp_store());
 
   // Allocate an array of descriptor set handles from temporary storage and
   // set them all to null. As we process bind operations, we'll allocate descriptor
   // sets and put them into the array as necessary.
   const size_t vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
-  VkDescriptorSet *vk_sets = ngfi_sa_alloc(ngfvk_tmp_store(), vk_sets_size_bytes);
+  VkDescriptorSet *vk_sets = ngfi_sa_alloc(ngfi_tmp_store(), vk_sets_size_bytes);
   memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
 
   // Allocate an array of vulkan descriptor set writes from temp storage.
   VkWriteDescriptorSet *vk_writes =
-      ngfi_sa_alloc(ngfvk_tmp_store(), nbind_operations *
+      ngfi_sa_alloc(ngfi_tmp_store(), nbind_operations *
                                       sizeof(VkWriteDescriptorSet));
 
   // Process each bind operation, constructing a corresponding
@@ -2895,7 +2886,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
 
           // Prepare descriptor counts.
           VkDescriptorPoolSize *vk_pool_sizes =
-            ngfi_sa_alloc(ngfvk_tmp_store(),
+            ngfi_sa_alloc(ngfi_tmp_store(),
                 sizeof(VkDescriptorPoolSize) *
                 NGF_DESCRIPTOR_TYPE_COUNT);
           for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
@@ -2992,7 +2983,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       const ngf_uniform_buffer_bind_info *bind_info =
           &bind_op->info.uniform_buffer;
       VkDescriptorBufferInfo *vk_bind_info =
-          ngfi_sa_alloc(ngfvk_tmp_store(), sizeof(VkDescriptorBufferInfo));
+          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
       vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
       vk_bind_info->offset = bind_info->offset;
@@ -3007,7 +2998,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder          enc,
       const ngf_image_sampler_bind_info *bind_info =
           &bind_op->info.image_sampler;
       VkDescriptorImageInfo *vk_bind_info =
-          ngfi_sa_alloc(ngfvk_tmp_store(), sizeof(VkDescriptorImageInfo));
+          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
       vk_bind_info->imageView   = VK_NULL_HANDLE;
       vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       vk_bind_info->sampler     = VK_NULL_HANDLE;

@@ -17,6 +17,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 #include "stack_alloc.h"
+#include "nicegraf_internal.h"
 
 #include <stdlib.h>
 #include <assert.h>
@@ -51,5 +52,14 @@ void ngfi_sa_reset(ngfi_sa *allocator) {
 void ngfi_sa_destroy(ngfi_sa *allocator) {
   assert(allocator);
   free(allocator);
+}
+
+ngfi_sa* ngfi_tmp_store() {
+  static NGFI_THREADLOCAL ngfi_sa *temp_storage = NULL;
+  if (temp_storage == NULL) {
+    const size_t sa_capacity = 1024 * 100; // 100K
+    temp_storage = ngfi_sa_create(sa_capacity);
+  }
+  return temp_storage;
 }
 
