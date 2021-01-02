@@ -494,7 +494,7 @@ static GLenum get_gl_cubemap_face(ngf_cubemap_face face) {
 
 #pragma endregion
 
-static ngf_diagnostic_info ngfi_diag_info = {
+ngf_diagnostic_info ngfi_diag_info = {
   .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
   .userdata  = NULL,
   .callback  = NULL
@@ -1732,10 +1732,9 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
   assert(buf);
-  if (buf->state != NGFI_CMD_BUFFER_READY) {
-    NGFI_DIAG_ERROR("Command buffer is not in READY state, and cannot be started.");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+
+  NGFI_TRANSITION_CMD_BUF(buf, NGFI_CMD_BUFFER_READY);
+ 
   ngf_error err = NGF_ERROR_OK;
   if (buf->first_cmd_block != NULL) {
     ngfgl_cmd_buffer_free_cmds(buf);
@@ -1754,35 +1753,31 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
 }
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf,
                                       ngf_render_encoder *enc) {
-  if (buf->state != NGFI_CMD_BUFFER_READY) {
-    enc->__handle = 0u;
-    NGFI_DIAG_ERROR("Command buffer is not in READY state, can't start a new encoder.");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+
+  enc->__handle = 0u;
+  NGFI_TRANSITION_CMD_BUF(buf, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer buf,
                                     ngf_xfer_encoder *enc) {
-  if (buf->state != NGFI_CMD_BUFFER_READY) {
-    enc->__handle = 0u;
-    NGFI_DIAG_ERROR("Command buffer is not in READY state, can't start a new encoder.");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  enc->__handle = 0u;
+  NGFI_TRANSITION_CMD_BUF(buf, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
-  if (((ngf_cmd_buffer)enc.__handle)->renderpass_active) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  NGFI_TRANSITION_CMD_BUF((ngf_cmd_buffer)enc.__handle,
+                           NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   enc.__handle = 0u;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+  NGFI_TRANSITION_CMD_BUF((ngf_cmd_buffer)enc.__handle,
+                           NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   enc.__handle = 0u;
   return NGF_ERROR_OK;
 }
@@ -2052,6 +2047,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   ngf_render_target active_rt = NULL;
   for (uint32_t buf_i = 0u; buf_i < nbuffers; ++buf_i) {
     const ngf_cmd_buffer buf = bufs[buf_i];
+    NGFI_TRANSITION_CMD_BUF(buf, NGFI_CMD_BUFFER_SUBMITTED);
     for (const ngfgl_cmd_block *block = buf->first_cmd_block; block!= NULL;
          block= block->next) {
       for (uint32_t i = 0; i < block->next_cmd_idx; ++i) {
