@@ -26,6 +26,12 @@
 #include <stdlib.h>
 #include <string.h> 
 
+ngf_diagnostic_info ngfi_diag_info = {
+  .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  .userdata = NULL,
+  .callback = NULL
+};
+
 // Default allocation callbacks.
 void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
   return malloc(obj_size * nobjs);

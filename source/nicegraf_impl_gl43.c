@@ -494,12 +494,6 @@ static GLenum get_gl_cubemap_face(ngf_cubemap_face face) {
 
 #pragma endregion
 
-ngf_diagnostic_info ngfi_diag_info = {
-  .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
-  .userdata  = NULL,
-  .callback  = NULL
-};
-
 static void GL_APIENTRY ngfgl_debug_message_callback(
   GLenum source,
   GLenum type,
