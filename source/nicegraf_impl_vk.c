@@ -53,7 +53,7 @@ struct {
 } _vk;
 
 // Holds diagnostic log configuration.
-static ngf_diagnostic_info ngfi_diag_info = {
+ngf_diagnostic_info ngfi_diag_info = {
   .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
   .userdata  = NULL,
   .callback  = NULL
@@ -116,14 +116,15 @@ typedef struct {
 } ngfvk_cmd_bundle;
 
 typedef struct ngf_cmd_buffer_t {
-  ngfvk_cmd_bundle                 active_bundle;  // < The current bundle.
-  ngf_graphics_pipeline            active_pipe;    // < The bound pipeline.
-  ATOMIC_INT                       frame_id;       // < id of the frame that the
-                                                   //   cmd buffer is intended for.
-  ngfvk_desc_superpool            *desc_superpool; // < The superpool from which
-                                                   //   the desc pools for this cmd
-                                                   //   buffer are allocated.
-  ngf_render_target                active_rt;      // < Active render target.
+  ngfvk_cmd_bundle                 active_bundle;     // < The current bundle.
+  ngf_graphics_pipeline            active_pipe;       // < The bound pipeline.
+  ATOMIC_INT                       frame_id;          // < id of the frame that the
+                                                      //   cmd buffer is intended for.
+  ngfvk_desc_superpool            *desc_superpool;    // < The superpool from which
+                                                      //   the desc pools for this cmd
+                                                      //   buffer are allocated.
+  ngf_render_target                active_rt;         // < Active render target.
+  bool                             renderpass_active; // < Has an active renderpass.
   ngfi_cmd_buffer_state            state;
 } ngf_cmd_buffer_t;
 
@@ -1720,6 +1721,10 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info *info,
   *result = cmd_buf;
   cmd_buf->active_pipe = NULL;
   cmd_buf->state = NGFI_CMD_BUFFER_READY;
+  cmd_buf->renderpass_active = false;
+  cmd_buf->active_rt = NULL;
+  cmd_buf->desc_superpool = NULL;
+  cmd_buf->frame_id = 0u;
   cmd_buf->active_bundle.vkcmdbuf = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vkpool   = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vksem    = VK_NULL_HANDLE;
@@ -1765,11 +1770,10 @@ static ngf_error ngfvk_cmd_bundle_create(VkCommandPool     pool,
 }
 
 static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
-  if (!NGFI_CMD_BUF_RECORDABLE(cmd_buf->state) ||
-      cmd_buf->frame_id != interlocked_read(&_vk.frame_id)) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
+  NGFI_CHECK_CONDITION(cmd_buf->frame_id == interlocked_read(&_vk.frame_id),
+                       NGF_ERROR_INVALID_OPERATION,
+                       "Attempt to submit a command buffer recorded for another frame");
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   return NGF_ERROR_OK;
 }
 
@@ -1786,10 +1790,7 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer    cmd_buf,
 }
 
 static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
-  if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  cmd_buf->state = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   return NGF_ERROR_OK;
 }
 
@@ -1804,13 +1805,9 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
   assert(cmd_buf);
 
-  // Verify we're in a valid state.
-  if (cmd_buf->state != NGFI_CMD_BUFFER_READY &&
-      cmd_buf->state != NGFI_CMD_BUFFER_SUBMITTED) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY);
+
   cmd_buf->frame_id       = interlocked_read(&_vk.frame_id);
-  cmd_buf->state          = NGFI_CMD_BUFFER_READY;
   cmd_buf->desc_superpool = NULL;
   cmd_buf->active_rt      = NULL;
   const size_t fi = cmd_buf->frame_id % CURRENT_CONTEXT->max_inflight_frames;
@@ -1839,10 +1836,11 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
   ngfvk_frame_resources *frame_sync_data = 
       &CURRENT_CONTEXT->frame_res[fi % CURRENT_CONTEXT->max_inflight_frames];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
-    if (bufs[i]->state != NGFI_CMD_BUFFER_AWAITING_SUBMIT ||
-        fi != bufs[i]->frame_id) {
+    if (fi != bufs[i]->frame_id) {
+      NGFI_DIAG_ERROR("attempt to submit command buffer that wasn't recorded for this frame.");
       return NGF_ERROR_INVALID_OPERATION;
     }
+    NGFI_TRANSITION_CMD_BUF(bufs[i], NGFI_CMD_BUFFER_SUBMITTED);
     if (bufs[i]->desc_superpool) {
       NGFI_DARRAY_APPEND(frame_sync_data->reset_desc_superpools,
                          bufs[i]->desc_superpool);
@@ -1852,7 +1850,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer *bufs) {
                        bufs[i]->active_bundle.vkcmdbuf);
     NGFI_DARRAY_APPEND(frame_sync_data->cmd_buf_sems,
                        bufs[i]->active_bundle.vksem);
-    bufs[i]->state = NGFI_CMD_BUFFER_SUBMITTED;
     bufs[i]->active_pipe = VK_NULL_HANDLE;
     bufs[i]->active_rt = NULL;
     memset(&bufs[i]->active_bundle, 0, sizeof(bufs[i]->active_bundle));
@@ -2747,6 +2744,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
      }
   };
   buf->active_rt = target;
+  buf->renderpass_active = true;
   vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf,
                       &begin_info,
                        VK_SUBPASS_CONTENTS_INLINE);
@@ -2755,6 +2753,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_render_target target) 
 void ngf_cmd_end_pass(ngf_render_encoder enc) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
+  buf->renderpass_active = false;
 }
 
 void ngf_cmd_draw(ngf_render_encoder enc,
