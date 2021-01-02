@@ -197,7 +197,7 @@ ngf_error ngfi_create_native_binding_map(
     const ngf_pipeline_layout_info *layout,
     const ngf_plmd_cis_map *images_to_cis,
     const ngf_plmd_cis_map *samplers_to_cis,
-   ngfi_native_binding_map *result) {
+    ngfi_native_binding_map *result) {
   ngf_error err = NGF_ERROR_OK;
   uint32_t nmap_entries = layout->ndescriptor_set_layouts + 1;
   ngfi_native_binding_map map =
@@ -214,7 +214,7 @@ ngf_error ngfi_create_native_binding_map(
     const ngf_descriptor_set_layout_info *set_layout =
         &layout->descriptor_set_layouts[set];
     map[set] = NGFI_ALLOCN(ngfi_native_binding,
-                          set_layout->ndescriptors + 1u);
+                           set_layout->ndescriptors + 1u);
     if (map[set] == NULL) {
       err = NGF_ERROR_OUT_OF_MEM;
       goto _ngf_create_native_binding_map_cleanup;
@@ -272,7 +272,8 @@ void ngfi_destroy_binding_map(ngfi_native_binding_map map) {
   if (map != NULL) {
     for (uint32_t i = 0; map[i] != NULL; ++i) {
       ngfi_native_binding *set = map[i];
-      if (set->cis_bindings) {
+      if (set->ngf_binding_id != (uint32_t)-1 &&
+          set->cis_bindings) {
         NGFI_FREEN(set->cis_bindings, set->ncis_bindings);
       }
       NGFI_FREE(set);
