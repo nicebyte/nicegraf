@@ -65,12 +65,6 @@ static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 // one.
 id<MTLDevice> MTL_DEVICE = nil;
 
-ngf_diagnostic_info ngfi_diag_info = {
-  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
-  nullptr,
-  nullptr
-};
-
 #pragma mark ngf_enum_maps
 
 struct mtl_format {

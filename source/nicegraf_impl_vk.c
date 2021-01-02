@@ -52,13 +52,6 @@ struct {
   ATOMIC_INT       frame_id;
 } _vk;
 
-// Holds diagnostic log configuration.
-ngf_diagnostic_info ngfi_diag_info = {
-  .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
-  .userdata  = NULL,
-  .callback  = NULL
-};
-
 // Swapchain state.
 typedef struct ngfvk_swapchain {
   VkSwapchainKHR   vk_swapchain;

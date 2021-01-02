@@ -213,6 +213,8 @@ ngf_device_capabilities* ngfi_device_caps_lock();
 void ngfi_device_caps_unlock(ngf_device_capabilities*);
 const ngf_device_capabilities* ngfi_device_caps_read();
 
+extern ngf_diagnostic_info ngfi_diag_info;
+
 #ifdef __cplusplus
 }
 #endif
