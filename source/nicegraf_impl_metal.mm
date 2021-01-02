@@ -65,7 +65,7 @@ static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 // one.
 id<MTLDevice> MTL_DEVICE = nil;
 
-static ngf_diagnostic_info ngfi_diag_info = {
+ngf_diagnostic_info ngfi_diag_info = {
   NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
   nullptr,
   nullptr
@@ -531,6 +531,7 @@ struct ngf_render_target_t {
 
 struct ngf_cmd_buffer_t {
   ngfi_cmd_buffer_state state = NGFI_CMD_BUFFER_READY;
+  bool renderpass_active = false;
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
   id<MTLBlitCommandEncoder> active_bce = nil;
@@ -1474,7 +1475,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
   cmd_buffer->active_rce = nil;
   cmd_buffer->active_bce = nil;
-  cmd_buffer->state = NGFI_CMD_BUFFER_READY;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_READY);
   return NGF_ERROR_OK;
 }
 
@@ -1484,74 +1485,57 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) NGF_NO
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
   }
   for (uint32_t b = 0u; b < n; ++b) {
+    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_SUBMITTED);
     if (b < n - 1u) {
       [cmd_buffers[b]->mtl_cmd_buffer commit];
     } else {
       CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
     }
     cmd_buffers[b]->mtl_cmd_buffer = nil;
-    cmd_buffers[b]->state =  NGFI_CMD_BUFFER_SUBMITTED;
   }
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
                                       ngf_render_encoder *enc) NGF_NOEXCEPT {
-  if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
-    enc->__handle = 0u;
-    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
-                      "cannot be started.")
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
+  enc->__handle = 0u;
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if(cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    NGFI_DIAG_WARNING("Calling ngf_render_encoder_end on a render encoder "
-                      "that is not active.")
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   if (cmd_buf->active_rce){
     [cmd_buf->active_rce endEncoding];
     cmd_buf->active_rce = nil;
   }
-  cmd_buf->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
                                     ngf_xfer_encoder *enc) NGF_NOEXCEPT {
-  if (cmd_buf->state != NGFI_CMD_BUFFER_READY) {
-    enc->__handle = 0u;
-    NGFI_DIAG_WARNING("Command buffer is not in READY state and "
-                      "a transfer encoder cannot be created for it.")
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  cmd_buf->state = NGFI_CMD_BUFFER_RECORDING;
+  enc->__handle = 0u;
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  if (cmd_buf->state != NGFI_CMD_BUFFER_RECORDING) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   if (cmd_buf->active_bce) {
     [cmd_buf->active_bce endEncoding];
     cmd_buf->active_bce = nil;
   }
-  cmd_buf->state = NGFI_CMD_BUFFER_READY;
   return NGF_ERROR_OK;
 }
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc,
                         const ngf_render_target rt) NGF_NOEXCEPT {
   auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
+  cmd_buffer->renderpass_active = true;
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
     cmd_buffer->active_rce = nil;
@@ -1580,6 +1564,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc,
 
 void ngf_cmd_end_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
+  cmd_buffer->renderpass_active = false;
   [cmd_buffer->active_rce endEncoding];
   cmd_buffer->active_rce = nil;
   cmd_buffer->active_pipe = nullptr;
