@@ -158,6 +158,18 @@ typedef enum {
 #define NGFI_CMD_BUF_RECORDABLE(s) (s == NGFI_CMD_BUFFER_READY || \
                                     s == NGFI_CMD_BUFFER_AWAITING_SUBMIT)
 
+ngf_error ngfi_transition_cmd_buf(ngfi_cmd_buffer_state *cur_state,
+                                  bool                   has_active_renderpass,
+                                  ngfi_cmd_buffer_state  new_state);
+
+#define NGFI_TRANSITION_CMD_BUF(b, new_state) \
+  if (ngfi_transition_cmd_buf(&(b)->state, \
+                               (b)->renderpass_active, \
+                               new_state) != NGF_ERROR_OK) { \
+    return NGF_ERROR_INVALID_OPERATION; \
+  }
+
+
 // Interlocked ops.
 #if defined(_WIN32)
 #define ATOMIC_INT ULONG
@@ -190,6 +202,10 @@ if (ngfi_diag_info.callback) { \
 #define NGFI_DIAG_INFO(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_INFO, fmt,##__VA_ARGS__)
 #define NGFI_DIAG_WARNING(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_WARNING, fmt,##__VA_ARGS__)
 #define NGFI_DIAG_ERROR(fmt, ...) NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, fmt,##__VA_ARGS__)
+
+// Convenience macro to invoke diagnostic callback and raise error on unmet precondition.
+#define NGFI_CHECK_CONDITION(cond, err_code, err_fmtstring, ...) \
+  if (!(cond)) { NGFI_DIAG_ERROR(err_fmtstring,##__VA_ARGS__); return err_code; }
 
 // Access to device capabilities global structure.
 void ngfi_device_caps_create();
