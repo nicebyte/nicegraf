@@ -1015,6 +1015,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   // Create a map of NGF -> OpenGL resource bindings.
   const ngf_pipeline_layout_info *pipeline_layout = info->layout;
   pipeline->ndescriptors_layouts = pipeline_layout->ndescriptor_set_layouts;
+  pipeline->binding_map = NULL;
   err = ngfi_create_native_binding_map(pipeline_layout,
                                        info->image_to_combined_map,
                                        info->sampler_to_combined_map,
