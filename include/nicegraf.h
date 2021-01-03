@@ -1149,7 +1149,7 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
 
 
 /**
- * Begin a frame of rendering. This functions starts a frame of rendering in
+ * Begin a frame of rendering. This function starts a frame of rendering in
  * the thread's current context. It acquires an image from the context's
  * associated swap chain.
  * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
