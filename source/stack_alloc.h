@@ -1,5 +1,5 @@
 /**
-Copyright (c) 2019 nicegraf contributors
+Copyright (c) 2021 nicegraf contributors
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to
@@ -26,11 +26,11 @@ extern "C" {
 #endif
 
 typedef struct ngfi_sa_t {
-  uint8_t *ptr;
+  uint8_t* ptr;
   size_t   capacity;
 #pragma warning(push)
-#pragma warning(disable:4200)
-  uint8_t  data[];
+#pragma warning(disable : 4200)
+  uint8_t data[];
 #pragma warning(pop)
 } ngfi_sa;
 
@@ -45,27 +45,24 @@ ngfi_sa* ngfi_sa_create(size_t capacity);
  * if the allocator has no available capacity to accomodate the request,
  * returns a null pointer.
  */
-void* ngfi_sa_alloc(ngfi_sa *allocator, size_t nbytes);
-
+void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes);
 
 /**
  * resets the state of the given stack allocator. capacity is fully restored,
  * all pointers to memory previously allocated are invalidated.
  */
-void ngfi_sa_reset(ngfi_sa *allocator);
+void ngfi_sa_reset(ngfi_sa* allocator);
 
 /**
  * tear down the given stack allocator.
  */
-void ngfi_sa_destroy(ngfi_sa *allocator);
+void ngfi_sa_destroy(ngfi_sa* allocator);
 
 /**
  * Per-thread temporary storage based on stack allocator.
  */
-ngfi_sa* ngfi_tmp_store();
+ngfi_sa* ngfi_tmp_store( );
 
 #ifdef __cplusplus
 }
 #endif
-
-
