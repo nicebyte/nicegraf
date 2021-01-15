@@ -1,28 +1,29 @@
 /**
-Copyright © 2018 nicegraf contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2021 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 #pragma once
 
 #include "nicegraf.h"
+
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -36,14 +37,14 @@ extern "C" {
  * object.
  */
 typedef struct ngf_util_graphics_pipeline_data {
-  ngf_graphics_pipeline_info pipeline_info ;
-  ngf_blend_info blend_info;
-  ngf_depth_stencil_info depth_stencil_info;
-  ngf_vertex_input_info vertex_input_info;
-  ngf_multisample_info multisample_info;
-  ngf_rasterization_info rasterization_info;
-  ngf_specialization_info spec_info;
-  ngf_pipeline_layout_info layout_info;
+  ngf_graphics_pipeline_info pipeline_info;
+  ngf_blend_info             blend_info;
+  ngf_depth_stencil_info     depth_stencil_info;
+  ngf_vertex_input_info      vertex_input_info;
+  ngf_multisample_info       multisample_info;
+  ngf_rasterization_info     rasterization_info;
+  ngf_specialization_info    spec_info;
+  ngf_pipeline_layout_info   layout_info;
 } ngf_util_graphics_pipeline_data;
 
 /**
@@ -55,8 +56,8 @@ typedef struct ngf_util_graphics_pipeline_data {
  * @param result Pipeline configuration data will be stored here.
  */
 void ngf_util_create_default_graphics_pipeline_data(
-    const ngf_irect2d *viewport,
-    ngf_util_graphics_pipeline_data *result);
+    const ngf_irect2d*               viewport,
+    ngf_util_graphics_pipeline_data* result);
 
 /**
  * Creates a simple pipeline layout with just a single descriptor set.
@@ -69,9 +70,10 @@ void ngf_util_create_default_graphics_pipeline_data(
  *               be populated by this function. The descriptor set within it
  *               must be freed by the caller when it is no longer necessary.
  */
-ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
-                                        uint32_t ndesc,
-                                        ngf_pipeline_layout_info *result);
+ngf_error ngf_util_create_simple_layout(
+    const ngf_descriptor_info* desc,
+    uint32_t                   ndesc,
+    ngf_pipeline_layout_info*  result);
 
 /**
  * Creates a pipeline layout from shader metadata produced by ngf_shaderc.
@@ -84,8 +86,8 @@ ngf_error ngf_util_create_simple_layout(const ngf_descriptor_info *desc,
  *               must be freed by the caller when it is no longer necessary.
  */
 ngf_error ngf_util_create_pipeline_layout_from_metadata(
-    const ngf_plmd_layout *layout_metadata,
-    ngf_pipeline_layout_info *result);
+    const ngf_plmd_layout*    layout_metadata,
+    ngf_pipeline_layout_info* result);
 
 const char* ngf_util_get_error_name(const ngf_error err);
 
