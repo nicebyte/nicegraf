@@ -82,30 +82,6 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 #define NGFI_MAX(a, b) (a > b ? a : b)
 #define NGFI_MIN(a, b) (a < b ? a : b)
 
-// A fast fixed-size block allocator.
-typedef struct ngfi_block_allocator ngfi_block_allocator;
-
-// Creates a new block allocator with a given fixed `block_size` and a given
-// initial capacity of `nblocks`.
-ngfi_block_allocator* ngfi_blkalloc_create(uint32_t block_size, uint32_t nblocks);
-
-// Destroys the given block allocator. All unfreed pointers obtained from the
-// destroyed allocator become invalid.
-void ngfi_blkalloc_destroy(ngfi_block_allocator* alloc);
-
-// Allocates the next free block from the allocator. Returns NULL on error.
-void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc);
-
-typedef enum {
-  NGFI_BLK_NO_ERROR,
-  NGFI_BLK_DOUBLE_FREE,
-  NGFI_BLK_WRONG_ALLOCATOR
-} ngfi_blkalloc_error;
-
-// Returns the given block to the allocator.
-// Freeing a NULL pointer does nothing.
-ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr);
-
 // For fixing unreferenced parameter warnings.
 #if defined(__GNUC__) && !defined(__clang__)
 static void _NGF_FAKE_USE_HELPER(int _, ...) {
