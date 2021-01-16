@@ -24,6 +24,7 @@
 #include "gl_43_core.h"
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
+#include "block_alloc.h"
 #define EGLAPI  // prevent __declspec(dllimport) issue on Windows
 #include "EGL/egl.h"
 #include "EGL/eglext.h"

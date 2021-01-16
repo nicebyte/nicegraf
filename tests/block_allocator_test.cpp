@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "nicegraf_internal.h"
+#include "block_alloc.h"
 #include <random>
 
 struct test_data {
