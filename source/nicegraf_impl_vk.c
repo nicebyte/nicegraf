@@ -21,11 +21,11 @@
  */
 
 #define _CRT_SECURE_NO_WARNINGS
+#include "block_alloc.h"
 #include "dynamic_array.h"
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
 #include "stack_alloc.h"
-#include "block_alloc.h"
 #include "vk_10.h"
 
 #include <assert.h>
@@ -107,17 +107,32 @@ typedef struct {
   VkCommandPool   vkpool;
 } ngfvk_cmd_bundle;
 
+#define NGFVK_BIND_OP_CHUNK_SIZE (10u)
+
+typedef struct ngfvk_bind_op_chunk {
+  struct ngfvk_bind_op_chunk* next;
+  ngf_resource_bind_op        data[NGFVK_BIND_OP_CHUNK_SIZE];
+  size_t                      last_idx;
+} ngfvk_bind_op_chunk;
+
+typedef struct ngfvk_bind_op_chunk_list {
+  ngfvk_bind_op_chunk* first;
+  ngfvk_bind_op_chunk* last;
+} ngfvk_bind_op_chunk_list;
+
 typedef struct ngf_cmd_buffer_t {
-  ngfvk_cmd_bundle      active_bundle;      // < The current bundle.
-  ngf_graphics_pipeline active_pipe;        // < The bound pipeline.
-  ATOMIC_INT            frame_id;           // < id of the frame that the
-                                            //   cmd buffer is intended for.
-  ngfvk_desc_superpool* desc_superpool;     // < The superpool from which
-                                            //   the desc pools for this cmd
-                                            //   buffer are allocated.
-  ngf_render_target     active_rt;          // < Active render target.
-  bool                  renderpass_active;  // < Has an active renderpass.
-  ngfi_cmd_buffer_state state;
+  ngfvk_cmd_bundle      active_bundle;         // < The current bundle.
+  ngf_graphics_pipeline active_pipe;           // < The bound pipeline.
+  ATOMIC_INT            frame_id;              // < id of the frame that the
+                                               //   cmd buffer is intended for.
+  ngfvk_desc_superpool* desc_superpool;        // < The superpool from which
+                                               //   the desc pools for this cmd
+                                               //   buffer are allocated.
+  ngf_render_target        active_rt;          // < Active render target.
+  bool                     renderpass_active;  // < Has an active renderpass.
+  ngfi_cmd_buffer_state    state;
+  ngfvk_bind_op_chunk_list pending_bind_ops;  // < Resource binds that need to be performed
+                                              //   before the next draw.
 } ngf_cmd_buffer_t;
 
 typedef struct {
@@ -195,7 +210,7 @@ typedef struct ngf_context_t {
   VkSurfaceKHR           surface;
   uint32_t               frame_number;
   uint32_t               max_inflight_frames;
-  ngfi_block_allocator*  bind_op_allocator;
+  ngfi_block_allocator*  bind_op_chunk_allocator;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -235,11 +250,6 @@ typedef struct ngf_render_target_t {
   uint32_t      width;
   uint32_t      height;
 } ngf_render_target_t;
-
-typedef struct ngfvk_bind_op_list {
-  struct ngfvk_bind_op_list* next;
-  ngf_resource_bind_op       data;
-} ngfvk_bind_op_list;
 
 #pragma endregion
 
@@ -1390,8 +1400,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   memset(ctx->desc_superpools, 0, sizeof(ngfvk_desc_superpool) * ctx->max_inflight_frames);
 
   // initialize bind op allocator.
-  ctx->bind_op_allocator = ngfi_blkalloc_create(sizeof(ngfvk_bind_op_list), 256);
-  if (ctx->bind_op_allocator == NULL) {
+  ctx->bind_op_chunk_allocator = ngfi_blkalloc_create(sizeof(ngfvk_bind_op_chunk), 256);
+  if (ctx->bind_op_chunk_allocator == NULL) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
@@ -1540,8 +1550,8 @@ void ngf_destroy_context(ngf_context ctx) {
     if (ctx->surface != VK_NULL_HANDLE) { vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL); }
     if (ctx->allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(ctx->allocator); }
     if (ctx->frame_res != NULL) { NGFI_FREEN(ctx->frame_res, ctx->max_inflight_frames); }
-    if (ctx->bind_op_allocator) { ngfi_blkalloc_destroy(ctx->bind_op_allocator); }
- 
+    if (ctx->bind_op_chunk_allocator) { ngfi_blkalloc_destroy(ctx->bind_op_chunk_allocator); }
+
     if (CURRENT_CONTEXT == ctx) CURRENT_CONTEXT = NULL;
     NGFI_FREE(ctx);
   }
@@ -1566,6 +1576,8 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   cmd_buf->active_rt              = NULL;
   cmd_buf->desc_superpool         = NULL;
   cmd_buf->frame_id               = 0u;
+  cmd_buf->pending_bind_ops.first = NULL;
+  cmd_buf->pending_bind_ops.last  = NULL;
   cmd_buf->active_bundle.vkcmdbuf = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vkpool   = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vksem    = VK_NULL_HANDLE;
@@ -1621,7 +1633,17 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* en
   return ngfvk_encoder_start(cmd_buf);
 }
 
+static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
+  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
+  while (chunk) {
+    ngfvk_bind_op_chunk* next = chunk->next;
+    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
+    chunk = next;
+  }
+}
+
 static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
+  ngfvk_cleanup_pending_binds(cmd_buf);
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   return NGF_ERROR_OK;
 }
@@ -1658,6 +1680,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   if (buffer->active_bundle.vksem != VK_NULL_HANDLE) {
     vkDestroySemaphore(_vk.device, buffer->active_bundle.vksem, NULL);
   }
+  ngfvk_cleanup_pending_binds(buffer);
   NGFI_FREE(buffer);
 }
 
@@ -2524,7 +2547,6 @@ void ngf_cmd_bind_gfx_resources(
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-
   // Binding resources requires an active pipeline.
   ngf_graphics_pipeline active_pipe = buf->active_pipe;
   assert(active_pipe);
