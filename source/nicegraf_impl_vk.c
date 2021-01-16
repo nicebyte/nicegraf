@@ -25,6 +25,7 @@
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
 #include "stack_alloc.h"
+#include "block_alloc.h"
 #include "vk_10.h"
 
 #include <assert.h>
@@ -194,6 +195,7 @@ typedef struct ngf_context_t {
   VkSurfaceKHR           surface;
   uint32_t               frame_number;
   uint32_t               max_inflight_frames;
+  ngfi_block_allocator*  bind_op_allocator;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -233,6 +235,11 @@ typedef struct ngf_render_target_t {
   uint32_t      width;
   uint32_t      height;
 } ngf_render_target_t;
+
+typedef struct ngfvk_bind_op_list {
+  struct ngfvk_bind_op_list* next;
+  ngf_resource_bind_op       data;
+} ngfvk_bind_op_list;
 
 #pragma endregion
 
@@ -1382,6 +1389,13 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   }
   memset(ctx->desc_superpools, 0, sizeof(ngfvk_desc_superpool) * ctx->max_inflight_frames);
 
+  // initialize bind op allocator.
+  ctx->bind_op_allocator = ngfi_blkalloc_create(sizeof(ngfvk_bind_op_list), 256);
+  if (ctx->bind_op_allocator == NULL) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_context_cleanup;
+  }
+
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
   return err;
@@ -1526,6 +1540,8 @@ void ngf_destroy_context(ngf_context ctx) {
     if (ctx->surface != VK_NULL_HANDLE) { vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL); }
     if (ctx->allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(ctx->allocator); }
     if (ctx->frame_res != NULL) { NGFI_FREEN(ctx->frame_res, ctx->max_inflight_frames); }
+    if (ctx->bind_op_allocator) { ngfi_blkalloc_destroy(ctx->bind_op_allocator); }
+ 
     if (CURRENT_CONTEXT == ctx) CURRENT_CONTEXT = NULL;
     NGFI_FREE(ctx);
   }
