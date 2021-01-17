@@ -118,6 +118,7 @@ typedef struct ngfvk_bind_op_chunk {
 typedef struct ngfvk_bind_op_chunk_list {
   ngfvk_bind_op_chunk* first;
   ngfvk_bind_op_chunk* last;
+  uint32_t             size;
 } ngfvk_bind_op_chunk_list;
 
 typedef struct ngf_cmd_buffer_t {
@@ -1578,6 +1579,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   cmd_buf->frame_id               = 0u;
   cmd_buf->pending_bind_ops.first = NULL;
   cmd_buf->pending_bind_ops.last  = NULL;
+  cmd_buf->pending_bind_ops.size  = 0u;
   cmd_buf->active_bundle.vkcmdbuf = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vkpool   = VK_NULL_HANDLE;
   cmd_buf->active_bundle.vksem    = VK_NULL_HANDLE;
@@ -1640,6 +1642,7 @@ static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
     ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
     chunk = next;
   }
+  cmd_buf->pending_bind_ops.size = 0u;
 }
 
 static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
@@ -2524,6 +2527,242 @@ void ngf_cmd_draw(
     uint32_t           nelements,
     uint32_t           ninstances) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+
+  // Before performing the draw, record all the pending resource bind
+  // commands.
+
+  // Binding resources requires an active pipeline.
+  ngf_graphics_pipeline active_pipe = buf->active_pipe;
+  assert(active_pipe);
+
+  // Get the number of active descriptor set layouts in the pipeline.
+  const uint32_t ndesc_set_layouts = NGFI_DARRAY_SIZE(active_pipe->vk_descriptor_set_layouts);
+
+  // Reset temp. storage to make sure we have all of it available.
+  ngfi_sa_reset(ngfi_tmp_store());
+
+  // Allocate an array of descriptor set handles from temporary storage and
+  // set them all to null. As we process bind operations, we'll allocate
+  // descriptor sets and put them into the array as necessary.
+  const size_t     vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
+  VkDescriptorSet* vk_sets            = ngfi_sa_alloc(ngfi_tmp_store(), vk_sets_size_bytes);
+  memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
+
+  const uint32_t nbind_operations = buf->pending_bind_ops.size;
+
+  // Allocate an array of vulkan descriptor set writes from temp storage.
+  VkWriteDescriptorSet* vk_writes =
+      ngfi_sa_alloc(ngfi_tmp_store(), nbind_operations * sizeof(VkWriteDescriptorSet));
+
+  // Process each bind operation, constructing a corresponding
+  // vulkan descriptor set write operation.
+  ngfvk_bind_op_chunk* chunk = buf->pending_bind_ops.first;
+  while (chunk) {
+    for (size_t boi = 0; boi < chunk->last_idx; ++boi) {
+      const ngf_resource_bind_op* bind_op = &chunk->data[boi];
+
+      // Ensure that a valid descriptor set is referenced by this
+      // bind operation.
+      if (bind_op->target_set >= ndesc_set_layouts) {
+        NGFI_DIAG_ERROR(
+            "invalid descriptor set %d referenced by bind operation (max. "
+            "allowed is %d)",
+            bind_op->target_set,
+            ndesc_set_layouts);
+        return;
+      }
+
+      // Find a target descriptor set from vk_sets for this write (or allocate a
+      // new one if it hasn't been created yet).
+      if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
+        // The target descriptor set hasn't been allocated yet.
+
+        const ATOMIC_INT      superpool_idx = _vk.frame_id % (CURRENT_CONTEXT->max_inflight_frames);
+        ngfvk_desc_superpool* superpool     = &CURRENT_CONTEXT->desc_superpools[superpool_idx];
+        buf->desc_superpool                 = superpool;
+
+        // Ensure we have an active desriptor pool that is able to service the
+        // request.
+        const bool                 have_active_pool    = (superpool->active_pool != NULL);
+        bool                       fresh_pool_required = !have_active_pool;
+        const ngfvk_desc_set_size* set_size =
+            &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes, bind_op->target_set);
+        if (have_active_pool) {
+          // Check if the active descriptor pool can fit the required descriptor
+          // set.
+          ngfvk_desc_pool*                pool     = superpool->active_pool;
+          const ngfvk_desc_pool_capacity* capacity = &pool->capacity;
+          ngfvk_desc_pool_capacity*       usage    = &pool->utilization;
+          for (ngf_descriptor_type i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
+               ++i) {
+            fresh_pool_required |=
+                (usage->descriptors[i] + set_size->counts[i] >= capacity->descriptors[i]);
+          }
+          fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
+        }
+        if (fresh_pool_required) {
+          if (!have_active_pool || superpool->active_pool->next == NULL) {
+            // TODO: make this tweakable
+            ngfvk_desc_pool_capacity capacity;
+            capacity.sets = 100u;
+            for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
+
+            // Prepare descriptor counts.
+            VkDescriptorPoolSize* vk_pool_sizes = ngfi_sa_alloc(
+                ngfi_tmp_store(),
+                sizeof(VkDescriptorPoolSize) * NGF_DESCRIPTOR_TYPE_COUNT);
+            for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+              vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
+              vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
+            }
+
+            // Prepare a createinfo structure for the new pool.
+            const VkDescriptorPoolCreateInfo vk_pool_ci = {
+                .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+                .pNext         = NULL,
+                .flags         = 0u,
+                .maxSets       = capacity.sets,
+                .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
+                .pPoolSizes    = vk_pool_sizes};
+
+            // Create the new pool.
+            ngfvk_desc_pool* new_pool = NGFI_ALLOC(ngfvk_desc_pool);
+            new_pool->next            = NULL;
+            new_pool->capacity        = capacity;
+            memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
+            const VkResult vk_pool_create_result =
+                vkCreateDescriptorPool(_vk.device, &vk_pool_ci, NULL, &new_pool->vk_pool);
+            if (vk_pool_create_result == VK_SUCCESS) {
+              if (superpool->active_pool != NULL && superpool->active_pool->next == NULL) {
+                superpool->active_pool->next = new_pool;
+              } else if (superpool->active_pool == NULL) {
+                superpool->list = new_pool;
+              } else {  // shouldn't happen
+                assert(false);
+              }
+              superpool->active_pool = new_pool;
+            } else {
+              NGFI_FREE(new_pool);
+              assert(false);
+            }
+          } else {
+            superpool->active_pool = superpool->active_pool->next;
+          }
+        }
+
+        // Allocate the new descriptor set from the pool.
+        ngfvk_desc_pool* pool = superpool->active_pool;
+
+        const VkDescriptorSetAllocateInfo vk_desc_set_info = {
+            .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .pNext              = NULL,
+            .descriptorPool     = pool->vk_pool,
+            .descriptorSetCount = 1u,
+            .pSetLayouts =
+                &NGFI_DARRAY_AT(active_pipe->vk_descriptor_set_layouts, bind_op->target_set)};
+        const VkResult desc_set_alloc_result =
+            vkAllocateDescriptorSets(_vk.device, &vk_desc_set_info, &vk_sets[bind_op->target_set]);
+        if (desc_set_alloc_result != VK_SUCCESS) {
+          NGFI_DIAG_WARNING(
+              "Failed to bind graphics resources - could not allocate descriptor "
+              "set. "
+              "VK error was %d",
+              desc_set_alloc_result);
+          return;
+        }
+
+        // Update usage counters for the active descriptor pool.
+        for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+          pool->utilization.descriptors[i] += set_size->counts[i];
+        }
+        pool->utilization.sets++;
+      }
+
+      // At this point, we have a valid descriptor set in the `vk_sets` array.
+      // We'll use it in the write operation corresponding to the current bind_op.
+      VkDescriptorSet set = vk_sets[bind_op->target_set];
+
+      // Construct a vulkan descriptor set write corresponding to this bind
+      // operation.
+      VkWriteDescriptorSet* vk_write = &vk_writes[boi];
+
+      vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      vk_write->pNext           = NULL;
+      vk_write->dstSet          = set;
+      vk_write->dstBinding      = bind_op->target_binding;
+      vk_write->descriptorCount = 1u;
+      vk_write->dstArrayElement = 0u;
+      vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
+
+      switch (bind_op->type) {
+      case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniform_buffer;
+        VkDescriptorBufferInfo*             vk_bind_info =
+            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
+
+        vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
+        vk_bind_info->offset = bind_info->offset;
+        vk_bind_info->range  = bind_info->range;
+
+        vk_write->pBufferInfo = vk_bind_info;
+        break;
+      }
+      case NGF_DESCRIPTOR_TEXTURE:
+      case NGF_DESCRIPTOR_SAMPLER:
+      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+        const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
+        VkDescriptorImageInfo*             vk_bind_info =
+            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
+        vk_bind_info->imageView   = VK_NULL_HANDLE;
+        vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        vk_bind_info->sampler     = VK_NULL_HANDLE;
+        if (bind_op->type == NGF_DESCRIPTOR_TEXTURE ||
+            bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
+          vk_bind_info->imageView   = bind_info->image_subresource.image->vkview;
+          vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        }
+        if (bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
+            bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
+          vk_bind_info->sampler = bind_info->sampler->vksampler;
+        }
+        vk_write->pImageInfo = vk_bind_info;
+        break;
+      }
+
+      default:
+        assert(false);
+      }
+    }
+    ngfvk_bind_op_chunk* prev_chunk = chunk;
+    chunk                           = prev_chunk->next;
+    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, prev_chunk);
+  }
+  buf->pending_bind_ops.first = buf->pending_bind_ops.last = NULL;
+  buf->pending_bind_ops.size                               = 0u;
+
+  // perform all the vulkan descriptor set write operations to populate the
+  // newly allocated descriptor sets.
+  vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
+
+  // bind each of the descriptor sets individually (this ensures that desc.
+  // sets bound for a compatible pipeline earlier in this command buffer
+  // don't get clobbered).
+  for (uint32_t s = 0; s < ndesc_set_layouts; ++s) {
+    if (vk_sets[s] != VK_NULL_HANDLE) {
+      vkCmdBindDescriptorSets(
+          buf->active_bundle.vkcmdbuf,
+          VK_PIPELINE_BIND_POINT_GRAPHICS,
+          active_pipe->vk_pipeline_layout,
+          s,
+          1,
+          &vk_sets[s],
+          0,
+          NULL);
+    }
+  }
+
+  // With all resources bound, we may perform the draw operation.
+
   if (indexed) {
     vkCmdDrawIndexed(buf->active_bundle.vkcmdbuf, nelements, ninstances, first_element, 0u, 0u);
   } else {
@@ -2547,224 +2786,22 @@ void ngf_cmd_bind_gfx_resources(
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-  // Binding resources requires an active pipeline.
-  ngf_graphics_pipeline active_pipe = buf->active_pipe;
-  assert(active_pipe);
 
-  // Get the number of active descriptor set layouts in the pipeline.
-  const uint32_t ndesc_set_layouts = NGFI_DARRAY_SIZE(active_pipe->vk_descriptor_set_layouts);
-
-  // Reset temp. storage to make sure we have all of it available.
-  ngfi_sa_reset(ngfi_tmp_store());
-
-  // Allocate an array of descriptor set handles from temporary storage and
-  // set them all to null. As we process bind operations, we'll allocate
-  // descriptor sets and put them into the array as necessary.
-  const size_t     vk_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
-  VkDescriptorSet* vk_sets            = ngfi_sa_alloc(ngfi_tmp_store(), vk_sets_size_bytes);
-  memset(vk_sets, VK_NULL_HANDLE, vk_sets_size_bytes);
-
-  // Allocate an array of vulkan descriptor set writes from temp storage.
-  VkWriteDescriptorSet* vk_writes =
-      ngfi_sa_alloc(ngfi_tmp_store(), nbind_operations * sizeof(VkWriteDescriptorSet));
-
-  // Process each bind operation, constructing a corresponding
-  // vulkan descriptor set write operation.
-  for (size_t boi = 0; boi < nbind_operations; ++boi) {
-    const ngf_resource_bind_op* bind_op = &bind_operations[boi];
-
-    // Ensure that a valid descriptor set is referenced by this
-    // bind operation.
-    if (bind_op->target_set >= ndesc_set_layouts) {
-      NGFI_DIAG_ERROR(
-          "invalid descriptor set %d referenced by bind operation (max. "
-          "allowed is %d)",
-          bind_op->target_set,
-          ndesc_set_layouts);
-      return;
-    }
-
-    // Find a target descriptor set from vk_sets for this write (or allocate a
-    // new one if it hasn't been created yet).
-    if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
-      // The target descriptor set hasn't been allocated yet.
-
-      const ATOMIC_INT      superpool_idx = _vk.frame_id % (CURRENT_CONTEXT->max_inflight_frames);
-      ngfvk_desc_superpool* superpool     = &CURRENT_CONTEXT->desc_superpools[superpool_idx];
-      buf->desc_superpool                 = superpool;
-
-      // Ensure we have an active desriptor pool that is able to service the
-      // request.
-      const bool                 have_active_pool    = (superpool->active_pool != NULL);
-      bool                       fresh_pool_required = !have_active_pool;
-      const ngfvk_desc_set_size* set_size =
-          &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes, bind_op->target_set);
-      if (have_active_pool) {
-        // Check if the active descriptor pool can fit the required descriptor
-        // set.
-        ngfvk_desc_pool*                pool     = superpool->active_pool;
-        const ngfvk_desc_pool_capacity* capacity = &pool->capacity;
-        ngfvk_desc_pool_capacity*       usage    = &pool->utilization;
-        for (ngf_descriptor_type i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
-             ++i) {
-          fresh_pool_required |=
-              (usage->descriptors[i] + set_size->counts[i] >= capacity->descriptors[i]);
-        }
-        fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
+  for (uint32_t i = 0; i < nbind_operations; ++i) {
+    ngfvk_bind_op_chunk_list* pending_bind_ops = &buf->pending_bind_ops;
+    if (!pending_bind_ops->last || pending_bind_ops->last->last_idx >= NGFVK_BIND_OP_CHUNK_SIZE) {
+      ngfvk_bind_op_chunk* prev_last = pending_bind_ops->last;
+      pending_bind_ops->last       = ngfi_blkalloc_alloc(CURRENT_CONTEXT->bind_op_chunk_allocator);
+      pending_bind_ops->last->next = NULL;
+      pending_bind_ops->last->last_idx = 0;
+      if (prev_last) {
+        prev_last->next = pending_bind_ops->last;
+      } else {
+        pending_bind_ops->first = pending_bind_ops->last;
       }
-      if (fresh_pool_required) {
-        if (!have_active_pool || superpool->active_pool->next == NULL) {
-          // TODO: make this tweakable
-          ngfvk_desc_pool_capacity capacity;
-          capacity.sets = 100u;
-          for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
-
-          // Prepare descriptor counts.
-          VkDescriptorPoolSize* vk_pool_sizes = ngfi_sa_alloc(
-              ngfi_tmp_store(),
-              sizeof(VkDescriptorPoolSize) * NGF_DESCRIPTOR_TYPE_COUNT);
-          for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-            vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
-            vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
-          }
-
-          // Prepare a createinfo structure for the new pool.
-          const VkDescriptorPoolCreateInfo vk_pool_ci = {
-              .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-              .pNext         = NULL,
-              .flags         = 0u,
-              .maxSets       = capacity.sets,
-              .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
-              .pPoolSizes    = vk_pool_sizes};
-
-          // Create the new pool.
-          ngfvk_desc_pool* new_pool = NGFI_ALLOC(ngfvk_desc_pool);
-          new_pool->next            = NULL;
-          new_pool->capacity        = capacity;
-          memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
-          const VkResult vk_pool_create_result =
-              vkCreateDescriptorPool(_vk.device, &vk_pool_ci, NULL, &new_pool->vk_pool);
-          if (vk_pool_create_result == VK_SUCCESS) {
-            if (superpool->active_pool != NULL && superpool->active_pool->next == NULL) {
-              superpool->active_pool->next = new_pool;
-            } else if (superpool->active_pool == NULL) {
-              superpool->list = new_pool;
-            } else {  // shouldn't happen
-              assert(false);
-            }
-            superpool->active_pool = new_pool;
-          } else {
-            NGFI_FREE(new_pool);
-            assert(false);
-          }
-        } else {
-          superpool->active_pool = superpool->active_pool->next;
-        }
-      }
-
-      // Allocate the new descriptor set from the pool.
-      ngfvk_desc_pool* pool = superpool->active_pool;
-
-      const VkDescriptorSetAllocateInfo vk_desc_set_info = {
-          .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-          .pNext              = NULL,
-          .descriptorPool     = pool->vk_pool,
-          .descriptorSetCount = 1u,
-          .pSetLayouts =
-              &NGFI_DARRAY_AT(active_pipe->vk_descriptor_set_layouts, bind_op->target_set)};
-      const VkResult desc_set_alloc_result =
-          vkAllocateDescriptorSets(_vk.device, &vk_desc_set_info, &vk_sets[bind_op->target_set]);
-      if (desc_set_alloc_result != VK_SUCCESS) {
-        NGFI_DIAG_WARNING(
-            "Failed to bind graphics resources - could not allocate descriptor "
-            "set. "
-            "VK error was %d",
-            desc_set_alloc_result);
-        return;
-      }
-
-      // Update usage counters for the active descriptor pool.
-      for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-        pool->utilization.descriptors[i] += set_size->counts[i];
-      }
-      pool->utilization.sets++;
     }
-
-    // At this point, we have a valid descriptor set in the `vk_sets` array.
-    // We'll use it in the write operation corresponding to the current bind_op.
-    VkDescriptorSet set = vk_sets[bind_op->target_set];
-
-    // Construct a vulkan descriptor set write corresponding to this bind
-    // operation.
-    VkWriteDescriptorSet* vk_write = &vk_writes[boi];
-
-    vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    vk_write->pNext           = NULL;
-    vk_write->dstSet          = set;
-    vk_write->dstBinding      = bind_op->target_binding;
-    vk_write->descriptorCount = 1u;
-    vk_write->dstArrayElement = 0u;
-    vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
-
-    switch (bind_op->type) {
-    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-      const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniform_buffer;
-      VkDescriptorBufferInfo*             vk_bind_info =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
-
-      vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
-      vk_bind_info->offset = bind_info->offset;
-      vk_bind_info->range  = bind_info->range;
-
-      vk_write->pBufferInfo = vk_bind_info;
-      break;
-    }
-    case NGF_DESCRIPTOR_TEXTURE:
-    case NGF_DESCRIPTOR_SAMPLER:
-    case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
-      const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
-      VkDescriptorImageInfo*             vk_bind_info =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
-      vk_bind_info->imageView   = VK_NULL_HANDLE;
-      vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      vk_bind_info->sampler     = VK_NULL_HANDLE;
-      if (bind_op->type == NGF_DESCRIPTOR_TEXTURE ||
-          bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
-        vk_bind_info->imageView   = bind_info->image_subresource.image->vkview;
-        vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      }
-      if (bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
-          bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
-        vk_bind_info->sampler = bind_info->sampler->vksampler;
-      }
-      vk_write->pImageInfo = vk_bind_info;
-      break;
-    }
-
-    default:
-      assert(false);
-    }
-  }
-
-  // perform all the vulkan descriptor set write operations to populate the
-  // newly allocated descriptor sets.
-  vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
-
-  // bind each of the descriptor sets individually (this ensures that desc.
-  // sets bound for a compatible pipeline earlier in this command buffer
-  // don't get clobbered).
-  for (uint32_t s = 0; s < ndesc_set_layouts; ++s) {
-    if (vk_sets[s] != VK_NULL_HANDLE) {
-      vkCmdBindDescriptorSets(
-          buf->active_bundle.vkcmdbuf,
-          VK_PIPELINE_BIND_POINT_GRAPHICS,
-          active_pipe->vk_pipeline_layout,
-          s,
-          1,
-          &vk_sets[s],
-          0,
-          NULL);
-    }
+    pending_bind_ops->last->data[pending_bind_ops->last->last_idx++] = bind_operations[i];
+    pending_bind_ops->size++;
   }
 }
 
