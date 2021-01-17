@@ -2556,7 +2556,8 @@ void ngf_cmd_draw(
 
   // Process each bind operation, constructing a corresponding
   // vulkan descriptor set write operation.
-  ngfvk_bind_op_chunk* chunk = buf->pending_bind_ops.first;
+  ngfvk_bind_op_chunk* chunk                = buf->pending_bind_ops.first;
+  uint32_t             descriptor_write_idx = 0u;
   while (chunk) {
     for (size_t boi = 0; boi < chunk->last_idx; ++boi) {
       const ngf_resource_bind_op* bind_op = &chunk->data[boi];
@@ -2684,7 +2685,7 @@ void ngf_cmd_draw(
 
       // Construct a vulkan descriptor set write corresponding to this bind
       // operation.
-      VkWriteDescriptorSet* vk_write = &vk_writes[boi];
+      VkWriteDescriptorSet* vk_write = &vk_writes[descriptor_write_idx++];
 
       vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       vk_write->pNext           = NULL;
