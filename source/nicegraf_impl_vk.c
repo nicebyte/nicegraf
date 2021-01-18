@@ -1642,6 +1642,7 @@ static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
     ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
     chunk = next;
   }
+  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
   cmd_buf->pending_bind_ops.size = 0u;
 }
 
@@ -2968,7 +2969,8 @@ void ngf_cmd_copy_uniform_buffer(
       src_offset,
       dst_offset,
       VK_ACCESS_UNIFORM_READ_BIT,
-      VK_PIPELINE_STAGE_VERTEX_INPUT_BIT);
+      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 }
 
 void ngf_cmd_write_image(
