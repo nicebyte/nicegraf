@@ -20,50 +20,39 @@
  * IN THE SOFTWARE.
  */
 
-#include "stack_alloc.h"
+#pragma once
 
 #include "nicegraf_internal.h"
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-ngfi_sa* ngfi_sa_create(size_t capacity) {
-  ngfi_sa* result = malloc(capacity + sizeof(ngfi_sa));
-  if (result) {
-    result->capacity = capacity;
-    result->ptr      = result->data;
-  }
-  return result;
-}
+// A fast fixed-size block allocator.
+typedef struct ngfi_block_allocator ngfi_block_allocator;
 
-void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
-  assert(allocator);
-  void*           result             = NULL;
-  const ptrdiff_t consumed_capacity  = allocator->ptr - allocator->data;
-  const ptrdiff_t available_capacity = (ptrdiff_t)allocator->capacity - consumed_capacity;
-  if (available_capacity >= (ptrdiff_t)nbytes) {
-    result = allocator->ptr;
-    allocator->ptr += nbytes;
-  }
-  return result;
-}
+// Creates a new block allocator with a given fixed `block_size` and a given
+// initial capacity of `nblocks`.
+ngfi_block_allocator* ngfi_blkalloc_create(uint32_t block_size, uint32_t nblocks);
 
-void ngfi_sa_reset(ngfi_sa* allocator) {
-  assert(allocator);
-  allocator->ptr = allocator->data;
-}
+// Destroys the given block allocator. All unfreed pointers obtained from the
+// destroyed allocator become invalid.
+void ngfi_blkalloc_destroy(ngfi_block_allocator* alloc);
 
-void ngfi_sa_destroy(ngfi_sa* allocator) {
-  assert(allocator);
-  free(allocator);
-}
+// Allocates the next free block from the allocator. Returns NULL on error.
+void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc);
 
-ngfi_sa* ngfi_tmp_store() {
-  static NGFI_THREADLOCAL ngfi_sa* temp_storage = NULL;
-  if (temp_storage == NULL) {
-    const size_t sa_capacity = 1024 * 100;  // 100K
-    temp_storage             = ngfi_sa_create(sa_capacity);
-  }
-  return temp_storage;
+typedef enum {
+  NGFI_BLK_NO_ERROR,
+  NGFI_BLK_DOUBLE_FREE,
+  NGFI_BLK_WRONG_ALLOCATOR
+} ngfi_blkalloc_error;
+
+// Returns the given block to the allocator.
+// Freeing a NULL pointer does nothing.
+ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr);
+
+#ifdef __cplusplus
 }
+#endif
+

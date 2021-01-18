@@ -56,8 +56,11 @@ ngf_lib_target(NAME ngf_metadata_parser
 ngf_lib_target(NAME nicegraf_internal
                SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
+                    ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.h
+                    ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.h
                     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
                     ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c
+                    ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.c
                DEPS ngf_metadata_parser)
 
 # nicegraf utility library.

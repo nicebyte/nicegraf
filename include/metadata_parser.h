@@ -1,27 +1,30 @@
 /**
-Copyright © 2020 nicegraf contributors
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
-of the Software, and to permit persons to whom the Software is furnished to do
-so, subject to the following conditions:
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
+ * Copyright (c) 2021 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
 #pragma once
 
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:4200)
+#pragma warning(disable : 4200)
 #endif
 
 #include <stddef.h>
@@ -49,9 +52,9 @@ typedef struct ngf_plmd ngf_plmd;
  */
 typedef struct ngf_plmd_header {
   uint32_t magic_number; /**< must always be 0xdeadbeef */
-  uint32_t header_size; /**< size of the metadata header in bytes. */
-  uint32_t version_maj; /**< major version of the format in use. */
-  uint32_t version_min; /**< minor version of the format in use. */
+  uint32_t header_size;  /**< size of the metadata header in bytes. */
+  uint32_t version_maj;  /**< major version of the format in use. */
+  uint32_t version_min;  /**< minor version of the format in use. */
 
   /**
    * Offset, in bytes, from the beginning of the file, at which
@@ -66,13 +69,13 @@ typedef struct ngf_plmd_header {
   uint32_t pipeline_layout_offset;
 
   /**
-   * Offset, in bytes, from the beginning of the file, at which a 
+   * Offset, in bytes, from the beginning of the file, at which a
    * SEPARATE_TO_COMBINED_MAP record is stored, which maps separate image
    * bindings to the corresponding auto-generated combined image/sampler
    * bindings.
    */
   uint32_t image_to_cis_map_offset;
-  
+
   /**
    * Offset, in bytes, from the beginning of the file, at which a
    * SEPARATE_TO_COMBINED_MAP record is stored, which map separate sampler
@@ -89,16 +92,16 @@ typedef struct ngf_plmd_header {
 } ngf_plmd_header;
 
 typedef struct ngf_plmd_entrypoints {
-  const char *vert_shader_entrypoint;
-  const char *frag_shader_entrypoint;
+  const char* vert_shader_entrypoint;
+  const char* frag_shader_entrypoint;
 } ngf_plmd_entrypoints;
 
 /**
  * Information about a descriptor.
  */
 typedef struct ngf_plmd_descriptor {
-  uint32_t binding; /**< Binding within the set. */
-  uint32_t type; /**< Type of the descriptor (NGF_PLMD_DESC_...) */
+  uint32_t binding;               /**< Binding within the set. */
+  uint32_t type;                  /**< Type of the descriptor (NGF_PLMD_DESC_...) */
   uint32_t stage_visibility_mask; /**< Mask indicating which shader stages the
                                        descriptor is used from. */
 } ngf_plmd_descriptor;
@@ -107,7 +110,7 @@ typedef struct ngf_plmd_descriptor {
  * Information about a descriptor set.
  */
 typedef struct ngf_plmd_descriptor_set_layout {
-  uint32_t ndescriptors; /**< Number of descriptors in the set. */
+  uint32_t            ndescriptors; /**< Number of descriptors in the set. */
   ngf_plmd_descriptor descriptors[];
 } ngf_plmd_descriptor_set_layout;
 
@@ -115,8 +118,8 @@ typedef struct ngf_plmd_descriptor_set_layout {
  * Information about a pipeline layout.
  */
 typedef struct ngf_plmd_layout {
-  uint32_t ndescriptor_sets; /**< Number of descriptor sets.*/
-  const ngf_plmd_descriptor_set_layout **set_layouts;
+  uint32_t                               ndescriptor_sets; /**< Number of descriptor sets.*/
+  const ngf_plmd_descriptor_set_layout** set_layouts;
 } ngf_plmd_layout;
 
 /**
@@ -145,30 +148,30 @@ typedef struct ngf_plmd_cis_map_entry {
  * texture unit by the CPU-side code. This is in contrast to HLSL, which allows
  * specifying the sampler to use directly from the shader code.
  *
- * To address this discrepancy, each unique texture-sampler pair used by the 
+ * To address this discrepancy, each unique texture-sampler pair used by the
  * source HLSL generates a "synthetic" combined texture/sampler in the output.
- * Each separate texture and sampler is then mapped to a set of auto-generated 
+ * Each separate texture and sampler is then mapped to a set of auto-generated
  * combined texture/samplers that it is used in.
  */
 typedef struct ngf_plmd_cis_map {
-  uint32_t nentries; /**< Number of entries in the map. */
-  const ngf_plmd_cis_map_entry **entries;
+  uint32_t                       nentries; /**< Number of entries in the map. */
+  const ngf_plmd_cis_map_entry** entries;
 } ngf_plmd_cis_map;
 
 /**
  * A user-provided metadata entry.
  */
 typedef struct ngf_plmd_user_entry {
-  const char *key;
-  const char *value;
+  const char* key;
+  const char* value;
 } ngf_plmd_user_entry;
 
 /**
  * User-provided metadata.
  */
 typedef struct ngf_plmd_user {
-  uint32_t nentries; /**< Number of entries. */
-  ngf_plmd_user_entry *entries;
+  uint32_t             nentries; /**< Number of entries. */
+  ngf_plmd_user_entry* entries;
 } ngf_plmd_user;
 
 typedef enum ngf_plmd_error {
@@ -182,19 +185,21 @@ typedef enum ngf_plmd_error {
 
 typedef struct ngf_plmd_alloc_callbacks {
   void* (*alloc)(size_t);
-  void  (*free)(void*);
+  void (*free)(void*);
 } ngf_plmd_alloc_callbacks;
 
-ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
-                             const ngf_plmd_alloc_callbacks *alloc_cb,
-                             ngf_plmd **result);
-void ngf_plmd_destroy(ngf_plmd *m, const ngf_plmd_alloc_callbacks *alloc_cb);
-const ngf_plmd_layout* ngf_plmd_get_layout(const ngf_plmd *m);
-const ngf_plmd_cis_map* ngf_plmd_get_image_to_cis_map(const ngf_plmd *m);
-const ngf_plmd_cis_map* ngf_plmd_get_sampler_to_cis_map(const ngf_plmd *m);
-const ngf_plmd_user* ngf_plmd_get_user(const ngf_plmd *m);
-const ngf_plmd_entrypoints* ngf_plmd_get_entrypoints(const ngf_plmd *m);
-const ngf_plmd_header* ngf_plmd_get_header(const ngf_plmd *m);
+ngf_plmd_error ngf_plmd_load(
+    const void*                     buf,
+    size_t                          buf_size,
+    const ngf_plmd_alloc_callbacks* alloc_cb,
+    ngf_plmd**                      result);
+void                        ngf_plmd_destroy(ngf_plmd* m, const ngf_plmd_alloc_callbacks* alloc_cb);
+const ngf_plmd_layout*      ngf_plmd_get_layout(const ngf_plmd* m);
+const ngf_plmd_cis_map*     ngf_plmd_get_image_to_cis_map(const ngf_plmd* m);
+const ngf_plmd_cis_map*     ngf_plmd_get_sampler_to_cis_map(const ngf_plmd* m);
+const ngf_plmd_user*        ngf_plmd_get_user(const ngf_plmd* m);
+const ngf_plmd_entrypoints* ngf_plmd_get_entrypoints(const ngf_plmd* m);
+const ngf_plmd_header*      ngf_plmd_get_header(const ngf_plmd* m);
 
 const char* ngf_plmd_get_error_name(const ngf_plmd_error err);
 
