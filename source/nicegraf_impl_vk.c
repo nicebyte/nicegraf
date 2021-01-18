@@ -2429,7 +2429,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       {.srcSubpass    = 0u,
        .dstSubpass    = VK_SUBPASS_EXTERNAL,
        .srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-       .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+       .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
 
