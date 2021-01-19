@@ -3380,21 +3380,18 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   assert(result);
 
   const bool is_sampled_from         = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
+  const bool is_xfer_dst             = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
   const bool is_attachment           = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
   const bool is_depth_stencil_format = info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
                                        info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
                                        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
 
-  VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;  // TODO: add transfer dst as
-                                                                       // one of image usage flags
-  if (is_sampled_from) { usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
-  if (is_attachment) {
-    if (is_depth_stencil_format) {
-      usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    } else {
-      usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    }
-  }
+  const VkImageUsageFlagBits attachment_usage_bits =
+      is_depth_stencil_format ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                              : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  const VkImageUsageFlagBits usage_flags = (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
+                                           (is_attachment ? attachment_usage_bits : 0u) |
+                                           (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u);
 
   ngf_error err = NGF_ERROR_OK;
   *result       = NGFI_ALLOC(ngf_image_t);
