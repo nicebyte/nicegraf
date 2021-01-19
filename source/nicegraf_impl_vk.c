@@ -2358,50 +2358,52 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   rt->nclear_values           = 0u;
   uint32_t ncolor_attachments = 0u;
   for (uint32_t a = 0u; a < info->nattachments; ++a) {
-    const ngf_attachment*    ngf_attachment_desc = &info->attachments[a];
-    VkAttachmentDescription* vk_attachment_desc  = &vk_attachment_descs[a];
-    vk_attachment_desc->flags                    = 0u;
-    vk_attachment_desc->format                   = ngf_attachment_desc->image_ref.image->vkformat;
+    const ngf_attachment*  ngf_attachment_desc = &info->attachments[a];
+    VkAttachmentReference* attachment_ref      = ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR
+                                                ? &color_attachment_refs[ncolor_attachments++]
+                                                : &depth_stencil_attachment_ref;
+
+    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
+      attachment_ref->attachment = a;
+      attachment_ref->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    } else {
+      if (attachment_ref->attachment != VK_ATTACHMENT_UNUSED) {
+        NGFI_DIAG_ERROR("Attempt to specify more than a single depth/stencil attachment.");
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_render_target_cleanup;
+      }
+      attachment_ref->attachment = a;
+      switch (ngf_attachment_desc->type) {
+      case NGF_ATTACHMENT_DEPTH:
+        attachment_ref->layout =
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // TODO: enable /separate
+                                                               // depth/stencil layout
+        break;
+      case NGF_ATTACHMENT_STENCIL:
+        attachment_ref->layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
+        break;
+      case NGF_ATTACHMENT_DEPTH_STENCIL:
+        attachment_ref->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        break;
+      default:
+        assert(false);
+      }
+    }
+    const ngf_image ngf_attachment_img = ngf_attachment_desc->image_ref.image;
+    const bool attachment_sampled = ngf_attachment_img->usage_flags | NGF_IMAGE_USAGE_SAMPLE_FROM;
+    VkAttachmentDescription* vk_attachment_desc = &vk_attachment_descs[a];
+    vk_attachment_desc->flags                   = 0u;
+    vk_attachment_desc->format                  = ngf_attachment_desc->image_ref.image->vkformat;
     vk_attachment_desc->samples       = VK_SAMPLE_COUNT_1_BIT;  // TODO: multisampled render targets
     vk_attachment_desc->loadOp        = get_vk_load_op(ngf_attachment_desc->load_op);
     vk_attachment_desc->storeOp       = get_vk_store_op(ngf_attachment_desc->store_op);
     vk_attachment_desc->stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     vk_attachment_desc->stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     vk_attachment_desc->initialLayout =
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;  // TODO: set correct layout
-                                                   // here
-    vk_attachment_desc->finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    attachment_views[a]             = ngf_attachment_desc->image_ref.image->vkview;
-
-    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
-      VkAttachmentReference* color_ref = &color_attachment_refs[ncolor_attachments++];
-      color_ref->attachment            = a;
-      color_ref->layout                = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    } else {
-      if (depth_stencil_attachment_ref.attachment != VK_ATTACHMENT_UNUSED) {
-        NGFI_DIAG_ERROR("Attempt to specify more than a single depth/stencil attachment.");
-        err = NGF_ERROR_OBJECT_CREATION_FAILED;
-        goto ngf_create_render_target_cleanup;
-      }
-      depth_stencil_attachment_ref.attachment = a;
-      switch (ngf_attachment_desc->type) {
-      case NGF_ATTACHMENT_DEPTH:
-        depth_stencil_attachment_ref.layout =
-            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;  // TODO: enable
-                                                               // separate
-                                                               // depth/stencil
-                                                               // layout
-        break;
-      case NGF_ATTACHMENT_STENCIL:
-        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL;
-        break;
-      case NGF_ATTACHMENT_DEPTH_STENCIL:
-        depth_stencil_attachment_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        break;
-      default:
-        assert(false);
-      }
-    }
+        attachment_sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : attachment_ref->layout;
+    vk_attachment_desc->finalLayout =
+        attachment_sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : attachment_ref->layout;
+    attachment_views[a] = ngf_attachment_desc->image_ref.image->vkview;
 
     VkClearValue* clear_val = &rt->clear_values[rt->nclear_values++];
     if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
