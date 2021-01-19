@@ -172,6 +172,7 @@ typedef struct ngf_image_t {
   VkFormat       vkformat;
   VmaAllocator   parent_allocator;
   ngf_extent3d   extent;
+  uint32_t       usage_flags;
 } ngf_image_t;
 
 // Vulkan resources associated with a given frame.
@@ -1652,7 +1653,7 @@ static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
     chunk = next;
   }
   cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
-  cmd_buf->pending_bind_ops.size = 0u;
+  cmd_buf->pending_bind_ops.size                                   = 0u;
 }
 
 static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
@@ -2438,8 +2439,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       {.srcSubpass    = 0u,
        .dstSubpass    = VK_SUBPASS_EXTERNAL,
        .srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-       .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+       .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
 
@@ -2979,8 +2979,7 @@ void ngf_cmd_copy_uniform_buffer(
       src_offset,
       dst_offset,
       VK_ACCESS_UNIFORM_READ_BIT,
-      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-      VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+      VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
 }
 
 void ngf_cmd_write_image(
@@ -3356,8 +3355,9 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     goto ngf_create_image_cleanup;
   }
 
-  img->vkformat = get_vk_image_format(info->format);
-  img->extent   = info->extent;
+  img->vkformat    = get_vk_image_format(info->format);
+  img->extent      = info->extent;
+  img->usage_flags = info->usage_hint;
 
   const bool              is_cubemap    = info->type == NGF_IMAGE_TYPE_CUBE;
   const VkImageCreateInfo vk_image_info = {
