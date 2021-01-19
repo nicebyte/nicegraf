@@ -256,6 +256,11 @@ typedef struct ngf_render_target_t {
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 
+static struct {
+  pthread_mutex_t lock;
+  NGFI_DARRAY_OF(VkImageMemoryBarrier) barriers;
+} NGFVK_PENDING_IMG_BARRIER_QUEUE;
+
 #pragma region vk_enum_maps
 
 static VkFilter get_vk_filter(ngf_sampler_filter filter) {
@@ -872,6 +877,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     // Initialize frame id.
     _vk.frame_id = 0;
 
+    // Populate device capabilities.
     ngfi_device_caps_create();
     ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
     if (caps_ptr) {
@@ -880,6 +886,9 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
           phys_dev_properties.limits.minUniformBufferOffsetAlignment;
       ngfi_device_caps_unlock(caps_ptr);
     }
+
+    // Initialize pending image barrier queue.
+    NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
 
     // Done!
   }
