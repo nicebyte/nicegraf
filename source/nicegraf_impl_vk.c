@@ -2456,6 +2456,9 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   rt->height             = info->attachments[0].image_ref.image->extent.height;
   rt->ncolor_attachments = ncolor_attachments;
 
+  const bool have_depth_attachment =
+      depth_stencil_attachment_ref.attachment != VK_ATTACHMENT_UNUSED;
+
   // Subpass description.
   const VkSubpassDescription subpass_desc = {
       .flags                   = 0u,
@@ -2465,19 +2468,23 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       .colorAttachmentCount    = ncolor_attachments,
       .pColorAttachments       = color_attachment_refs,
       .pResolveAttachments     = NULL,  // TODO: multisampled render targets
-      .pDepthStencilAttachment = depth_stencil_attachment_ref.attachment != VK_ATTACHMENT_UNUSED
-                                     ? &depth_stencil_attachment_ref
-                                     : NULL,
+      .pDepthStencilAttachment = have_depth_attachment ? &depth_stencil_attachment_ref : NULL,
       .preserveAttachmentCount = 0u,
       .pPreserveAttachments    = NULL};
 
+  const VkPipelineStageFlags source_stage_flags =
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+      (have_depth_attachment ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : 0u);
+  const VkAccessFlags source_access_flags =
+      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+      (have_depth_attachment ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : 0u);
   // Specify subpass dependencies.
   VkSubpassDependency subpass_deps[] = {
       {.srcSubpass    = 0u,
        .dstSubpass    = VK_SUBPASS_EXTERNAL,
-       .srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+       .srcStageMask  = source_stage_flags,
        .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-       .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+       .srcAccessMask = source_access_flags,
        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT},
 
   };
