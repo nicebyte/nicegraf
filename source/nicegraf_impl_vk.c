@@ -890,6 +890,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 
     // Initialize pending image barrier queue.
     NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
+    pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
 
     // Done!
   }
@@ -1729,6 +1730,9 @@ ngf_error ngf_begin_frame() {
   CURRENT_CONTEXT->frame_res[fi].active = true;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
+  // Insert placeholders for deferred barriers.
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].cmd_bufs, VK_NULL_HANDLE);
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems, VK_NULL_HANDLE);
   CURRENT_CONTEXT->frame_res[fi].cmd_pool = CURRENT_CONTEXT->cmd_pools[fi];
 
   // reset stack allocator.
@@ -1782,8 +1786,34 @@ ngf_error ngf_end_frame() {
 
   frame_sync->nfences = 0u;
 
+  // Prep a command buffer for pending image barriers if necessary.
+  pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
+  const uint32_t npending_barriers = NGFI_DARRAY_SIZE(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers);
+  const bool     have_deferred_barriers = npending_barriers > 0;
+  if (have_deferred_barriers) {
+    ngfvk_cmd_bundle bundle;
+    ngfvk_cmd_bundle_create(CURRENT_CONTEXT->cmd_pools[fi], &bundle);
+    vkCmdPipelineBarrier(
+        bundle.vkcmdbuf,
+        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+        0,
+        0,
+        NULL,
+        0,
+        NULL,
+        npending_barriers,
+        NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers.data);
+    vkEndCommandBuffer(bundle.vkcmdbuf);
+    frame_sync->cmd_bufs.data[0]     = bundle.vkcmdbuf;
+    frame_sync->cmd_buf_sems.data[0] = bundle.vksem;
+    NGFI_DARRAY_CLEAR(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers);
+  }
+  pthread_mutex_unlock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
+
   // Submit pending gfx commands & present.
-  const uint32_t nsubmitted_gfx_cmdbuffers = NGFI_DARRAY_SIZE(frame_sync->cmd_bufs);
+  const uint32_t nsubmitted_gfx_cmdbuffers =
+      NGFI_DARRAY_SIZE(frame_sync->cmd_bufs) - (have_deferred_barriers ? 0 : 1);
   if (nsubmitted_gfx_cmdbuffers > 0) {
     // If present is necessary, acquire a swapchain image before submitting
     // any graphics commands.
@@ -1800,14 +1830,19 @@ ngf_error ngf_end_frame() {
       wait_sems        = &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
       wait_stage_flags = &color_attachment_stage;
     }
+    const VkCommandBuffer* cmd_bufs =
+        have_deferred_barriers ? frame_sync->cmd_bufs.data : &frame_sync->cmd_bufs.data[1];
+    const VkSemaphore* cmd_buf_sems =
+        have_deferred_barriers ? frame_sync->cmd_buf_sems.data : &frame_sync->cmd_buf_sems.data[1];
+
     ngfvk_submit_commands(
         _vk.gfx_queue,
-        frame_sync->cmd_bufs.data,
+        cmd_bufs,
         nsubmitted_gfx_cmdbuffers,
         wait_stage_flags,
         wait_sems,
         wait_sem_count,
-        frame_sync->cmd_buf_sems.data,
+        cmd_buf_sems,
         nsubmitted_gfx_cmdbuffers,
         frame_sync->fences[frame_sync->nfences++]);
 
@@ -1816,8 +1851,8 @@ ngf_error ngf_end_frame() {
       const VkPresentInfoKHR present_info = {
           .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
           .pNext              = NULL,
-          .waitSemaphoreCount = (uint32_t)NGFI_DARRAY_SIZE(frame_sync->cmd_buf_sems),
-          .pWaitSemaphores    = frame_sync->cmd_buf_sems.data,
+          .waitSemaphoreCount = nsubmitted_gfx_cmdbuffers,
+          .pWaitSemaphores    = cmd_buf_sems,
           .swapchainCount     = 1,
           .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
           .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
@@ -3337,12 +3372,17 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   assert(info);
   assert(result);
 
+  const bool is_sampled_from         = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
+  const bool is_attachment           = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
+  const bool is_depth_stencil_format = info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
+                                       info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
+                                       info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+
   VkImageUsageFlagBits usage_flags = VK_IMAGE_USAGE_TRANSFER_DST_BIT;  // TODO: add transfer dst as
                                                                        // one of image usage flags
-  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) { usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
-  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
-    if (info->format == NGF_IMAGE_FORMAT_DEPTH32 || info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
-        info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+  if (is_sampled_from) { usage_flags |= VK_IMAGE_USAGE_SAMPLED_BIT; }
+  if (is_attachment) {
+    if (is_depth_stencil_format) {
       usage_flags |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
     } else {
       usage_flags |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
@@ -3411,6 +3451,34 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       &img->vkview);
 
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
+
+  const VkImageMemoryBarrier barrier = {
+      .sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .pNext         = NULL,
+      .srcAccessMask = 0u,
+      .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                       VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .newLayout = is_sampled_from
+                       ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                       : (is_depth_stencil_format ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                  : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image               = img->vkimg,
+      .subresourceRange    = {
+          .aspectMask =
+              (is_depth_stencil_format ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+                                       : VK_IMAGE_ASPECT_COLOR_BIT),
+          .baseMipLevel   = 0u,
+          .levelCount     = vk_image_info.mipLevels,
+          .baseArrayLayer = 0u,
+          .layerCount     = vk_image_info.arrayLayers}};
+
+  pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
+  NGFI_DARRAY_APPEND(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, barrier);
+  pthread_mutex_unlock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
 
 ngf_create_image_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_image(img); }
