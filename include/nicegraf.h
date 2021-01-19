@@ -608,8 +608,9 @@ typedef enum ngf_image_format {
  */
 typedef enum ngf_image_usage {
   NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
-  NGF_IMAGE_USAGE_ATTACHMENT  = 0x02  /**< Can be used as an attachment for a
+  NGF_IMAGE_USAGE_ATTACHMENT  = 0x02, /**< Can be used as an attachment for a
                                            render target.*/
+  NGF_IMAGE_USAGE_XFER_DST = 0x04 /**< Can be used as a destination for a transfer operation. **/
 } ngf_image_usage;
 
 /**
