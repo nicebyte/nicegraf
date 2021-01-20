@@ -1041,6 +1041,8 @@ static ngf_error ngfvk_create_swapchain(
   formats = NULL;
   VkSurfaceCapabilitiesKHR surface_caps;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vk.phys_dev, surface, &surface_caps);
+  const VkExtent2D min_surface_extent = surface_caps.minImageExtent;
+  const VkExtent2D max_surface_extent = surface_caps.maxImageExtent;
 
   // Determine if we should use exclusive or concurrent sharing mode for
   // swapchain images.
@@ -1059,7 +1061,13 @@ static ngf_error ngfvk_create_swapchain(
       .minImageCount         = swapchain_info->capacity_hint,
       .imageFormat           = requested_format,
       .imageColorSpace       = color_space,
-      .imageExtent           = {.width = swapchain_info->width, .height = swapchain_info->height},
+      .imageExtent =
+          {.width = NGFI_MIN(
+               max_surface_extent.width,
+               NGFI_MAX(min_surface_extent.width, swapchain_info->width)),
+           .height = NGFI_MIN(
+               max_surface_extent.height,
+               NGFI_MAX(min_surface_extent.height, swapchain_info->height))},
       .imageArrayLayers      = 1,
       .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
       .imageSharingMode      = sharing_mode,
@@ -1428,8 +1436,8 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   if (ctx == NULL) { return NGF_ERROR_INVALID_OPERATION; }
   ngf_error err = NGF_ERROR_OK;
   ngfvk_destroy_swapchain(&ctx->swapchain);
-  ctx->swapchain_info.width  = new_width;
-  ctx->swapchain_info.height = new_height;
+  ctx->swapchain_info.width  = NGFI_MAX(1, new_width);
+  ctx->swapchain_info.height = NGFI_MAX(1, new_height);
   err = ngfvk_create_swapchain(&ctx->swapchain_info, ctx->surface, &ctx->swapchain);
   return err;
 }
@@ -2867,8 +2875,8 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
   const VkViewport viewport      = {
       .x        = (float)r->x,
       .y        = is_default_rt ? (float)r->y + (float)r->height : (float)r->y,
-      .width    = (float)r->width,
-      .height   = (is_default_rt ? -1.0f : 1.0f) * (float)r->height,
+      .width    = NGFI_MAX(1, (float)r->width),
+      .height   = (is_default_rt ? -1.0f : 1.0f) * NGFI_MAX(1, (float)r->height),
       .minDepth = 0.0f,  // TODO: add depth parameter
       .maxDepth = 1.0f   // TODO: add max depth parameter
   };
@@ -3379,12 +3387,12 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   assert(info);
   assert(result);
 
-  const bool is_sampled_from         = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
-  const bool is_xfer_dst             = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
-  const bool is_attachment           = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
-  const bool is_depth_stencil        = info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
-  const bool is_depth_only           = info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
-                                       info->format == NGF_IMAGE_FORMAT_DEPTH16;
+  const bool is_sampled_from  = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
+  const bool is_xfer_dst      = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
+  const bool is_attachment    = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
+  const bool is_depth_stencil = info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+  const bool is_depth_only =
+      info->format == NGF_IMAGE_FORMAT_DEPTH32 || info->format == NGF_IMAGE_FORMAT_DEPTH16;
 
   const VkImageUsageFlagBits attachment_usage_bits =
       is_depth_only || is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -3401,9 +3409,12 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     goto ngf_create_image_cleanup;
   }
 
-  img->vkformat    = get_vk_image_format(info->format);
-  img->extent      = info->extent;
-  img->usage_flags = info->usage_hint;
+  img->vkformat      = get_vk_image_format(info->format);
+  img->extent        = info->extent;
+  img->usage_flags   = info->usage_hint;
+  img->extent.depth  = NGFI_MAX(1, img->extent.depth);
+  img->extent.width  = NGFI_MAX(1, img->extent.width);
+  img->extent.height = NGFI_MAX(1, img->extent.height);
 
   const bool              is_cubemap    = info->type == NGF_IMAGE_TYPE_CUBE;
   const VkImageCreateInfo vk_image_info = {
