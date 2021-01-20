@@ -3382,13 +3382,13 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const bool is_sampled_from         = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
   const bool is_xfer_dst             = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
   const bool is_attachment           = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
-  const bool is_depth_stencil_format = info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
-                                       info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
-                                       info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+  const bool is_depth_stencil        = info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+  const bool is_depth_only           = info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
+                                       info->format == NGF_IMAGE_FORMAT_DEPTH16;
 
   const VkImageUsageFlagBits attachment_usage_bits =
-      is_depth_stencil_format ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                              : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+      is_depth_only || is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                        : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   const VkImageUsageFlagBits usage_flags = (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
                                            (is_attachment ? attachment_usage_bits : 0u) |
                                            (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u);
@@ -3466,15 +3466,18 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
       .newLayout = is_sampled_from
                        ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                       : (is_depth_stencil_format ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                  : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
+                       : (is_depth_only
+                              ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+                              : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                  : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)),
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .image               = img->vkimg,
       .subresourceRange    = {
-          .aspectMask =
-              (is_depth_stencil_format ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
-                                       : VK_IMAGE_ASPECT_COLOR_BIT),
+          .aspectMask = is_depth_only ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                      : (is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
+                                                             VK_IMAGE_ASPECT_STENCIL_BIT)
+                                                          : VK_IMAGE_ASPECT_COLOR_BIT),
           .baseMipLevel   = 0u,
           .levelCount     = vk_image_info.mipLevels,
           .baseArrayLayer = 0u,
