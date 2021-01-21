@@ -3541,7 +3541,8 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
 
 void ngf_destroy_sampler(ngf_sampler sampler) {
   if (sampler) {
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_samplers, sampler->vksampler);
+    const uint32_t fi = CURRENT_CONTEXT->frame_id;
+    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_samplers, sampler->vksampler);
     NGFI_FREE(sampler);
   }
 }
