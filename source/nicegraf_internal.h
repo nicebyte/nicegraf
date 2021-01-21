@@ -144,28 +144,6 @@ ngf_error ngfi_transition_cmd_buf(
     return NGF_ERROR_INVALID_OPERATION;                                                          \
   }
 
-// Interlocked ops.
-#if defined(_WIN32)
-#define ATOMIC_INT              ULONG
-#define interlocked_inc(v)      ((ULONG)InterlockedIncrement((LONG*)v))
-#define interlocked_post_inc(v) ((ULONG)InterlockedExchangeAdd((LONG*)v, 1))
-#define interlocked_read(v)     ((ULONG)InterlockedExchangeAdd((LONG*)v, 0))
-#elif defined(_WIN64)
-#define ATOMIC_INT              ULONG64
-#define interlocked_inc(v)      ((ULONG64)InterlockedIncrement64((LONG64*)x))
-#define interlocked_post_inc(v) ((ULONG64)InterlockedExchangeAdd64((LONG*)v, 1))
-#define interlocked_read(v)     ((ULONG64)InterlockedExchangeAdd64((LONG64*)v, 0))
-#else
-#if defined(__LP64__)
-#define ATOMIC_INT uint64_t
-#else
-#define ATOMIC_INT uint32_t
-#endif
-#define interlocked_inc(v)      (__sync_add_and_fetch(v, 1))
-#define interlocked_post_inc(v) (__sync_fetch_and_add(v, 1))
-#define interlocked_read(v)     (__sync_add_and_fetch(v, 0))
-#endif
-
 // Invoke diagnostic message callback directly.
 #define NGFI_DIAG_MSG(level, fmt, ...)                                           \
   if (ngfi_diag_info.callback) {                                                 \
