@@ -1697,9 +1697,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
 
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
   assert(bufs);
-  uint32_t               fi = CURRENT_CONTEXT->frame_id;
-  ngfvk_frame_resources* frame_sync_data =
-      &CURRENT_CONTEXT->frame_res[fi % CURRENT_CONTEXT->max_inflight_frames];
+  uint32_t               fi              = CURRENT_CONTEXT->frame_id;
+  ngfvk_frame_resources* frame_sync_data = &CURRENT_CONTEXT->frame_res[fi];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
     NGFI_TRANSITION_CMD_BUF(bufs[i], NGFI_CMD_BUFFER_SUBMITTED);
     if (bufs[i]->desc_superpool) {
@@ -1771,9 +1770,9 @@ ngf_error ngf_end_frame() {
   ngf_error err = NGF_ERROR_OK;
 
   // Obtain the current frame sync structure and increment frame number.
-  const uint32_t fi = CURRENT_CONTEXT->frame_id;
-  CURRENT_CONTEXT->frame_id =
-      (CURRENT_CONTEXT->frame_id + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  const uint32_t fi                 = CURRENT_CONTEXT->frame_id;
+  const uint32_t next_fi            = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  CURRENT_CONTEXT->frame_id         = next_fi;
   ngfvk_frame_resources* frame_sync = &CURRENT_CONTEXT->frame_res[fi];
 
   frame_sync->nfences = 0u;
@@ -1855,7 +1854,6 @@ ngf_error ngf_end_frame() {
   }
 
   // Retire resources.
-  const uint32_t         next_fi         = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
   ngfvk_frame_resources* next_frame_sync = &CURRENT_CONTEXT->frame_res[next_fi];
   ngfvk_retire_resources(next_frame_sync);
   return err;
@@ -3541,7 +3539,8 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
 
 void ngf_destroy_sampler(ngf_sampler sampler) {
   if (sampler) {
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res->retire_samplers, sampler->vksampler);
+    const uint32_t fi = CURRENT_CONTEXT->frame_id;
+    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_samplers, sampler->vksampler);
     NGFI_FREE(sampler);
   }
 }
