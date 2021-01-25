@@ -18,6 +18,6 @@ jobs:
     - name: run_cmake
       run: cd ./build && cmake .. -DNGF_BUILD_TESTS=yes
     - name: make
-      run:  cd ./build && make
+      run:  cd ./build && make ngf_tests
     - name: test
       run: ./tests/ngf_tests
