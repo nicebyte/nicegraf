@@ -188,7 +188,7 @@ ngf_plmd_error ngf_plmd_load(const void *buf, size_t buf_size,
   const uint8_t *set_ptr = pipeline_layout_ptr + sizeof(uint32_t);
   for (uint32_t s = 0u; s < nsets; ++s) {
     meta->layout.set_layouts[s] = (const ngf_plmd_descriptor_set_layout*)set_ptr;
-    const uint32_t set_data_size =
+    const size_t set_data_size =
         meta->layout.set_layouts[s]->ndescriptors * sizeof(ngf_plmd_descriptor) +
         sizeof(uint32_t);
     set_ptr += set_data_size;
