@@ -23,6 +23,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,7 +42,7 @@ typedef struct {
 } ngfi_handle_pool_info;
 
 ngfi_handle_pool ngfi_create_handle_pool(const ngfi_handle_pool_info* info);
-void             ngfi_destroy_handle_pool(ngfi_handle_pool pool);
+bool             ngfi_destroy_handle_pool(ngfi_handle_pool pool);
 uint64_t         ngfi_handle_pool_alloc(ngfi_handle_pool pool);
 void             ngfi_handle_pool_free(ngfi_handle_pool pool, uint64_t handle);
 
