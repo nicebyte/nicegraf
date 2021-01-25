@@ -90,7 +90,7 @@ static void _NGF_FAKE_USE_HELPER(int _, ...) {
 #define NGFI_FAKE_USE(...) _NGF_FAKE_USE_HELPER(0u, __VA_ARGS__)
 #else
 #define NGFI_FAKE_USE(...) \
-  { sizeof(__VA_ARGS__); }
+  { (void)sizeof(__VA_ARGS__); }
 #endif
 
 // MSVC warnings that are safe to ignore.
@@ -161,10 +161,10 @@ ngf_error ngfi_transition_cmd_buf(
   }
 
 // Access to device capabilities global structure.
-void                           ngfi_device_caps_create();
-ngf_device_capabilities*       ngfi_device_caps_lock();
+void                           ngfi_device_caps_create(void);
+ngf_device_capabilities*       ngfi_device_caps_lock(void);
 void                           ngfi_device_caps_unlock(ngf_device_capabilities*);
-const ngf_device_capabilities* ngfi_device_caps_read();
+const ngf_device_capabilities* ngfi_device_caps_read(void);
 
 extern ngf_diagnostic_info ngfi_diag_info;
 

@@ -156,7 +156,7 @@ PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR;
 HMODULE vkdll = NULL;
 
 
-bool vkl_init_loader() {
+bool vkl_init_loader(void) {
   vkdll = LoadLibraryA("vulkan-1.dll");
   if (!vkdll) {
     return false;

@@ -59,7 +59,7 @@ void ngfi_sa_destroy(ngfi_sa* allocator) {
   free(allocator);
 }
 
-ngfi_sa* ngfi_tmp_store() {
+ngfi_sa* ngfi_tmp_store(void) {
   static NGFI_THREADLOCAL ngfi_sa* temp_storage = NULL;
   if (temp_storage == NULL) {
     const size_t sa_capacity = 1024 * 100;  // 100K
