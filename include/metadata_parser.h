@@ -118,8 +118,8 @@ typedef struct ngf_plmd_descriptor_set_layout {
  * Information about a pipeline layout.
  */
 typedef struct ngf_plmd_layout {
-  uint32_t                               ndescriptor_sets; /**< Number of descriptor sets.*/
   const ngf_plmd_descriptor_set_layout** set_layouts;
+  uint32_t                               ndescriptor_sets; /**< Number of descriptor sets.*/
 } ngf_plmd_layout;
 
 /**
@@ -154,8 +154,8 @@ typedef struct ngf_plmd_cis_map_entry {
  * combined texture/samplers that it is used in.
  */
 typedef struct ngf_plmd_cis_map {
-  uint32_t                       nentries; /**< Number of entries in the map. */
   const ngf_plmd_cis_map_entry** entries;
+  uint32_t                       nentries; /**< Number of entries in the map. */
 } ngf_plmd_cis_map;
 
 /**
@@ -170,8 +170,8 @@ typedef struct ngf_plmd_user_entry {
  * User-provided metadata.
  */
 typedef struct ngf_plmd_user {
-  uint32_t             nentries; /**< Number of entries. */
   ngf_plmd_user_entry* entries;
+  uint32_t             nentries; /**< Number of entries. */
 } ngf_plmd_user;
 
 typedef enum ngf_plmd_error {
