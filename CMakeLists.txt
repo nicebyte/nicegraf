@@ -25,7 +25,7 @@ project(nicegraf)
 
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 # These are the compilator flags that are used on all nicegraf targets.
 if(WIN32)
@@ -150,6 +150,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/handle_pool_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf_internal)
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
