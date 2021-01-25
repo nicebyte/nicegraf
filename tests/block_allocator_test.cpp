@@ -10,7 +10,7 @@ struct test_data {
 
 static constexpr uint32_t num_max_entries = 1000u;
 
-TEST_CASE("Basic block allocator functionality", "[blkalloc_basic]") {
+TEST_CASE("Basic block allocator functionality") {
   ngfi_block_allocator *allocator =
       ngfi_blkalloc_create(sizeof(test_data), num_max_entries);
   REQUIRE(allocator != NULL);

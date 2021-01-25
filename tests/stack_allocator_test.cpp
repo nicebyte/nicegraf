@@ -1,7 +1,7 @@
 #include "catch.hpp"
 #include "stack_alloc.h"
 
-TEST_CASE("exhaust-reset-exhaust", "[stack_alloc]") {
+TEST_CASE("exhaust-reset-exhaust") {
   const uint32_t value   = 0xdeadbeef;
   const uint32_t nvalues = 10;
   ngfi_sa *sa = ngfi_sa_create(sizeof(value) * nvalues);
