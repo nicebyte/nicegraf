@@ -60,8 +60,8 @@ SOFTWARE.
 #define NGFI_DARRAY_AT(a, i) (a.data[i])
 
 #define NGFI_DARRAY_POP(a) {\
-  assert(a->data != a->endptr); \
-  --a->endptr; \
+  assert(a.data != a.endptr); \
+  --(a.endptr); \
 }
 
 #define NGFI_DARRAY_SWAP(a, i, j) { \
