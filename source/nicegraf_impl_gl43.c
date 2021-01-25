@@ -461,7 +461,12 @@ static void GL_APIENTRY ngfgl_debug_message_callback(
     GLsizei       length,
     const GLchar* message,
     const void*   userdata) {
-  NGFI_FAKE_USE(length, severity, source, type, id, userdata);
+  NGFI_IGNORE_VAR(length);
+  NGFI_IGNORE_VAR(severity);
+  NGFI_IGNORE_VAR(source);
+  NGFI_IGNORE_VAR(type);
+  NGFI_IGNORE_VAR(id);
+  NGFI_IGNORE_VAR(userdata);
   if (ngfi_diag_info.callback) {
     ngf_diagnostic_message_type ngf_msg_type;
     switch (severity) {
@@ -612,7 +617,9 @@ ngf_create_context_cleanup:
 }
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
-  NGFI_FAKE_USE(ctx, new_width, new_height);
+  NGFI_IGNORE_VAR(ctx);
+  NGFI_IGNORE_VAR(new_width);
+  NGFI_IGNORE_VAR(new_height);
   return NGF_ERROR_OK;
 }
 
@@ -1558,7 +1565,7 @@ void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) {
 }
 
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) {
-  NGFI_FAKE_USE(info);
+  NGFI_IGNORE_VAR(info);
   assert(result);
   if (COMMAND_POOL == NULL) { COMMAND_POOL = ngfi_blkalloc_create(sizeof(ngfgl_cmd_block), 100); }
   ngf_error err      = NGF_ERROR_OK;
