@@ -70,7 +70,7 @@ TEST_CASE("Block allocator fuzz test", "[blkalloc_fuzz]") {
       }
     } else if (active_blocks > 0u) {
       uint32_t idx = 0u;
-      idx = (num_max_entries - 1u) * d(gen);
+      idx = static_cast<uint32_t>((num_max_entries - 1u) * d(gen));
       if (data[idx] != nullptr) {
         --active_blocks;
         REQUIRE(data[idx]->p1 == (test_data*)data[idx]);
