@@ -154,4 +154,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf_internal)
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
+    if (NOT WIN32)
+        target_link_libraries(ngf_tests pthread)
+    endif()
 endif()
