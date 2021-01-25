@@ -37,7 +37,7 @@
 void ngf_util_create_default_graphics_pipeline_data(
     const ngf_irect2d*               window_size,
     ngf_util_graphics_pipeline_data* result) {
-  NGFI_FAKE_USE(window_size);
+  NGFI_IGNORE_VAR(window_size);
   ngf_blend_info bi;
   bi.enable                        = false;
   result->blend_info               = bi;

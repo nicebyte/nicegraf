@@ -58,15 +58,15 @@ function (ngf_target)
   endif()
 endfunction()
 
+# Shortcut for adding a new library target.
 function (ngf_library)
    ngf_target(TYPE lib ${ARGN})
 endfunction()
 
+# Shortcut for adding a new binary target.
 function (ngf_binary)
    ngf_target(TYPE bin ${ARGN})
 endfunction()
-
-
 
 # A helper library for parsing shader metadata produced by
 # nicegraf-shaderc.
