@@ -5,7 +5,7 @@
 
 struct point { float x, y; };
 
-TEST_CASE("Creating a dynamic array", "[dynarr_create]") {
+TEST_CASE("Creating a dynamic array") {
   NGFI_DARRAY_OF(point) pt_array;
   NGFI_DARRAY_RESET(pt_array, 100u);
   REQUIRE(pt_array.data != NULL);
@@ -14,7 +14,7 @@ TEST_CASE("Creating a dynamic array", "[dynarr_create]") {
   NGFI_DARRAY_DESTROY(pt_array);
 }
 
-TEST_CASE("Populate a dynamic array", "[dynarr_populate]") {
+TEST_CASE("Populate a dynamic array") {
   NGFI_DARRAY_OF(point) pt_array;
   std::vector<point> check_array;
   std::random_device rd;
