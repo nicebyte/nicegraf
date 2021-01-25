@@ -23,73 +23,97 @@ SOFTWARE.
 cmake_minimum_required(VERSION 3.14.0)
 project(nicegraf)
 
+
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_CXX_STANDARD 17)
+
+# These are the compilator flags that are used on all nicegraf targets.
+if(WIN32)
+    set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
+else()
+    set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas")
+endif()
+    
+
 # This function adds a new library target and sets some configuration
 # common across all libs.
-function (ngf_lib_target)
-  cmake_parse_arguments(LIB "" "NAME" "SRCS;DEPS;COPTS" ${ARGN})
-  add_library(${LIB_NAME} STATIC ${LIB_SRCS})
-  if ( LIB_DEPS )
-    target_link_libraries(${LIB_NAME} ${LIB_DEPS})
+function (ngf_target)
+  cmake_parse_arguments(TGT "" "NAME" "TYPE;SRCS;DEPS;COPTS" ${ARGN})
+  if (TGT_TYPE STREQUAL "lib")
+    add_library(${TGT_NAME} STATIC ${TGT_SRCS})
+  elseif(TGT_TYPE STREQUAL "bin")
+    add_executable(${TGT_NAME} ${TGT_SRCS})
+  else()
+    message(FATAL_ERROR "invalid target type")
   endif()
-  target_include_directories(${LIB_NAME}
+  if ( TGT_DEPS )
+    target_link_libraries(${TGT_NAME} ${TGT_DEPS})
+  endif()
+  target_include_directories(${TGT_NAME}
                              PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
                              PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source)
-  if(WIN32)
-    set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
-  else()
-    set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas")
-  endif()
-  target_compile_options(${LIB_NAME} PRIVATE ${NICEGRAF_COMMON_COMPILE_OPTS})
-  if ( LIB_COPTS )
-    target_compile_options(${LIB_NAME} PRIVATE ${LIB_COPTS})
+  target_compile_options(${TGT_NAME} PRIVATE ${NICEGRAF_COMMON_COMPILE_OPTS})
+  if ( TGT_COPTS )
+    target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
   endif()
 endfunction()
+
+function (ngf_library)
+   ngf_target(TYPE lib ${ARGN})
+endfunction()
+
+function (ngf_binary)
+   ngf_target(TYPE bin ${ARGN})
+endfunction()
+
 
 
 # A helper library for parsing shader metadata produced by
 # nicegraf-shaderc.
-ngf_lib_target(NAME ngf_metadata_parser
-               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
-                    ${CMAKE_CURRENT_LIST_DIR}/source/metadata_parser.c)
+ngf_library(NAME ngf_metadata_parser
+            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/metadata_parser.c)
 
 # A library with various utilities shared internally across different backends.
-ngf_lib_target(NAME nicegraf_internal
-               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
-                    ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.h
-                    ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.h
-                    ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
-                    ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c
-                    ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.c
-               DEPS ngf_metadata_parser)
+ngf_library(NAME nicegraf_internal
+            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/handle_pool.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/handle_pool.c
+            DEPS ngf_metadata_parser)
 
 # nicegraf utility library.
-ngf_lib_target(NAME nicegraf_util
-           SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
-                ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_util.c
-           DEPS nicegraf_internal)
+ngf_library(NAME nicegraf_util
+            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_util.c
+            DEPS nicegraf_internal)
 
 # Common dependencies used by nicegraf on all platforms.
 set(NICEGRAF_COMMON_DEPS nicegraf_internal ngf_metadata_parser)
 
 if (APPLE)
   # Nicegraf with Metal backend.
-  ngf_lib_target(NAME nicegraf_mtl
-                 SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm
-                 DEPS ${NICEGRAF_COMMON_DEPS}
-                 COPTS "--std=c++17" "-fobjc-arc")
+  ngf_library(NAME nicegraf_mtl
+              SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                   ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm
+              DEPS ${NICEGRAF_COMMON_DEPS}
+              COPTS "--std=c++17" "-fobjc-arc")
 else()
   # Import the EGL library for context creation.
   set(EGL_NO_GLEW ON)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/EGL/EGL)
 
   # Nicegraf with GL backend.
-  ngf_lib_target(NAME nicegraf_gl
-                 SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
-                      ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c
-                 DEPS egl)
+  ngf_library(NAME nicegraf_gl
+              SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                   ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
+                   ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c
+              DEPS egl)
 
   # Try searching for Vulkan SDK.
   find_package(Vulkan)
@@ -107,11 +131,11 @@ else()
     endif()
 
     # Vulkan backend.
-    ngf_lib_target(NAME nicegraf_vk
-                   SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/vk_10.c
-                   DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
+    ngf_library(NAME nicegraf_vk
+                SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c
+                     ${CMAKE_CURRENT_LIST_DIR}/source/vk_10.c
+                DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 
     # Add Vulkan header directory to nicegraf_vk include paths.
     get_property(VK_INCLUDE_PATH TARGET Vulkan::Vulkan PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
@@ -119,4 +143,14 @@ else()
   else()
     message(WARNING "nicegraf Vulkan backend will not be built because Vulkan SDK was not found.")
   endif()
+endif()
+
+if (NGF_BUILD_TESTS STREQUAL "yes")
+    ngf_binary(NAME ngf_tests
+               SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block_allocator_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
+               DEPS nicegraf_internal)
+    target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
 endif()
