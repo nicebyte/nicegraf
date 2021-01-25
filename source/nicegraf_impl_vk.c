@@ -598,7 +598,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
     VkDebugUtilsMessageTypeFlagsEXT             type,
     const VkDebugUtilsMessengerCallbackDataEXT* data,
     void*                                       userdata) {
-  NGFI_FAKE_USE(type, userdata);
+  NGFI_IGNORE_VAR(type);
+  NGFI_IGNORE_VAR(userdata);
   ngf_diagnostic_message_type ngf_msg_type;
   switch (severity) {
   case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
@@ -1579,7 +1580,7 @@ ngf_error ngf_set_context(ngf_context ctx) {
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) {
   assert(info);
   assert(result);
-  NGFI_FAKE_USE(info);
+  NGFI_IGNORE_VAR(info);
 
   ngf_cmd_buffer cmd_buf = NGFI_ALLOC(ngf_cmd_buffer_t);
   if (cmd_buf == NULL) { return NGF_ERROR_OUT_OF_MEM; }
@@ -2296,10 +2297,10 @@ ngf_error ngf_default_render_target(
   assert(result);
   ngf_render_target rt  = NULL;
   ngf_error         err = NGF_ERROR_OK;
-  NGFI_FAKE_USE(depth_load_op);
-  NGFI_FAKE_USE(clear_depth);
-  NGFI_FAKE_USE(color_store_op);
-  NGFI_FAKE_USE(depth_store_op);
+  NGFI_IGNORE_VAR(depth_load_op);
+  NGFI_IGNORE_VAR(clear_depth);
+  NGFI_IGNORE_VAR(color_store_op);
+  NGFI_IGNORE_VAR(depth_store_op);
 
   if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
     rt = NGFI_ALLOC(ngf_render_target_t);
@@ -2906,7 +2907,8 @@ static void ngfvk_cmd_copy_buffer(
     size_t               dst_offset,
     VkAccessFlags        usage_access_mask,
     VkPipelineStageFlags usage_stage_mask) {
-  NGFI_FAKE_USE(usage_access_mask, usage_stage_mask);
+  NGFI_IGNORE_VAR(usage_access_mask)
+  NGFI_IGNORE_VAR(usage_stage_mask);
   const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
 
   VkBufferMemoryBarrier pre_xfer_mem_bar = {
@@ -3204,7 +3206,8 @@ void* ngf_attrib_buffer_map_range(
     size_t            offset,
     size_t            size,
     uint32_t          flags) {
-  NGFI_FAKE_USE(size, flags);
+  NGFI_IGNORE_VAR(size);
+  NGFI_IGNORE_VAR(flags);
   return ngfvk_map_buffer(&buf->data, offset);
 }
 
@@ -3256,7 +3259,8 @@ void ngf_destroy_index_buffer(ngf_index_buffer buffer) {
 }
 
 void* ngf_index_buffer_map_range(ngf_index_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  NGFI_FAKE_USE(size, flags);
+  NGFI_IGNORE_VAR(size);
+  NGFI_IGNORE_VAR(flags);
   return ngfvk_map_buffer(&buf->data, offset);
 }
 
@@ -3313,7 +3317,8 @@ void* ngf_uniform_buffer_map_range(
     size_t             offset,
     size_t             size,
     uint32_t           flags) {
-  NGFI_FAKE_USE(size, flags);
+  NGFI_IGNORE_VAR(size);
+  NGFI_IGNORE_VAR(flags);
   return ngfvk_map_buffer(&buf->data, offset);
 }
 
@@ -3358,7 +3363,8 @@ void ngf_destroy_pixel_buffer(ngf_pixel_buffer buffer) {
 }
 
 void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  NGFI_FAKE_USE(size, flags);
+  NGFI_IGNORE_VAR(size);
+  NGFI_IGNORE_VAR(flags);
   return ngfvk_map_buffer(&buf->data, offset);
 }
 

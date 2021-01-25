@@ -83,15 +83,7 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 #define NGFI_MIN(a, b) (a < b ? a : b)
 
 // For fixing unreferenced parameter warnings.
-#if defined(__GNUC__) && !defined(__clang__)
-static void _NGF_FAKE_USE_HELPER(int _, ...) {
-  _ <<= 0u;
-}
-#define NGFI_FAKE_USE(...) _NGF_FAKE_USE_HELPER(0u, __VA_ARGS__)
-#else
-#define NGFI_FAKE_USE(...) \
-  { (void)sizeof(__VA_ARGS__); }
-#endif
+#define NGFI_IGNORE_VAR(name) { (void)name; }
 
 // MSVC warnings that are safe to ignore.
 #pragma warning(disable : 4201)
