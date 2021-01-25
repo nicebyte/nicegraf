@@ -1,6 +1,8 @@
 #include "catch.hpp"
 #include "handle_pool.h"
 
+#include <atomic>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -219,5 +221,62 @@ TEST_CASE("destroying pool fails if not all handles are returned", "[fail destro
   const bool successful_destroy_result = ngfi_destroy_handle_pool(pool);
   REQUIRE(successful_destroy_result);
   REQUIRE(counters.nfrees == pool_info.initial_size);
+}
+
+TEST_CASE("multithreaded setup", "[multithread]") {
+  alloc_counters        counters;
+  ngfi_handle_pool_info pool_info {
+      .initial_size         = DEFAULT_POOL_SIZE,
+      .allocator            = unlimited_fake_handle_allocator,
+      .allocator_userdata   = &counters,
+      .deallocator          = fake_handle_deallocator,
+      .deallocator_userdata = &counters};
+  ngfi_handle_pool pool = ngfi_create_handle_pool(&pool_info);
+  
+  srand(static_cast<unsigned int>(time(NULL)));
+  auto worker = [pool]() {
+    constexpr uint32_t nallocs_per_thread = 50000;
+    std::vector<uint64_t> handles;
+    for (uint32_t i = 0; i < nallocs_per_thread; ++i) {
+      const uint64_t handle = ngfi_handle_pool_alloc(pool);
+      REQUIRE(handle);
+      handles.push_back(handle);
+      if (rand() % 10 < 5) {
+        const uint32_t j = static_cast<uint32_t>(rand() % handles.size());
+        std::swap(handles[handles.size() - 1], handles[j]);
+        ngfi_handle_pool_free(pool, handles.back());
+        handles.pop_back();
+      }
+    }
+    for (const uint64_t h : handles) {
+        ngfi_handle_pool_free(pool, h);
+    }
+  };
+
+  std::vector<std::thread> threads;
+  constexpr uint32_t nthreads = 5;
+  for (uint32_t i = 0u; i < nthreads; ++i) {
+    threads.push_back(std::thread(worker));
+  }
+
+  std::atomic<int> end = 0;
+  std::thread straggler { [pool, &end]() {
+    const uint64_t h = ngfi_handle_pool_alloc(pool);
+    while (end.load() == 0) std::this_thread::yield();
+    ngfi_handle_pool_free(pool, h);
+  }};
+
+  for (std::thread& t : threads) {
+    t.join();
+  }
  
+  const bool failed_destroy_result = ngfi_destroy_handle_pool(pool);
+  REQUIRE_FALSE(failed_destroy_result);
+
+  end = 1;
+  straggler.join();
+
+  const bool successful_destroy_result = ngfi_destroy_handle_pool(pool);
+  REQUIRE(successful_destroy_result);
+  REQUIRE(counters.nallocs == counters.nfrees);
 }
