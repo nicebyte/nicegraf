@@ -6,6 +6,7 @@
 typedef struct ngfi_handle_pool_t {
   NGFI_DARRAY_OF(uint64_t) handles;
   pthread_mutex_t         lock;
+  size_t                  size;
   ngfi_handle_pool_info   info;
 } ngfi_handle_pool_t;
 
@@ -21,6 +22,7 @@ ngfi_handle_pool ngfi_create_handle_pool(const ngfi_handle_pool_info* info) {
   pthread_mutex_init(&pool->lock, 0);
 
   NGFI_DARRAY_RESET(pool->handles, info->initial_size);
+  pool->size = info->initial_size;
   pool->info = *info;
   
   for (size_t i = 0; i < pool->info.initial_size; ++i) {
@@ -56,10 +58,15 @@ uint64_t ngfi_handle_pool_alloc(ngfi_handle_pool pool) {
   assert(pool);
   uint64_t result = 0u;
   pthread_mutex_lock(&pool->lock);
-  const size_t pool_size = NGFI_DARRAY_SIZE(pool->handles);
-  if (pool_size > 0) {
+  const size_t navailable_handles = NGFI_DARRAY_SIZE(pool->handles);
+  if (navailable_handles > 0) {
     result = *NGFI_DARRAY_BACKPTR(pool->handles);
     NGFI_DARRAY_POP(pool->handles);
+  } else {
+    result = pool->info.allocator(pool->info.allocator_userdata);
+    if (result != 0u) {
+      ++pool->size;
+    }
   }
   pthread_mutex_unlock(&pool->lock);
   return result;
