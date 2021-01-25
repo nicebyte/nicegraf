@@ -24,7 +24,7 @@ ngfi_handle_pool ngfi_create_handle_pool(const ngfi_handle_pool_info* info) {
   pool->info = *info;
   
   for (size_t i = 0; i < pool->info.initial_size; ++i) {
-    const uint64_t handle = pool->info.allocator(pool->info.allocator_userinfo);
+    const uint64_t handle = pool->info.allocator(pool->info.allocator_userdata);
     if (handle == 0u) {
       goto ngfi_handle_pool_cleanup;
     }
@@ -44,7 +44,7 @@ void ngfi_destroy_handle_pool(ngfi_handle_pool pool) {
   if (pool != NULL) {
     const size_t pool_size = NGFI_DARRAY_SIZE(pool->handles);
     for(size_t i = 0; i < pool_size && pool->info.deallocator; ++i) {
-      pool->info.deallocator(NGFI_DARRAY_AT(pool->handles, i), pool->info.deallocator_userinfo);
+      pool->info.deallocator(NGFI_DARRAY_AT(pool->handles, i), pool->info.deallocator_userdata);
     }
     NGFI_DARRAY_DESTROY(pool->handles);
     pthread_mutex_destroy(&pool->lock);

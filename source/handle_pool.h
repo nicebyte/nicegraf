@@ -35,9 +35,9 @@ typedef void (*ngfi_handle_deallocator)(uint64_t, void*);
 typedef struct {
   uint32_t                initial_size;
   ngfi_handle_allocator   allocator;
-  void*                   allocator_userinfo;
+  void*                   allocator_userdata;
   ngfi_handle_deallocator deallocator;
-  void*                   deallocator_userinfo;
+  void*                   deallocator_userdata;
 } ngfi_handle_pool_info;
 
 ngfi_handle_pool ngfi_create_handle_pool(const ngfi_handle_pool_info* info);
