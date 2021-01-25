@@ -14,10 +14,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: make_build_dir
-      run: mkdir -p tests/build
+      run: mkdir -p build
     - name: run_cmake
-      run: cd tests/build && cmake ..
+      run: cd ./build && cmake .. -DNGF_BUILD_TESTS=yes
     - name: make
-      run:  cd tests/build && make
+      run:  cd ./build && make
     - name: test
       run: ./tests/ngf_tests
