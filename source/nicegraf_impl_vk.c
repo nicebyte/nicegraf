@@ -892,7 +892,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   return NGF_ERROR_OK;
 }
 
-const ngf_device_capabilities* ngf_get_device_capabilities() {
+const ngf_device_capabilities* ngf_get_device_capabilities(void) {
   return ngfi_device_caps_read();
 }
 
@@ -1714,7 +1714,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_begin_frame() {
+ngf_error ngf_begin_frame(void) {
   ngf_error      err                    = NGF_ERROR_OK;
   const uint32_t fi                     = CURRENT_CONTEXT->frame_id;
   CURRENT_CONTEXT->frame_res[fi].active = true;
@@ -1766,7 +1766,7 @@ static void ngfvk_submit_commands(
   vkQueueSubmit(queue, 1, &submit_info, fence);
 }
 
-ngf_error ngf_end_frame() {
+ngf_error ngf_end_frame(void) {
   ngf_error err = NGF_ERROR_OK;
 
   // Obtain the current frame sync structure and increment frame number.
@@ -3545,6 +3545,6 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
   }
 }
 
-void ngf_finish() {
+void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
 }

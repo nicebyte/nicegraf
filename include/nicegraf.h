@@ -1155,7 +1155,7 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
  * associated swap chain.
  * @return Error codes: NGF_ERROR_BEGIN_FRAME_FAILED, NGF_ERROR_NO_FRAME
  */
-ngf_error ngf_begin_frame() NGF_NOEXCEPT;
+ngf_error ngf_begin_frame(void) NGF_NOEXCEPT;
 
 /**
  * End a frame of rendering. This function releases the image that was
@@ -1163,13 +1163,13 @@ ngf_error ngf_begin_frame() NGF_NOEXCEPT;
  * ngf_begin_frame.
  * @return Error codes: NGF_ERROR_END_FRAME_FAILED
  */
-ngf_error ngf_end_frame() NGF_NOEXCEPT;
+ngf_error ngf_end_frame(void) NGF_NOEXCEPT;
 
 /**
  * Get a pointer to the device capabilities structure.
  * @return NULL if no context is present on the calling thread.
  */
-const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT;
+const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
 
 /**
  * Set the memory allocation callbacks that the library will use for its
@@ -1428,7 +1428,7 @@ void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) NGF_NOEXCEPT;
 /**
  * Wait for all pending rendering commands to complete.
  */
-void ngf_finish() NGF_NOEXCEPT;
+void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * Creates a new command buffer that is in the "ready" state.

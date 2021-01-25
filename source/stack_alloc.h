@@ -61,7 +61,7 @@ void ngfi_sa_destroy(ngfi_sa* allocator);
 /**
  * Per-thread temporary storage based on stack allocator.
  */
-ngfi_sa* ngfi_tmp_store( );
+ngfi_sa* ngfi_tmp_store(void);
 
 #ifdef __cplusplus
 }

@@ -153,11 +153,11 @@ static struct {
   pthread_mutex_t         mut;
 } ngfi_device_caps;
 
-void ngfi_device_caps_create() {
+void ngfi_device_caps_create(void) {
   pthread_mutex_init(&ngfi_device_caps.mut, NULL);
 }
 
-const ngf_device_capabilities* ngfi_device_caps_read() {
+const ngf_device_capabilities* ngfi_device_caps_read(void) {
   const ngf_device_capabilities* result = NULL;
   pthread_mutex_lock(&ngfi_device_caps.mut);
   if (ngfi_device_caps.initialized) { result = &ngfi_device_caps.caps; }
@@ -165,7 +165,7 @@ const ngf_device_capabilities* ngfi_device_caps_read() {
   return result;
 }
 
-ngf_device_capabilities* ngfi_device_caps_lock() {
+ngf_device_capabilities* ngfi_device_caps_lock(void) {
   pthread_mutex_lock(&ngfi_device_caps.mut);
   return ngfi_device_caps.initialized ? NULL : &ngfi_device_caps.caps;
 }

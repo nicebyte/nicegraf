@@ -183,7 +183,7 @@ extern PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
 extern PFN_vkQueuePresentKHR vkQueuePresentKHR;
 extern PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR;
 
-bool vkl_init_loader();
+bool vkl_init_loader(void);
 void vkl_init_instance(VkInstance instance);
 void vkl_init_device(VkDevice device);
 
