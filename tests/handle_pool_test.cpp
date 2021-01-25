@@ -35,7 +35,7 @@ void fake_handle_deallocator(uint64_t h, void* c) {
 
 }  // namespace
 
-TEST_CASE("default capacity allocated", "[default capacity]") {
+TEST_CASE("default capacity allocated") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -50,7 +50,7 @@ TEST_CASE("default capacity allocated", "[default capacity]") {
   REQUIRE(counters.nfrees == 0);
 }
 
-TEST_CASE("cleanup happens on failed create", "[fail create]") {
+TEST_CASE("cleanup happens on failed create") {
   alloc_counters        counters;
   constexpr uint32_t    nadditional_handles = 50;
   ngfi_handle_pool_info pool_info {
@@ -66,7 +66,7 @@ TEST_CASE("cleanup happens on failed create", "[fail create]") {
   REQUIRE(counters.nfrees == DEFAULT_POOL_SIZE);
 }
 
-TEST_CASE("requesting handles within capacity doesn't chage pool size", "[nochange capacity]") {
+TEST_CASE("requesting handles within capacity doesn't chage pool size") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -83,7 +83,7 @@ TEST_CASE("requesting handles within capacity doesn't chage pool size", "[nochan
   }
 }
 
-TEST_CASE("requesting handles over current capacity causes new allocations", "[grow capacity]") {
+TEST_CASE("requesting handles over current capacity causes new allocations") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -103,7 +103,7 @@ TEST_CASE("requesting handles over current capacity causes new allocations", "[g
   REQUIRE(counters.nfrees == 0u);
 }
 
-TEST_CASE("returning handles to pool doesn't change number of allocations", "[nochange allocs]") {
+TEST_CASE("returning handles to pool doesn't change number of allocations") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -130,7 +130,7 @@ TEST_CASE("returning handles to pool doesn't change number of allocations", "[no
   }
 }
 
-TEST_CASE("handle request returns 0 when no more can be allocated", "[fail alloc]") {
+TEST_CASE("handle request returns 0 when no more can be allocated") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -157,7 +157,7 @@ TEST_CASE("handle request returns 0 when no more can be allocated", "[fail alloc
   REQUIRE(counters.nfrees == 0);
 }
 
-TEST_CASE("handles are recycled", "[recycle]") {
+TEST_CASE("handles are recycled") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -188,7 +188,7 @@ TEST_CASE("handles are recycled", "[recycle]") {
   }
 }
 
-TEST_CASE("destroying pool fails if not all handles are returned", "[fail destroy]") {
+TEST_CASE("destroying pool fails if not all handles are returned") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -218,7 +218,7 @@ TEST_CASE("destroying pool fails if not all handles are returned", "[fail destro
   REQUIRE(counters.nfrees == pool_info.initial_size);
 }
 
-TEST_CASE("multithreaded setup", "[multithread]") {
+TEST_CASE("multithreaded setup") {
   alloc_counters        counters;
   ngfi_handle_pool_info pool_info {
       .initial_size         = DEFAULT_POOL_SIZE,
@@ -269,3 +269,4 @@ TEST_CASE("multithreaded setup", "[multithread]") {
   REQUIRE(successful_destroy_result);
   REQUIRE(counters.nallocs == counters.nfrees);
 }
+
