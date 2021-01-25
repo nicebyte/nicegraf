@@ -20,4 +20,4 @@ jobs:
     - name: make
       run:  cd ./build && make ngf_tests
     - name: test
-      run: ./ngf_tests
+      run: .build/ngf_tests
