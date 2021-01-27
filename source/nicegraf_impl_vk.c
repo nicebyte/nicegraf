@@ -121,8 +121,12 @@ typedef struct ngfvk_bind_op_chunk_list {
 
 typedef struct {
   VmaAllocator  parent_allocator;
-  VkBuffer      vkbuf;
-  VmaAllocation alloc;
+  uint64_t      obj_handle;
+  VmaAllocation vma_alloc;
+} ngfvk_alloc;
+
+typedef struct {
+  ngfvk_alloc   alloc;
   size_t        size;
   size_t        mapped_offset;
 } ngfvk_buffer;
@@ -156,7 +160,7 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkRenderPass) retire_render_passes;
   NGFI_DARRAY_OF(VkSampler) retire_samplers;
   NGFI_DARRAY_OF(ngf_image_t) retire_images;
-  NGFI_DARRAY_OF(ngfvk_buffer) retire_buffers;
+  NGFI_DARRAY_OF(ngfvk_alloc) retire_buffers;
   NGFI_DARRAY_OF(ngfvk_desc_superpool*) reset_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
@@ -1510,9 +1514,10 @@ void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   }
 
   for (uint32_t a = 0; a < NGFI_DARRAY_SIZE(frame_res->retire_buffers); ++a) {
-    ngfvk_buffer* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
-    vmaDestroyBuffer(b->parent_allocator, b->vkbuf, b->alloc);
+    ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
+    vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
   }
+  
   for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools); ++p) {
     ngfvk_desc_superpool* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
     for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
@@ -1521,6 +1526,7 @@ void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     }
     superpool->active_pool = superpool->list;
   }
+
   NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
   NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
@@ -2756,7 +2762,7 @@ void ngf_cmd_draw(
         VkDescriptorBufferInfo*             vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
-        vk_bind_info->buffer = bind_info->buffer->data.vkbuf;
+        vk_bind_info->buffer = (VkBuffer)bind_info->buffer->data.alloc.obj_handle;
         vk_bind_info->offset = bind_info->offset;
         vk_bind_info->range  = bind_info->range;
 
@@ -2894,7 +2900,7 @@ void ngf_cmd_bind_attrib_buffer(
     uint32_t                offset) {
   ngf_cmd_buffer buf      = NGFVK_ENC2CMDBUF(enc);
   VkDeviceSize   vkoffset = offset;
-  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, &abuf->data.vkbuf, &vkoffset);
+  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, (VkBuffer*)&abuf->data.alloc.obj_handle, &vkoffset);
 }
 
 void ngf_cmd_bind_index_buffer(
@@ -2904,7 +2910,7 @@ void ngf_cmd_bind_index_buffer(
   ngf_cmd_buffer    buf      = NGFVK_ENC2CMDBUF(enc);
   const VkIndexType idx_type = get_vk_index_type(index_type);
   assert(idx_type == VK_INDEX_TYPE_UINT16 || idx_type == VK_INDEX_TYPE_UINT32);
-  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, ibuf->data.vkbuf, 0u, idx_type);
+  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->data.alloc.obj_handle, 0u, idx_type);
 }
 
 static void ngfvk_cmd_copy_buffer(
@@ -2978,8 +2984,8 @@ void ngf_cmd_copy_attrib_buffer(
   assert(buf);
   ngfvk_cmd_copy_buffer(
       buf->active_bundle.vkcmdbuf,
-      src->data.vkbuf,
-      dst->data.vkbuf,
+      (VkBuffer)src->data.alloc.obj_handle,
+      (VkBuffer)dst->data.alloc.obj_handle,
       size,
       src_offset,
       dst_offset,
@@ -2998,8 +3004,8 @@ void ngf_cmd_copy_index_buffer(
   assert(buf);
   ngfvk_cmd_copy_buffer(
       buf->active_bundle.vkcmdbuf,
-      src->data.vkbuf,
-      dst->data.vkbuf,
+      (VkBuffer)src->data.alloc.obj_handle,
+      (VkBuffer)dst->data.alloc.obj_handle,
       size,
       src_offset,
       dst_offset,
@@ -3018,8 +3024,8 @@ void ngf_cmd_copy_uniform_buffer(
   assert(buf);
   ngfvk_cmd_copy_buffer(
       buf->active_bundle.vkcmdbuf,
-      src->data.vkbuf,
-      dst->data.vkbuf,
+      (VkBuffer)src->data.alloc.obj_handle,
+      (VkBuffer)dst->data.alloc.obj_handle,
       size,
       src_offset,
       dst_offset,
@@ -3078,7 +3084,7 @@ void ngf_cmd_write_image(
       .imageExtent = {.width = extent->width, .height = extent->height, .depth = extent->depth}};
   vkCmdCopyBufferToImage(
       buf->active_bundle.vkcmdbuf,
-      src->data.vkbuf,
+      (VkBuffer)src->data.alloc.obj_handle,
       dst.image->vkimg,
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       1u,
@@ -3117,9 +3123,7 @@ static ngf_error ngfvk_create_buffer(
     VkBufferUsageFlags    vk_usage_flags,
     uint32_t              vma_usage_flags,
     VkMemoryPropertyFlags vk_mem_flags,
-    VkBuffer*             vk_buffer,
-    VmaAllocation*        vma_alloc,
-    VmaAllocator*         vma_allocator) {
+    ngfvk_alloc*          alloc) {
   const VkBufferCreateInfo buf_vk_info = {
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .pNext                 = NULL,
@@ -3143,26 +3147,26 @@ static ngf_error ngfvk_create_buffer(
       CURRENT_CONTEXT->allocator,
       &buf_vk_info,
       &buf_alloc_info,
-      vk_buffer,
-      vma_alloc,
+      (VkBuffer*)&alloc->obj_handle,
+      &alloc->vma_alloc,
       NULL);
-  *vma_allocator = CURRENT_CONTEXT->allocator;
+  alloc->parent_allocator = CURRENT_CONTEXT->allocator;
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
   void*    result   = NULL;
-  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc, &result);
+  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
   if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
   return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
 }
 
 static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
-  vmaFlushAllocation(CURRENT_CONTEXT->allocator, buf->alloc, buf->mapped_offset + offset, size);
+  vmaFlushAllocation(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
 }
 
 static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc);
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
 }
 
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attrib_buffer* result) {
@@ -3185,9 +3189,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attri
       vk_usage_flags,
       vma_usage_flags,
       vk_mem_flags,
-      &buf->data.vkbuf,
-      &buf->data.alloc,
-      &buf->data.parent_allocator);
+      &buf->data.alloc);
 
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
@@ -3200,7 +3202,7 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attri
 
 static void ngfvk_buffer_retire(ngfvk_buffer buf) {
   const uint32_t fi = CURRENT_CONTEXT->frame_id;
-  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf);
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
 }
 
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
@@ -3248,9 +3250,7 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info* info, ngf_index_b
       vk_usage_flags,
       vma_usage_flags,
       vk_mem_flags,
-      &buf->data.vkbuf,
-      &buf->data.alloc,
-      &buf->data.parent_allocator);
+      &buf->data.alloc);
 
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
@@ -3302,9 +3302,7 @@ ngf_create_uniform_buffer(const ngf_uniform_buffer_info* info, ngf_uniform_buffe
       vk_usage_flags,
       vma_usage_flags,
       vk_mem_flags,
-      &buf->data.vkbuf,
-      &buf->data.alloc,
-      &buf->data.parent_allocator);
+      &buf->data.alloc);
 
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
@@ -3352,9 +3350,7 @@ ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info* info, ngf_pixel_b
       VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
       VMA_MEMORY_USAGE_CPU_ONLY,
       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT,
-      &buf->data.vkbuf,
-      &buf->data.alloc,
-      &buf->data.parent_allocator);
+      &buf->data.alloc);
 
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
