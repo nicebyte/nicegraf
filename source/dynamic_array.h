@@ -84,3 +84,6 @@ SOFTWARE.
 #define NGFI_DARRAY_EMPTY(a) (a.endptr == a.data)
 
 #define NGFI_DARRAY_BACKPTR(a) (a.endptr - 1)
+
+#define NGFI_DARRAY_FOREACH(a, countername) \
+for (size_t countername = 0; (countername) < NGFI_DARRAY_SIZE(a); ++(countername))
