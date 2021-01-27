@@ -632,11 +632,6 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
   return VK_FALSE;
 }
 
-#if defined(XCB_NONE)
-xcb_connection_t* XCB_CONNECTION = NULL;
-xcb_visualid_t    XCB_VISUALID   = {0};
-#endif
-
 static bool
 ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_family_index) {
 #if defined(_WIN32) || defined(_WIN64)
@@ -644,6 +639,10 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
 #elif defined(__ANDROID__)
   return true;  // All Android queues surfaces support present.
 #else
+#if defined(XCB_NONE)
+static xcb_connection_t* XCB_CONNECTION = NULL;
+static xcb_visualid_t    XCB_VISUALID   = {0};
+#endif
 
   if (XCB_CONNECTION == NULL) {
     int                screen_idx = 0;
