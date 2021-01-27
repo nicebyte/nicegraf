@@ -193,9 +193,13 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(ngfvk_desc_superpool*) reset_desc_superpools;
 
   // Fences that will be signaled at the end of the frame.
-  VkFence  fences[2];
-  uint32_t nfences;
-  bool     active;
+  // Theoretically there could be multiple if there are multiple queue submissions
+  // per frame, but currently we limit ourselves to 1 submission.
+  VkFence  fences[1];
+
+  // Number of fences to wait on to complete all submissions related to this
+  // frame.
+  uint32_t nwait_fences;
 } ngfvk_frame_resources;
 
 // API context. Each thread calling nicegraf gets its own context.
@@ -1374,12 +1378,11 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_superpools, 8);
     ctx->frame_res[f].cmd_pool         = VK_NULL_HANDLE;
-    ctx->frame_res[f].active           = false;
     const VkFenceCreateInfo fence_info = {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .pNext = NULL,
         .flags = 0u};
-    ctx->frame_res[f].nfences = 0;
+    ctx->frame_res[f].nwait_fences = 0;
     for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
       vk_err = vkCreateFence(_vk.device, &fence_info, NULL, &ctx->frame_res[f].fences[i]);
       if (vk_err != VK_SUCCESS) {
@@ -1438,16 +1441,15 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
 }
 
 void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
-  if (frame_res->active && frame_res->nfences > 0u) {
+  if (frame_res->nwait_fences > 0 && frame_res->nwait_fences > 0u) {
     VkResult wait_status = VK_SUCCESS;
     do {
       wait_status =
-          vkWaitForFences(_vk.device, frame_res->nfences, frame_res->fences, VK_TRUE, 0x3B9ACA00ul);
+          vkWaitForFences(_vk.device, frame_res->nwait_fences, frame_res->fences, VK_TRUE, 0x3B9ACA00ul);
     } while (wait_status == VK_TIMEOUT);
-    vkResetFences(_vk.device, frame_res->nfences, frame_res->fences);
-    frame_res->nfences = 0;
+    vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
+    frame_res->nwait_fences = 0;
   }
-  frame_res->active = false;
 
   const size_t nretired_cmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
 
@@ -1538,7 +1540,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_render_passes);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
-      for (uint32_t i = 0u; i < ctx->frame_res[f].nfences; ++i) {
+      for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
     }
@@ -1718,7 +1720,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
 ngf_error ngf_begin_frame(void) {
   ngf_error      err                    = NGF_ERROR_OK;
   const uint32_t fi                     = CURRENT_CONTEXT->frame_id;
-  CURRENT_CONTEXT->frame_res[fi].active = true;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
   // Insert placeholders for deferred barriers.
@@ -1776,7 +1777,7 @@ ngf_error ngf_end_frame(void) {
   CURRENT_CONTEXT->frame_id         = next_fi;
   ngfvk_frame_resources* frame_sync = &CURRENT_CONTEXT->frame_res[fi];
 
-  frame_sync->nfences = 0u;
+  frame_sync->nwait_fences = 0u;
 
   // Prep a command buffer for pending image barriers if necessary.
   pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
@@ -1836,7 +1837,7 @@ ngf_error ngf_end_frame(void) {
         wait_sem_count,
         cmd_buf_sems,
         nsubmitted_gfx_cmdbuffers,
-        frame_sync->fences[frame_sync->nfences++]);
+        frame_sync->fences[frame_sync->nwait_fences++]);
 
     // Present if necessary.
     if (needs_present) {
