@@ -126,9 +126,9 @@ typedef struct {
 } ngfvk_alloc;
 
 typedef struct {
-  ngfvk_alloc   alloc;
-  size_t        size;
-  size_t        mapped_offset;
+  ngfvk_alloc alloc;
+  size_t      size;
+  size_t      mapped_offset;
 } ngfvk_buffer;
 
 // Vulkan resources associated with a given frame.
@@ -261,7 +261,7 @@ typedef struct ngf_render_target_t {
 
 #pragma endregion
 
-#pragma region global_vars
+#pragma region               global_vars
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 
 static struct {
@@ -641,8 +641,8 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
   return true;  // All Android queues surfaces support present.
 #else
 #if defined(XCB_NONE)
-static xcb_connection_t* XCB_CONNECTION = NULL;
-static xcb_visualid_t    XCB_VISUALID   = {0};
+  static xcb_connection_t* XCB_CONNECTION = NULL;
+  static xcb_visualid_t    XCB_VISUALID   = {0};
 #endif
 
   if (XCB_CONNECTION == NULL) {
@@ -1098,7 +1098,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
     vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
   }
-  
+
   for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools); ++p) {
     ngfvk_desc_superpool* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
     for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
@@ -1503,7 +1503,11 @@ static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
 }
 
 static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
-  vmaFlushAllocation(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
+  vmaFlushAllocation(
+      CURRENT_CONTEXT->allocator,
+      buf->alloc.vma_alloc,
+      buf->mapped_offset + offset,
+      size);
 }
 
 static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
@@ -1517,7 +1521,7 @@ static void ngfvk_buffer_retire(ngfvk_buffer buf) {
 
 #pragma endregion
 
-#pragma region external_funcs
+#pragma region                 external_funcs
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
   return ngfi_device_caps_read();
 }
@@ -1787,7 +1791,6 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* en
   enc->__handle = (uintptr_t)((void*)cmd_buf);
   return ngfvk_encoder_start(cmd_buf);
 }
-
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
@@ -2989,7 +2992,12 @@ void ngf_cmd_bind_attrib_buffer(
     uint32_t                offset) {
   ngf_cmd_buffer buf      = NGFVK_ENC2CMDBUF(enc);
   VkDeviceSize   vkoffset = offset;
-  vkCmdBindVertexBuffers(buf->active_bundle.vkcmdbuf, binding, 1, (VkBuffer*)&abuf->data.alloc.obj_handle, &vkoffset);
+  vkCmdBindVertexBuffers(
+      buf->active_bundle.vkcmdbuf,
+      binding,
+      1,
+      (VkBuffer*)&abuf->data.alloc.obj_handle,
+      &vkoffset);
 }
 
 void ngf_cmd_bind_index_buffer(
@@ -2999,7 +3007,11 @@ void ngf_cmd_bind_index_buffer(
   ngf_cmd_buffer    buf      = NGFVK_ENC2CMDBUF(enc);
   const VkIndexType idx_type = get_vk_index_type(index_type);
   assert(idx_type == VK_INDEX_TYPE_UINT16 || idx_type == VK_INDEX_TYPE_UINT32);
-  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->data.alloc.obj_handle, 0u, idx_type);
+  vkCmdBindIndexBuffer(
+      buf->active_bundle.vkcmdbuf,
+      (VkBuffer)ibuf->data.alloc.obj_handle,
+      0u,
+      idx_type);
 }
 
 void ngf_cmd_copy_attrib_buffer(
@@ -3458,7 +3470,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       &img->alloc.vma_alloc,
       NULL);
   img->alloc.parent_allocator = CURRENT_CONTEXT->allocator;
-  img->type             = info->type;
+  img->type                   = info->type;
 
   if (create_image_vkerr != VK_SUCCESS) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
