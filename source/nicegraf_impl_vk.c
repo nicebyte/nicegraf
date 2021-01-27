@@ -32,8 +32,14 @@
 #include <string.h>
 #include <vk_mem_alloc.h>
 
+#pragma region constants
+
 #define NGFVK_INVALID_IDX  (~0u)
 #define NGFVK_MAX_PHYS_DEV (64u)  // 64 GPUs oughta be enough for everybody.
+#define NGFVK_BIND_OP_CHUNK_SIZE (10u)
+#define NGFVK_MAX_COLOR_ATTACHMENTS 16u
+
+#pragma endregion
 
 #pragma region internal_struct_definitions
 // Singleton for holding vulkan instance, device and
@@ -104,8 +110,6 @@ typedef struct {
   VkSemaphore     vksem;
   VkCommandPool   vkpool;
 } ngfvk_cmd_bundle;
-
-#define NGFVK_BIND_OP_CHUNK_SIZE (10u)
 
 typedef struct ngfvk_bind_op_chunk {
   struct ngfvk_bind_op_chunk* next;
@@ -245,8 +249,6 @@ typedef struct ngf_graphics_pipeline_t {
   NGFI_DARRAY_OF(ngfvk_desc_set_size) desc_set_sizes;
   VkPipelineLayout vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
-
-#define NGFVK_MAX_COLOR_ATTACHMENTS 16u
 
 typedef struct ngf_render_target_t {
   VkFramebuffer frame_buffer;
@@ -1051,55 +1053,56 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
         frame_res->cmd_bufs.data);
     vkResetCommandPool(_vk.device, frame_res->cmd_pool, 0u);
   }
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->cmd_bufs); ++s) {
+
+  NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, s) {
     vkDestroySemaphore(_vk.device, NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s), NULL);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipelines); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_pipelines, p) {
     vkDestroyPipeline(_vk.device, NGFI_DARRAY_AT(frame_res->retire_pipelines, p), NULL);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipeline_layouts); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_pipeline_layouts, p) {
     vkDestroyPipelineLayout(
         _vk.device,
         NGFI_DARRAY_AT(frame_res->retire_pipeline_layouts, p),
         NULL);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_dset_layouts); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_dset_layouts, p) {
     vkDestroyDescriptorSetLayout(
         _vk.device,
         NGFI_DARRAY_AT(frame_res->retire_dset_layouts, p),
         NULL);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_framebuffers); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_framebuffers, p) {
     vkDestroyFramebuffer(_vk.device, NGFI_DARRAY_AT(frame_res->retire_framebuffers, p), NULL);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_render_passes); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_render_passes, p) {
     vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(frame_res->retire_render_passes, p), NULL);
   }
 
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_samplers); ++s) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_samplers, s) {
     vkDestroySampler(_vk.device, NGFI_DARRAY_AT(frame_res->retire_samplers, s), NULL);
   }
 
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_images); ++s) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_images, s) {
     ngfvk_alloc img = NGFI_DARRAY_AT(frame_res->retire_images, s);
     vmaDestroyImage(img.parent_allocator, (VkImage)img.obj_handle, img.vma_alloc);
   }
 
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_image_views); ++s) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_image_views, s) {
     vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_image_views, s), NULL);
   }
 
-  for (uint32_t a = 0; a < NGFI_DARRAY_SIZE(frame_res->retire_buffers); ++a) {
+  NGFI_DARRAY_FOREACH(frame_res->retire_buffers, a) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
     vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
   }
 
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools); ++p) {
+  NGFI_DARRAY_FOREACH(frame_res->reset_desc_superpools, p) {
     ngfvk_desc_superpool* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
     for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
       vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
@@ -1521,7 +1524,8 @@ static void ngfvk_buffer_retire(ngfvk_buffer buf) {
 
 #pragma endregion
 
-#pragma region                 external_funcs
+#pragma region external_funcs
+
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
   return ngfi_device_caps_read();
 }
