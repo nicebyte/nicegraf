@@ -176,7 +176,7 @@ typedef enum {
 
 #pragma endregion
 
-#pragma region vk_struct_definitions
+#pragma region external_struct_definitions
 
 typedef struct ngf_cmd_buffer_t {
   ngfvk_cmd_bundle      active_bundle;         // < The current bundle.
@@ -261,12 +261,15 @@ typedef struct ngf_render_target_t {
 
 #pragma endregion
 
+#pragma region global_vars
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 
 static struct {
   pthread_mutex_t lock;
   NGFI_DARRAY_OF(VkImageMemoryBarrier) barriers;
 } NGFVK_PENDING_IMG_BARRIER_QUEUE;
+
+#pragma endregion
 
 #pragma region vk_enum_maps
 
