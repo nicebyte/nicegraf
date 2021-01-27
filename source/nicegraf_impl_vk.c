@@ -35,8 +35,7 @@
 #define NGFVK_INVALID_IDX  (~0u)
 #define NGFVK_MAX_PHYS_DEV (64u)  // 64 GPUs oughta be enough for everybody.
 
-#pragma region vk_struct_definitions
-
+#pragma region internal_struct_definitions
 // Singleton for holding vulkan instance, device and
 // queue handles.
 // This is shared by all contexts.
@@ -120,19 +119,6 @@ typedef struct ngfvk_bind_op_chunk_list {
   uint32_t             size;
 } ngfvk_bind_op_chunk_list;
 
-typedef struct ngf_cmd_buffer_t {
-  ngfvk_cmd_bundle      active_bundle;         // < The current bundle.
-  ngf_graphics_pipeline active_pipe;           // < The bound pipeline.
-  ngfvk_desc_superpool* desc_superpool;        // < The superpool from which
-                                               //   the desc pools for this cmd
-                                               //   buffer are allocated.
-  ngf_render_target        active_rt;          // < Active render target.
-  bool                     renderpass_active;  // < Has an active renderpass.
-  ngfi_cmd_buffer_state    state;
-  ngfvk_bind_op_chunk_list pending_bind_ops;  // < Resource binds that need to be performed
-                                              //   before the next draw.
-} ngf_cmd_buffer_t;
-
 typedef struct {
   VmaAllocator  parent_allocator;
   VkBuffer      vkbuf;
@@ -141,26 +127,7 @@ typedef struct {
   size_t        mapped_offset;
 } ngfvk_buffer;
 
-typedef struct ngf_attrib_buffer_t {
-  ngfvk_buffer data;
-} ngf_attrib_buffer_t;
-
-typedef struct ngf_index_buffer_t {
-  ngfvk_buffer data;
-} ngf_index_buffer_t;
-
-typedef struct ngf_uniform_buffer_t {
-  ngfvk_buffer data;
-} ngf_uniform_buffer_t;
-
-typedef struct ngf_pixel_buffer_t {
-  ngfvk_buffer data;
-} ngf_pixel_buffer_t;
-
-typedef struct ngf_sampler_t {
-  VkSampler vksampler;
-} ngf_sampler_t;
-
+// TODO: move this below, needs to be here temporarily.
 typedef struct ngf_image_t {
   ngf_image_type type;
   VkImage        vkimg;
@@ -202,6 +169,55 @@ typedef struct ngfvk_frame_resources {
   uint32_t nwait_fences;
 } ngfvk_frame_resources;
 
+// Vulkan needs to render-to-texture upside-down to maintain a semblance of
+// a consistent coordinate system across different backends. This requires to
+// flip polygon winding order as well. Since winding/culling are baked into
+// pipeline state, we need two flavors for every pipeline...
+// TODO: use VK_EXT_extended_dynamic_state to set polygon winding dynamically
+// when that extension is more widely supported.
+typedef enum {
+  NGFVK_PIPELINE_FLAVOR_VANILLA = 0u,
+  NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE,
+  NGFVK_PIPELINE_FLAVOR_COUNT
+} ngfvk_pipeline_flavor;
+
+#pragma endregion
+
+#pragma region vk_struct_definitions
+
+typedef struct ngf_cmd_buffer_t {
+  ngfvk_cmd_bundle      active_bundle;         // < The current bundle.
+  ngf_graphics_pipeline active_pipe;           // < The bound pipeline.
+  ngfvk_desc_superpool* desc_superpool;        // < The superpool from which
+                                               //   the desc pools for this cmd
+                                               //   buffer are allocated.
+  ngf_render_target        active_rt;          // < Active render target.
+  bool                     renderpass_active;  // < Has an active renderpass.
+  ngfi_cmd_buffer_state    state;
+  ngfvk_bind_op_chunk_list pending_bind_ops;  // < Resource binds that need to be performed
+                                              //   before the next draw.
+} ngf_cmd_buffer_t;
+
+typedef struct ngf_attrib_buffer_t {
+  ngfvk_buffer data;
+} ngf_attrib_buffer_t;
+
+typedef struct ngf_index_buffer_t {
+  ngfvk_buffer data;
+} ngf_index_buffer_t;
+
+typedef struct ngf_uniform_buffer_t {
+  ngfvk_buffer data;
+} ngf_uniform_buffer_t;
+
+typedef struct ngf_pixel_buffer_t {
+  ngfvk_buffer data;
+} ngf_pixel_buffer_t;
+
+typedef struct ngf_sampler_t {
+  VkSampler vksampler;
+} ngf_sampler_t;
+
 // API context. Each thread calling nicegraf gets its own context.
 typedef struct ngf_context_t {
   ngfvk_frame_resources* frame_res;
@@ -221,18 +237,6 @@ typedef struct ngf_shader_stage_t {
   VkShaderStageFlagBits vk_stage_bits;
   char*                 entry_point_name;
 } ngf_shader_stage_t;
-
-// Vulkan needs to render-to-texture upside-down to maintain a semblance of
-// a consistent coordinate system across different backends. This requires to
-// flip polygon winding order as well. Since winding/culling are baked into
-// pipeline state, we need two flavors for every pipeline...
-// TODO: use VK_EXT_extended_dynamic_state to set polygon winding dynamically
-// when that extension is more widely supported.
-typedef enum {
-  NGFVK_PIPELINE_FLAVOR_VANILLA = 0u,
-  NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE,
-  NGFVK_PIPELINE_FLAVOR_COUNT
-} ngfvk_pipeline_flavor;
 
 typedef struct ngf_graphics_pipeline_t {
   VkPipeline vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_COUNT];
