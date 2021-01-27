@@ -195,7 +195,7 @@ typedef struct ngfvk_frame_resources {
   // Fences that will be signaled at the end of the frame.
   // Theoretically there could be multiple if there are multiple queue submissions
   // per frame, but currently we limit ourselves to 1 submission.
-  VkFence  fences[1];
+  VkFence fences[1];
 
   // Number of fences to wait on to complete all submissions related to this
   // frame.
@@ -1444,8 +1444,12 @@ void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   if (frame_res->nwait_fences > 0 && frame_res->nwait_fences > 0u) {
     VkResult wait_status = VK_SUCCESS;
     do {
-      wait_status =
-          vkWaitForFences(_vk.device, frame_res->nwait_fences, frame_res->fences, VK_TRUE, 0x3B9ACA00ul);
+      wait_status = vkWaitForFences(
+          _vk.device,
+          frame_res->nwait_fences,
+          frame_res->fences,
+          VK_TRUE,
+          0x3B9ACA00ul);
     } while (wait_status == VK_TIMEOUT);
     vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
     frame_res->nwait_fences = 0;
@@ -1700,16 +1704,16 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
 
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
   assert(bufs);
-  uint32_t               fi              = CURRENT_CONTEXT->frame_id;
-  ngfvk_frame_resources* frame_sync_data = &CURRENT_CONTEXT->frame_res[fi];
+  uint32_t               fi             = CURRENT_CONTEXT->frame_id;
+  ngfvk_frame_resources* frame_res_data = &CURRENT_CONTEXT->frame_res[fi];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
     NGFI_TRANSITION_CMD_BUF(bufs[i], NGFI_CMD_BUFFER_SUBMITTED);
     if (bufs[i]->desc_superpool) {
-      NGFI_DARRAY_APPEND(frame_sync_data->reset_desc_superpools, bufs[i]->desc_superpool);
+      NGFI_DARRAY_APPEND(frame_res_data->reset_desc_superpools, bufs[i]->desc_superpool);
     }
     vkEndCommandBuffer(bufs[i]->active_bundle.vkcmdbuf);
-    NGFI_DARRAY_APPEND(frame_sync_data->cmd_bufs, bufs[i]->active_bundle.vkcmdbuf);
-    NGFI_DARRAY_APPEND(frame_sync_data->cmd_buf_sems, bufs[i]->active_bundle.vksem);
+    NGFI_DARRAY_APPEND(frame_res_data->cmd_bufs, bufs[i]->active_bundle.vkcmdbuf);
+    NGFI_DARRAY_APPEND(frame_res_data->cmd_buf_sems, bufs[i]->active_bundle.vksem);
     bufs[i]->active_pipe = VK_NULL_HANDLE;
     bufs[i]->active_rt   = NULL;
     memset(&bufs[i]->active_bundle, 0, sizeof(bufs[i]->active_bundle));
@@ -1718,8 +1722,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
 }
 
 ngf_error ngf_begin_frame(void) {
-  ngf_error      err                    = NGF_ERROR_OK;
-  const uint32_t fi                     = CURRENT_CONTEXT->frame_id;
+  ngf_error      err = NGF_ERROR_OK;
+  const uint32_t fi  = CURRENT_CONTEXT->frame_id;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
   // Insert placeholders for deferred barriers.
@@ -1772,12 +1776,12 @@ ngf_error ngf_end_frame(void) {
   ngf_error err = NGF_ERROR_OK;
 
   // Obtain the current frame sync structure and increment frame number.
-  const uint32_t fi                 = CURRENT_CONTEXT->frame_id;
-  const uint32_t next_fi            = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
-  CURRENT_CONTEXT->frame_id         = next_fi;
-  ngfvk_frame_resources* frame_sync = &CURRENT_CONTEXT->frame_res[fi];
+  const uint32_t fi                = CURRENT_CONTEXT->frame_id;
+  const uint32_t next_fi           = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  CURRENT_CONTEXT->frame_id        = next_fi;
+  ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[fi];
 
-  frame_sync->nwait_fences = 0u;
+  frame_res->nwait_fences = 0u;
 
   // Prep a command buffer for pending image barriers if necessary.
   pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
@@ -1798,15 +1802,15 @@ ngf_error ngf_end_frame(void) {
         npending_barriers,
         NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers.data);
     vkEndCommandBuffer(bundle.vkcmdbuf);
-    frame_sync->cmd_bufs.data[0]     = bundle.vkcmdbuf;
-    frame_sync->cmd_buf_sems.data[0] = bundle.vksem;
+    frame_res->cmd_bufs.data[0]     = bundle.vkcmdbuf;
+    frame_res->cmd_buf_sems.data[0] = bundle.vksem;
     NGFI_DARRAY_CLEAR(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers);
   }
   pthread_mutex_unlock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
 
   // Submit pending gfx commands & present.
   const uint32_t nsubmitted_gfx_cmdbuffers =
-      NGFI_DARRAY_SIZE(frame_sync->cmd_bufs) - (have_deferred_barriers ? 0 : 1);
+      NGFI_DARRAY_SIZE(frame_res->cmd_bufs) - (have_deferred_barriers ? 0 : 1);
   if (nsubmitted_gfx_cmdbuffers > 0) {
     // If present is necessary, acquire a swapchain image before submitting
     // any graphics commands.
@@ -1824,9 +1828,9 @@ ngf_error ngf_end_frame(void) {
       wait_stage_flags = &color_attachment_stage;
     }
     const VkCommandBuffer* cmd_bufs =
-        have_deferred_barriers ? frame_sync->cmd_bufs.data : &frame_sync->cmd_bufs.data[1];
+        have_deferred_barriers ? frame_res->cmd_bufs.data : &frame_res->cmd_bufs.data[1];
     const VkSemaphore* cmd_buf_sems =
-        have_deferred_barriers ? frame_sync->cmd_buf_sems.data : &frame_sync->cmd_buf_sems.data[1];
+        have_deferred_barriers ? frame_res->cmd_buf_sems.data : &frame_res->cmd_buf_sems.data[1];
 
     ngfvk_submit_commands(
         _vk.gfx_queue,
@@ -1837,7 +1841,7 @@ ngf_error ngf_end_frame(void) {
         wait_sem_count,
         cmd_buf_sems,
         nsubmitted_gfx_cmdbuffers,
-        frame_sync->fences[frame_sync->nwait_fences++]);
+        frame_res->fences[frame_res->nwait_fences++]);
 
     // Present if necessary.
     if (needs_present) {
@@ -1856,8 +1860,8 @@ ngf_error ngf_end_frame(void) {
   }
 
   // Retire resources.
-  ngfvk_frame_resources* next_frame_sync = &CURRENT_CONTEXT->frame_res[next_fi];
-  ngfvk_retire_resources(next_frame_sync);
+  ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[next_fi];
+  ngfvk_retire_resources(next_frame_res);
   return err;
 }
 
