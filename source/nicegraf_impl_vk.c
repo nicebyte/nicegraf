@@ -131,18 +131,6 @@ typedef struct {
   size_t        mapped_offset;
 } ngfvk_buffer;
 
-// TODO: move this below, needs to be here temporarily.
-typedef struct ngf_image_t {
-  ngf_image_type type;
-  VkImage        vkimg;
-  VmaAllocation  alloc;
-  VkImageView    vkview;
-  VkFormat       vkformat;
-  VmaAllocator   parent_allocator;
-  ngf_extent3d   extent;
-  uint32_t       usage_flags;
-} ngf_image_t;
-
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
   // Command buffers submitted to the graphics queue, their
@@ -159,7 +147,8 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkFramebuffer) retire_framebuffers;
   NGFI_DARRAY_OF(VkRenderPass) retire_render_passes;
   NGFI_DARRAY_OF(VkSampler) retire_samplers;
-  NGFI_DARRAY_OF(ngf_image_t) retire_images;
+  NGFI_DARRAY_OF(VkImageView) retire_image_views;
+  NGFI_DARRAY_OF(ngfvk_alloc) retire_images;
   NGFI_DARRAY_OF(ngfvk_alloc) retire_buffers;
   NGFI_DARRAY_OF(ngfvk_desc_superpool*) reset_desc_superpools;
 
@@ -222,7 +211,15 @@ typedef struct ngf_sampler_t {
   VkSampler vksampler;
 } ngf_sampler_t;
 
-// API context. Each thread calling nicegraf gets its own context.
+typedef struct ngf_image_t {
+  ngfvk_alloc    alloc;
+  ngf_image_type type;
+  VkImageView    vkview;
+  VkFormat       vkformat;
+  ngf_extent3d   extent;
+  uint32_t       usage_flags;
+} ngf_image_t;
+
 typedef struct ngf_context_t {
   ngfvk_frame_resources* frame_res;
   ngfvk_swapchain        swapchain;
@@ -945,8 +942,8 @@ static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
   if (swapchain->depth_image) {
     vmaDestroyImage(
         CURRENT_CONTEXT->allocator,
-        swapchain->depth_image->vkimg,
-        swapchain->depth_image->alloc);
+        (VkImage)swapchain->depth_image->alloc.obj_handle,
+        swapchain->depth_image->alloc.vma_alloc);
     vkDestroyImageView(_vk.device, swapchain->depth_image->vkview, NULL);
   }
 }
@@ -1382,6 +1379,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_framebuffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_render_passes, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_image_views, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_superpools, 8);
@@ -1508,9 +1506,12 @@ void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   }
 
   for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_images); ++s) {
-    ngf_image img = &NGFI_DARRAY_AT(frame_res->retire_images, s);
-    vmaDestroyImage(img->parent_allocator, img->vkimg, img->alloc);
-    vkDestroyImageView(_vk.device, img->vkview, NULL);
+    ngfvk_alloc img = NGFI_DARRAY_AT(frame_res->retire_images, s);
+    vmaDestroyImage(img.parent_allocator, (VkImage)img.obj_handle, img.vma_alloc);
+  }
+
+  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_image_views); ++s) {
+    vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_image_views, s), NULL);
   }
 
   for (uint32_t a = 0; a < NGFI_DARRAY_SIZE(frame_res->retire_buffers); ++a) {
@@ -1534,6 +1535,7 @@ void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->retire_framebuffers);
   NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
+  NGFI_DARRAY_CLEAR(frame_res->retire_image_views);
   NGFI_DARRAY_CLEAR(frame_res->retire_images);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
@@ -1553,6 +1555,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_framebuffers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_render_passes);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_image_views);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
@@ -3053,7 +3056,7 @@ void ngf_cmd_write_image(
       .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image               = dst.image->vkimg,
+      .image               = (VkImage)dst.image->alloc.obj_handle,
       .subresourceRange    = {
           .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel   = dst.mip_level,
@@ -3085,7 +3088,7 @@ void ngf_cmd_write_image(
   vkCmdCopyBufferToImage(
       buf->active_bundle.vkcmdbuf,
       (VkBuffer)src->data.alloc.obj_handle,
-      dst.image->vkimg,
+      (VkImage)dst.image->alloc.obj_handle,
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       1u,
       &copy_op);
@@ -3098,7 +3101,7 @@ void ngf_cmd_write_image(
       .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image               = dst.image->vkimg,
+      .image               = (VkImage)dst.image->alloc.obj_handle,
       .subresourceRange    = {
           .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel   = dst.mip_level,
@@ -3445,10 +3448,10 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       CURRENT_CONTEXT->allocator,
       &vk_image_info,
       &vma_alloc_info,
-      &img->vkimg,
-      &img->alloc,
+      (VkImage*)&img->alloc.obj_handle,
+      &img->alloc.vma_alloc,
       NULL);
-  img->parent_allocator = CURRENT_CONTEXT->allocator;
+  img->alloc.parent_allocator = CURRENT_CONTEXT->allocator;
   img->type             = info->type;
 
   if (create_image_vkerr != VK_SUCCESS) {
@@ -3456,7 +3459,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     goto ngf_create_image_cleanup;
   }
   err = ngfvk_create_vk_image_view(
-      img->vkimg,
+      (VkImage)img->alloc.obj_handle,
       get_vk_image_view_type(info->type, info->extent.depth),
       vk_image_info.format,
       vk_image_info.mipLevels,
@@ -3481,7 +3484,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
                                                   : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)),
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .image               = img->vkimg,
+      .image               = (VkImage)img->alloc.obj_handle,
       .subresourceRange    = {
           .aspectMask = is_depth_only ? VK_IMAGE_ASPECT_DEPTH_BIT
                                       : (is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
@@ -3503,9 +3506,10 @@ ngf_create_image_cleanup:
 
 void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
-    if (img->vkimg != VK_NULL_HANDLE) {
+    if (img->alloc.obj_handle != VK_NULL_HANDLE) {
       const uint32_t fi = CURRENT_CONTEXT->frame_id;
-      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_images, *img);
+      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_images, img->alloc);
+      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_image_views, img->vkview);
       NGFI_FREE(img);
     }
   }
