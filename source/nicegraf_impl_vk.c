@@ -603,6 +603,7 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 
 #pragma endregion
 
+#pragma region internal_funcs
 // Handler for messages from validation layers, etc.
 // All messages are forwarded to the user-provided debug callback.
 static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
@@ -665,247 +666,41 @@ static xcb_visualid_t    XCB_VISUALID   = {0};
 #endif
 }
 
-ngf_error ngf_initialize(const ngf_init_info* init_info) {
-  assert(init_info);
-  if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
-  ngfi_diag_info = init_info->diag_info;
-
-  if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
-    vkl_init_loader();                   // Initialize the vulkan loader.
-
-    const char* const ext_names[] = {// Names of instance-level extensions.
-                                     "VK_KHR_surface",
-                                     VK_SURFACE_EXT,
-                                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-                                     VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
-
-    const VkApplicationInfo app_info = {
-        // Application information.
-        .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext            = NULL,
-        .pApplicationName = NULL,  // TODO: allow specifying app name.
-        .pEngineName      = "nicegraf",
-        .engineVersion    = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
-        .apiVersion       = VK_MAKE_VERSION(1, 0, 9)};
-
-    // Names of instance layers to enable.
-    const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
-    const char* enabled_layers[]      = {validation_layer_name};
-
-    // Check if validation layers are supported.
-    uint32_t nlayers = 0u;
-    vkEnumerateInstanceLayerProperties(&nlayers, NULL);
-    VkLayerProperties* layer_props =
-        ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
-    vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
-    bool validation_supported = false;
-    for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
-      validation_supported = (strcmp(validation_layer_name, layer_props[l].layerName) == 0u);
-    }
-
-    // Enable validation only if detailed verbosity is requested.
-    const bool enable_validation =
-        validation_supported && (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
-
-    // Create a Vulkan instance.
-    const VkInstanceCreateInfo inst_info = {
-        .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext                   = NULL,
-        .flags                   = 0u,
-        .pApplicationInfo        = &app_info,
-        .enabledLayerCount       = enable_validation ? 1u : 0u,
-        .ppEnabledLayerNames     = enabled_layers,
-        .enabledExtensionCount   = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
-        .ppEnabledExtensionNames = ext_names};
-    VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
-      return NGF_ERROR_OBJECT_CREATION_FAILED;
-    }
-
-    vkl_init_instance(_vk.instance);  // load instance-level Vulkan functions.
-
-    if (enable_validation) {
-      // Install a debug callback to forward vulkan debug messages to the user.
-      const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
-          .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-          .pNext           = NULL,
-          .flags           = 0u,
-          .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
-
-          .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-          .pfnUserCallback = ngfvk_debug_message_callback,
-          .pUserData       = NULL};
-      VkDebugUtilsMessengerEXT vk_debug_messenger;
-      vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
-    }
-
-    // Obtain a list of available physical devices.
-    uint32_t         nphysdev = NGFVK_MAX_PHYS_DEV;
-    VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
-    vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-
-    // Pick a suitable physical device based on user's preference.
-    uint32_t                    best_device_score = 0U;
-    uint32_t                    best_device_index = NGFVK_INVALID_IDX;
-    const ngf_device_preference pref              = init_info->device_pref;
-    for (uint32_t i = 0; i < nphysdev; ++i) {
-      VkPhysicalDeviceProperties dev_props;
-      vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
-      uint32_t score = 0U;
-      switch (dev_props.deviceType) {
-      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-        score += 100U;
-        if (pref == NGF_DEVICE_PREFERENCE_DISCRETE) { score += 1000U; }
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-        score += 90U;
-        if (pref == NGF_DEVICE_PREFERENCE_INTEGRATED) { score += 1000U; }
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-        score += 80U;
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_CPU:
-        score += 70U;
-        break;
-      default:
-        score += 10U;
-      }
-      if (score > best_device_score) {
-        best_device_index = i;
-        best_device_score = score;
-      }
-    }
-    if (best_device_index == NGFVK_INVALID_IDX) {
-      NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-    _vk.phys_dev = physdevs[best_device_index];
-    VkPhysicalDeviceProperties phys_dev_properties;
-    vkGetPhysicalDeviceProperties(_vk.phys_dev, &phys_dev_properties);
-
-    // Obtain a list of queue family properties from the device.
-    uint32_t num_queue_families = 0U;
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, NULL);
-    VkQueueFamilyProperties* queue_families =
-        NGFI_ALLOCN(VkQueueFamilyProperties, num_queue_families);
-    assert(queue_families);
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, queue_families);
-
-    // Pick suitable queue families for graphics and present.
-    uint32_t gfx_family_idx     = NGFVK_INVALID_IDX;
-    uint32_t present_family_idx = NGFVK_INVALID_IDX;
-    for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
-      const VkQueueFlags flags      = queue_families[q].queueFlags;
-      const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
-      const VkBool32     is_present = ngfvk_query_presentation_support(_vk.phys_dev, q);
-      if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) { gfx_family_idx = q; }
-      if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
-        present_family_idx = q;
-      }
-    }
-    NGFI_FREEN(queue_families, num_queue_families);
-    queue_families = NULL;
-    if (gfx_family_idx == NGFVK_INVALID_IDX || present_family_idx == NGFVK_INVALID_IDX) {
-      NGFI_DIAG_ERROR("Could not find a suitable queue family.");
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-    _vk.gfx_family_idx     = gfx_family_idx;
-    _vk.present_family_idx = present_family_idx;
-
-    // Create logical device.
-    const float                   queue_prio     = 1.0f;
-    const VkDeviceQueueCreateInfo gfx_queue_info = {
-        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .pNext            = NULL,
-        .flags            = 0,
-        .queueFamilyIndex = _vk.gfx_family_idx,
-        .queueCount       = 1,
-        .pQueuePriorities = &queue_prio};
-    const VkDeviceQueueCreateInfo present_queue_info = {
-        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .pNext            = NULL,
-        .flags            = 0,
-        .queueFamilyIndex = _vk.present_family_idx,
-        .queueCount       = 1,
-        .pQueuePriorities = &queue_prio};
-    const bool same_gfx_and_present               = _vk.gfx_family_idx == _vk.present_family_idx;
-    const VkDeviceQueueCreateInfo queue_infos[]   = {gfx_queue_info, present_queue_info};
-    const uint32_t                num_queue_infos = 1u + (same_gfx_and_present ? 0u : 1u);
-    const char*                   device_exts[]   = {
-        "VK_KHR_maintenance1",
-        "VK_KHR_swapchain",
-        "VK_KHR_shader_float16_int8"};
-    const VkPhysicalDeviceFeatures required_features = {.samplerAnisotropy = VK_TRUE};
-
-    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
-        .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
-        .pNext         = NULL,
-        .shaderFloat16 = false,
-        .shaderInt8    = false};
-
-    if (vkGetPhysicalDeviceFeatures2KHR) {
-      VkPhysicalDeviceFeatures2KHR phys_features = {
-          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-          .pNext = &sf16_features};
-      vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
-    }
-
-    const VkDeviceCreateInfo dev_info = {
-        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   = &sf16_features,
-        .flags                   = 0,
-        .queueCreateInfoCount    = num_queue_infos,
-        .pQueueCreateInfos       = queue_infos,
-        .enabledLayerCount       = 0,
-        .ppEnabledLayerNames     = NULL,
-        .pEnabledFeatures        = &required_features,
-        .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
-        .ppEnabledExtensionNames = device_exts};
-    vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-
-    // Load device-level entry points.
-    vkl_init_device(_vk.device);
-
-    // Obtain queue handles.
-    vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
-    vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
-
-    // Populate device capabilities.
-    ngfi_device_caps_create();
-    ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
-    if (caps_ptr) {
-      caps_ptr->clipspace_z_zero_to_one = true;  // always true on Vulkan.
-      caps_ptr->uniform_buffer_offset_alignment =
-          phys_dev_properties.limits.minUniformBufferOffsetAlignment;
-      ngfi_device_caps_unlock(caps_ptr);
-    }
-
-    // Initialize pending image barrier queue.
-    NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
-    pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
-
-    // Done!
+static ngf_error ngfvk_create_vk_image_view(
+    VkImage         image,
+    VkImageViewType image_type,
+    VkFormat        image_format,
+    uint32_t        nmips,
+    uint32_t        nlayers,
+    VkImageView*    result) {
+  const bool is_depth =
+      image_format == VK_FORMAT_D16_UNORM || image_format == VK_FORMAT_D16_UNORM_S8_UINT ||
+      image_format == VK_FORMAT_D24_UNORM_S8_UINT || image_format == VK_FORMAT_D32_SFLOAT ||
+      image_format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+  const VkImageViewCreateInfo image_view_info = {
+      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .pNext    = NULL,
+      .flags    = 0u,
+      .image    = image,
+      .viewType = image_type,
+      .format   = image_format,
+      .components =
+          {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+           .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+           .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+           .a = VK_COMPONENT_SWIZZLE_IDENTITY},
+      .subresourceRange = {
+          .aspectMask     = is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+          .baseMipLevel   = 0u,
+          .levelCount     = nmips,
+          .baseArrayLayer = 0u,
+          .layerCount     = nlayers}};
+  const VkResult create_view_vkerr = vkCreateImageView(_vk.device, &image_view_info, NULL, result);
+  if (create_view_vkerr != VK_SUCCESS) {
+    return NGF_ERROR_INVALID_OPERATION;
+  } else {
+    return NGF_ERROR_OK;
   }
-
-  return NGF_ERROR_OK;
-}
-
-const ngf_device_capabilities* ngf_get_device_capabilities(void) {
-  return ngfi_device_caps_read();
 }
 
 static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
@@ -947,43 +742,6 @@ static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
         (VkImage)swapchain->depth_image->alloc.obj_handle,
         swapchain->depth_image->alloc.vma_alloc);
     vkDestroyImageView(_vk.device, swapchain->depth_image->vkview, NULL);
-  }
-}
-
-static ngf_error ngfvk_create_vk_image_view(
-    VkImage         image,
-    VkImageViewType image_type,
-    VkFormat        image_format,
-    uint32_t        nmips,
-    uint32_t        nlayers,
-    VkImageView*    result) {
-  const bool is_depth =
-      image_format == VK_FORMAT_D16_UNORM || image_format == VK_FORMAT_D16_UNORM_S8_UINT ||
-      image_format == VK_FORMAT_D24_UNORM_S8_UINT || image_format == VK_FORMAT_D32_SFLOAT ||
-      image_format == VK_FORMAT_D32_SFLOAT_S8_UINT;
-  const VkImageViewCreateInfo image_view_info = {
-      .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .pNext    = NULL,
-      .flags    = 0u,
-      .image    = image,
-      .viewType = image_type,
-      .format   = image_format,
-      .components =
-          {.r = VK_COMPONENT_SWIZZLE_IDENTITY,
-           .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-           .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-           .a = VK_COMPONENT_SWIZZLE_IDENTITY},
-      .subresourceRange = {
-          .aspectMask     = is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
-          .baseMipLevel   = 0u,
-          .levelCount     = nmips,
-          .baseArrayLayer = 0u,
-          .layerCount     = nlayers}};
-  const VkResult create_view_vkerr = vkCreateImageView(_vk.device, &image_view_info, NULL, result);
-  if (create_view_vkerr != VK_SUCCESS) {
-    return NGF_ERROR_INVALID_OPERATION;
-  } else {
-    return NGF_ERROR_OK;
   }
 }
 
@@ -1268,6 +1026,502 @@ ngfvk_create_swapchain_cleanup:
   return err;
 }
 
+static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
+  if (frame_res->nwait_fences > 0 && frame_res->nwait_fences > 0u) {
+    VkResult wait_status = VK_SUCCESS;
+    do {
+      wait_status = vkWaitForFences(
+          _vk.device,
+          frame_res->nwait_fences,
+          frame_res->fences,
+          VK_TRUE,
+          0x3B9ACA00ul);
+    } while (wait_status == VK_TIMEOUT);
+    vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
+    frame_res->nwait_fences = 0;
+  }
+
+  const size_t nretired_cmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
+
+  if (nretired_cmd_bufs > 0u) {
+    vkFreeCommandBuffers(
+        _vk.device,
+        frame_res->cmd_pool,
+        NGFI_DARRAY_SIZE(frame_res->cmd_bufs),
+        frame_res->cmd_bufs.data);
+    vkResetCommandPool(_vk.device, frame_res->cmd_pool, 0u);
+  }
+  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->cmd_bufs); ++s) {
+    vkDestroySemaphore(_vk.device, NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s), NULL);
+  }
+
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipelines); ++p) {
+    vkDestroyPipeline(_vk.device, NGFI_DARRAY_AT(frame_res->retire_pipelines, p), NULL);
+  }
+
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipeline_layouts); ++p) {
+    vkDestroyPipelineLayout(
+        _vk.device,
+        NGFI_DARRAY_AT(frame_res->retire_pipeline_layouts, p),
+        NULL);
+  }
+
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_dset_layouts); ++p) {
+    vkDestroyDescriptorSetLayout(
+        _vk.device,
+        NGFI_DARRAY_AT(frame_res->retire_dset_layouts, p),
+        NULL);
+  }
+
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_framebuffers); ++p) {
+    vkDestroyFramebuffer(_vk.device, NGFI_DARRAY_AT(frame_res->retire_framebuffers, p), NULL);
+  }
+
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_render_passes); ++p) {
+    vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(frame_res->retire_render_passes, p), NULL);
+  }
+
+  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_samplers); ++s) {
+    vkDestroySampler(_vk.device, NGFI_DARRAY_AT(frame_res->retire_samplers, s), NULL);
+  }
+
+  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_images); ++s) {
+    ngfvk_alloc img = NGFI_DARRAY_AT(frame_res->retire_images, s);
+    vmaDestroyImage(img.parent_allocator, (VkImage)img.obj_handle, img.vma_alloc);
+  }
+
+  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_image_views); ++s) {
+    vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_image_views, s), NULL);
+  }
+
+  for (uint32_t a = 0; a < NGFI_DARRAY_SIZE(frame_res->retire_buffers); ++a) {
+    ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
+    vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
+  }
+  
+  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools); ++p) {
+    ngfvk_desc_superpool* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
+    for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
+      vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
+      memset(&pool->utilization, 0, sizeof(pool->utilization));
+    }
+    superpool->active_pool = superpool->list;
+  }
+
+  NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
+  NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
+  NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
+  NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
+  NGFI_DARRAY_CLEAR(frame_res->retire_framebuffers);
+  NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
+  NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
+  NGFI_DARRAY_CLEAR(frame_res->retire_image_views);
+  NGFI_DARRAY_CLEAR(frame_res->retire_images);
+  NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
+  NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
+  NGFI_DARRAY_CLEAR(frame_res->reset_desc_superpools);
+}
+ngf_error ngf_initialize(const ngf_init_info* init_info) {
+  assert(init_info);
+  if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
+  ngfi_diag_info = init_info->diag_info;
+
+  if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
+    vkl_init_loader();                   // Initialize the vulkan loader.
+
+    const char* const ext_names[] = {// Names of instance-level extensions.
+                                     "VK_KHR_surface",
+                                     VK_SURFACE_EXT,
+                                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+                                     VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+
+    const VkApplicationInfo app_info = {
+        // Application information.
+        .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext            = NULL,
+        .pApplicationName = NULL,  // TODO: allow specifying app name.
+        .pEngineName      = "nicegraf",
+        .engineVersion    = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
+        .apiVersion       = VK_MAKE_VERSION(1, 0, 9)};
+
+    // Names of instance layers to enable.
+    const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
+    const char* enabled_layers[]      = {validation_layer_name};
+
+    // Check if validation layers are supported.
+    uint32_t nlayers = 0u;
+    vkEnumerateInstanceLayerProperties(&nlayers, NULL);
+    VkLayerProperties* layer_props =
+        ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
+    vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
+    bool validation_supported = false;
+    for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
+      validation_supported = (strcmp(validation_layer_name, layer_props[l].layerName) == 0u);
+    }
+
+    // Enable validation only if detailed verbosity is requested.
+    const bool enable_validation =
+        validation_supported && (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
+
+    // Create a Vulkan instance.
+    const VkInstanceCreateInfo inst_info = {
+        .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0u,
+        .pApplicationInfo        = &app_info,
+        .enabledLayerCount       = enable_validation ? 1u : 0u,
+        .ppEnabledLayerNames     = enabled_layers,
+        .enabledExtensionCount   = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
+        .ppEnabledExtensionNames = ext_names};
+    VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
+    if (vk_err != VK_SUCCESS) {
+      NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
+      return NGF_ERROR_OBJECT_CREATION_FAILED;
+    }
+
+    vkl_init_instance(_vk.instance);  // load instance-level Vulkan functions.
+
+    if (enable_validation) {
+      // Install a debug callback to forward vulkan debug messages to the user.
+      const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
+          .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+          .pNext           = NULL,
+          .flags           = 0u,
+          .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+
+          .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+          .pfnUserCallback = ngfvk_debug_message_callback,
+          .pUserData       = NULL};
+      VkDebugUtilsMessengerEXT vk_debug_messenger;
+      vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
+    }
+
+    // Obtain a list of available physical devices.
+    uint32_t         nphysdev = NGFVK_MAX_PHYS_DEV;
+    VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
+    vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    if (vk_err != VK_SUCCESS) {
+      NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+
+    // Pick a suitable physical device based on user's preference.
+    uint32_t                    best_device_score = 0U;
+    uint32_t                    best_device_index = NGFVK_INVALID_IDX;
+    const ngf_device_preference pref              = init_info->device_pref;
+    for (uint32_t i = 0; i < nphysdev; ++i) {
+      VkPhysicalDeviceProperties dev_props;
+      vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
+      uint32_t score = 0U;
+      switch (dev_props.deviceType) {
+      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        score += 100U;
+        if (pref == NGF_DEVICE_PREFERENCE_DISCRETE) { score += 1000U; }
+        break;
+      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+        score += 90U;
+        if (pref == NGF_DEVICE_PREFERENCE_INTEGRATED) { score += 1000U; }
+        break;
+      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+        score += 80U;
+        break;
+      case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        score += 70U;
+        break;
+      default:
+        score += 10U;
+      }
+      if (score > best_device_score) {
+        best_device_index = i;
+        best_device_score = score;
+      }
+    }
+    if (best_device_index == NGFVK_INVALID_IDX) {
+      NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+    _vk.phys_dev = physdevs[best_device_index];
+    VkPhysicalDeviceProperties phys_dev_properties;
+    vkGetPhysicalDeviceProperties(_vk.phys_dev, &phys_dev_properties);
+
+    // Obtain a list of queue family properties from the device.
+    uint32_t num_queue_families = 0U;
+    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, NULL);
+    VkQueueFamilyProperties* queue_families =
+        NGFI_ALLOCN(VkQueueFamilyProperties, num_queue_families);
+    assert(queue_families);
+    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, queue_families);
+
+    // Pick suitable queue families for graphics and present.
+    uint32_t gfx_family_idx     = NGFVK_INVALID_IDX;
+    uint32_t present_family_idx = NGFVK_INVALID_IDX;
+    for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
+      const VkQueueFlags flags      = queue_families[q].queueFlags;
+      const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+      const VkBool32     is_present = ngfvk_query_presentation_support(_vk.phys_dev, q);
+      if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) { gfx_family_idx = q; }
+      if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
+        present_family_idx = q;
+      }
+    }
+    NGFI_FREEN(queue_families, num_queue_families);
+    queue_families = NULL;
+    if (gfx_family_idx == NGFVK_INVALID_IDX || present_family_idx == NGFVK_INVALID_IDX) {
+      NGFI_DIAG_ERROR("Could not find a suitable queue family.");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+    _vk.gfx_family_idx     = gfx_family_idx;
+    _vk.present_family_idx = present_family_idx;
+
+    // Create logical device.
+    const float                   queue_prio     = 1.0f;
+    const VkDeviceQueueCreateInfo gfx_queue_info = {
+        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext            = NULL,
+        .flags            = 0,
+        .queueFamilyIndex = _vk.gfx_family_idx,
+        .queueCount       = 1,
+        .pQueuePriorities = &queue_prio};
+    const VkDeviceQueueCreateInfo present_queue_info = {
+        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .pNext            = NULL,
+        .flags            = 0,
+        .queueFamilyIndex = _vk.present_family_idx,
+        .queueCount       = 1,
+        .pQueuePriorities = &queue_prio};
+    const bool same_gfx_and_present               = _vk.gfx_family_idx == _vk.present_family_idx;
+    const VkDeviceQueueCreateInfo queue_infos[]   = {gfx_queue_info, present_queue_info};
+    const uint32_t                num_queue_infos = 1u + (same_gfx_and_present ? 0u : 1u);
+    const char*                   device_exts[]   = {
+        "VK_KHR_maintenance1",
+        "VK_KHR_swapchain",
+        "VK_KHR_shader_float16_int8"};
+    const VkPhysicalDeviceFeatures required_features = {.samplerAnisotropy = VK_TRUE};
+
+    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
+        .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+        .pNext         = NULL,
+        .shaderFloat16 = false,
+        .shaderInt8    = false};
+
+    if (vkGetPhysicalDeviceFeatures2KHR) {
+      VkPhysicalDeviceFeatures2KHR phys_features = {
+          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+          .pNext = &sf16_features};
+      vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
+    }
+
+    const VkDeviceCreateInfo dev_info = {
+        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext                   = &sf16_features,
+        .flags                   = 0,
+        .queueCreateInfoCount    = num_queue_infos,
+        .pQueueCreateInfos       = queue_infos,
+        .enabledLayerCount       = 0,
+        .ppEnabledLayerNames     = NULL,
+        .pEnabledFeatures        = &required_features,
+        .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
+        .ppEnabledExtensionNames = device_exts};
+    vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
+    if (vk_err != VK_SUCCESS) {
+      NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+
+    // Load device-level entry points.
+    vkl_init_device(_vk.device);
+
+    // Obtain queue handles.
+    vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
+    vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
+
+    // Populate device capabilities.
+    ngfi_device_caps_create();
+    ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
+    if (caps_ptr) {
+      caps_ptr->clipspace_z_zero_to_one = true;  // always true on Vulkan.
+      caps_ptr->uniform_buffer_offset_alignment =
+          phys_dev_properties.limits.minUniformBufferOffsetAlignment;
+      ngfi_device_caps_unlock(caps_ptr);
+    }
+
+    // Initialize pending image barrier queue.
+    NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
+    pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
+
+    // Done!
+  }
+
+  return NGF_ERROR_OK;
+}
+
+static ngf_error ngfvk_cmd_bundle_create(VkCommandPool pool, ngfvk_cmd_bundle* bundle) {
+  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
+      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext              = NULL,
+      .commandPool        = pool,
+      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1u};
+  VkResult vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info, &bundle->vkcmdbuf);
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR("Failed to allocate cmd buffer, VK error: %d", vk_err);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+  bundle->vkpool                         = pool;
+  VkCommandBufferBeginInfo cmd_buf_begin = {
+      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
+      .pInheritanceInfo = NULL};
+  vkBeginCommandBuffer(bundle->vkcmdbuf, &cmd_buf_begin);
+
+  // Create semaphore.
+  VkSemaphoreCreateInfo vk_sem_info = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0u};
+  vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
+  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
+  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
+  while (chunk) {
+    ngfvk_bind_op_chunk* next = chunk->next;
+    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
+    chunk = next;
+  }
+  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
+  cmd_buf->pending_bind_ops.size                                   = 0u;
+}
+
+static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+  return NGF_ERROR_OK;
+}
+
+static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
+  ngfvk_cleanup_pending_binds(cmd_buf);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_submit_commands(
+    VkQueue                     queue,
+    const VkCommandBuffer*      cmd_bufs,
+    uint32_t                    ncmd_bufs,
+    const VkPipelineStageFlags* wait_stage_flags,
+    const VkSemaphore*          wait_sems,
+    uint32_t                    nwait_sems,
+    const VkSemaphore*          signal_sems,
+    uint32_t                    nsignal_sems,
+    VkFence                     fence) {
+  const VkSubmitInfo submit_info = {
+      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext                = NULL,
+      .waitSemaphoreCount   = nwait_sems,
+      .pWaitSemaphores      = wait_sems,
+      .pWaitDstStageMask    = wait_stage_flags,
+      .commandBufferCount   = ncmd_bufs,
+      .pCommandBuffers      = cmd_bufs,
+      .signalSemaphoreCount = nsignal_sems,
+      .pSignalSemaphores    = signal_sems};
+  vkQueueSubmit(queue, 1, &submit_info, fence);
+}
+
+static void ngfvk_cmd_copy_buffer(
+    VkCommandBuffer      vkcmdbuf,
+    VkBuffer             src,
+    VkBuffer             dst,
+    size_t               size,
+    size_t               src_offset,
+    size_t               dst_offset,
+    VkAccessFlags        usage_access_mask,
+    VkPipelineStageFlags usage_stage_mask) {
+  NGFI_IGNORE_VAR(usage_access_mask)
+  NGFI_IGNORE_VAR(usage_stage_mask);
+  const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
+
+  VkBufferMemoryBarrier pre_xfer_mem_bar = {
+      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+      .pNext               = NULL,
+      .buffer              = dst,
+      .srcAccessMask       = usage_access_mask,
+      .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .offset              = dst_offset,
+      .size                = size};
+  vkCmdPipelineBarrier(
+      vkcmdbuf,
+      usage_stage_mask,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      0,
+      0u,
+      NULL,
+      1u,
+      &pre_xfer_mem_bar,
+      0,
+      NULL);
+  vkCmdCopyBuffer(vkcmdbuf, src, dst, 1u, &copy_region);
+
+  VkBufferMemoryBarrier post_xfer_mem_bar = {
+      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+      .pNext               = NULL,
+      .buffer              = dst,
+      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .dstAccessMask       = usage_access_mask,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .offset              = dst_offset,
+      .size                = size};
+
+  vkCmdPipelineBarrier(
+      vkcmdbuf,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      usage_stage_mask,
+      0,
+      0u,
+      NULL,
+      1u,
+      &post_xfer_mem_bar,
+      0,
+      NULL);
+}
+
+static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
+  void*    result   = NULL;
+  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
+  if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
+  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
+}
+
+static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
+  vmaFlushAllocation(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
+}
+
+static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
+}
+
+static void ngfvk_buffer_retire(ngfvk_buffer buf) {
+  const uint32_t fi = CURRENT_CONTEXT->frame_id;
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
+}
+
+#pragma endregion
+
+#pragma region external_funcs
+const ngf_device_capabilities* ngf_get_device_capabilities(void) {
+  return ngfi_device_caps_read();
+}
+
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) {
   assert(info);
   assert(result);
@@ -1448,102 +1702,6 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   return err;
 }
 
-void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
-  if (frame_res->nwait_fences > 0 && frame_res->nwait_fences > 0u) {
-    VkResult wait_status = VK_SUCCESS;
-    do {
-      wait_status = vkWaitForFences(
-          _vk.device,
-          frame_res->nwait_fences,
-          frame_res->fences,
-          VK_TRUE,
-          0x3B9ACA00ul);
-    } while (wait_status == VK_TIMEOUT);
-    vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
-    frame_res->nwait_fences = 0;
-  }
-
-  const size_t nretired_cmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
-
-  if (nretired_cmd_bufs > 0u) {
-    vkFreeCommandBuffers(
-        _vk.device,
-        frame_res->cmd_pool,
-        NGFI_DARRAY_SIZE(frame_res->cmd_bufs),
-        frame_res->cmd_bufs.data);
-    vkResetCommandPool(_vk.device, frame_res->cmd_pool, 0u);
-  }
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->cmd_bufs); ++s) {
-    vkDestroySemaphore(_vk.device, NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s), NULL);
-  }
-
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipelines); ++p) {
-    vkDestroyPipeline(_vk.device, NGFI_DARRAY_AT(frame_res->retire_pipelines, p), NULL);
-  }
-
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_pipeline_layouts); ++p) {
-    vkDestroyPipelineLayout(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_pipeline_layouts, p),
-        NULL);
-  }
-
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_dset_layouts); ++p) {
-    vkDestroyDescriptorSetLayout(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_dset_layouts, p),
-        NULL);
-  }
-
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_framebuffers); ++p) {
-    vkDestroyFramebuffer(_vk.device, NGFI_DARRAY_AT(frame_res->retire_framebuffers, p), NULL);
-  }
-
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->retire_render_passes); ++p) {
-    vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(frame_res->retire_render_passes, p), NULL);
-  }
-
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_samplers); ++s) {
-    vkDestroySampler(_vk.device, NGFI_DARRAY_AT(frame_res->retire_samplers, s), NULL);
-  }
-
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_images); ++s) {
-    ngfvk_alloc img = NGFI_DARRAY_AT(frame_res->retire_images, s);
-    vmaDestroyImage(img.parent_allocator, (VkImage)img.obj_handle, img.vma_alloc);
-  }
-
-  for (uint32_t s = 0u; s < NGFI_DARRAY_SIZE(frame_res->retire_image_views); ++s) {
-    vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_image_views, s), NULL);
-  }
-
-  for (uint32_t a = 0; a < NGFI_DARRAY_SIZE(frame_res->retire_buffers); ++a) {
-    ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
-    vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
-  }
-  
-  for (uint32_t p = 0u; p < NGFI_DARRAY_SIZE(frame_res->reset_desc_superpools); ++p) {
-    ngfvk_desc_superpool* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_superpools, p);
-    for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
-      vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
-      memset(&pool->utilization, 0, sizeof(pool->utilization));
-    }
-    superpool->active_pool = superpool->list;
-  }
-
-  NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
-  NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
-  NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
-  NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
-  NGFI_DARRAY_CLEAR(frame_res->retire_framebuffers);
-  NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
-  NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
-  NGFI_DARRAY_CLEAR(frame_res->retire_image_views);
-  NGFI_DARRAY_CLEAR(frame_res->retire_images);
-  NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
-  NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
-  NGFI_DARRAY_CLEAR(frame_res->reset_desc_superpools);
-}
-
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
     vkDeviceWaitIdle(_vk.device);
@@ -1620,41 +1778,6 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-static ngf_error ngfvk_cmd_bundle_create(VkCommandPool pool, ngfvk_cmd_bundle* bundle) {
-  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
-      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .pNext              = NULL,
-      .commandPool        = pool,
-      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1u};
-  VkResult vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info, &bundle->vkcmdbuf);
-  if (vk_err != VK_SUCCESS) {
-    NGFI_DIAG_ERROR("Failed to allocate cmd buffer, VK error: %d", vk_err);
-    return NGF_ERROR_OBJECT_CREATION_FAILED;
-  }
-  bundle->vkpool                         = pool;
-  VkCommandBufferBeginInfo cmd_buf_begin = {
-      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .pNext            = NULL,
-      .flags            = 0,
-      .pInheritanceInfo = NULL};
-  vkBeginCommandBuffer(bundle->vkcmdbuf, &cmd_buf_begin);
-
-  // Create semaphore.
-  VkSemaphoreCreateInfo vk_sem_info = {
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0u};
-  vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
-  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  return NGF_ERROR_OK;
-}
-
-static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  return NGF_ERROR_OK;
-}
-
 ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf, ngf_render_encoder* enc) {
   enc->__handle = (uintptr_t)((void*)cmd_buf);
   return ngfvk_encoder_start(cmd_buf);
@@ -1665,22 +1788,6 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* en
   return ngfvk_encoder_start(cmd_buf);
 }
 
-static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
-  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
-  while (chunk) {
-    ngfvk_bind_op_chunk* next = chunk->next;
-    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
-    chunk = next;
-  }
-  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
-  cmd_buf->pending_bind_ops.size                                   = 0u;
-}
-
-static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
-  ngfvk_cleanup_pending_binds(cmd_buf);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
-  return NGF_ERROR_OK;
-}
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
@@ -1762,29 +1869,6 @@ ngf_error ngf_begin_frame(void) {
   }
 
   return err;
-}
-
-static void ngfvk_submit_commands(
-    VkQueue                     queue,
-    const VkCommandBuffer*      cmd_bufs,
-    uint32_t                    ncmd_bufs,
-    const VkPipelineStageFlags* wait_stage_flags,
-    const VkSemaphore*          wait_sems,
-    uint32_t                    nwait_sems,
-    const VkSemaphore*          signal_sems,
-    uint32_t                    nsignal_sems,
-    VkFence                     fence) {
-  const VkSubmitInfo submit_info = {
-      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext                = NULL,
-      .waitSemaphoreCount   = nwait_sems,
-      .pWaitSemaphores      = wait_sems,
-      .pWaitDstStageMask    = wait_stage_flags,
-      .commandBufferCount   = ncmd_bufs,
-      .pCommandBuffers      = cmd_bufs,
-      .signalSemaphoreCount = nsignal_sems,
-      .pSignalSemaphores    = signal_sems};
-  vkQueueSubmit(queue, 1, &submit_info, fence);
 }
 
 ngf_error ngf_end_frame(void) {
@@ -2918,66 +3002,6 @@ void ngf_cmd_bind_index_buffer(
   vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->data.alloc.obj_handle, 0u, idx_type);
 }
 
-static void ngfvk_cmd_copy_buffer(
-    VkCommandBuffer      vkcmdbuf,
-    VkBuffer             src,
-    VkBuffer             dst,
-    size_t               size,
-    size_t               src_offset,
-    size_t               dst_offset,
-    VkAccessFlags        usage_access_mask,
-    VkPipelineStageFlags usage_stage_mask) {
-  NGFI_IGNORE_VAR(usage_access_mask)
-  NGFI_IGNORE_VAR(usage_stage_mask);
-  const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
-
-  VkBufferMemoryBarrier pre_xfer_mem_bar = {
-      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-      .pNext               = NULL,
-      .buffer              = dst,
-      .srcAccessMask       = usage_access_mask,
-      .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .offset              = dst_offset,
-      .size                = size};
-  vkCmdPipelineBarrier(
-      vkcmdbuf,
-      usage_stage_mask,
-      VK_PIPELINE_STAGE_TRANSFER_BIT,
-      0,
-      0u,
-      NULL,
-      1u,
-      &pre_xfer_mem_bar,
-      0,
-      NULL);
-  vkCmdCopyBuffer(vkcmdbuf, src, dst, 1u, &copy_region);
-
-  VkBufferMemoryBarrier post_xfer_mem_bar = {
-      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-      .pNext               = NULL,
-      .buffer              = dst,
-      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .dstAccessMask       = usage_access_mask,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .offset              = dst_offset,
-      .size                = size};
-
-  vkCmdPipelineBarrier(
-      vkcmdbuf,
-      VK_PIPELINE_STAGE_TRANSFER_BIT,
-      usage_stage_mask,
-      0,
-      0u,
-      NULL,
-      1u,
-      &post_xfer_mem_bar,
-      0,
-      NULL);
-}
-
 void ngf_cmd_copy_attrib_buffer(
     ngf_xfer_encoder        enc,
     const ngf_attrib_buffer src,
@@ -3159,21 +3183,6 @@ static ngf_error ngfvk_create_buffer(
   return (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
-static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
-  void*    result   = NULL;
-  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
-  if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
-  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
-}
-
-static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
-  vmaFlushAllocation(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
-}
-
-static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
-}
-
 ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attrib_buffer* result) {
   assert(info);
   assert(result);
@@ -3203,11 +3212,6 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attri
   }
 
   return err;
-}
-
-static void ngfvk_buffer_retire(ngfvk_buffer buf) {
-  const uint32_t fi = CURRENT_CONTEXT->frame_id;
-  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
 }
 
 void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) {
@@ -3565,3 +3569,5 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
 }
+
+#pragma endregion
