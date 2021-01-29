@@ -34,9 +34,9 @@
 
 #pragma region constants
 
-#define NGFVK_INVALID_IDX  (~0u)
-#define NGFVK_MAX_PHYS_DEV (64u)  // 64 GPUs oughta be enough for everybody.
-#define NGFVK_BIND_OP_CHUNK_SIZE (10u)
+#define NGFVK_INVALID_IDX           (~0u)
+#define NGFVK_MAX_PHYS_DEV          (64u)  // 64 GPUs oughta be enough for everybody.
+#define NGFVK_BIND_OP_CHUNK_SIZE    (10u)
 #define NGFVK_MAX_COLOR_ATTACHMENTS 16u
 
 #pragma endregion
@@ -606,6 +606,7 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 #pragma endregion
 
 #pragma region internal_funcs
+
 // Handler for messages from validation layers, etc.
 // All messages are forwarded to the user-provided debug callback.
 static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
@@ -1124,6 +1125,170 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
   NGFI_DARRAY_CLEAR(frame_res->reset_desc_superpools);
 }
+
+static ngf_error ngfvk_cmd_bundle_create(VkCommandPool pool, ngfvk_cmd_bundle* bundle) {
+  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
+      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+      .pNext              = NULL,
+      .commandPool        = pool,
+      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+      .commandBufferCount = 1u};
+  VkResult vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info, &bundle->vkcmdbuf);
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR("Failed to allocate cmd buffer, VK error: %d", vk_err);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+  bundle->vkpool                         = pool;
+  VkCommandBufferBeginInfo cmd_buf_begin = {
+      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
+      .pInheritanceInfo = NULL};
+  vkBeginCommandBuffer(bundle->vkcmdbuf, &cmd_buf_begin);
+
+  // Create semaphore.
+  VkSemaphoreCreateInfo vk_sem_info = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0u};
+  vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
+  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
+  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
+  while (chunk) {
+    ngfvk_bind_op_chunk* next = chunk->next;
+    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
+    chunk = next;
+  }
+  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
+  cmd_buf->pending_bind_ops.size                                   = 0u;
+}
+
+static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+  return NGF_ERROR_OK;
+}
+
+static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
+  ngfvk_cleanup_pending_binds(cmd_buf);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_submit_commands(
+    VkQueue                     queue,
+    const VkCommandBuffer*      cmd_bufs,
+    uint32_t                    ncmd_bufs,
+    const VkPipelineStageFlags* wait_stage_flags,
+    const VkSemaphore*          wait_sems,
+    uint32_t                    nwait_sems,
+    const VkSemaphore*          signal_sems,
+    uint32_t                    nsignal_sems,
+    VkFence                     fence) {
+  const VkSubmitInfo submit_info = {
+      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext                = NULL,
+      .waitSemaphoreCount   = nwait_sems,
+      .pWaitSemaphores      = wait_sems,
+      .pWaitDstStageMask    = wait_stage_flags,
+      .commandBufferCount   = ncmd_bufs,
+      .pCommandBuffers      = cmd_bufs,
+      .signalSemaphoreCount = nsignal_sems,
+      .pSignalSemaphores    = signal_sems};
+  vkQueueSubmit(queue, 1, &submit_info, fence);
+}
+
+static void ngfvk_cmd_copy_buffer(
+    VkCommandBuffer      vkcmdbuf,
+    VkBuffer             src,
+    VkBuffer             dst,
+    size_t               size,
+    size_t               src_offset,
+    size_t               dst_offset,
+    VkAccessFlags        usage_access_mask,
+    VkPipelineStageFlags usage_stage_mask) {
+  NGFI_IGNORE_VAR(usage_access_mask)
+  NGFI_IGNORE_VAR(usage_stage_mask);
+  const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
+
+  VkBufferMemoryBarrier pre_xfer_mem_bar = {
+      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+      .pNext               = NULL,
+      .buffer              = dst,
+      .srcAccessMask       = usage_access_mask,
+      .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .offset              = dst_offset,
+      .size                = size};
+  vkCmdPipelineBarrier(
+      vkcmdbuf,
+      usage_stage_mask,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      0,
+      0u,
+      NULL,
+      1u,
+      &pre_xfer_mem_bar,
+      0,
+      NULL);
+  vkCmdCopyBuffer(vkcmdbuf, src, dst, 1u, &copy_region);
+
+  VkBufferMemoryBarrier post_xfer_mem_bar = {
+      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
+      .pNext               = NULL,
+      .buffer              = dst,
+      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+      .dstAccessMask       = usage_access_mask,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .offset              = dst_offset,
+      .size                = size};
+
+  vkCmdPipelineBarrier(
+      vkcmdbuf,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      usage_stage_mask,
+      0,
+      0u,
+      NULL,
+      1u,
+      &post_xfer_mem_bar,
+      0,
+      NULL);
+}
+
+static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
+  void*    result   = NULL;
+  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
+  if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
+  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
+}
+
+static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
+  vmaFlushAllocation(
+      CURRENT_CONTEXT->allocator,
+      buf->alloc.vma_alloc,
+      buf->mapped_offset + offset,
+      size);
+}
+
+static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
+  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
+}
+
+static void ngfvk_buffer_retire(ngfvk_buffer buf) {
+  const uint32_t fi = CURRENT_CONTEXT->frame_id;
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
+}
+
+#pragma endregion
+
+#pragma region external_funcs
+
 ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
@@ -1362,170 +1527,6 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 
   return NGF_ERROR_OK;
 }
-
-static ngf_error ngfvk_cmd_bundle_create(VkCommandPool pool, ngfvk_cmd_bundle* bundle) {
-  VkCommandBufferAllocateInfo vk_cmdbuf_info = {
-      .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-      .pNext              = NULL,
-      .commandPool        = pool,
-      .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-      .commandBufferCount = 1u};
-  VkResult vk_err = vkAllocateCommandBuffers(_vk.device, &vk_cmdbuf_info, &bundle->vkcmdbuf);
-  if (vk_err != VK_SUCCESS) {
-    NGFI_DIAG_ERROR("Failed to allocate cmd buffer, VK error: %d", vk_err);
-    return NGF_ERROR_OBJECT_CREATION_FAILED;
-  }
-  bundle->vkpool                         = pool;
-  VkCommandBufferBeginInfo cmd_buf_begin = {
-      .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-      .pNext            = NULL,
-      .flags            = 0,
-      .pInheritanceInfo = NULL};
-  vkBeginCommandBuffer(bundle->vkcmdbuf, &cmd_buf_begin);
-
-  // Create semaphore.
-  VkSemaphoreCreateInfo vk_sem_info = {
-      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0u};
-  vk_err = vkCreateSemaphore(_vk.device, &vk_sem_info, NULL, &bundle->vksem);
-  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  return NGF_ERROR_OK;
-}
-
-static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
-  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
-  while (chunk) {
-    ngfvk_bind_op_chunk* next = chunk->next;
-    ngfi_blkalloc_free(CURRENT_CONTEXT->bind_op_chunk_allocator, chunk);
-    chunk = next;
-  }
-  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
-  cmd_buf->pending_bind_ops.size                                   = 0u;
-}
-
-static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  return NGF_ERROR_OK;
-}
-
-static ngf_error ngfvk_encoder_end(ngf_cmd_buffer cmd_buf) {
-  ngfvk_cleanup_pending_binds(cmd_buf);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
-  return NGF_ERROR_OK;
-}
-
-static void ngfvk_submit_commands(
-    VkQueue                     queue,
-    const VkCommandBuffer*      cmd_bufs,
-    uint32_t                    ncmd_bufs,
-    const VkPipelineStageFlags* wait_stage_flags,
-    const VkSemaphore*          wait_sems,
-    uint32_t                    nwait_sems,
-    const VkSemaphore*          signal_sems,
-    uint32_t                    nsignal_sems,
-    VkFence                     fence) {
-  const VkSubmitInfo submit_info = {
-      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext                = NULL,
-      .waitSemaphoreCount   = nwait_sems,
-      .pWaitSemaphores      = wait_sems,
-      .pWaitDstStageMask    = wait_stage_flags,
-      .commandBufferCount   = ncmd_bufs,
-      .pCommandBuffers      = cmd_bufs,
-      .signalSemaphoreCount = nsignal_sems,
-      .pSignalSemaphores    = signal_sems};
-  vkQueueSubmit(queue, 1, &submit_info, fence);
-}
-
-static void ngfvk_cmd_copy_buffer(
-    VkCommandBuffer      vkcmdbuf,
-    VkBuffer             src,
-    VkBuffer             dst,
-    size_t               size,
-    size_t               src_offset,
-    size_t               dst_offset,
-    VkAccessFlags        usage_access_mask,
-    VkPipelineStageFlags usage_stage_mask) {
-  NGFI_IGNORE_VAR(usage_access_mask)
-  NGFI_IGNORE_VAR(usage_stage_mask);
-  const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
-
-  VkBufferMemoryBarrier pre_xfer_mem_bar = {
-      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-      .pNext               = NULL,
-      .buffer              = dst,
-      .srcAccessMask       = usage_access_mask,
-      .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .offset              = dst_offset,
-      .size                = size};
-  vkCmdPipelineBarrier(
-      vkcmdbuf,
-      usage_stage_mask,
-      VK_PIPELINE_STAGE_TRANSFER_BIT,
-      0,
-      0u,
-      NULL,
-      1u,
-      &pre_xfer_mem_bar,
-      0,
-      NULL);
-  vkCmdCopyBuffer(vkcmdbuf, src, dst, 1u, &copy_region);
-
-  VkBufferMemoryBarrier post_xfer_mem_bar = {
-      .sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-      .pNext               = NULL,
-      .buffer              = dst,
-      .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .dstAccessMask       = usage_access_mask,
-      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-      .offset              = dst_offset,
-      .size                = size};
-
-  vkCmdPipelineBarrier(
-      vkcmdbuf,
-      VK_PIPELINE_STAGE_TRANSFER_BIT,
-      usage_stage_mask,
-      0,
-      0u,
-      NULL,
-      1u,
-      &post_xfer_mem_bar,
-      0,
-      NULL);
-}
-
-static void* ngfvk_map_buffer(ngfvk_buffer* buf, size_t offset) {
-  void*    result   = NULL;
-  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
-  if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
-  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
-}
-
-static void ngfvk_flush_buffer(ngfvk_buffer* buf, size_t offset, size_t size) {
-  vmaFlushAllocation(
-      CURRENT_CONTEXT->allocator,
-      buf->alloc.vma_alloc,
-      buf->mapped_offset + offset,
-      size);
-}
-
-static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
-}
-
-static void ngfvk_buffer_retire(ngfvk_buffer buf) {
-  const uint32_t fi = CURRENT_CONTEXT->frame_id;
-  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
-}
-
-#pragma endregion
-
-#pragma region external_funcs
-
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
   return ngfi_device_caps_read();
 }
