@@ -151,6 +151,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/handle_pool_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf_internal)
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
