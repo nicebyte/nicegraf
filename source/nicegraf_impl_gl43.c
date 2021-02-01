@@ -1597,7 +1597,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buf) {
   }
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf) {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf, ngf_frame_token token) {
+  NGFI_IGNORE_VAR(token);
   assert(buf);
 
   NGFI_TRANSITION_CMD_BUF(buf, NGFI_CMD_BUFFER_READY);
@@ -2426,12 +2427,14 @@ void ngf_finish() {
   glFinish();
 }
 
-ngf_error ngf_begin_frame() {
+ngf_error ngf_begin_frame(ngf_frame_token* token) {
+  NGFI_IGNORE_VAR(token);
   glGenBuffers(0, NULL);
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame() {
+ngf_error ngf_end_frame(ngf_frame_token token) {
+  NGFI_IGNORE_VAR(token);
   return eglSwapBuffers(CURRENT_CONTEXT->dpy, CURRENT_CONTEXT->surface)
              ? NGF_ERROR_OK
              : NGF_ERROR_INVALID_OPERATION;
