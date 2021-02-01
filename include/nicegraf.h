@@ -1005,13 +1005,16 @@ typedef struct ngf_cmd_buffer_info {
 /**
  * Encodes a series of rendering commands.
  *
- * Internally, a command buffer may be in any of the following four states:
+ * Internally, a command buffer may be in any of the following five states:
+ *   - new;
  *   - ready;
  *   - recording;
  *   - awaiting submission;
  *   - submitted.
  *
- * Every newly created command buffer is in the "ready" state.
+ * Every newly created command buffer is in the "new" state. It can be transitioned
+ * to the "ready" state by calling `ngf_start_cmd_buffer` on it.
+ * 
  * When a command buffer is in the "ready" state, you may begin recording a new
  * series of rendering commands into it.
  *
@@ -1031,7 +1034,7 @@ typedef struct ngf_cmd_buffer_info {
  * The three rules above mean that a command buffer may not have more than
  * one encoder active at a given time.
  *
- * Once all the desired commands have been recorded, and the command buffer is
+ * Once all of the desired commands have been recorded, and the command buffer is
  * in the "awaiting submission" state, the command buffer may be
  * submitted for execution via a call to \ref ngf_cmd_buffer_submit, which
  * transitions it into the "submitted" state.
@@ -1044,9 +1047,7 @@ typedef struct ngf_cmd_buffer_info {
  * It is, however, possible to begin recording a new, completely separate batch
  * of commands by calling \ref ngf_cmd_buffer_start which implicitly
  * transitions the buffer to the "ready" state if it is already "submitted".
- * This does not affect any previously submitted commands. Calling
- * \ref ngf_cmd_buffer_start on a command buffer that is in the "ready" state
- * is safe and has no effects.
+ * This does not affect any previously submitted commands. 
  *
  * Calling a command buffer function on a buffer that is in a state not
  * expected by that function will result in an error. For example, calling

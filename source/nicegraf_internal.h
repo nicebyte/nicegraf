@@ -117,6 +117,7 @@ const ngfi_native_binding*
 ngfi_binding_map_lookup(const ngfi_native_binding_map map, uint32_t set, uint32_t binding);
 
 typedef enum {
+  NGFI_CMD_BUFFER_NEW,
   NGFI_CMD_BUFFER_READY,
   NGFI_CMD_BUFFER_RECORDING,
   NGFI_CMD_BUFFER_AWAITING_SUBMIT,

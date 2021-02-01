@@ -1573,7 +1573,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   ngf_cmd_buffer buf = *result;
   if (buf == NULL) { err = NGF_ERROR_OUT_OF_MEM; }
   buf->first_cmd_block = buf->last_cmd_block = NULL;
-  buf->state                                 = NGFI_CMD_BUFFER_READY;
+  buf->state                                 = NGFI_CMD_BUFFER_NEW;
   buf->renderpass_active                     = false;
   return err;
 }
