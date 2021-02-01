@@ -185,8 +185,12 @@ ngf_error ngfi_transition_cmd_buf(
     bool                   has_active_renderpass,
     ngfi_cmd_buffer_state  new_state) {
   switch (new_state) {
+  case NGFI_CMD_BUFFER_NEW:
+    NGFI_DIAG_ERROR("command buffer cannot go back to a `new` state");
+    return NGF_ERROR_INVALID_OPERATION;
   case NGFI_CMD_BUFFER_READY:
-    if (*cur_state != NGFI_CMD_BUFFER_SUBMITTED && *cur_state != NGFI_CMD_BUFFER_READY) {
+    if (*cur_state != NGFI_CMD_BUFFER_SUBMITTED && *cur_state != NGFI_CMD_BUFFER_READY &&
+        *cur_state != NGFI_CMD_BUFFER_NEW) {
       NGFI_DIAG_ERROR("command buffer not in a startable state.");
       return NGF_ERROR_INVALID_OPERATION;
     }
