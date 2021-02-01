@@ -1774,7 +1774,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   if (cmd_buf == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   *result                         = cmd_buf;
   cmd_buf->active_pipe            = NULL;
-  cmd_buf->state                  = NGFI_CMD_BUFFER_READY;
+  cmd_buf->state                  = NGFI_CMD_BUFFER_NEW;
   cmd_buf->renderpass_active      = false;
   cmd_buf->active_rt              = NULL;
   cmd_buf->desc_superpool         = NULL;

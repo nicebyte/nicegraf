@@ -524,7 +524,7 @@ struct ngf_render_target_t {
 };
 
 struct ngf_cmd_buffer_t {
-  ngfi_cmd_buffer_state state = NGFI_CMD_BUFFER_READY;
+  ngfi_cmd_buffer_state state = NGFI_CMD_BUFFER_NEW;
   bool renderpass_active = false;
   id<MTLCommandBuffer> mtl_cmd_buffer = nil;
   id<MTLRenderCommandEncoder> active_rce = nil;
