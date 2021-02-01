@@ -23,6 +23,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "block_alloc.h"
 #include "dynamic_array.h"
+#include "frame_token.h"
 #include "nicegraf.h"
 #include "nicegraf_internal.h"
 #include "stack_alloc.h"
@@ -183,16 +184,15 @@ typedef enum {
 #pragma region external_struct_definitions
 
 typedef struct ngf_cmd_buffer_t {
-  ngfvk_cmd_bundle      active_bundle;         // < The current bundle.
-  ngf_graphics_pipeline active_pipe;           // < The bound pipeline.
-  ngfvk_desc_superpool* desc_superpool;        // < The superpool from which
-                                               //   the desc pools for this cmd
-                                               //   buffer are allocated.
-  ngf_render_target        active_rt;          // < Active render target.
+  ngf_frame_token          parent_frame;    // < The frame this cmd buffer is associated with.
+  ngfi_cmd_buffer_state    state;           // < State of the cmd buffer (i.e. new/recording/etc.)
+  ngfvk_cmd_bundle         active_bundle;   // < The current bundle.
+  ngf_graphics_pipeline    active_pipe;     // < The bound pipeline.
+  ngfvk_desc_superpool*    desc_superpool;  // < The superpool of descriptor pools.
+  ngf_render_target        active_rt;       // < Active render target.
   bool                     renderpass_active;  // < Has an active renderpass.
-  ngfi_cmd_buffer_state    state;
-  ngfvk_bind_op_chunk_list pending_bind_ops;  // < Resource binds that need to be performed
-                                              //   before the next draw.
+  ngfvk_bind_op_chunk_list pending_bind_ops;   // < Resource binds that need to be performed
+                                               //   before the next draw.
 } ngf_cmd_buffer_t;
 
 typedef struct ngf_attrib_buffer_t {
@@ -235,6 +235,7 @@ typedef struct ngf_context_t {
   uint32_t               frame_id;
   uint32_t               max_inflight_frames;
   ngfi_block_allocator*  bind_op_chunk_allocator;
+  ngf_frame_token        current_frame_token;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -1695,6 +1696,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     goto ngf_create_context_cleanup;
   }
 
+  ctx->current_frame_token = ~0u;
+
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
   return err;
@@ -1773,8 +1776,9 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   ngf_cmd_buffer cmd_buf = NGFI_ALLOC(ngf_cmd_buffer_t);
   if (cmd_buf == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   *result                         = cmd_buf;
-  cmd_buf->active_pipe            = NULL;
+  cmd_buf->parent_frame           = ~0u;
   cmd_buf->state                  = NGFI_CMD_BUFFER_NEW;
+  cmd_buf->active_pipe            = NULL;
   cmd_buf->renderpass_active      = false;
   cmd_buf->active_rt              = NULL;
   cmd_buf->desc_superpool         = NULL;
@@ -1807,10 +1811,10 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   assert(cmd_buf);
-  NGFI_IGNORE_VAR(token);
 
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY);
 
+  cmd_buf->parent_frame   = token;
   cmd_buf->desc_superpool = NULL;
   cmd_buf->active_rt      = NULL;
   const size_t fi         = CURRENT_CONTEXT->frame_id;
@@ -1838,6 +1842,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
   uint32_t               fi             = CURRENT_CONTEXT->frame_id;
   ngfvk_frame_resources* frame_res_data = &CURRENT_CONTEXT->frame_res[fi];
   for (uint32_t i = 0u; i < nbuffers; ++i) {
+    if (bufs[i]->parent_frame != CURRENT_CONTEXT->current_frame_token) {
+      NGFI_DIAG_ERROR("submitting a command buffer for the wrong frame");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
     NGFI_TRANSITION_CMD_BUF(bufs[i], NGFI_CMD_BUFFER_SUBMITTED);
     if (bufs[i]->desc_superpool) {
       NGFI_DARRAY_APPEND(frame_res_data->reset_desc_superpools, bufs[i]->desc_superpool);
@@ -1853,7 +1861,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
 }
 
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
-  NGFI_IGNORE_VAR(token);
   ngf_error      err = NGF_ERROR_OK;
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
@@ -1878,11 +1885,22 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
         &CURRENT_CONTEXT->swapchain.image_idx);
   }
 
+  CURRENT_CONTEXT->current_frame_token = ngfi_encode_frame_token(
+      (uint16_t)((uintptr_t)CURRENT_CONTEXT & 0xffff),
+      (uint8_t)CURRENT_CONTEXT->max_inflight_frames,
+      (uint8_t)CURRENT_CONTEXT->frame_id);
+
+  *token = CURRENT_CONTEXT->current_frame_token;
+
   return err;
 }
 
 ngf_error ngf_end_frame(ngf_frame_token token) {
-  NGFI_IGNORE_VAR(token);
+  if (token != CURRENT_CONTEXT->current_frame_token) {
+    NGFI_DIAG_ERROR("ending a frame with an unexpected frame token");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
   ngf_error err = NGF_ERROR_OK;
 
   // Obtain the current frame sync structure and increment frame number.
