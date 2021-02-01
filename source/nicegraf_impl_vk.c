@@ -1805,8 +1805,9 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf) {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   assert(cmd_buf);
+  NGFI_IGNORE_VAR(token);
 
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY);
 
@@ -1851,7 +1852,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_begin_frame(void) {
+ngf_error ngf_begin_frame(ngf_frame_token* token) {
+  NGFI_IGNORE_VAR(token);
   ngf_error      err = NGF_ERROR_OK;
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
@@ -1879,7 +1881,8 @@ ngf_error ngf_begin_frame(void) {
   return err;
 }
 
-ngf_error ngf_end_frame(void) {
+ngf_error ngf_end_frame(ngf_frame_token token) {
+  NGFI_IGNORE_VAR(token);
   ngf_error err = NGF_ERROR_OK;
 
   // Obtain the current frame sync structure and increment frame number.

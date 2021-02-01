@@ -677,7 +677,7 @@ const ngf_device_capabilities* ngf_get_device_capabilities()  NGF_NOEXCEPT{
   return ngfi_device_caps_read();
 }
 
-ngf_error ngf_begin_frame() NGF_NOEXCEPT {
+ngf_error ngf_begin_frame(ngf_frame_token*) NGF_NOEXCEPT {
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem,
                           DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
@@ -686,7 +686,7 @@ ngf_error ngf_begin_frame() NGF_NOEXCEPT {
            : NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame() NGF_NOEXCEPT {
+ngf_error ngf_end_frame(ngf_frame_token) NGF_NOEXCEPT {
   ngf_context ctx = CURRENT_CONTEXT;
   if(CURRENT_CONTEXT->frame.color_drawable &&
      CURRENT_CONTEXT->pending_cmd_buffer) {
@@ -1463,7 +1463,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   }
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
+ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer, ngf_frame_token) NGF_NOEXCEPT {
   assert(cmd_buffer);
   cmd_buffer->mtl_cmd_buffer = nil;
   cmd_buffer->mtl_cmd_buffer = [CURRENT_CONTEXT->queue commandBuffer];
