@@ -36,15 +36,15 @@ ngfi_encode_frame_token(uint16_t ctx_id, uint8_t max_inflight_frames, uint8_t fr
 }
 
 static inline uint16_t ngfi_frame_ctx_id(uint32_t frame_token) {
-  return (frame_token >> 0x10) & 0xffff;
+  return ((uint16_t)(frame_token >> 0x10)) & 0xffff;
 }
 
 static inline uint8_t ngfi_frame_max_inflight_frames(uint32_t frame_token) {
-  return (frame_token >> 0x08) & 0xff;
+  return ((uint8_t)(frame_token >> 0x08)) & 0xff;
 }
 
 static inline uint8_t ngfi_frame_id(uint32_t frame_token) {
-  return frame_token & 0xff;
+  return (uint8_t)(frame_token & 0xff);
 }
 
 #ifdef __cplusplus
