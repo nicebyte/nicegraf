@@ -141,8 +141,8 @@ typedef struct ngfvk_frame_resources {
   // Command buffers submitted to the graphics queue, their
   // associated semaphores and parent command pool.
   NGFI_DARRAY_OF(VkCommandBuffer) cmd_bufs;
+  NGFI_DARRAY_OF(VkCommandPool) cmd_pools;
   NGFI_DARRAY_OF(VkSemaphore) cmd_buf_sems;
-  VkCommandPool cmd_pool;
 
   // Resources that should be disposed of at some point after this
   // frame's completion.
@@ -178,6 +178,12 @@ typedef enum {
   NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE,
   NGFVK_PIPELINE_FLAVOR_COUNT
 } ngfvk_pipeline_flavor;
+
+typedef struct {
+  uint16_t       ctx_id;
+  uint8_t        num_pools;
+  VkCommandPool* pools;
+} ngfvk_command_superpool;
 
 #pragma endregion
 
@@ -229,13 +235,13 @@ typedef struct ngf_context_t {
   ngfvk_swapchain        swapchain;
   ngf_swapchain_info     swapchain_info;
   VmaAllocator           allocator;
-  VkCommandPool*         cmd_pools;
   ngfvk_desc_superpool*  desc_superpools;
   VkSurfaceKHR           surface;
   uint32_t               frame_id;
   uint32_t               max_inflight_frames;
   ngfi_block_allocator*  bind_op_chunk_allocator;
   ngf_frame_token        current_frame_token;
+  NGFI_DARRAY_OF(ngfvk_command_superpool) command_superpools;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -1045,15 +1051,23 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     frame_res->nwait_fences = 0;
   }
 
-  const size_t nretired_cmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
+  NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, i) {
+    if (frame_res->cmd_pools.data[i]) {
+      vkFreeCommandBuffers(
+          _vk.device,
+          frame_res->cmd_pools.data[i],
+          1,
+          &(frame_res->cmd_bufs.data[i]));
+    }
+  }
 
-  if (nretired_cmd_bufs > 0u) {
-    vkFreeCommandBuffers(
-        _vk.device,
-        frame_res->cmd_pool,
-        NGFI_DARRAY_SIZE(frame_res->cmd_bufs),
-        frame_res->cmd_bufs.data);
-    vkResetCommandPool(_vk.device, frame_res->cmd_pool, 0u);
+  NGFI_DARRAY_FOREACH(frame_res->cmd_pools, i) {
+    if (frame_res->cmd_pools.data[i]) {
+      vkResetCommandPool(
+          _vk.device,
+          frame_res->cmd_pools.data[i],
+          VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
+    }
   }
 
   NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, s) {
@@ -1114,6 +1128,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   }
 
   NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
+  NGFI_DARRAY_CLEAR(frame_res->cmd_pools);
   NGFI_DARRAY_CLEAR(frame_res->cmd_buf_sems);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
   NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
@@ -1284,6 +1299,62 @@ static void ngfvk_unmap_buffer(ngfvk_buffer* buf) {
 static void ngfvk_buffer_retire(ngfvk_buffer buf) {
   const uint32_t fi = CURRENT_CONTEXT->frame_id;
   NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buf.alloc);
+}
+
+static ngf_error ngfvk_create_command_superpool(
+    ngfvk_command_superpool* superpool,
+    uint8_t                  npools,
+    uint16_t                 ctx_id) {
+  superpool->ctx_id    = ctx_id;
+  superpool->num_pools = npools;
+  superpool->pools     = NGFI_ALLOCN(VkCommandPool, npools);
+  if (superpool->pools == NULL) { return NGF_ERROR_OUT_OF_MEM; }
+
+  for (size_t i = 0; i < npools; ++i) {
+    const VkCommandPoolCreateInfo command_pool_ci = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .pNext            = NULL,
+        .queueFamilyIndex = _vk.gfx_family_idx,
+        .flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT};
+    if (vkCreateCommandPool(_vk.device, &command_pool_ci, NULL, &superpool->pools[i]) !=
+        VK_SUCCESS) {
+      return NGF_ERROR_OBJECT_CREATION_FAILED;
+    }
+  }
+
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_destroy_command_superpool(ngfvk_command_superpool* superpool) {
+  for (size_t i = 0; i < superpool->num_pools; ++i) {
+    vkDestroyCommandPool(_vk.device, superpool->pools[i], NULL);
+  }
+  NGFI_FREEN(superpool->pools, superpool->num_pools);
+}
+
+static ngfvk_command_superpool* ngfvk_find_command_superpool(uint16_t ctx_id, uint8_t nframes) {
+  ngfvk_command_superpool* result = NULL;
+  NGFI_DARRAY_FOREACH(CURRENT_CONTEXT->command_superpools, i) {
+    if (CURRENT_CONTEXT->command_superpools.data[i].ctx_id == ctx_id) {
+      result = &CURRENT_CONTEXT->command_superpools.data[i];
+      break;
+    }
+  }
+
+  if (result == NULL) {
+    ngfvk_command_superpool s = {
+        .ctx_id    = (uint16_t)~0,
+        .num_pools = 0,
+    };
+    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->command_superpools, s);
+    ngfvk_create_command_superpool(
+        NGFI_DARRAY_BACKPTR(CURRENT_CONTEXT->command_superpools),
+        nframes,
+        ctx_id);
+    result = NGFI_DARRAY_BACKPTR(CURRENT_CONTEXT->command_superpools);
+  }
+
+  return result;
 }
 
 #pragma endregion
@@ -1638,6 +1709,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
     NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_bufs, max_inflight_frames);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_pools, max_inflight_frames);
     NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_buf_sems, max_inflight_frames);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
@@ -1649,7 +1721,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_superpools, 8);
-    ctx->frame_res[f].cmd_pool         = VK_NULL_HANDLE;
+
     const VkFenceCreateInfo fence_info = {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .pNext = NULL,
@@ -1664,22 +1736,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     }
   }
   ctx->frame_id = 0u;
-
-  // Create command pools.
-  const VkCommandPoolCreateInfo cmd_pool_info = {
-      .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-      .pNext            = NULL,
-      .flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
-      .queueFamilyIndex = _vk.gfx_family_idx};
-  ctx->cmd_pools = NGFI_ALLOCN(VkCommandPool, ctx->max_inflight_frames);
-  for (uint32_t p = 0u; p < ctx->max_inflight_frames; ++p) {
-    vk_err = vkCreateCommandPool(_vk.device, &cmd_pool_info, NULL, &ctx->cmd_pools[p]);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to create command pools for context.");
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-  }
 
   // initialize descriptor superpools.
   ctx->desc_superpools = NGFI_ALLOCN(ngfvk_desc_superpool, ctx->max_inflight_frames);
@@ -1697,6 +1753,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   }
 
   ctx->current_frame_token = ~0u;
+
+  NGFI_DARRAY_RESET(ctx->command_superpools, 3);
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
@@ -1720,6 +1778,7 @@ void ngf_destroy_context(ngf_context ctx) {
     for (uint32_t f = 0u; ctx->frame_res != NULL && f < ctx->max_inflight_frames; ++f) {
       ngfvk_retire_resources(&ctx->frame_res[f]);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_bufs);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_pools);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_buf_sems);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
@@ -1733,11 +1792,6 @@ void ngf_destroy_context(ngf_context ctx) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
     }
-    for (uint32_t p = 0; p < ctx->max_inflight_frames; ++p) {
-      const VkCommandPool pool = ctx->cmd_pools[p];
-      if (pool != VK_NULL_HANDLE) { vkDestroyCommandPool(_vk.device, pool, NULL); }
-    }
-    NGFI_FREEN(ctx->cmd_pools, ctx->max_inflight_frames);
 
     // Free descriptor superpools.
     for (size_t p = 0u; p < ctx->max_inflight_frames; ++p) {
@@ -1757,6 +1811,11 @@ void ngf_destroy_context(ngf_context ctx) {
     if (ctx->allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(ctx->allocator); }
     if (ctx->frame_res != NULL) { NGFI_FREEN(ctx->frame_res, ctx->max_inflight_frames); }
     if (ctx->bind_op_chunk_allocator) { ngfi_blkalloc_destroy(ctx->bind_op_chunk_allocator); }
+
+    NGFI_DARRAY_FOREACH(ctx->command_superpools, i) {
+      ngfvk_destroy_command_superpool(&ctx->command_superpools.data[i]);
+    }
+    NGFI_DARRAY_DESTROY(ctx->command_superpools);
 
     if (CURRENT_CONTEXT == ctx) CURRENT_CONTEXT = NULL;
     NGFI_FREE(ctx);
@@ -1817,8 +1876,12 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   cmd_buf->parent_frame   = token;
   cmd_buf->desc_superpool = NULL;
   cmd_buf->active_rt      = NULL;
-  const size_t fi         = CURRENT_CONTEXT->frame_id;
-  return ngfvk_cmd_bundle_create(CURRENT_CONTEXT->cmd_pools[fi], &cmd_buf->active_bundle);
+
+  const ngfvk_command_superpool* superpool =
+      ngfvk_find_command_superpool(ngfi_frame_ctx_id(token), ngfi_frame_max_inflight_frames(token));
+  const VkCommandPool pool = superpool->pools[ngfi_frame_id(token)];
+
+  return ngfvk_cmd_bundle_create(pool, &cmd_buf->active_bundle);
 }
 
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
@@ -1852,6 +1915,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
     }
     vkEndCommandBuffer(bufs[i]->active_bundle.vkcmdbuf);
     NGFI_DARRAY_APPEND(frame_res_data->cmd_bufs, bufs[i]->active_bundle.vkcmdbuf);
+    NGFI_DARRAY_APPEND(frame_res_data->cmd_pools, bufs[i]->active_bundle.vkpool);
     NGFI_DARRAY_APPEND(frame_res_data->cmd_buf_sems, bufs[i]->active_bundle.vksem);
     bufs[i]->active_pipe = VK_NULL_HANDLE;
     bufs[i]->active_rt   = NULL;
@@ -1864,11 +1928,12 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngf_error      err = NGF_ERROR_OK;
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
+  NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_pools);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
   // Insert placeholders for deferred barriers.
   NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].cmd_bufs, VK_NULL_HANDLE);
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].cmd_pools, VK_NULL_HANDLE);
   NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems, VK_NULL_HANDLE);
-  CURRENT_CONTEXT->frame_res[fi].cmd_pool = CURRENT_CONTEXT->cmd_pools[fi];
 
   // reset stack allocator.
   ngfi_sa_reset(ngfi_tmp_store());
@@ -1916,8 +1981,12 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   const uint32_t npending_barriers = NGFI_DARRAY_SIZE(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers);
   const bool     have_deferred_barriers = npending_barriers > 0;
   if (have_deferred_barriers) {
-    ngfvk_cmd_bundle bundle;
-    ngfvk_cmd_bundle_create(CURRENT_CONTEXT->cmd_pools[fi], &bundle);
+    const ngfvk_command_superpool* superpool = ngfvk_find_command_superpool(
+        ngfi_frame_ctx_id(token),
+        ngfi_frame_max_inflight_frames(token));
+    const VkCommandPool pool = superpool->pools[ngfi_frame_id(token)];
+    ngfvk_cmd_bundle    bundle;
+    ngfvk_cmd_bundle_create(pool, &bundle);
     vkCmdPipelineBarrier(
         bundle.vkcmdbuf,
         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -1931,6 +2000,7 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
         NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers.data);
     vkEndCommandBuffer(bundle.vkcmdbuf);
     frame_res->cmd_bufs.data[0]     = bundle.vkcmdbuf;
+    frame_res->cmd_pools.data[0]    = bundle.vkpool;
     frame_res->cmd_buf_sems.data[0] = bundle.vksem;
     NGFI_DARRAY_CLEAR(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers);
   }
