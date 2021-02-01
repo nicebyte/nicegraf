@@ -32,7 +32,7 @@ static inline uint32_t
 ngfi_encode_frame_token(uint16_t ctx_id, uint8_t max_inflight_frames, uint8_t frame_id) {
   const uint32_t ctx_id_ext = ctx_id, max_inflight_frames_ext = max_inflight_frames,
                  frame_id_ext = frame_id;
-  return (ctx_id_ext << 0x10) | (max_inflight_frames_ext << 0x08) | frame_id;
+  return (ctx_id_ext << 0x10) | (max_inflight_frames_ext << 0x08) | frame_id_ext;
 }
 
 static inline uint32_t ngfi_frame_ctx_id(uint32_t frame_token) {
