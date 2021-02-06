@@ -86,8 +86,9 @@ typedef struct {
 } ngfvk_desc_pool_capacity;
 
 typedef struct {
-  ngfvk_desc_count counts;
-} ngfvk_desc_set_size;
+  VkDescriptorSetLayout vk_handle;
+  ngfvk_desc_count      counts;
+} ngfvk_desc_set_layout;
 
 typedef struct ngfvk_desc_superpool_t ngfvk_desc_superpool;
 
@@ -252,8 +253,7 @@ typedef struct ngf_shader_stage_t {
 
 typedef struct ngf_graphics_pipeline_t {
   VkPipeline vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_COUNT];
-  NGFI_DARRAY_OF(VkDescriptorSetLayout) vk_descriptor_set_layouts;
-  NGFI_DARRAY_OF(ngfvk_desc_set_size) desc_set_sizes;
+  NGFI_DARRAY_OF(ngfvk_desc_set_layout) descriptor_set_layouts;
   VkPipelineLayout vk_pipeline_layout;
 } ngf_graphics_pipeline_t;
 
@@ -2362,14 +2362,17 @@ ngf_error ngf_create_graphics_pipeline(
       .pDynamicStates    = dynamic_states};
 
   // Descriptor set layouts.
-  NGFI_DARRAY_RESET(pipeline->vk_descriptor_set_layouts, info->layout->ndescriptor_set_layouts);
-  NGFI_DARRAY_RESET(pipeline->desc_set_sizes, info->layout->ndescriptor_set_layouts);
+  NGFI_DARRAY_RESET(pipeline->descriptor_set_layouts, info->layout->ndescriptor_set_layouts);
+  VkDescriptorSetLayout* vk_set_layouts = ngfi_sa_alloc(
+      ngfi_tmp_store(),
+      sizeof(VkDescriptorSetLayout) * info->layout->ndescriptor_set_layouts);
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
-    VkDescriptorSetLayoutBinding* vk_descriptor_bindings = NGFI_ALLOCN(
-        VkDescriptorSetLayoutBinding,
-        info->layout->descriptor_set_layouts[s].ndescriptors);
-    ngfvk_desc_set_size set_size;
-    memset(&set_size, 0, sizeof(set_size));
+    VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
+        NGFI_ALLOCN(  // TODO: use temp storage here
+            VkDescriptorSetLayoutBinding,
+            info->layout->descriptor_set_layouts[s].ndescriptors);
+    ngfvk_desc_set_layout set_layout;
+    memset(&set_layout, 0, sizeof(set_layout));
     for (uint32_t b = 0u; b < info->layout->descriptor_set_layouts[s].ndescriptors; ++b) {
       VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[b];
       const ngf_descriptor_info*    d    = &info->layout->descriptor_set_layouts[s].descriptors[b];
@@ -2379,7 +2382,7 @@ ngf_error ngf_create_graphics_pipeline(
       vk_d->descriptorCount              = 1u;
       vk_d->stageFlags                   = get_vk_stage_flags(d->stage_flags);
       vk_d->pImmutableSamplers           = NULL;
-      set_size.counts[d->type]++;
+      set_layout.counts[d->type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -2387,10 +2390,9 @@ ngf_error ngf_create_graphics_pipeline(
         .flags        = 0u,
         .bindingCount = info->layout->descriptor_set_layouts[s].ndescriptors,
         .pBindings    = vk_descriptor_bindings};
-    VkDescriptorSetLayout result_dsl = VK_NULL_HANDLE;
-    vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &result_dsl);
-    NGFI_DARRAY_APPEND(pipeline->vk_descriptor_set_layouts, result_dsl);
-    NGFI_DARRAY_APPEND(pipeline->desc_set_sizes, set_size);
+    vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &set_layout.vk_handle);
+    NGFI_DARRAY_APPEND(pipeline->descriptor_set_layouts, set_layout);
+    vk_set_layouts[s] = set_layout.vk_handle;
     NGFI_FREEN(vk_descriptor_bindings, info->layout->descriptor_set_layouts[s].ndescriptors);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -2399,13 +2401,13 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Pipeline layout.
-  const uint32_t ndescriptor_sets = NGFI_DARRAY_SIZE(pipeline->vk_descriptor_set_layouts);
+  const uint32_t ndescriptor_sets = NGFI_DARRAY_SIZE(pipeline->descriptor_set_layouts);
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
       .setLayoutCount         = ndescriptor_sets,
-      .pSetLayouts            = pipeline->vk_descriptor_set_layouts.data,
+      .pSetLayouts            = vk_set_layouts,
       .pushConstantRangeCount = 0u,
       .pPushConstantRanges    = NULL};
   vk_err = vkCreatePipelineLayout(
@@ -2478,13 +2480,11 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
     if (p->vk_pipeline_layout != VK_NULL_HANDLE) {
       NGFI_DARRAY_APPEND(res->retire_pipeline_layouts, p->vk_pipeline_layout);
     }
-    for (uint32_t l = 0u; l < NGFI_DARRAY_SIZE(p->vk_descriptor_set_layouts); ++l) {
-      VkDescriptorSetLayout set_layout = NGFI_DARRAY_AT(p->vk_descriptor_set_layouts, l);
-      if (set_layout != VK_NULL_HANDLE) {
-        NGFI_DARRAY_APPEND(res->retire_dset_layouts, set_layout);
-      }
+    NGFI_DARRAY_FOREACH(p->descriptor_set_layouts, l) {
+      VkDescriptorSetLayout set_layout = NGFI_DARRAY_AT(p->descriptor_set_layouts, l).vk_handle;
+      NGFI_DARRAY_APPEND(res->retire_dset_layouts, set_layout);
     }
-    NGFI_DARRAY_DESTROY(p->vk_descriptor_set_layouts);
+    NGFI_DARRAY_DESTROY(p->descriptor_set_layouts);
     NGFI_FREE(p);
   }
 }
@@ -2785,7 +2785,7 @@ void ngf_cmd_draw(
   assert(active_pipe);
 
   // Get the number of active descriptor set layouts in the pipeline.
-  const uint32_t ndesc_set_layouts = NGFI_DARRAY_SIZE(active_pipe->vk_descriptor_set_layouts);
+  const uint32_t ndesc_set_layouts = NGFI_DARRAY_SIZE(active_pipe->descriptor_set_layouts);
 
   // Reset temp. storage to make sure we have all of it available.
   ngfi_sa_reset(ngfi_tmp_store());
@@ -2833,10 +2833,11 @@ void ngf_cmd_draw(
 
         // Ensure we have an active desriptor pool that is able to service the
         // request.
-        const bool                 have_active_pool    = (superpool->active_pool != NULL);
-        bool                       fresh_pool_required = !have_active_pool;
-        const ngfvk_desc_set_size* set_size =
-            &NGFI_DARRAY_AT(buf->active_pipe->desc_set_sizes, bind_op->target_set);
+        const bool                   have_active_pool    = (superpool->active_pool != NULL);
+        bool                         fresh_pool_required = !have_active_pool;
+        const ngfvk_desc_set_layout* set_layout =
+            &NGFI_DARRAY_AT(buf->active_pipe->descriptor_set_layouts, bind_op->target_set);
+
         if (have_active_pool) {
           // Check if the active descriptor pool can fit the required descriptor
           // set.
@@ -2846,7 +2847,7 @@ void ngf_cmd_draw(
           for (ngf_descriptor_type i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT;
                ++i) {
             fresh_pool_required |=
-                (usage->descriptors[i] + set_size->counts[i] >= capacity->descriptors[i]);
+                (usage->descriptors[i] + set_layout->counts[i] >= capacity->descriptors[i]);
           }
           fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
         }
@@ -2908,8 +2909,7 @@ void ngf_cmd_draw(
             .pNext              = NULL,
             .descriptorPool     = pool->vk_pool,
             .descriptorSetCount = 1u,
-            .pSetLayouts =
-                &NGFI_DARRAY_AT(active_pipe->vk_descriptor_set_layouts, bind_op->target_set)};
+            .pSetLayouts        = &set_layout->vk_handle};
         const VkResult desc_set_alloc_result =
             vkAllocateDescriptorSets(_vk.device, &vk_desc_set_info, &vk_sets[bind_op->target_set]);
         if (desc_set_alloc_result != VK_SUCCESS) {
@@ -2923,7 +2923,7 @@ void ngf_cmd_draw(
 
         // Update usage counters for the active descriptor pool.
         for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-          pool->utilization.descriptors[i] += set_size->counts[i];
+          pool->utilization.descriptors[i] += set_layout->counts[i];
         }
         pool->utilization.sets++;
       }
