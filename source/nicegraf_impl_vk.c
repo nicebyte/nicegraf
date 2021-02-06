@@ -97,7 +97,7 @@ typedef struct ngfvk_desc_pool {
   ngfvk_desc_pool_capacity utilization;
 } ngfvk_desc_pool;
 
-struct ngfvk_desc_pools_t {
+typedef struct ngfvk_desc_pools_t {
   ngfvk_desc_pool* active_pool;
   ngfvk_desc_pool* list;
 } ngfvk_desc_pools;
@@ -193,7 +193,7 @@ typedef struct ngf_cmd_buffer_t {
   ngfi_cmd_buffer_state    state;           // < State of the cmd buffer (i.e. new/recording/etc.)
   ngfvk_cmd_bundle         active_bundle;   // < The current bundle.
   ngf_graphics_pipeline    active_pipe;     // < The bound pipeline.
-  ngfvk_desc_pools*    desc_superpool;  // < The superpool of descriptor pools.
+  ngfvk_desc_pools*        desc_superpool;  // < The superpool of descriptor pools.
   ngf_render_target        active_rt;       // < Active render target.
   bool                     renderpass_active;  // < Has an active renderpass.
   ngfvk_bind_op_chunk_list pending_bind_ops;   // < Resource binds that need to be performed
@@ -234,7 +234,7 @@ typedef struct ngf_context_t {
   ngfvk_swapchain        swapchain;
   ngf_swapchain_info     swapchain_info;
   VmaAllocator           allocator;
-  ngfvk_desc_pools*  desc_superpools;
+  ngfvk_desc_pools*      desc_superpools;
   VkSurfaceKHR           surface;
   uint32_t               frame_id;
   uint32_t               max_inflight_frames;
@@ -1794,7 +1794,7 @@ void ngf_destroy_context(ngf_context ctx) {
     // Free descriptor superpools.
     for (size_t p = 0u; p < ctx->max_inflight_frames; ++p) {
       ngfvk_desc_pools* sp   = &ctx->desc_superpools[p];
-      ngfvk_desc_pool*      pool = sp->list;
+      ngfvk_desc_pool*  pool = sp->list;
       while (pool) {
         vkDestroyDescriptorPool(_vk.device, pool->vk_pool, NULL);
         ngfvk_desc_pool* prev_pool = pool;
@@ -2825,9 +2825,9 @@ void ngf_cmd_draw(
       if (vk_sets[bind_op->target_set] == VK_NULL_HANDLE) {
         // The target descriptor set hasn't been allocated yet.
 
-        const uint32_t        superpool_idx = CURRENT_CONTEXT->frame_id;
+        const uint32_t    superpool_idx = CURRENT_CONTEXT->frame_id;
         ngfvk_desc_pools* superpool     = &CURRENT_CONTEXT->desc_superpools[superpool_idx];
-        buf->desc_superpool                 = superpool;
+        buf->desc_superpool             = superpool;
 
         // Ensure we have an active desriptor pool that is able to service the
         // request.
