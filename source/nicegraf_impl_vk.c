@@ -35,10 +35,11 @@
 
 #pragma region constants
 
-#define NGFVK_INVALID_IDX           (~0u)
-#define NGFVK_MAX_PHYS_DEV          (64u)  // 64 GPUs oughta be enough for everybody.
-#define NGFVK_BIND_OP_CHUNK_SIZE    (10u)
-#define NGFVK_MAX_COLOR_ATTACHMENTS 16u
+#define NGFVK_INVALID_IDX                      (~0u)
+#define NGFVK_MAX_PHYS_DEV                     (64u)  // 64 GPUs oughta be enough for everybody.
+#define NGFVK_BIND_OP_CHUNK_SIZE               (10u)
+#define NGFVK_MAX_COLOR_ATTACHMENTS            16u
+#define NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT (1u << 31u)
 
 #pragma endregion
 
@@ -3549,6 +3550,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const bool is_sampled_from  = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
   const bool is_xfer_dst      = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
   const bool is_attachment    = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
+  const bool is_transient     = info->usage_hint & NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
   const bool is_depth_stencil = info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
   const bool is_depth_only =
       info->format == NGF_IMAGE_FORMAT_DEPTH32 || info->format == NGF_IMAGE_FORMAT_DEPTH16;
@@ -3558,6 +3560,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
                                         : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   const VkImageUsageFlagBits usage_flags = (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
                                            (is_attachment ? attachment_usage_bits : 0u) |
+                                           (is_transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0) |
                                            (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u);
 
   ngf_error err = NGF_ERROR_OK;
