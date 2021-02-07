@@ -115,7 +115,7 @@ typedef struct ngf_diagnostic_info {
                                                     be passed as-is to the
                                                     callback. */
   ngf_diagnostic_callback callback;       /**< Pointer to the diagnostic
-                                                    message callback function.*/
+                                               message callback function.*/
 } ngf_diagnostic_info;
 
 /**
@@ -441,12 +441,22 @@ typedef struct ngf_vertex_input_info {
   uint32_t                      nattribs;           /**< Number of attribute descriptions.*/
 } ngf_vertex_input_info;
 
+typedef enum ngf_sample_count {
+  NGF_SAMPLE_COUNT_1 = 1,
+  NGF_SAMPLE_COUNT_2 = 2,
+  NGF_SAMPLE_COUNT_4 = 4,
+  NGF_SAMPLE_COUNT_8 = 8,
+  NGF_SAMPLE_COUNT_16 = 16,
+  NGF_SAMPLE_COUNT_32 = 32,
+  NGF_SAMPLE_COUNT_64 = 64,
+} ngf_sample_count;
+
 /**
  * Specifies state of multisampling.
  */
 typedef struct ngf_multisample_info {
-  bool multisample;       /**< Whether to enable multisampling.*/
-  bool alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
+  ngf_sample_count sample_count;      /**< MSAA sample count. */
+  bool             alpha_to_coverage; /**< Whether alpha-to-coverage is enabled.*/
 } ngf_multisample_info;
 
 /**
@@ -618,14 +628,13 @@ typedef enum ngf_image_usage {
  */
 typedef struct ngf_image_info {
   ngf_image_type type;
-  ngf_extent3d   extent;     /**< Width, height and depth (for 3d images) or no. of
-                                  layers (for layered images).*/
-  uint32_t         nmips;    /**< Number of mip levels.*/
-  ngf_image_format format;   /**< Internal format.*/
-  uint32_t         nsamples; /**< Number of samples. 0 indicates non-multisampled
-                                  images.*/
-  uint32_t usage_hint;       /**< How the client intends to use the image. Must be a
-                                  combination of image usage flags.*/
+  ngf_extent3d   extent;         /**< Width, height and depth (for 3d images) or no. of
+                                      layers (for layered images).*/
+  uint32_t         nmips;        /**< Number of mip levels.*/
+  ngf_image_format format;       /**< Internal format.*/
+  ngf_sample_count sample_count; /**< Number of samples. **/
+  uint32_t         usage_hint;   /**< How the client intends to use the image. Must be a
+                                      combination of image usage flags.*/
 } ngf_image_info;
 
 typedef struct ngf_image_t* ngf_image;
