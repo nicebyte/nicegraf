@@ -529,8 +529,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   config_attribs[a++] = EGL_CONFORMANT;
   config_attribs[a++] = EGL_OPENGL_BIT;
   if (swapchain_info != NULL) {
-    const glformat color_format         = get_gl_format(swapchain_info->cfmt);
-    const glformat depth_stencil_format = get_gl_format(swapchain_info->dfmt);
+    const glformat color_format         = get_gl_format(swapchain_info->color_format);
+    const glformat depth_stencil_format = get_gl_format(swapchain_info->depth_format);
     config_attribs[a++]                 = EGL_COLOR_BUFFER_TYPE;
     config_attribs[a++]                 = EGL_RGB_BUFFER;
     config_attribs[a++]                 = EGL_RED_SIZE;
@@ -559,7 +559,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     err_code = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
   }
-  ctx->has_depth = (swapchain_info->dfmt != NGF_IMAGE_FORMAT_UNDEFINED);
+  ctx->has_depth = (swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED);
 
   // Create context with chosen config.
   EGLint is_debug          = (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
@@ -584,7 +584,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   // Create surface if necessary.
   ctx->srgb_surface = false;
   if (swapchain_info) {
-    const glformat color_format          = get_gl_format(swapchain_info->cfmt);
+    const glformat color_format          = get_gl_format(swapchain_info->color_format);
     EGLint         egl_surface_attribs[] = {
         EGL_RENDER_BUFFER,
         swapchain_info->capacity_hint <= 1 ? EGL_SINGLE_BUFFER : EGL_BACK_BUFFER,

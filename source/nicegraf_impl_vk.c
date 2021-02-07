@@ -827,7 +827,7 @@ static ngf_error ngfvk_create_swapchain(
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, formats);
   const VkColorSpaceKHR color_space =
       VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;  // TODO: use correct colorspace here.
-  const VkFormat requested_format = get_vk_image_format(swapchain_info->cfmt);
+  const VkFormat requested_format = get_vk_image_format(swapchain_info->color_format);
   if (!(nformats == 1 && formats[0].format == VK_FORMAT_UNDEFINED)) {
     bool found = false;
     for (size_t f = 0; !found && f < nformats; ++f) {
@@ -914,7 +914,7 @@ static ngf_error ngfvk_create_swapchain(
         .type     = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent   = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips    = 1u,
-        .format   = swapchain_info->cfmt,
+        .format   = swapchain_info->color_format,
         .nsamples = swapchain_info->nsamples,
         .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
     };
@@ -977,7 +977,7 @@ static ngf_error ngfvk_create_swapchain(
   }
 
   // Determine if we need a depth attachment.
-  const bool have_depth_attachment = swapchain_info->dfmt != NGF_IMAGE_FORMAT_UNDEFINED;
+  const bool have_depth_attachment = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
 
   // Create an image for the depth attachment if necessary.
   if (have_depth_attachment) {
@@ -986,7 +986,7 @@ static ngf_error ngfvk_create_swapchain(
         .extent   = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips    = 1u,
         .nsamples = get_vk_sample_count(swapchain_info->nsamples),
-        .format   = swapchain_info->dfmt,
+        .format   = swapchain_info->depth_format,
         .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
     err = ngf_create_image(&depth_image_info, &swapchain->depth_image);
@@ -994,7 +994,7 @@ static ngf_error ngfvk_create_swapchain(
   } else {
     swapchain->depth_image = NULL;
   }
-  const VkFormat requested_depth_format = get_vk_image_format(swapchain_info->dfmt);
+  const VkFormat requested_depth_format = get_vk_image_format(swapchain_info->depth_format);
 
   // Set up attachment descriptions.
   const VkAttachmentDescription color_attachment_desc = {
