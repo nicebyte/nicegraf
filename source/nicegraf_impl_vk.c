@@ -911,12 +911,12 @@ static ngf_error ngfvk_create_swapchain(
   // Create multisampled images, if necessary.
   if (is_multisampled) {
     const ngf_image_info ms_image_info = {
-        .type     = NGF_IMAGE_TYPE_IMAGE_2D,
-        .extent   = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
-        .nmips    = 1u,
-        .format   = swapchain_info->color_format,
-        .nsamples = swapchain_info->nsamples,
-        .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
+        .type   = NGF_IMAGE_TYPE_IMAGE_2D,
+        .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
+        .nmips  = 1u,
+        .format = swapchain_info->color_format,
+        .sample_count = swapchain_info->nsamples,
+        .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
     };
     swapchain->multisample_images = NGFI_ALLOCN(ngf_image, swapchain->num_images);
     if (swapchain->multisample_images == NULL) {
@@ -945,9 +945,7 @@ static ngf_error ngfvk_create_swapchain(
           1u,
           1u,
           &swapchain->multisample_image_views[i]);
-      if (err != NGF_ERROR_OK) {
-        goto ngfvk_create_swapchain_cleanup;
-      }
+      if (err != NGF_ERROR_OK) { goto ngfvk_create_swapchain_cleanup; }
     }
 
   } else {
@@ -969,9 +967,7 @@ static ngf_error ngfvk_create_swapchain(
         1u,
         1u,
         &swapchain->image_views[i]);
-    if (err != NGF_ERROR_OK) {
-      goto ngfvk_create_swapchain_cleanup;
-    }
+    if (err != NGF_ERROR_OK) { goto ngfvk_create_swapchain_cleanup; }
   }
 
   // Determine if we need a depth attachment.
@@ -980,12 +976,12 @@ static ngf_error ngfvk_create_swapchain(
   // Create an image for the depth attachment if necessary.
   if (have_depth_attachment) {
     const ngf_image_info depth_image_info = {
-        .type     = NGF_IMAGE_TYPE_IMAGE_2D,
-        .extent   = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
-        .nmips    = 1u,
-        .nsamples = get_vk_sample_count(swapchain_info->nsamples),
-        .format   = swapchain_info->depth_format,
-        .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT |
+        .type   = NGF_IMAGE_TYPE_IMAGE_2D,
+        .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
+        .nmips  = 1u,
+        .sample_count = get_vk_sample_count(swapchain_info->nsamples),
+        .format       = swapchain_info->depth_format,
+        .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
     err = ngf_create_image(&depth_image_info, &swapchain->depth_image);
     if (err != NGF_ERROR_OK) { goto ngfvk_create_swapchain_cleanup; }
@@ -2494,15 +2490,12 @@ ngf_error ngf_create_graphics_pipeline(
       .lineWidth               = 0.0f};
 
   // Prepare multisampling.
-  // TODO: use proper number of samples
   // TODO: use specified alpha-to-coverage
   VkPipelineMultisampleStateCreateInfo multisampling = {
-      .sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-      .pNext                = NULL,
-      .flags                = 0u,
-      .rasterizationSamples = info->multisample->multisample
-                                  ? VK_SAMPLE_COUNT_8_BIT
-                                  : VK_SAMPLE_COUNT_1_BIT,  // TODO: fix nicegraf api
+      .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .pNext                 = NULL,
+      .flags                 = 0u,
+      .rasterizationSamples  = get_vk_sample_count(info->multisample->sample_count),
       .sampleShadingEnable   = VK_FALSE,
       .minSampleShading      = 0.0f,
       .pSampleMask           = NULL,
@@ -2780,10 +2773,10 @@ ngf_error ngf_default_render_target(
     }
     if (have_resolve) {
       VkAttachmentDescription* desc = &attachment_descs[resolve_attachment_idx];
-      desc->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-      desc->storeOp = vk_color_store_op;
-      desc->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      desc->finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      desc->loadOp                  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      desc->storeOp                 = vk_color_store_op;
+      desc->initialLayout           = VK_IMAGE_LAYOUT_UNDEFINED;
+      desc->finalLayout             = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
     VkRenderPassCreateInfo renderpass_info = swapchain->renderpass.info;
     renderpass_info.pAttachments           = attachment_descs;
@@ -3713,7 +3706,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .format                = img->vkformat,
       .mipLevels             = info->nmips,
       .arrayLayers           = !is_cubemap ? 1u : 6u,  // TODO: layered images
-      .samples               = get_vk_sample_count(info->nsamples),
+      .samples               = get_vk_sample_count(info->sample_count),
       .usage                 = usage_flags,
       .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,

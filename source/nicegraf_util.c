@@ -61,7 +61,7 @@ void ngf_util_create_default_graphics_pipeline_data(
   result->depth_stencil_info = dsi;
   ngf_vertex_input_info vii  = {.nattribs = 0, .nvert_buf_bindings = 0};
   result->vertex_input_info  = vii;
-  ngf_multisample_info msi   = {.multisample = false, .alpha_to_coverage = false};
+  ngf_multisample_info msi   = {.sample_count = NGF_SAMPLE_COUNT_1, .alpha_to_coverage = false};
   result->multisample_info   = msi;
   ngf_rasterization_info ri  = {
       .cull_mode    = NGF_CULL_MODE_NONE,
