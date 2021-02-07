@@ -2780,7 +2780,8 @@ ngf_error ngf_default_render_target(
     }
     if (have_resolve) {
       VkAttachmentDescription* desc = &attachment_descs[resolve_attachment_idx];
-      desc->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE, desc->storeOp = vk_color_store_op;
+      desc->loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      desc->storeOp = vk_color_store_op;
       desc->initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       desc->finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
