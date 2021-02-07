@@ -745,10 +745,8 @@ typedef struct ngf_render_target_t* ngf_render_target;
  * Swapchain configuration.
  */
 typedef struct ngf_swapchain_info {
-  ngf_image_format cfmt;          /**< Swapchain image format. */
-  ngf_image_format dfmt;          /**< Format to use for the depth buffer, if set to
-                                       NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will
-                                       be created. */
+  ngf_image_format color_format;  /**< Swapchain image format. */
+  ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
   int              nsamples;      /**< Number of samples per pixel (0 for non-multisampled) */
   uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
   uint32_t         width;         /**< Width of swapchain images in pixels. */
