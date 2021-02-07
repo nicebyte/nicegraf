@@ -946,7 +946,6 @@ static ngf_error ngfvk_create_swapchain(
           1u,
           &swapchain->multisample_image_views[i]);
       if (err != NGF_ERROR_OK) {
-        err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngfvk_create_swapchain_cleanup;
       }
     }
@@ -971,7 +970,6 @@ static ngf_error ngfvk_create_swapchain(
         1u,
         &swapchain->image_views[i]);
     if (err != NGF_ERROR_OK) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngfvk_create_swapchain_cleanup;
     }
   }
