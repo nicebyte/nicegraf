@@ -1066,7 +1066,7 @@ static ngf_error ngfvk_create_swapchain(
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
       .pNext           = NULL,
       .flags           = 0u,
-      .attachmentCount = (have_depth_attachment ? 2u : 1u) + (is_multisampled ? 1u : 0u),
+      .attachmentCount = total_attachments_count,
       .pAttachments    = swapchain->renderpass.attachment_descs,
       .subpassCount    = 1u,
       .pSubpasses      = &swapchain->renderpass.subpass_desc,
