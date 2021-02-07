@@ -919,6 +919,10 @@ static ngf_error ngfvk_create_swapchain(
         .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
     };
     swapchain->multisample_images = NGFI_ALLOCN(ngf_image, swapchain->num_images);
+    if (swapchain->multisample_images == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngfvk_create_swapchain_cleanup;
+    }
     for (size_t i = 0u; i < swapchain->num_images; ++i) {
       const ngf_error img_create_error =
           ngf_create_image(&ms_image_info, &swapchain->multisample_images[i]);
@@ -929,6 +933,10 @@ static ngf_error ngfvk_create_swapchain(
     }
     // Create image views for multisample images.
     swapchain->multisample_image_views = NGFI_ALLOCN(VkImageView, swapchain->num_images);
+    if (swapchain->multisample_image_views == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngfvk_create_swapchain_cleanup;
+    }
     for (uint32_t i = 0u; i < swapchain->num_images; ++i) {
       err = ngfvk_create_vk_image_view(
           (VkImage)swapchain->multisample_images[i]->alloc.obj_handle,
