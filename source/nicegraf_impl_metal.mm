@@ -395,7 +395,7 @@ public:
                        id<MTLDevice>             device) {
     // Initialize the Metal layer.
     const MTLPixelFormat pixel_format =
-        get_mtl_pixel_format(swapchain_info.cfmt).format;
+        get_mtl_pixel_format(swapchain_info.color_format).format;
     if (pixel_format == MTLPixelFormatInvalid) {
       NGFI_DIAG_ERROR("Image format not supported by Metal backend");
       return NGF_ERROR_INVALID_FORMAT;
@@ -461,10 +461,10 @@ public:
   
 private:
   void initialize_depth_attachments(const ngf_swapchain_info &swapchain_info) {
-    if (swapchain_info.dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
+    if (swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
       depth_images_.reset(
                           new id<MTLTexture>[swapchain_info.capacity_hint]);
-      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.dfmt).format;
+      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
       assert(depth_format != MTLPixelFormatInvalid);
       for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
         auto *depth_texture_desc            = [MTLTextureDescriptor new];
@@ -732,7 +732,7 @@ ngf_error ngf_default_render_target(
                             clear_color->clear_color[2],
                             clear_color->clear_color[3]);
     }
-    const ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
+    const ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.depth_format;
     if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
       rt->pass_descriptor.depthAttachment =
           [MTLRenderPassDepthAttachmentDescriptor new];
@@ -982,7 +982,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   for (uint32_t ca = 0u; ca < compatible_rt.ncolor_attachments; ++ca) {
     if (compatible_rt.is_default) {
       mtl_pipe_desc.colorAttachments[ca].pixelFormat =
-          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.cfmt).format;
+          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.color_format).format;
     }
     else {
       mtl_pipe_desc.colorAttachments[ca].pixelFormat =
@@ -1009,10 +1009,10 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
     mtl_pipe_desc.depthAttachmentPixelFormat =
         compatible_rt.pass_descriptor.depthAttachment.texture.pixelFormat;
   } else if (compatible_rt.is_default &&
-             CURRENT_CONTEXT->swapchain_info.dfmt !=
+             CURRENT_CONTEXT->swapchain_info.depth_format !=
                  NGF_IMAGE_FORMAT_UNDEFINED) {
     mtl_pipe_desc.depthAttachmentPixelFormat =
-        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.dfmt).format;
+        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.depth_format).format;
   }
 
   mtl_pipe_desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
@@ -1419,8 +1419,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   mtl_img_desc.height           = info->extent.height;
   mtl_img_desc.mipmapLevelCount = info->nmips;
   mtl_img_desc.storageMode      = MTLStorageModePrivate;
-  // TODO: multisample textures.
-  mtl_img_desc.sampleCount      = info->nsamples == 0u ? 1u : info->nsamples;
+  mtl_img_desc.sampleCount      = info->sample_count;
   if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc.usage |= MTLTextureUsageRenderTarget;
   }
@@ -1541,7 +1540,7 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc,
     assert(CURRENT_CONTEXT->frame.color_drawable);
     rt->pass_descriptor.colorAttachments[0].texture =
       CURRENT_CONTEXT->frame.color_drawable.texture;
-    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.dfmt;
+    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.depth_format;
     if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
       id<MTLTexture> depth_tex = CURRENT_CONTEXT->frame.depth_texture;
       rt->pass_descriptor.depthAttachment.texture = depth_tex;
