@@ -906,7 +906,7 @@ static ngf_error ngfvk_create_swapchain(
     goto ngfvk_create_swapchain_cleanup;
   }
 
-  const bool is_multisampled = swapchain_info->nsamples > 1u;
+  const bool is_multisampled = swapchain_info->sample_count > 1u;
 
   // Create multisampled images, if necessary.
   if (is_multisampled) {
@@ -915,7 +915,7 @@ static ngf_error ngfvk_create_swapchain(
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
         .format = swapchain_info->color_format,
-        .sample_count = swapchain_info->nsamples,
+        .sample_count = swapchain_info->sample_count,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
     };
     swapchain->multisample_images = NGFI_ALLOCN(ngf_image, swapchain->num_images);
@@ -979,7 +979,7 @@ static ngf_error ngfvk_create_swapchain(
         .type   = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
-        .sample_count = get_vk_sample_count(swapchain_info->nsamples),
+        .sample_count = get_vk_sample_count(swapchain_info->sample_count),
         .format       = swapchain_info->depth_format,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
@@ -994,7 +994,7 @@ static ngf_error ngfvk_create_swapchain(
   const VkAttachmentDescription color_attachment_desc = {
       .flags          = 0u,
       .format         = requested_format,
-      .samples        = get_vk_sample_count(swapchain_info->nsamples),
+      .samples        = get_vk_sample_count(swapchain_info->sample_count),
       .loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
       .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
       .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
@@ -1005,7 +1005,7 @@ static ngf_error ngfvk_create_swapchain(
   const VkAttachmentDescription depth_attachment_desc = {
       .flags          = 0u,
       .format         = requested_depth_format,
-      .samples        = get_vk_sample_count(swapchain_info->nsamples),
+      .samples        = get_vk_sample_count(swapchain_info->sample_count),
       .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
       .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
       .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
