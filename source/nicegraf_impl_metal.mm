@@ -328,7 +328,7 @@ static std::optional<MTLTextureType> get_mtl_texture_type(ngf_image_type type,
   } if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1 && sample_count != NGF_SAMPLE_COUNT_1) {
     return MTLTextureType2DMultisample;
   } else if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1 && sample_count != NGF_SAMPLE_COUNT_1) {
-    return MTLTextureType2DMultisampleArray;
+    if (@available(iOS 14.0, *)) return MTLTextureType2DMultisampleArray;
   } else if (type == NGF_IMAGE_TYPE_IMAGE_3D) {
     return MTLTextureType3D;
   } else if (type == NGF_IMAGE_TYPE_CUBE && nlayers == 1) {
