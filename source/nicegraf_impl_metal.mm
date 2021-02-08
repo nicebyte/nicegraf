@@ -319,11 +319,16 @@ static MTLWinding get_mtl_winding(ngf_front_face_mode w) {
 }
 
 static std::optional<MTLTextureType> get_mtl_texture_type(ngf_image_type type,
-                                                          uint32_t nlayers) {
-  if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1) {
+                                                          uint32_t nlayers,
+                                                          ngf_sample_count sample_count) {
+  if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1 && sample_count == NGF_SAMPLE_COUNT_1) {
     return MTLTextureType2D;
-  } else if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1) {
+  } else if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1 && sample_count == NGF_SAMPLE_COUNT_1) {
     return MTLTextureType2DArray;
+  } if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1 && sample_count != NGF_SAMPLE_COUNT_1) {
+    return MTLTextureType2DMultisample;
+  } else if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers > 1 && sample_count != NGF_SAMPLE_COUNT_1) {
+    return MTLTextureType2DMultisampleArray;
   } else if (type == NGF_IMAGE_TYPE_IMAGE_3D) {
     return MTLTextureType3D;
   } else if (type == NGF_IMAGE_TYPE_CUBE && nlayers == 1) {
@@ -367,153 +372,8 @@ static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
   return filters[f];
 }
 
-// Manages the final presentation surfaces.
-class ngfmtl_swapchain {
-public:
-  struct frame {
-    id<CAMetalDrawable> color_drawable = nil;
-    id<MTLTexture>      depth_texture  = nil;
-  };
-  
-  ngfmtl_swapchain() = default;
-  ngfmtl_swapchain(ngfmtl_swapchain &&other) { *this = std::move(other); }
-  ngfmtl_swapchain& operator=(ngfmtl_swapchain &&other) {
-    layer_        = other.layer_;
-    other.layer_  = nil;
-    depth_images_ = std::move(other.depth_images_);
-    capacity_     = other.capacity_;
-    img_idx_      = other.img_idx_;
-    
-    return *this;
-  }
-  
-  // Delete copy ctor and copy assignment to make this type move-only.
-  ngfmtl_swapchain& operator=(const ngfmtl_swapchain&) = delete;
-  ngfmtl_swapchain(const ngfmtl_swapchain&) = delete;
-
-  ngf_error initialize(const ngf_swapchain_info &swapchain_info,
-                       id<MTLDevice>             device) {
-    // Initialize the Metal layer.
-    const MTLPixelFormat pixel_format =
-        get_mtl_pixel_format(swapchain_info.color_format).format;
-    if (pixel_format == MTLPixelFormatInvalid) {
-      NGFI_DIAG_ERROR("Image format not supported by Metal backend");
-      return NGF_ERROR_INVALID_FORMAT;
-    }
-    layer_ = [CAMetalLayer layer];
-    layer_.device = device;
-    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
-    layer_.pixelFormat = pixel_format;
-    layer_.framebufferOnly = YES;
-#if TARGET_OS_OSX
-    if (@available(macOS 10.13.2, *)) {
-      layer_.maximumDrawableCount = swapchain_info.capacity_hint;
-    }
-    if (@available(macOS 10.13, *)) {
-      layer_.displaySyncEnabled =
-      (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO);
-    }
-#endif
-    
-    // Associate the newly created Metal layer with the user-provided View.
-    NGFMTL_VIEW_TYPE *view=
-        CFBridgingRelease((void*)swapchain_info.native_handle);
-#if TARGET_OS_OSX
-    [view setLayer:layer_];
-#else
-    [view.layer addSublayer:layer_];
-    [layer_ setContentsScale:view.layer.contentsScale];
-    [layer_ setContentsGravity:kCAGravityResizeAspect];
-    [layer_ setFrame:view.frame];
-#endif
-    CFBridgingRetain(view);
-    
-    // Remember the number of images in the swapchain.
-    capacity_ = swapchain_info.capacity_hint;
-    
-    // Initialize depth attachments if necessary.
-    initialize_depth_attachments(swapchain_info);
-    return NGF_ERROR_OK;
-  }
-
-  ngf_error resize(const ngf_swapchain_info &swapchain_info) {
-    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
-
-    NGFMTL_VIEW_TYPE *view=
-        CFBridgingRelease((void*)swapchain_info.native_handle);
-
-    [layer_ setContentsScale:view.layer.contentsScale];
-    [layer_ setFrame:view.frame];
-
-    CFBridgingRetain(view);
-
-    // ReiInitialize depth attachments if necessary.
-    initialize_depth_attachments(swapchain_info);
-    return NGF_ERROR_OK;
-  }
-  
-  frame next_frame() {
-    img_idx_ = (img_idx_ + 1u) % capacity_;
-    return { [layer_ nextDrawable],
-      depth_images_.get() ? depth_images_[img_idx_] : nil };
-  }
-  operator bool() { return layer_; }
-  
-private:
-  void initialize_depth_attachments(const ngf_swapchain_info &swapchain_info) {
-    if (swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
-      depth_images_.reset(
-                          new id<MTLTexture>[swapchain_info.capacity_hint]);
-      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
-      assert(depth_format != MTLPixelFormatInvalid);
-      for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
-        auto *depth_texture_desc            = [MTLTextureDescriptor new];
-        depth_texture_desc.textureType      = MTLTextureType2D;
-        depth_texture_desc.width            = swapchain_info.width;
-        depth_texture_desc.height           = swapchain_info.height;
-        depth_texture_desc.pixelFormat      = depth_format;
-        depth_texture_desc.depth            = 1u;
-        depth_texture_desc.sampleCount      = 1u;
-        depth_texture_desc.mipmapLevelCount = 1u;
-        depth_texture_desc.arrayLength      = 1u;
-        depth_texture_desc.usage            = MTLTextureUsageRenderTarget;
-        depth_texture_desc.storageMode      = MTLStorageModePrivate;
-        depth_texture_desc.resourceOptions  = MTLResourceStorageModePrivate;
-        if (@available(macOS 10.14, *)) {
-          depth_texture_desc.allowGPUOptimizedContents = true;
-        }
-        depth_images_[i] =
-            [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
-      }
-    } else {
-      depth_images_.reset(nullptr);
-    }
-  }
-
-  CAMetalLayer                      *layer_    = nil;
-  uint32_t                           img_idx_  = 0u;
-  uint32_t                           capacity_ = 0u;
-  std::unique_ptr<id<MTLTexture>[]>  depth_images_;
-};
 
 #pragma mark ngf_struct_definitions
-struct ngf_context_t {
-  ~ngf_context_t() {
-    if (last_cmd_buffer)
-      [last_cmd_buffer waitUntilCompleted];
-  }
-  id<MTLDevice> device = nil;
-  ngfmtl_swapchain swapchain;
-  ngfmtl_swapchain::frame frame;
-  id<MTLCommandQueue> queue = nil;
-  bool is_current = false;
-  ngf_swapchain_info swapchain_info;
-  id<MTLCommandBuffer> pending_cmd_buffer = nil;
-  id<MTLCommandBuffer> last_cmd_buffer = nil;
-  dispatch_semaphore_t frame_sync_sem = nil;
-};
-
-NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
 struct ngf_render_target_t {
   mutable MTLRenderPassDescriptor *pass_descriptor = nil;
@@ -626,6 +486,204 @@ private:
   NgfObjType *ptr_;
 };
 
+// Manages the final presentation surfaces.
+class ngfmtl_swapchain {
+public:
+  struct frame {
+    id<MTLTexture> color_attachment_texture() {
+      return multisample_texture ? multisample_texture : color_drawable.texture;
+    }
+    
+    id<MTLTexture> resolve_attachment_texture() {
+      return multisample_texture ? color_drawable.texture : nil;
+    }
+    
+    id<MTLTexture> depth_attachment_texture() { return depth_texture; }
+    
+    id<CAMetalDrawable> color_drawable = nil;
+    id<MTLTexture>      depth_texture  = nil;
+    id<MTLTexture>      multisample_texture = nil;
+  };
+  
+  ngfmtl_swapchain() = default;
+  ngfmtl_swapchain(ngfmtl_swapchain &&other) { *this = std::move(other); }
+  ngfmtl_swapchain& operator=(ngfmtl_swapchain &&other) {
+    layer_        = other.layer_;
+    other.layer_  = nil;
+    depth_images_ = std::move(other.depth_images_);
+    capacity_     = other.capacity_;
+    img_idx_      = other.img_idx_;
+    
+    return *this;
+  }
+  
+  // Delete copy ctor and copy assignment to make this type move-only.
+  ngfmtl_swapchain& operator=(const ngfmtl_swapchain&) = delete;
+  ngfmtl_swapchain(const ngfmtl_swapchain&) = delete;
+
+  ngf_error initialize(const ngf_swapchain_info &swapchain_info,
+                       id<MTLDevice>             device) {
+    // Initialize the Metal layer.
+    const MTLPixelFormat pixel_format =
+        get_mtl_pixel_format(swapchain_info.color_format).format;
+    if (pixel_format == MTLPixelFormatInvalid) {
+      NGFI_DIAG_ERROR("Image format not supported by Metal backend");
+      return NGF_ERROR_INVALID_FORMAT;
+    }
+    layer_ = [CAMetalLayer layer];
+    layer_.device = device;
+    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
+    layer_.pixelFormat = pixel_format;
+    layer_.framebufferOnly = YES;
+#if TARGET_OS_OSX
+    if (@available(macOS 10.13.2, *)) {
+      layer_.maximumDrawableCount = swapchain_info.capacity_hint;
+    }
+    if (@available(macOS 10.13, *)) {
+      layer_.displaySyncEnabled =
+      (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO);
+    }
+#endif
+    
+    // Associate the newly created Metal layer with the user-provided View.
+    NGFMTL_VIEW_TYPE *view=
+        CFBridgingRelease((void*)swapchain_info.native_handle);
+#if TARGET_OS_OSX
+    [view setLayer:layer_];
+#else
+    [view.layer addSublayer:layer_];
+    [layer_ setContentsScale:view.layer.contentsScale];
+    [layer_ setContentsGravity:kCAGravityResizeAspect];
+    [layer_ setFrame:view.frame];
+#endif
+    CFBridgingRetain(view);
+    
+    // Remember the number of images in the swapchain.
+    capacity_ = swapchain_info.capacity_hint;
+    
+    // Initialize depth attachments if necessary.
+    initialize_depth_attachments(swapchain_info);
+    initialize_multisample_images(swapchain_info);
+
+    return NGF_ERROR_OK;
+  }
+
+  ngf_error resize(const ngf_swapchain_info &swapchain_info) {
+    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
+
+    NGFMTL_VIEW_TYPE *view=
+        CFBridgingRelease((void*)swapchain_info.native_handle);
+
+    [layer_ setContentsScale:view.layer.contentsScale];
+    [layer_ setFrame:view.frame];
+
+    CFBridgingRetain(view);
+
+    // ReiInitialize depth attachments & multisample images if necessary.
+    initialize_depth_attachments(swapchain_info);
+    initialize_multisample_images(swapchain_info);
+    
+    return NGF_ERROR_OK;
+  }
+  
+  frame next_frame() {
+    img_idx_ = (img_idx_ + 1u) % capacity_;
+    return { [layer_ nextDrawable],
+      depth_images_.get() ? depth_images_[img_idx_] : nil,
+      is_multusampled() ? multisample_images_[img_idx_]->texture : nil
+    };
+  }
+  
+  operator bool() { return layer_; }
+  
+  bool is_multusampled() const { return multisample_images_.get(); }
+  
+private:
+  void initialize_depth_attachments(const ngf_swapchain_info &swapchain_info) {
+    if (swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
+      depth_images_.reset(
+                          new id<MTLTexture>[swapchain_info.capacity_hint]);
+      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
+      assert(depth_format != MTLPixelFormatInvalid);
+      for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
+        auto *depth_texture_desc            = [MTLTextureDescriptor new];
+        depth_texture_desc.textureType      = swapchain_info.nsamples > 1u? MTLTextureType2DMultisample : MTLTextureType2D;
+        depth_texture_desc.width            = swapchain_info.width;
+        depth_texture_desc.height           = swapchain_info.height;
+        depth_texture_desc.pixelFormat      = depth_format;
+        depth_texture_desc.depth            = 1u;
+        depth_texture_desc.sampleCount      = (NSUInteger)swapchain_info.nsamples;
+        depth_texture_desc.mipmapLevelCount = 1u;
+        depth_texture_desc.arrayLength      = 1u;
+        depth_texture_desc.usage            = MTLTextureUsageRenderTarget;
+        depth_texture_desc.storageMode      = MTLStorageModePrivate;
+        depth_texture_desc.resourceOptions  = MTLResourceStorageModePrivate;
+        if (@available(macOS 10.14, *)) {
+          depth_texture_desc.allowGPUOptimizedContents = true;
+        }
+        depth_images_[i] =
+            [MTL_DEVICE newTextureWithDescriptor:depth_texture_desc];
+      }
+    } else {
+      depth_images_.reset(nullptr);
+    }
+  }
+  
+  void initialize_multisample_images(const ngf_swapchain_info &swapchain_info) {
+    destroy_multisample_images();
+    if (swapchain_info.nsamples > NGF_SAMPLE_COUNT_1) {
+      multisample_images_.reset(new ngf_image[capacity_]);
+      for (size_t i = 0; i < capacity_; ++i) {
+        const ngf_image_info info = {
+          .type = NGF_IMAGE_TYPE_IMAGE_2D,
+          .extent = {
+            .width = swapchain_info.width,
+            .height = swapchain_info.height,
+            .depth = 1u
+          },
+          .nmips = 1u,
+          .format = swapchain_info.color_format,
+          .sample_count = (ngf_sample_count)swapchain_info.nsamples,
+          .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT
+        };
+        ngf_create_image(&info, &multisample_images_[i]);
+      }
+    }
+  }
+  
+  void destroy_multisample_images() {
+    for(size_t i = 0; i < capacity_ && multisample_images_; ++i) {
+      ngf_destroy_image(multisample_images_[i]);
+    }
+    multisample_images_.reset(nullptr);
+  }
+
+  CAMetalLayer                      *layer_    = nil;
+  uint32_t                           img_idx_  = 0u;
+  uint32_t                           capacity_ = 0u;
+  std::unique_ptr<id<MTLTexture>[]>  depth_images_;
+  std::unique_ptr<ngf_image[]>       multisample_images_;
+};
+
+struct ngf_context_t {
+  ~ngf_context_t() {
+    if (last_cmd_buffer)
+      [last_cmd_buffer waitUntilCompleted];
+  }
+  id<MTLDevice> device = nil;
+  ngfmtl_swapchain swapchain;
+  ngfmtl_swapchain::frame frame;
+  id<MTLCommandQueue> queue = nil;
+  bool is_current = false;
+  ngf_swapchain_info swapchain_info;
+  id<MTLCommandBuffer> pending_cmd_buffer = nil;
+  id<MTLCommandBuffer> last_cmd_buffer = nil;
+  dispatch_semaphore_t frame_sync_sem = nil;
+};
+
+NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
+
+
 #define NGFMTL_NURSERY(type, name) \
 ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
     name(NGFI_ALLOC(ngf_##type##_t));
@@ -723,7 +781,9 @@ ngf_error ngf_default_render_target(
     rt->pass_descriptor.colorAttachments[0].loadAction =
         get_mtl_load_action(color_load_op);
     rt->pass_descriptor.colorAttachments[0].storeAction =
-        get_mtl_store_action(color_store_op);
+        CURRENT_CONTEXT->swapchain.is_multusampled()
+          ? MTLStoreActionMultisampleResolve
+          : get_mtl_store_action(color_store_op);
     if (color_load_op == NGF_LOAD_OP_CLEAR) {
       assert(clear_color);
       rt->pass_descriptor.colorAttachments[0].clearColor =
@@ -737,9 +797,11 @@ ngf_error ngf_default_render_target(
       rt->pass_descriptor.depthAttachment =
           [MTLRenderPassDepthAttachmentDescriptor new];
       rt->pass_descriptor.depthAttachment.loadAction =
-          get_mtl_load_action(depth_load_op);
+        get_mtl_load_action(depth_load_op);
       rt->pass_descriptor.depthAttachment.storeAction =
-          get_mtl_store_action(depth_store_op);
+          CURRENT_CONTEXT->swapchain.is_multusampled()
+            ? MTLStoreActionDontCare
+            : get_mtl_store_action(depth_store_op);
       if (depth_load_op == NGF_LOAD_OP_CLEAR) {
         assert(clear_depth);
         rt->pass_descriptor.depthAttachment.clearDepth =
@@ -1004,6 +1066,8 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
         get_mtl_blend_operation(info->blend->blend_op_alpha);
     }
   }
+  
+  mtl_pipe_desc.rasterSampleCount = info->multisample->sample_count;
 
   if (compatible_rt.pass_descriptor.depthAttachment.texture) {
     mtl_pipe_desc.depthAttachmentPixelFormat =
@@ -1407,7 +1471,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   }
 
   std::optional<MTLTextureType> maybe_texture_type =
-      get_mtl_texture_type(info->type, info->extent.depth);
+      get_mtl_texture_type(info->type, info->extent.depth, info->sample_count);
   if (!maybe_texture_type.has_value()) {
     NGFI_DIAG_ERROR("Image type %d not supported by Metal backend.",
                     info->type);
@@ -1428,11 +1492,13 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   }
   switch(mtl_img_desc.textureType) {
   case MTLTextureType2D:
+  case MTLTextureType2DMultisample:
   case MTLTextureType3D:
   case MTLTextureTypeCube:
       mtl_img_desc.depth = info->extent.depth;
       break;
   case MTLTextureType2DArray:
+  case MTLTextureType2DMultisampleArray:
   case MTLTextureTypeCubeArray:
       mtl_img_desc.depth       = 1u;
       mtl_img_desc.arrayLength = info->extent.depth;
@@ -1442,7 +1508,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   }
   NGFMTL_NURSERY(image, image);
   image->texture =
-      [CURRENT_CONTEXT->device newTextureWithDescriptor:mtl_img_desc];
+      [MTL_DEVICE newTextureWithDescriptor:mtl_img_desc];
   image->format = info->format;
   *result = image.release();
   return NGF_ERROR_OK;
@@ -1539,10 +1605,12 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc,
   if (rt->is_default) {
     assert(CURRENT_CONTEXT->frame.color_drawable);
     rt->pass_descriptor.colorAttachments[0].texture =
-      CURRENT_CONTEXT->frame.color_drawable.texture;
+      CURRENT_CONTEXT->frame.color_attachment_texture();
+    rt->pass_descriptor.colorAttachments[0].resolveTexture =
+      CURRENT_CONTEXT->frame.resolve_attachment_texture();
     ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.depth_format;
     if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-      id<MTLTexture> depth_tex = CURRENT_CONTEXT->frame.depth_texture;
+      id<MTLTexture> depth_tex = CURRENT_CONTEXT->frame.depth_attachment_texture();
       rt->pass_descriptor.depthAttachment.texture = depth_tex;
       if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
         rt->pass_descriptor.stencilAttachment.texture = depth_tex;
