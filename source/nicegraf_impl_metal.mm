@@ -607,12 +607,12 @@ private:
       assert(depth_format != MTLPixelFormatInvalid);
       for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
         auto *depth_texture_desc            = [MTLTextureDescriptor new];
-        depth_texture_desc.textureType      = swapchain_info.nsamples > 1u? MTLTextureType2DMultisample : MTLTextureType2D;
+        depth_texture_desc.textureType      = swapchain_info.sample_count > 1u? MTLTextureType2DMultisample : MTLTextureType2D;
         depth_texture_desc.width            = swapchain_info.width;
         depth_texture_desc.height           = swapchain_info.height;
         depth_texture_desc.pixelFormat      = depth_format;
         depth_texture_desc.depth            = 1u;
-        depth_texture_desc.sampleCount      = (NSUInteger)swapchain_info.nsamples;
+        depth_texture_desc.sampleCount      = (NSUInteger)swapchain_info.sample_count;
         depth_texture_desc.mipmapLevelCount = 1u;
         depth_texture_desc.arrayLength      = 1u;
         depth_texture_desc.usage            = MTLTextureUsageRenderTarget;
@@ -631,7 +631,7 @@ private:
   
   void initialize_multisample_images(const ngf_swapchain_info &swapchain_info) {
     destroy_multisample_images();
-    if (swapchain_info.nsamples > NGF_SAMPLE_COUNT_1) {
+    if (swapchain_info.sample_count > NGF_SAMPLE_COUNT_1) {
       multisample_images_.reset(new ngf_image[capacity_]);
       for (size_t i = 0; i < capacity_; ++i) {
         const ngf_image_info info = {
@@ -643,7 +643,7 @@ private:
           },
           .nmips = 1u,
           .format = swapchain_info.color_format,
-          .sample_count = (ngf_sample_count)swapchain_info.nsamples,
+          .sample_count = (ngf_sample_count)swapchain_info.sample_count,
           .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT
         };
         ngf_create_image(&info, &multisample_images_[i]);
