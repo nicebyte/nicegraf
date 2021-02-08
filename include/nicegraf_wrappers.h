@@ -129,7 +129,7 @@ class render_encoder {
   }
 
   ~render_encoder() {
-    ngf_render_encoder_end(enc_);
+    if (enc_.__handle) ngf_render_encoder_end(enc_);
   }
 
   render_encoder(render_encoder&& other) {
@@ -160,7 +160,7 @@ class xfer_encoder {
   }
 
   ~xfer_encoder() {
-    ngf_xfer_encoder_end(enc_);
+    if (enc_.__handle) ngf_xfer_encoder_end(enc_);
   }
 
   xfer_encoder(xfer_encoder&& other) {
