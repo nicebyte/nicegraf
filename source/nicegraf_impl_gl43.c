@@ -546,9 +546,9 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     config_attribs[a++]                 = EGL_STENCIL_SIZE;
     config_attribs[a++]                 = depth_stencil_format.sbits;
     config_attribs[a++]                 = EGL_SAMPLE_BUFFERS;
-    config_attribs[a++]                 = swapchain_info->nsamples > 0 ? 1 : 0;
+    config_attribs[a++]                 = swapchain_info->sample_count > NGF_SAMPLE_COUNT_1 ? 1 : 0;
     config_attribs[a++]                 = EGL_SAMPLES;
-    config_attribs[a++]                 = swapchain_info->nsamples;
+    config_attribs[a++]                 = swapchain_info->sample_count;
     config_attribs[a++]                 = EGL_SURFACE_TYPE;
     config_attribs[a++]                 = EGL_WINDOW_BIT;
   }
@@ -1085,7 +1085,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   image->glformat       = glf.format;
   image->is_srgb        = glf.srgb;
   image->gltype         = glf.type;
-  image->is_multisample = info->nsamples > 1;
+  image->is_multisample = info->sample_count > NGF_SAMPLE_COUNT_1;
 
   const bool cant_use_renderbuffer = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM ||
                                      info->nmips > 1 || info->extent.depth > 1 ||
@@ -1093,13 +1093,13 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   if (cant_use_renderbuffer) {
     image->is_renderbuffer = false;
     if (info->type == NGF_IMAGE_TYPE_IMAGE_2D && info->extent.depth <= 1) {
-      image->bind_point = info->nsamples > 1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
+      image->bind_point = info->sample_count > NGF_SAMPLE_COUNT_1 ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
     } else if (info->type == NGF_IMAGE_TYPE_IMAGE_2D && info->extent.depth > 1) {
       image->bind_point =
-          info->nsamples > 1 ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY : GL_TEXTURE_2D_ARRAY;
-    } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D && info->nsamples == 0u) {
+          info->sample_count > NGF_SAMPLE_COUNT_1 ? GL_TEXTURE_2D_MULTISAMPLE_ARRAY : GL_TEXTURE_2D_ARRAY;
+    } else if (info->type == NGF_IMAGE_TYPE_IMAGE_3D && info->sample_count <= NGF_SAMPLE_COUNT_1) {
       image->bind_point = GL_TEXTURE_3D;
-    } else if (info->type == NGF_IMAGE_TYPE_CUBE && info->nsamples == 0u) {
+    } else if (info->type == NGF_IMAGE_TYPE_CUBE && info->sample_count <= NGF_SAMPLE_COUNT_1) {
       image->bind_point = info->extent.depth > 1 ? GL_TEXTURE_CUBE_MAP_ARRAY : GL_TEXTURE_CUBE_MAP;
     } else {
       ngf_destroy_image(image);
@@ -1133,7 +1133,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     } else if (image->bind_point == GL_TEXTURE_2D_MULTISAMPLE) {
       glTexStorage2DMultisample(
           image->bind_point,
-          (GLsizei)info->nsamples,
+          (GLsizei)info->sample_count,
           glf.internal_format,
           (GLsizei)info->extent.width,
           (GLsizei)info->extent.height,
@@ -1141,7 +1141,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     } else if (image->bind_point == GL_TEXTURE_2D_MULTISAMPLE_ARRAY) {
       glTexStorage3DMultisample(
           image->bind_point,
-          (GLsizei)info->nsamples,
+          (GLsizei)info->sample_count,
           glf.internal_format,
           (GLsizei)info->extent.width,
           (GLsizei)info->extent.height,
@@ -1153,7 +1153,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     image->bind_point      = GL_RENDERBUFFER;
     (glGenRenderbuffers(1, &(image->glimage)));
     (glBindRenderbuffer(GL_RENDERBUFFER, image->glimage));
-    if (info->nsamples <= 1) {
+    if (info->sample_count <= NGF_SAMPLE_COUNT_1) {
       glRenderbufferStorage(
           image->bind_point,
           glf.internal_format,
@@ -1162,7 +1162,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     } else {
       glRenderbufferStorageMultisample(
           image->bind_point,
-          (GLsizei)info->nsamples,
+          (GLsizei)info->sample_count,
           glf.internal_format,
           (GLsizei)info->extent.width,
           (GLsizei)info->extent.height);
@@ -1949,8 +1949,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
 
             // Enable/disable multisampling.
             if (!bound_pipe ||
-                bound_pipe->multisample.multisample != pipeline->multisample.multisample) {
-              if (pipeline->multisample.multisample) {
+                bound_pipe->multisample.sample_count != pipeline->multisample.sample_count) {
+              if (pipeline->multisample.sample_count > NGF_SAMPLE_COUNT_1) {
                 glEnable(GL_MULTISAMPLE);
               } else {
                 glDisable(GL_MULTISAMPLE);
