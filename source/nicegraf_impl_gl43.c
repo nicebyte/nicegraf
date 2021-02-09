@@ -531,6 +531,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   if (swapchain_info != NULL) {
     const glformat color_format         = get_gl_format(swapchain_info->color_format);
     const glformat depth_stencil_format = get_gl_format(swapchain_info->depth_format);
+    const bool     msaa_samples         = swapchain_info->sample_count > NGF_SAMPLE_COUNT_1;
     config_attribs[a++]                 = EGL_COLOR_BUFFER_TYPE;
     config_attribs[a++]                 = EGL_RGB_BUFFER;
     config_attribs[a++]                 = EGL_RED_SIZE;
@@ -546,9 +547,9 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     config_attribs[a++]                 = EGL_STENCIL_SIZE;
     config_attribs[a++]                 = depth_stencil_format.sbits;
     config_attribs[a++]                 = EGL_SAMPLE_BUFFERS;
-    config_attribs[a++]                 = swapchain_info->sample_count > NGF_SAMPLE_COUNT_1 ? 1 : 0;
+    config_attribs[a++]                 = msaa_samples ? 1 : 0;
     config_attribs[a++]                 = EGL_SAMPLES;
-    config_attribs[a++]                 = swapchain_info->sample_count;
+    config_attribs[a++]                 = msaa_samples ? swapchain_info->sample_count : 0;
     config_attribs[a++]                 = EGL_SURFACE_TYPE;
     config_attribs[a++]                 = EGL_WINDOW_BIT;
   }
