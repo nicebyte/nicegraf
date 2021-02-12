@@ -22,6 +22,7 @@
 
 #include "nicegraf.h"
 #include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/native_binding_map.h"
 #include "nicegraf_wrappers.h"
 
 #include <memory>

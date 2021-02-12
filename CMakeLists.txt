@@ -80,9 +80,11 @@ ngf_library(NAME nicegraf_internal
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.c
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.c
             DEPS ngf_metadata_parser)
 
 # nicegraf utility library.
