@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "stack_alloc.h"
+#include "ngf-common/stack_alloc.h"
 
 TEST_CASE("exhaust-reset-exhaust") {
   const uint32_t value   = 0xdeadbeef;

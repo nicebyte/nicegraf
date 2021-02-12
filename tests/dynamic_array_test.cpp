@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "dynamic_array.h"
+#include "ngf-common/dynamic_array.h"
 #include <random>
 #include <vector>
 #include <queue>

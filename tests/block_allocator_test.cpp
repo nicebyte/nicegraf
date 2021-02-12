@@ -1,5 +1,5 @@
 #include "catch.hpp"
-#include "block_alloc.h"
+#include "ngf-common/block_alloc.h"
 #include <random>
 
 struct test_data {
