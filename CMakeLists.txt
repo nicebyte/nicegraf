@@ -77,7 +77,7 @@ ngf_library(NAME ngf_metadata_parser
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf_internal
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.h
