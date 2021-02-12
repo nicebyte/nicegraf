@@ -72,12 +72,6 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
     return err_code;                                             \
   }
 
-// Access to device capabilities global structure.
-void                           ngfi_device_caps_create(void);
-ngf_device_capabilities*       ngfi_device_caps_lock(void);
-void                           ngfi_device_caps_unlock(ngf_device_capabilities*);
-const ngf_device_capabilities* ngfi_device_caps_read(void);
-
 extern ngf_diagnostic_info ngfi_diag_info;
 
 #ifdef __cplusplus
