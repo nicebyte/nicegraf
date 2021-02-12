@@ -107,7 +107,7 @@ if (APPLE)
               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                    ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
               DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
-              COPTS "--std=c++17" "-fobjc-arc")
+              COPTS "-fobjc-arc")
 else()
   # Import the EGL library for context creation.
   set(EGL_NO_GLEW ON)
