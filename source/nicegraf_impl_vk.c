@@ -3185,6 +3185,14 @@ void ngf_cmd_draw(
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeline pipeline) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+
+  // If we had a pipeline bound for which there have been resources bound, but no draw call executed,
+  // commit those resources to actual descriptor sets and bind them so that the next pipeline is able to
+  // "see" those resources, provided that it's compatible.
+  if (buf->active_pipe && buf->pending_bind_ops.size > 0u) {
+    ngfvk_execute_pending_binds(buf);
+  }
+
   buf->active_pipe   = pipeline;
   vkCmdBindPipeline(
       buf->active_bundle.vkcmdbuf,
