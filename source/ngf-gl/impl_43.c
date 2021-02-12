@@ -20,11 +20,11 @@
  * IN THE SOFTWARE.
  */
 #define _CRT_SECURE_NO_WARNINGS
-#include "dynamic_array.h"
+#include "ngf-common/dynamic_array.h"
 #include "gl_43_core.h"
 #include "nicegraf.h"
-#include "nicegraf_internal.h"
-#include "block_alloc.h"
+#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/block_alloc.h"
 #define EGLAPI  // prevent __declspec(dllimport) issue on Windows
 #include "EGL/egl.h"
 #include "EGL/eglext.h"

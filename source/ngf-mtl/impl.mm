@@ -21,7 +21,7 @@
  */
 
 #include "nicegraf.h"
-#include "nicegraf_internal.h"
+#include "ngf-common/nicegraf_internal.h"
 #include "nicegraf_wrappers.h"
 
 #include <memory>

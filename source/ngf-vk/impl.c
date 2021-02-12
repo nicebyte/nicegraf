@@ -21,12 +21,12 @@
  */
 
 #define _CRT_SECURE_NO_WARNINGS
-#include "block_alloc.h"
-#include "dynamic_array.h"
-#include "frame_token.h"
+#include "ngf-common/block_alloc.h"
+#include "ngf-common/dynamic_array.h"
+#include "ngf-common/frame_token.h"
 #include "nicegraf.h"
-#include "nicegraf_internal.h"
-#include "stack_alloc.h"
+#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/stack_alloc.h"
 #include "vk_10.h"
 
 #include <assert.h>
