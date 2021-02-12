@@ -27,7 +27,7 @@ project(nicegraf)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 
-# These are the compilator flags that are used on all nicegraf targets.
+# These are the compiler flags that are used on all nicegraf targets.
 if(WIN32)
     set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
