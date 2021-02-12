@@ -82,7 +82,7 @@ ngf_library(NAME nicegraf_internal
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.c
