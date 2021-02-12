@@ -31,26 +31,13 @@
 #include <windows.h>
 // emulate pthread mutexes and condvars
 typedef CRITICAL_SECTION   pthread_mutex_t;
-typedef CONDITION_VARIABLE pthread_cond_t;
 #define pthread_mutex_lock(m)    (EnterCriticalSection(m), 0)
 #define pthread_mutex_unlock(m)  (LeaveCriticalSection(m), 0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m), 0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m), 0)
-#define pthread_cond_init(c, a)  (InitializeConditionVariable(c))
-#define pthread_cond_wait(c, m)  (SleepConditionVariableCS(c, m, INFINITE))
-#define pthread_cond_signal(c)   (WakeConditionVariable(c))
-#define ngfi_cur_thread_id()     (GetCurrentThreadId())
-#define pthread_cond_destroy(c)
 #else
 #define NGFI_THREADLOCAL __thread
 #include <pthread.h>
-#if defined(__APPLE__)
-#define ngfi_cur_thread_id() pthread_mach_thread_np(pthread_self())
-#else
-#include <sys/syscall.h>
-#include <unistd.h>
-#define ngfi_cur_thread_id() syscall(SYS_gettid)
-#endif
 #endif
 
 #ifdef __cplusplus
