@@ -51,6 +51,38 @@
 #define NGF_EMULATED_SPEC_CONST_PREFIX "SPIRV_CROSS_CONSTANT_ID_"
 #endif
 
+static struct {
+  ngf_device_capabilities caps;
+  bool                    initialized;
+  pthread_mutex_t         mut;
+} ngfi_device_caps;
+
+void ngfi_device_caps_create(void) {
+  pthread_mutex_init(&ngfi_device_caps.mut, NULL);
+}
+
+const ngf_device_capabilities* ngfi_device_caps_read(void) {
+  const ngf_device_capabilities* result = NULL;
+  pthread_mutex_lock(&ngfi_device_caps.mut);
+  if (ngfi_device_caps.initialized) { result = &ngfi_device_caps.caps; }
+  pthread_mutex_unlock(&ngfi_device_caps.mut);
+  return result;
+}
+
+ngf_device_capabilities* ngfi_device_caps_lock(void) {
+  pthread_mutex_lock(&ngfi_device_caps.mut);
+  return ngfi_device_caps.initialized ? NULL : &ngfi_device_caps.caps;
+}
+
+void ngfi_device_caps_unlock(ngf_device_capabilities* ptr) {
+  if (ptr == &ngfi_device_caps.caps) {
+    ngfi_device_caps.initialized = true;
+    pthread_mutex_unlock(&ngfi_device_caps.mut);
+  }
+}
+
+
+
 #pragma region ngf_impl_type_definitions
 
 struct ngf_graphics_pipeline_t {
