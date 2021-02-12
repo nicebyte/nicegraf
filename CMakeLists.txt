@@ -88,7 +88,7 @@ ngf_library(NAME nicegraf_internal
 # nicegraf utility library.
 ngf_library(NAME nicegraf_util
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-util/impl.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.c
             DEPS nicegraf_internal)
 
 # Common dependencies used by nicegraf on all platforms.
