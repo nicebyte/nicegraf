@@ -82,5 +82,3 @@ void ngfi_device_caps_unlock(ngf_device_capabilities* ptr) {
   }
 }
 
-extern ngf_diagnostic_info ngfi_diag_info;
-
