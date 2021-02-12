@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "nicegraf_internal.h"
+#include "macros.h"
 
 #ifdef __cplusplus
 extern "C" {

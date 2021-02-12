@@ -1,5 +1,5 @@
 #include "cmdbuf_state.h"
-#include "nicegraf_internal.h"
+#include "macros.h"
 
 ngf_error ngfi_transition_cmd_buf(
     ngfi_cmd_buffer_state* cur_state,

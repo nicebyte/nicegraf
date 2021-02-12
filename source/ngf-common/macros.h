@@ -56,6 +56,8 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 #pragma warning(disable : 4204)
 #pragma warning(disable : 4221)
 
+extern ngf_diagnostic_info ngfi_diag_info;
+
 // Invoke diagnostic message callback directly.
 #define NGFI_DIAG_MSG(level, fmt, ...)                                           \
   if (ngfi_diag_info.callback) {                                                 \
@@ -71,8 +73,6 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
     NGFI_DIAG_ERROR(err_fmtstring, ##__VA_ARGS__);               \
     return err_code;                                             \
   }
-
-extern ngf_diagnostic_info ngfi_diag_info;
 
 #ifdef __cplusplus
 }

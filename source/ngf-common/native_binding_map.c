@@ -1,5 +1,5 @@
 #include "native_binding_map.h"
-#include "nicegraf_internal.h"
+#include "macros.h"
 #include <string.h>
 
 const ngfi_native_binding*
