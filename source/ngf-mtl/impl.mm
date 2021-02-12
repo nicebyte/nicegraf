@@ -67,6 +67,8 @@ static constexpr uint32_t MAX_BUFFER_BINDINGS = 30u;
 // one.
 id<MTLDevice> MTL_DEVICE = nil;
 
+ngf_device_capabilities DEVICE_CAPS;
+
 #pragma mark ngf_enum_maps
 
 struct mtl_format {
@@ -723,18 +725,15 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
   MTL_DEVICE = MTLCreateSystemDefaultDevice();
 #endif
 
-  ngfi_device_caps_create();
-  ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
-  if (caps_ptr) {
-    caps_ptr->clipspace_z_zero_to_one = true; // always true on metal.
-    caps_ptr->uniform_buffer_offset_alignment = 256u;
-    ngfi_device_caps_unlock(caps_ptr);
-  }
+  // Initialize device capabilities.
+  DEVICE_CAPS.clipspace_z_zero_to_one = true;
+  DEVICE_CAPS.uniform_buffer_offset_alignment = 256;
+  
   return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities()  NGF_NOEXCEPT{
-  return ngfi_device_caps_read();
+  return &DEVICE_CAPS;
 }
 
 ngf_error ngf_begin_frame(ngf_frame_token*) NGF_NOEXCEPT {
