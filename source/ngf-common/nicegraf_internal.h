@@ -56,27 +56,6 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 #pragma warning(disable : 4204)
 #pragma warning(disable : 4221)
 
-typedef enum {
-  NGFI_CMD_BUFFER_NEW,
-  NGFI_CMD_BUFFER_READY,
-  NGFI_CMD_BUFFER_RECORDING,
-  NGFI_CMD_BUFFER_AWAITING_SUBMIT,
-  NGFI_CMD_BUFFER_SUBMITTED
-} ngfi_cmd_buffer_state;
-
-#define NGFI_CMD_BUF_RECORDABLE(s) \
-  (s == NGFI_CMD_BUFFER_READY || s == NGFI_CMD_BUFFER_AWAITING_SUBMIT)
-
-ngf_error ngfi_transition_cmd_buf(
-    ngfi_cmd_buffer_state* cur_state,
-    bool                   has_active_renderpass,
-    ngfi_cmd_buffer_state  new_state);
-
-#define NGFI_TRANSITION_CMD_BUF(b, new_state)                                                    \
-  if (ngfi_transition_cmd_buf(&(b)->state, (b)->renderpass_active, new_state) != NGF_ERROR_OK) { \
-    return NGF_ERROR_INVALID_OPERATION;                                                          \
-  }
-
 // Invoke diagnostic message callback directly.
 #define NGFI_DIAG_MSG(level, fmt, ...)                                           \
   if (ngfi_diag_info.callback) {                                                 \
