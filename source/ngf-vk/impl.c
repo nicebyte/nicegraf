@@ -1751,6 +1751,8 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
 
 #pragma region external_funcs
 
+ngf_device_capabilities DEVICE_CAPS;
+
 ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
@@ -1970,27 +1972,24 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
     vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
 
-    // Populate device capabilities.
-    ngfi_device_caps_create();
-    ngf_device_capabilities* caps_ptr = ngfi_device_caps_lock();
-    if (caps_ptr) {
-      caps_ptr->clipspace_z_zero_to_one = true;  // always true on Vulkan.
-      caps_ptr->uniform_buffer_offset_alignment =
-          phys_dev_properties.limits.minUniformBufferOffsetAlignment;
-      ngfi_device_caps_unlock(caps_ptr);
-    }
-
     // Initialize pending image barrier queue.
     NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
     pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
+
+    // Populate device capabilities.
+    DEVICE_CAPS.clipspace_z_zero_to_one = true;
+    DEVICE_CAPS.uniform_buffer_offset_alignment =
+          phys_dev_properties.limits.minUniformBufferOffsetAlignment;
+
 
     // Done!
   }
 
   return NGF_ERROR_OK;
 }
+
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
-  return ngfi_device_caps_read();
+  return &DEVICE_CAPS;
 }
 
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) {
