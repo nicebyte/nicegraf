@@ -1,5 +1,6 @@
 #include "native_binding_map.h"
 #include "nicegraf_internal.h"
+#include <string.h>
 
 const ngfi_native_binding*
 ngfi_binding_map_lookup(const ngfi_native_binding_map binding_map, uint32_t set, uint32_t binding) {
