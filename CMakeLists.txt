@@ -72,25 +72,23 @@ endfunction()
 # nicegraf-shaderc.
 ngf_library(NAME ngf_metadata_parser
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/metadata_parser.c)
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/metadata_parser.c)
 
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf_internal
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/handle_pool.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_internal.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/stack_alloc.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/block_alloc.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/handle_pool.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/nicegraf_internal.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c
             DEPS ngf_metadata_parser)
 
 # nicegraf utility library.
 ngf_library(NAME nicegraf_util
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_util.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-util/impl.c
             DEPS nicegraf_internal)
 
 # Common dependencies used by nicegraf on all platforms.
@@ -103,7 +101,7 @@ if (APPLE)
   find_library(APPLE_QUARTZ Quartz)
   ngf_library(NAME nicegraf_mtl
               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                   ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_metal.mm
+                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
               DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
               COPTS "--std=c++17" "-fobjc-arc")
 else()
@@ -114,8 +112,8 @@ else()
   # Nicegraf with GL backend.
   ngf_library(NAME nicegraf_gl
               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                   ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_gl43.c
-                   ${CMAKE_CURRENT_LIST_DIR}/source/gl_43_core.c
+                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-gl/impl_43.c
+                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-gl/gl_43_core.c
               DEPS egl)
 
   # Try searching for Vulkan SDK.
@@ -136,8 +134,8 @@ else()
     # Vulkan backend.
     ngf_library(NAME nicegraf_vk
                 SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                     ${CMAKE_CURRENT_LIST_DIR}/source/nicegraf_impl_vk.c
-                     ${CMAKE_CURRENT_LIST_DIR}/source/vk_10.c
+                     ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
+                     ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
                 DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 
     # Add Vulkan header directory to nicegraf_vk include paths.
@@ -153,7 +151,6 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/handle_pool_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf_internal)
