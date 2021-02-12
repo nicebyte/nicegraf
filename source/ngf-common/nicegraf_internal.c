@@ -22,11 +22,7 @@
 
 #include "nicegraf_internal.h"
 
-#include "dynamic_array.h"
-
-#include <assert.h>
 #include <stdlib.h>
-#include <string.h>
 
 ngf_diagnostic_info ngfi_diag_info = {
     .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
