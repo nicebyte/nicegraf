@@ -22,11 +22,12 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #include "ngf-common/block_alloc.h"
+#include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
 #include "ngf-common/frame_token.h"
-#include "nicegraf.h"
 #include "ngf-common/nicegraf_internal.h"
 #include "ngf-common/stack_alloc.h"
+#include "nicegraf.h"
 #include "vk_10.h"
 
 #include <assert.h>
@@ -1600,7 +1601,6 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
 }
 
 void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
-
   // Binding resources requires an active pipeline.
   ngf_graphics_pipeline active_pipe = cmd_buf->active_pipe;
   assert(active_pipe);
@@ -3186,14 +3186,12 @@ void ngf_cmd_draw(
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeline pipeline) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
 
-  // If we had a pipeline bound for which there have been resources bound, but no draw call executed,
-  // commit those resources to actual descriptor sets and bind them so that the next pipeline is able to
-  // "see" those resources, provided that it's compatible.
-  if (buf->active_pipe && buf->pending_bind_ops.size > 0u) {
-    ngfvk_execute_pending_binds(buf);
-  }
+  // If we had a pipeline bound for which there have been resources bound, but no draw call
+  // executed, commit those resources to actual descriptor sets and bind them so that the next
+  // pipeline is able to "see" those resources, provided that it's compatible.
+  if (buf->active_pipe && buf->pending_bind_ops.size > 0u) { ngfvk_execute_pending_binds(buf); }
 
-  buf->active_pipe   = pipeline;
+  buf->active_pipe = pipeline;
   vkCmdBindPipeline(
       buf->active_bundle.vkcmdbuf,
       VK_PIPELINE_BIND_POINT_GRAPHICS,

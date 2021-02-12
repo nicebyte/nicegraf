@@ -22,6 +22,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "gl_43_core.h"
 #include "ngf-common/block_alloc.h"
+#include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
 #include "ngf-common/native_binding_map.h"
 #include "ngf-common/nicegraf_internal.h"
