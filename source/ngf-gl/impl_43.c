@@ -25,7 +25,7 @@
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
 #include "ngf-common/native_binding_map.h"
-#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/macros.h"
 #include "nicegraf.h"
 #define EGLAPI  // prevent __declspec(dllimport) issue on Windows
 #include "EGL/egl.h"

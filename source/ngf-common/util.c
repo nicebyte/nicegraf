@@ -22,7 +22,7 @@
 
 #include "nicegraf_util.h"
 
-#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/macros.h"
 
 #include <assert.h>
 #include <string.h>

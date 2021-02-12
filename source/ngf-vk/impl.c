@@ -25,7 +25,7 @@
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
 #include "ngf-common/frame_token.h"
-#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/macros.h"
 #include "ngf-common/stack_alloc.h"
 #include "nicegraf.h"
 #include "vk_10.h"

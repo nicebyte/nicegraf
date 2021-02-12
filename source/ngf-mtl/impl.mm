@@ -21,7 +21,7 @@
  */
 
 #include "nicegraf.h"
-#include "ngf-common/nicegraf_internal.h"
+#include "ngf-common/macros.h"
 #include "ngf-common/native_binding_map.h"
 #include "ngf-common/cmdbuf_state.h"
 #include "nicegraf_wrappers.h"

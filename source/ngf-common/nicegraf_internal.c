@@ -20,7 +20,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "nicegraf_internal.h"
+#include "macros.h"
 
 #include <stdlib.h>
 

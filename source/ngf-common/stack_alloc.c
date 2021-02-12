@@ -22,7 +22,7 @@
 
 #include "stack_alloc.h"
 
-#include "nicegraf_internal.h"
+#include "macros.h"
 
 #include <assert.h>
 #include <stdio.h>
