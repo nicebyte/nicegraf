@@ -29,39 +29,55 @@
  * capacity is exceeded, an additional block pool is allocated.
  */
 
-typedef struct _ngf_blkalloc_block _ngf_blkalloc_block;
+typedef struct ngfi_blkalloc_block ngfi_blkalloc_block;
 
-typedef struct _ngf_blkalloc_block_header {  // Block metadata.
-  _ngf_blkalloc_block* next_free;            // Points to the next free block in list.
+typedef struct ngfi_blkalloc_block_header {  // Block metadata.
+  ngfi_blkalloc_block* next_free;            // Points to the next free block in list.
   uint32_t             marker_and_tag;       // Identifies the parent allocator.
-} _ngf_blkalloc_block_header;
+} ngfi_blkalloc_block_header;
 
-struct _ngf_blkalloc_block {  // The block itself.
-  _ngf_blkalloc_block_header header;
+struct ngfi_blkalloc_block {  // The block itself.
+  ngfi_blkalloc_block_header header;
   uint8_t                    data[];
 };
 
 struct ngfi_block_allocator {
   NGFI_DARRAY_OF(uint8_t*) pools;
-  _ngf_blkalloc_block* freelist;
+  ngfi_blkalloc_block* freelist;
   size_t               block_size;
   uint32_t             nblocks;
   uint32_t             tag;
 };
 
-static const uint32_t MARKER_MASK = (1u << 31);
+static const uint32_t FREE_BLOCK_MARKER_MASK = (1u << 31);
 
-static void _ngf_blkallock_add_pool(ngfi_block_allocator* alloc) {
-  _ngf_blkalloc_block* old_freelist = alloc->freelist;
+static bool ngfi_blkalloc_is_block_free(const ngfi_blkalloc_block* b) {
+  return b->header.marker_and_tag & FREE_BLOCK_MARKER_MASK;
+}
+
+static void ngfi_blkalloc_mark_block_inuse(ngfi_blkalloc_block* b) {
+  b->header.marker_and_tag |= FREE_BLOCK_MARKER_MASK;
+}
+
+static void ngfi_blkalloc_mark_block_free(ngfi_blkalloc_block* b) {
+  b->header.marker_and_tag &= (~FREE_BLOCK_MARKER_MASK);
+}
+
+static uint32_t ngfi_blkalloc_block_tag(const ngfi_blkalloc_block* b) {
+  return (~FREE_BLOCK_MARKER_MASK) & b->header.marker_and_tag;
+}
+
+static void ngfi_blkalloc_add_pool(ngfi_block_allocator* alloc) {
+  ngfi_blkalloc_block* old_freelist = alloc->freelist;
   const size_t         pool_size    = alloc->block_size * alloc->nblocks;
   uint8_t*             pool         = NGFI_ALLOCN(uint8_t, pool_size);
 
-  alloc->freelist = (_ngf_blkalloc_block*)pool;
+  alloc->freelist = (ngfi_blkalloc_block*)pool;
   for (uint32_t b = 0u; b < alloc->nblocks; ++b) {
-    _ngf_blkalloc_block* blk      = (_ngf_blkalloc_block*)(pool + alloc->block_size * b);
-    _ngf_blkalloc_block* next_blk = (_ngf_blkalloc_block*)(pool + alloc->block_size * (b + 1u));
+    ngfi_blkalloc_block* blk      = (ngfi_blkalloc_block*)(pool + alloc->block_size * b);
+    ngfi_blkalloc_block* next_blk = (ngfi_blkalloc_block*)(pool + alloc->block_size * (b + 1u));
     blk->header.next_free         = (b < alloc->nblocks - 1u) ? next_blk : old_freelist;
-    blk->header.marker_and_tag    = (~MARKER_MASK) & alloc->tag;
+    ngfi_blkalloc_mark_block_free(blk);
   }
   NGFI_DARRAY_APPEND(alloc->pools, pool);
 }
@@ -70,22 +86,22 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
   static NGFI_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
     uint32_t threadid = 0xffff + (rand() % 0xffff);
-    next_tag          = (~MARKER_MASK) & (threadid << 16);
+    next_tag          = (~FREE_BLOCK_MARKER_MASK) & (threadid << 16);
   }
 
   ngfi_block_allocator* alloc = NGFI_ALLOC(ngfi_block_allocator);
   if (alloc == NULL) { return NULL; }
 
-  const size_t unaligned_block_size = requested_block_size + sizeof(_ngf_blkalloc_block);
+  const size_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
   const size_t aligned_block_size =
-      unaligned_block_size + (unaligned_block_size % sizeof(_ngf_blkalloc_block*));
+      unaligned_block_size + (unaligned_block_size % sizeof(ngfi_blkalloc_block*));
 
   alloc->block_size = aligned_block_size;
   alloc->nblocks    = nblocks;
-  alloc->tag        = next_tag++;
+  alloc->tag        = (~FREE_BLOCK_MARKER_MASK) & (next_tag++);
   NGFI_DARRAY_RESET(alloc->pools, 8u);
   alloc->freelist = NULL;
-  _ngf_blkallock_add_pool(alloc);
+  ngfi_blkalloc_add_pool(alloc);
   return alloc;
 }
 
@@ -99,13 +115,13 @@ void ngfi_blkalloc_destroy(ngfi_block_allocator* alloc) {
 }
 
 void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
-  if (alloc->freelist == NULL) { _ngf_blkallock_add_pool(alloc); }
-  _ngf_blkalloc_block* blk    = alloc->freelist;
+  if (alloc->freelist == NULL) { ngfi_blkalloc_add_pool(alloc); }
+  ngfi_blkalloc_block* blk    = alloc->freelist;
   void*                result = NULL;
   if (blk != NULL) {
     alloc->freelist = blk->header.next_free;
     result          = blk->data;
-    blk->header.marker_and_tag |= MARKER_MASK;
+    ngfi_blkalloc_mark_block_inuse(blk);
   }
   return result;
 }
@@ -113,17 +129,16 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
 ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
   ngfi_blkalloc_error result = NGFI_BLK_NO_ERROR;
   if (ptr != NULL) {
-    _ngf_blkalloc_block* blk =
-        (_ngf_blkalloc_block*)((uint8_t*)ptr - offsetof(_ngf_blkalloc_block, data));
+    ngfi_blkalloc_block* blk =
+        (ngfi_blkalloc_block*)((uint8_t*)ptr - offsetof(ngfi_blkalloc_block, data));
 #if !defined(NDEBUG)
-    uint32_t blk_tag    = (~MARKER_MASK) & blk->header.marker_and_tag;
-    uint32_t my_tag     = alloc->tag;
-    uint32_t blk_marker = MARKER_MASK & blk->header.marker_and_tag;
-    if (blk_marker == 0u) {
+    uint32_t blk_tag = ngfi_blkalloc_block_tag(blk);
+    uint32_t my_tag  = alloc->tag;
+    if (ngfi_blkalloc_is_block_free(blk)) {
       result = NGFI_BLK_DOUBLE_FREE;
     } else if (my_tag == blk_tag) {
       blk->header.next_free = alloc->freelist;
-      blk->header.marker_and_tag &= (~MARKER_MASK);
+      ngfi_blkalloc_mark_block_free(blk);
       alloc->freelist = blk;
     } else {
       result = NGFI_BLK_WRONG_ALLOCATOR;
