@@ -20,8 +20,11 @@
  * IN THE SOFTWARE.
  */
 
- #include "block_alloc.h"
- #include "dynamic_array.h"
+#include "block_alloc.h"
+
+#include "dynamic_array.h"
+
+#include <time.h>
 
 /**
  * The block allocator. doles out memory in fixed-size blocks from a pool.
@@ -52,7 +55,7 @@ struct ngfi_block_allocator {
 static const uint32_t FREE_BLOCK_MARKER_MASK = (1u << 31);
 
 static bool ngfi_blkalloc_is_block_free(const ngfi_blkalloc_block* b) {
-  return b->header.marker_and_tag & FREE_BLOCK_MARKER_MASK;
+  return !(b->header.marker_and_tag & FREE_BLOCK_MARKER_MASK);
 }
 
 static void ngfi_blkalloc_mark_block_inuse(ngfi_blkalloc_block* b) {
@@ -77,7 +80,9 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* alloc) {
     ngfi_blkalloc_block* blk      = (ngfi_blkalloc_block*)(pool + alloc->block_size * b);
     ngfi_blkalloc_block* next_blk = (ngfi_blkalloc_block*)(pool + alloc->block_size * (b + 1u));
     blk->header.next_free         = (b < alloc->nblocks - 1u) ? next_blk : old_freelist;
+    blk->header.marker_and_tag    = alloc->tag;
     ngfi_blkalloc_mark_block_free(blk);
+    blk->header.marker_and_tag    |= 0;
   }
   NGFI_DARRAY_APPEND(alloc->pools, pool);
 }
@@ -85,7 +90,8 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* alloc) {
 ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32_t nblocks) {
   static NGFI_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
-    uint32_t threadid = 0xffff + (rand() % 0xffff);
+    srand((unsigned int)time(NULL));
+    uint32_t threadid = (uint32_t)rand();
     next_tag          = (~FREE_BLOCK_MARKER_MASK) & (threadid << 16);
   }
 
@@ -150,4 +156,3 @@ ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
   }
   return result;
 }
-
