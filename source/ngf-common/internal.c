@@ -51,4 +51,3 @@ void ngf_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks) {
     NGF_ALLOC_CB = callbacks;
   }
 }
-
