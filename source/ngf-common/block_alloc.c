@@ -82,7 +82,7 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* alloc) {
     blk->header.next_free         = (b < alloc->nblocks - 1u) ? next_blk : old_freelist;
     blk->header.marker_and_tag    = alloc->tag;
     ngfi_blkalloc_mark_block_free(blk);
-    blk->header.marker_and_tag    |= 0;
+    blk->header.marker_and_tag |= 0;
   }
   NGFI_DARRAY_APPEND(alloc->pools, pool);
 }

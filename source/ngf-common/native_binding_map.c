@@ -1,5 +1,7 @@
 #include "native_binding_map.h"
+
 #include "macros.h"
+
 #include <string.h>
 
 const ngfi_native_binding*
@@ -93,4 +95,3 @@ void ngfi_destroy_binding_map(ngfi_native_binding_map map) {
     NGFI_FREE(map);
   }
 }
-

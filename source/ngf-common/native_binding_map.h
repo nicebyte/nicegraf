@@ -56,5 +56,3 @@ ngfi_binding_map_lookup(const ngfi_native_binding_map map, uint32_t set, uint32_
 #ifdef __cplusplus
 }
 #endif
-
-
