@@ -35,8 +35,8 @@ else()
 endif()
     
 
-# This function adds a new library target and sets some configuration
-# common across all libs.
+# This function adds a new target and sets some configuration
+# common across all targets.
 function (ngf_target)
   cmake_parse_arguments(TGT "" "NAME" "TYPE;SRCS;DEPS;COPTS" ${ARGN})
   if (TGT_TYPE STREQUAL "lib")
@@ -63,7 +63,7 @@ function (ngf_library)
    ngf_target(TYPE lib ${ARGN})
 endfunction()
 
-# Shortcut for adding a new binary target.
+# Shortcut for adding a new executable target.
 function (ngf_binary)
    ngf_target(TYPE bin ${ARGN})
 endfunction()
