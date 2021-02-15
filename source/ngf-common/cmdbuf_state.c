@@ -1,4 +1,5 @@
 #include "cmdbuf_state.h"
+
 #include "macros.h"
 
 ngf_error ngfi_transition_cmd_buf(

@@ -8,7 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 // emulate pthread mutexes
-typedef CRITICAL_SECTION   pthread_mutex_t;
+typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_mutex_lock(m)    (EnterCriticalSection(m), 0)
 #define pthread_mutex_unlock(m)  (LeaveCriticalSection(m), 0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m), 0)
@@ -48,7 +48,8 @@ extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 #define NGFI_MIN(a, b) (a < b ? a : b)
 
 // For fixing unreferenced parameter warnings.
-#define NGFI_IGNORE_VAR(name) { (void)name; }
+#define NGFI_IGNORE_VAR(name) \
+  { (void)name; }
 
 // MSVC warnings that are safe to ignore.
 #pragma warning(disable : 4201)

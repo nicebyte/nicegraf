@@ -52,4 +52,3 @@ ngf_error ngfi_transition_cmd_buf(
 #ifdef __cplusplus
 }
 #endif
-
