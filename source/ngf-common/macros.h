@@ -7,7 +7,7 @@
 #define NGFI_THREADLOCAL __declspec(thread)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-// emulate pthread mutexes and condvars
+// emulate pthread mutexes
 typedef CRITICAL_SECTION   pthread_mutex_t;
 #define pthread_mutex_lock(m)    (EnterCriticalSection(m), 0)
 #define pthread_mutex_unlock(m)  (LeaveCriticalSection(m), 0)
