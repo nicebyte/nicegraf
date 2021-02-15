@@ -33,15 +33,14 @@ if(WIN32)
 else()
     set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror")
 endif()
-    
 
 # This function adds a new target and sets some configuration
 # common across all targets.
 function (ngf_target)
-  cmake_parse_arguments(TGT "" "NAME" "TYPE;SRCS;DEPS;COPTS" ${ARGN})
+  cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES" ${ARGN})
   if (TGT_TYPE STREQUAL "lib")
     add_library(${TGT_NAME} STATIC ${TGT_SRCS})
-  elseif(TGT_TYPE STREQUAL "bin")
+  elseif(TGT_TYPE STREQUAL "exe")
     add_executable(${TGT_NAME} ${TGT_SRCS})
   else()
     message(FATAL_ERROR "invalid target type")
@@ -50,8 +49,8 @@ function (ngf_target)
     target_link_libraries(${TGT_NAME} ${TGT_DEPS})
   endif()
   target_include_directories(${TGT_NAME}
-                             PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include
-                             PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source)
+                             PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES}
+                             PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${TGT_PVT_INCLUDES})
   target_compile_options(${TGT_NAME} PRIVATE ${NICEGRAF_COMMON_COMPILE_OPTS})
   if ( TGT_COPTS )
     target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
@@ -65,7 +64,7 @@ endfunction()
 
 # Shortcut for adding a new executable target.
 function (ngf_binary)
-   ngf_target(TYPE bin ${ARGN})
+   ngf_target(TYPE exe ${ARGN})
 endfunction()
 
 # A helper library for parsing shader metadata produced by
@@ -150,6 +149,7 @@ else()
   endif()
 endif()
 
+# Build tests only if explicitly requested.
 if (NGF_BUILD_TESTS STREQUAL "yes")
     ngf_binary(NAME ngf_tests
                SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block_allocator_test.cpp
@@ -161,5 +161,31 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
     if (NOT WIN32)
         target_link_libraries(ngf_tests pthread)
+    endif()
+endif()
+
+# Build samples only if explicitly requested.
+if (NGF_BUILD_SAMPLES STREQUAL "yes")
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc)
+    if (TARGET nicegraf_shaderc)
+        set_target_properties(nicegraf_shaderc PROPERTIES FOLDER "samples")
+        ngf_library(NAME ngf-samples-common
+                    SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
+                    PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
+        set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
+
+        function (ngf_sample)
+            cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
+            file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
+            ngf_binary(NAME ${SAMPLE_NAME}
+                       SRCS ${SAMPLE_SRCS}
+                       DEPS ngf-samples-common
+                       PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME})
+            set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
+        endfunction()
+        ngf_sample(NAME 00-template)
+    else()
+        message(FATAL_ERROR "Building samples requires nicegraf-shaderc. Make sure to run `git submodule update` from the repo root.")
     endif()
 endif()
