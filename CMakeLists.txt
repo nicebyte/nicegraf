@@ -176,7 +176,10 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         endif()
         ngf_library(NAME ngf-samples-common
                     SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/window.h
                          ${NGF_SAMPLES_PLATFORM_SOURCE}
                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
@@ -187,7 +190,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
             file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
             ngf_binary(NAME ${SAMPLE_NAME}
                        SRCS ${SAMPLE_SRCS}
-                       DEPS ngf-samples-common
+                       DEPS ngf-samples-common nicegraf_vk
                        PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME})
             set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
         endfunction()
