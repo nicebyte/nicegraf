@@ -169,9 +169,16 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc)
     if (TARGET nicegraf_shaderc)
         set_target_properties(nicegraf_shaderc PROPERTIES FOLDER "samples")
+        if (WIN32)
+            set(NGF_SAMPLES_PLATFORM_SOURCE ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/windows/window.cpp)
+        else()
+            message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
+        endif()
         ngf_library(NAME ngf-samples-common
                     SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/window.h
+                         ${NGF_SAMPLES_PLATFORM_SOURCE}
                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
         set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
 
