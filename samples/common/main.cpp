@@ -21,6 +21,10 @@
  */
 
 #include "sample-interface.h"
+#include "diagnostic-callback.h"
+#include "platform/window.h"
+
+#include "nicegraf.h"
 
 #include <stdio.h>
 
@@ -37,10 +41,42 @@
 #endif
 
 int NGF_SAMPLES_COMMON_MAIN(int, char**) {
+  /**
+   * We prefer a more verbose diagnostic output from nicegraf in debug builds.
+   */
+#if defined(NDEBUG)
+  constexpr ngf_diagnostic_log_verbosity diagnostics_verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
+#else
+  constexpr ngf_diagnostic_log_verbosity diagnostics_verbosity = NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
+#endif
+
+  /*
+   * Begin by initializing nicegraf.
+   * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
+   * and install a diagnostic callback.
+   */
+   const ngf_init_info init_info {
+    .device_pref = NGF_DEVICE_PREFERENCE_DISCRETE,
+    .diag_info   = {
+      .verbosity = diagnostics_verbosity,
+      .userdata  = nullptr,
+      .callback  = ngf_samples::sample_diagnostic_callback
+    }
+   };
+  const ngf_error init_error = ngf_initialize(&init_info);
+  
+
+  ngf_samples::window w = ngf_samples::window_create("nicegraf sample", 800, 600);
+  uint32_t cw, ch;
+  ngf_samples::window_get_size(w, &cw, &ch);
+  printf("created %dx%d window\n", cw, ch);
   void* userdata =  ngf_samples::sample_initialize(0, 0);
-  printf("Sample returned userdata: %p", userdata);
-  ngf_samples::sample_draw_frame(0, 0, 0, .0, userdata);
-  ngf_samples::sample_draw_ui(userdata);
+  while(!ngf_samples::window_is_closed(w) &&
+         ngf_samples::window_poll_events()) {
+    ngf_samples::sample_draw_frame(0, 0, 0, .0, userdata);
+    ngf_samples::sample_draw_ui(userdata);
+  }
   ngf_samples::sample_shutdown(userdata);
+  ngf_samples::window_destroy(w);
   return 0;
 }
