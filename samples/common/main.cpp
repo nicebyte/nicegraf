@@ -20,20 +20,21 @@
  * IN THE SOFTWARE.
  */
 
-#include "sample-interface.h"
 #include "diagnostic-callback.h"
-#include "platform/window.h"
-
+#include "nicegraf-exception.h"
 #include "nicegraf.h"
+#include "nicegraf_wrappers.h"
+#include "platform/window.h"
+#include "sample-interface.h"
 
 #include <stdio.h>
 
- /*
-  * Below we define the "common main" function, where all nicegraf samples begin
-  * meaningful execution. On some platforms, a special `main` might be required
-  * (which is defined in the platform-specific code), but it will eventually call
-  * into this one.
-  */
+/*
+ * Below we define the "common main" function, where all nicegraf samples begin
+ * meaningful execution. On some platforms, a special `main` might be required
+ * (which is defined in the platform-specific code), but it will eventually call
+ * into this one.
+ */
 #if defined(__APPLE__)
 #define NGF_SAMPLES_COMMON_MAIN apple_main
 #else
@@ -55,28 +56,91 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
    * and install a diagnostic callback.
    */
-   const ngf_init_info init_info {
-    .device_pref = NGF_DEVICE_PREFERENCE_DISCRETE,
-    .diag_info   = {
-      .verbosity = diagnostics_verbosity,
-      .userdata  = nullptr,
-      .callback  = ngf_samples::sample_diagnostic_callback
-    }
-   };
-  const ngf_error init_error = ngf_initialize(&init_info);
-  
+  const ngf_init_info init_info {
+      .device_pref = NGF_DEVICE_PREFERENCE_DISCRETE,
+      .diag_info   = {
+          .verbosity = diagnostics_verbosity,
+          .userdata  = nullptr,
+          .callback  = ngf_samples::sample_diagnostic_callback}};
+  NGF_SAMPLES_CHECK(ngf_initialize(&init_info));
 
-  ngf_samples::window w = ngf_samples::window_create("nicegraf sample", 800, 600);
-  uint32_t cw, ch;
-  ngf_samples::window_get_size(w, &cw, &ch);
-  printf("created %dx%d window\n", cw, ch);
-  void* userdata =  ngf_samples::sample_initialize(0, 0);
-  while(!ngf_samples::window_is_closed(w) &&
-         ngf_samples::window_poll_events()) {
-    ngf_samples::sample_draw_frame(0, 0, 0, .0, userdata);
-    ngf_samples::sample_draw_ui(userdata);
+  /**
+   * Create a window.
+   * The `width` and `height` here refer to the dimensions of the window's "client area", i.e. the
+   * area that can actually be rendered to (excludes borders and any other decorative elements). The
+   * dimensions we request are a hint, we need to get the actual dimensions after the window is
+   * created.
+   */
+  constexpr uint32_t  window_width_hint = 800, window_height_hint = 600;
+  ngf_samples::window window =
+      ngf_samples::window_create("nicegraf sample", window_width_hint, window_height_hint);
+  uint32_t fb_width, fb_height;
+  ngf_samples::window_get_size(window, &fb_width, &fb_height);
+
+  /**
+   * Configure the swapchain and create a nicegraf context.
+   * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with 8 samples
+   * per pixel.
+   */
+  const ngf_swapchain_info swapchain_info = {
+      .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+      .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
+      .sample_count  = NGF_SAMPLE_COUNT_8,
+      .capacity_hint = 3u,
+      .width         = fb_width,
+      .height        = fb_height,
+      .native_handle = ngf_samples::window_native_handle(window),
+      .present_mode  = NGF_PRESENTATION_MODE_FIFO};
+  const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
+  ngf_context            context;
+  NGF_SAMPLES_CHECK(ngf_create_context(&ctx_info, &context));
+
+  /**
+   * Make the newly created context current on this thread.
+   * Once a context has been made current on a thread, it cannot be switched * to another thread,
+   * and another context cannot be made current on that * thread.
+   */
+  NGF_SAMPLES_CHECK(ngf_set_context(context));
+
+  /**
+   * At this point, the sample can do any initialization specific to itself.
+   * The initialization returns an opaque pointer, which we pass on when calling into
+   * sample-specific code.
+   */
+  void* sample_opaque_data = ngf_samples::sample_initialize(fb_width, fb_height);
+
+  /**
+   * Main loop. Exit when either the window closes or `poll_events` returns false, indicating that
+   * the application has received a request to exit.
+   */
+  while (!ngf_samples::window_is_closed(window) && ngf_samples::window_poll_events()) {
+    /**
+     * Query the updated size of the window and handle resize events.
+     */
+    const uint32_t old_fb_width = fb_width, old_fb_height = fb_height;
+    ngf_samples::window_get_size(window, &fb_width, &fb_height);
+    if (fb_width != old_fb_width || fb_height != old_fb_height) {
+      ngf_resize_context(context, fb_width, fb_height);
+    }
+
+    /**
+     * Begin frame, call into sample-specific code to perform rendering, and end frame.
+     */
+    ngf_frame_token frame_token;
+    ngf_begin_frame(&frame_token);
+    ngf_samples::sample_draw_frame(frame_token, 0, 0, .0, sample_opaque_data);
+    ngf_samples::sample_draw_ui(sample_opaque_data);
+    ngf_end_frame(frame_token);
   }
-  ngf_samples::sample_shutdown(userdata);
-  ngf_samples::window_destroy(w);
+
+  /**
+   * De-initialize any sample-specific data, destroy the nicegraf context and destroy the window, in
+   * that order. Destroying the window before destroying the context associated with it may result
+   * in misbehavior.
+   */
+  ngf_samples::sample_shutdown(sample_opaque_data);
+  ngf_destroy_context(context);
+  ngf_samples::window_destroy(window);
+
   return 0;
 }
