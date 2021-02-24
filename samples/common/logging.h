@@ -28,8 +28,9 @@
 namespace ngf_samples {
 
 inline void vlog_msg(const char* prefix, const char* fmt, va_list args) {
-  fprintf(stderr, "[%s] ", prefix);
+  fprintf(stderr, "\n[%s] ", prefix);
   vfprintf(stderr, fmt, args);
+  fprintf(stderr, "\n");
 }
 
 inline void vloge(const char* fmt, va_list args) {
