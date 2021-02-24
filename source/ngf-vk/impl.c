@@ -758,10 +758,7 @@ static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
   }
 
   for (uint32_t i = 0u; swapchain->multisample_images && i < swapchain->num_images; ++i) {
-    vmaDestroyImage(
-        CURRENT_CONTEXT->allocator,
-        (VkImage)swapchain->multisample_images[i]->alloc.obj_handle,
-        swapchain->multisample_images[i]->alloc.vma_alloc);
+    ngf_destroy_image(swapchain->multisample_images[i]);
   }
   if (swapchain->multisample_images) {
     NGFI_FREEN(swapchain->multisample_images, swapchain->num_images);
@@ -776,11 +773,7 @@ static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
   }
 
   if (swapchain->depth_image) {
-    vmaDestroyImage(
-        CURRENT_CONTEXT->allocator,
-        (VkImage)swapchain->depth_image->alloc.obj_handle,
-        swapchain->depth_image->alloc.vma_alloc);
-    vkDestroyImageView(_vk.device, swapchain->depth_image->vkview, NULL);
+    ngf_destroy_image(swapchain->depth_image);
   }
 }
 
@@ -826,8 +819,6 @@ static ngf_error ngfvk_create_swapchain(
   VkSurfaceFormatKHR* formats = NGFI_ALLOCN(VkSurfaceFormatKHR, nformats);
   assert(formats);
   vkGetPhysicalDeviceSurfaceFormatsKHR(_vk.phys_dev, surface, &nformats, formats);
-  const VkColorSpaceKHR color_space =
-      VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;  // TODO: use correct colorspace here.
   const VkFormat requested_format = get_vk_image_format(swapchain_info->color_format);
   if (!(nformats == 1 && formats[0].format == VK_FORMAT_UNDEFINED)) {
     bool found = false;
@@ -863,7 +854,7 @@ static ngf_error ngfvk_create_swapchain(
       .surface         = surface,
       .minImageCount   = swapchain_info->capacity_hint,
       .imageFormat     = requested_format,
-      .imageColorSpace = color_space,
+      .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
       .imageExtent =
           {.width = NGFI_MIN(
                max_surface_extent.width,
@@ -2301,6 +2292,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngf_error      err = NGF_ERROR_OK;
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
+
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_bufs);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_pools);
   NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->frame_res[fi].cmd_buf_sems);
@@ -2383,53 +2375,54 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   // Submit pending gfx commands & present.
   const uint32_t nsubmitted_gfx_cmdbuffers =
       NGFI_DARRAY_SIZE(frame_res->cmd_bufs) - (have_deferred_barriers ? 0 : 1);
-  if (nsubmitted_gfx_cmdbuffers > 0) {
-    // If present is necessary, acquire a swapchain image before submitting
-    // any graphics commands.
-    const bool needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
+  const bool needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
+  const bool have_pending_gfx_cmds = nsubmitted_gfx_cmdbuffers > 0;
+  const VkCommandBuffer* cmd_bufs =
+      have_pending_gfx_cmds
+          ? (have_deferred_barriers ? frame_res->cmd_bufs.data : &frame_res->cmd_bufs.data[1])
+          : NULL;
+  const VkSemaphore* cmd_buf_sems =
+      have_pending_gfx_cmds ? (have_deferred_barriers ? frame_res->cmd_buf_sems.data
+                                                      : &frame_res->cmd_buf_sems.data[1])
+                            : NULL;
 
-    // Submit pending graphics commands.
-    const VkPipelineStageFlags color_attachment_stage =
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    uint32_t                    wait_sem_count   = 0u;
-    VkSemaphore*                wait_sems        = NULL;
-    const VkPipelineStageFlags* wait_stage_flags = NULL;
-    if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
-      wait_sem_count   = 1u;
-      wait_sems        = &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
-      wait_stage_flags = &color_attachment_stage;
-    }
-    const VkCommandBuffer* cmd_bufs =
-        have_deferred_barriers ? frame_res->cmd_bufs.data : &frame_res->cmd_bufs.data[1];
-    const VkSemaphore* cmd_buf_sems =
-        have_deferred_barriers ? frame_res->cmd_buf_sems.data : &frame_res->cmd_buf_sems.data[1];
-
-    ngfvk_submit_commands(
-        _vk.gfx_queue,
-        cmd_bufs,
-        nsubmitted_gfx_cmdbuffers,
-        wait_stage_flags,
-        wait_sems,
-        wait_sem_count,
-        cmd_buf_sems,
-        nsubmitted_gfx_cmdbuffers,
-        frame_res->fences[frame_res->nwait_fences++]);
-
-    // Present if necessary.
-    if (needs_present) {
-      const VkPresentInfoKHR present_info = {
-          .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-          .pNext              = NULL,
-          .waitSemaphoreCount = nsubmitted_gfx_cmdbuffers,
-          .pWaitSemaphores    = cmd_buf_sems,
-          .swapchainCount     = 1,
-          .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
-          .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
-          .pResults           = NULL};
-      const VkResult present_result = vkQueuePresentKHR(_vk.present_queue, &present_info);
-      if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
-    }
+  // Submit pending graphics commands.
+  const VkPipelineStageFlags color_attachment_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  uint32_t                   wait_sem_count         = 0u;
+  VkSemaphore*               wait_sems              = NULL;
+  const VkPipelineStageFlags* wait_stage_flags      = NULL;
+  if (CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE) {
+    wait_sem_count   = 1u;
+    wait_sems        = &CURRENT_CONTEXT->swapchain.image_semaphores[fi];
+    wait_stage_flags = &color_attachment_stage;
   }
+
+  ngfvk_submit_commands(
+      _vk.gfx_queue,
+      cmd_bufs,
+      nsubmitted_gfx_cmdbuffers,
+      wait_stage_flags,
+      wait_sems,
+      wait_sem_count,
+      cmd_buf_sems,
+      nsubmitted_gfx_cmdbuffers,
+      frame_res->fences[frame_res->nwait_fences++]);
+
+  // Present if necessary.
+  if (needs_present) {
+    const VkPresentInfoKHR present_info = {
+        .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext              = NULL,
+        .waitSemaphoreCount = nsubmitted_gfx_cmdbuffers,
+        .pWaitSemaphores    = cmd_buf_sems,
+        .swapchainCount     = 1,
+        .pSwapchains        = &CURRENT_CONTEXT->swapchain.vk_swapchain,
+        .pImageIndices      = &CURRENT_CONTEXT->swapchain.image_idx,
+        .pResults           = NULL};
+    const VkResult present_result = vkQueuePresentKHR(_vk.present_queue, &present_info);
+    if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
+  }
+
 
   // Retire resources.
   ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[next_fi];
