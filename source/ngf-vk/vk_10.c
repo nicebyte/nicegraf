@@ -1,5 +1,18 @@
 #include "vk_10.h"
 
+#define TO_STRING(str) #str
+#define STRINGIFY(str) TO_STRING(str)
+
+#if defined(_WIN32) || defined(_WIN64)
+#define ModuleHandle HMODULE
+#define VK_LOADER_LIB "vulkan-1.dll"
+#else
+#define LoadLibraryA(name) dlopen(name, RTLD_NOW)
+#define GetProcAddress(h, n) dlsym(h, n)
+#define ModuleHandle void*
+#define VK_LOADER_LIB "libvulkan.so.1"
+#endif
+
 PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 PFN_vkCreateInstance vkCreateInstance;
@@ -17,8 +30,8 @@ PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperties;
 PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
 PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties;
 PFN_vkGetPhysicalDeviceSparseImageFormatProperties vkGetPhysicalDeviceSparseImageFormatProperties;
-PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkGetPhysicalDeviceWin32PresentationSupportKHR;
-PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR;
+VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
 PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR;
@@ -153,11 +166,9 @@ PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR;
 PFN_vkQueuePresentKHR vkQueuePresentKHR;
 PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR;
 
-HMODULE vkdll = NULL;
-
-
 bool vkl_init_loader(void) {
-  vkdll = LoadLibraryA("vulkan-1.dll");
+  ModuleHandle vkdll = LoadLibraryA(VK_LOADER_LIB);
+
   if (!vkdll) {
     return false;
   }
@@ -174,6 +185,8 @@ bool vkl_init_loader(void) {
   return true;
 }
 
+extern VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+extern VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 void vkl_init_instance(VkInstance inst) {
   vkCreateDevice = (PFN_vkCreateDevice)vkGetInstanceProcAddr(inst, "vkCreateDevice");
   vkDestroyInstance = (PFN_vkDestroyInstance)vkGetInstanceProcAddr(inst, "vkDestroyInstance");
@@ -188,8 +201,8 @@ void vkl_init_instance(VkInstance inst) {
   vkGetPhysicalDeviceProperties = (PFN_vkGetPhysicalDeviceProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceProperties");
   vkGetPhysicalDeviceQueueFamilyProperties = (PFN_vkGetPhysicalDeviceQueueFamilyProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceQueueFamilyProperties");
   vkGetPhysicalDeviceSparseImageFormatProperties = (PFN_vkGetPhysicalDeviceSparseImageFormatProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceSparseImageFormatProperties");
-  vkGetPhysicalDeviceWin32PresentationSupportKHR = (PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceWin32PresentationSupportKHR");
-  vkCreateWin32SurfaceKHR = (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(inst, "vkCreateWin32SurfaceKHR");
+  VK_GET_DEVICE_PRES_FN = (VK_GET_DEVICE_PRES_FN_TYPE)vkGetInstanceProcAddr(inst, STRINGIFY(VK_GET_DEVICE_PRES_FN));
+  VK_CREATE_SURFACE_FN = (VK_CREATE_SURFACE_FN_TYPE)vkGetInstanceProcAddr(inst, STRINGIFY(VK_CREATE_SURFACE_FN));
   vkDestroySurfaceKHR = (PFN_vkDestroySurfaceKHR)vkGetInstanceProcAddr(inst, "vkDestroySurfaceKHR");
   vkGetPhysicalDeviceSurfaceSupportKHR =
     (PFN_vkGetPhysicalDeviceSurfaceSupportKHR)vkGetInstanceProcAddr(
