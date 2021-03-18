@@ -93,7 +93,7 @@ static void* GalogenGetProcAddress(const char *name)
     glXGetProcAddress = dlsym(lib, "glXGetProcAddressARB");
     assert(lib);
   }
-  return lib ? glXGetProcAddress(name) : NULL;
+  return lib ? glXGetProcAddress((const GLubyte*)name) : NULL;
 }
 #endif
 
