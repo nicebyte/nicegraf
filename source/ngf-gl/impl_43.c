@@ -24,8 +24,8 @@
 #include "ngf-common/block_alloc.h"
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
-#include "ngf-common/native_binding_map.h"
 #include "ngf-common/macros.h"
+#include "ngf-common/native_binding_map.h"
 #include "nicegraf.h"
 #define EGLAPI  // prevent __declspec(dllimport) issue on Windows
 #include "EGL/egl.h"
@@ -80,8 +80,6 @@ void ngfi_device_caps_unlock(ngf_device_capabilities* ptr) {
     pthread_mutex_unlock(&ngfi_device_caps.mut);
   }
 }
-
-
 
 #pragma region ngf_impl_type_definitions
 
@@ -294,7 +292,7 @@ struct ngf_cmd_buffer_t {
 #pragma endregion
 
 #pragma region ngf_impl_enum_maps
-static GLenum  gl_shader_stage(ngf_stage_type stage) {
+static GLenum gl_shader_stage(ngf_stage_type stage) {
   static const GLenum stages[NGF_STAGE_COUNT] = {GL_VERTEX_SHADER, GL_FRAGMENT_SHADER};
   return stages[stage];
 }
@@ -583,7 +581,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     config_attribs[a++]                 = EGL_SAMPLE_BUFFERS;
     config_attribs[a++]                 = msaa_samples ? 1 : 0;
     config_attribs[a++]                 = EGL_SAMPLES;
-    config_attribs[a++]                 = msaa_samples ? swapchain_info->sample_count : 0;
+    config_attribs[a++]                 = msaa_samples ? (EGLint)swapchain_info->sample_count : 0;
     config_attribs[a++]                 = EGL_SURFACE_TYPE;
     config_attribs[a++]                 = EGL_WINDOW_BIT;
   }
@@ -810,7 +808,7 @@ ngf_error ngfgl_compile_shader(
       // Ptr to spec constant value.
       const uint8_t* data = (uint8_t*)spec_info->value_buffer + spec->offset;
 
-      uint32_t bytes_written = 0;  // bytes written during this iteration.
+      int bytes_written = 0;  // bytes written during this iteration.
 
 // Write the #define to the buffer
 #define WRITE_SPEC_DEFINE(format, type) \
@@ -854,7 +852,7 @@ ngf_error ngfgl_compile_shader(
 
       // Verify that snprintf did not return an error and did not discard any
       // characters (if it did, that means the written string was too long).
-      if (bytes_written > 0 && bytes_written < spec_define_max_size) {
+      if (bytes_written > 0 && bytes_written < (int)spec_define_max_size) {
         defines_buffer_write_ptr += bytes_written;
       } else {
         err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -1756,7 +1754,6 @@ void ngf_cmd_bind_gfx_resources(
         bind_op->target_set,
         bind_op->target_binding);
     if (native_binding == NULL) {
-      static const char* err_msg = "invalid binding id";
       NGFI_DIAG_MSG(NGF_DIAGNOSTIC_ERROR, "Invalid binding id");
       continue;
     }
@@ -2105,7 +2102,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) {
                     glBindVertexBuffer(
                         vbuf_table_entry->binding,
                         vbuf_table_entry->buffer,
-                        vbuf_table_entry->offset,
+                        (GLintptr)vbuf_table_entry->offset,
                         stride);
                     found_binding = true;
                   }

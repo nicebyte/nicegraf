@@ -56,6 +56,10 @@ struct {
   VkQueue          present_queue;
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
+#if defined(__linux__)
+  xcb_connection_t* xcb_connection;
+  xcb_visualid_t    xcb_visualid;
+#endif
 } _vk;
 
 // Swapchain state.
@@ -330,7 +334,7 @@ static VkSamplerAddressMode get_vk_address_mode(ngf_sampler_wrap_mode mode) {
 }
 
 static VkSamplerMipmapMode get_vk_mipmode(ngf_sampler_filter filter) {
-  static const VkFilter vkmipmodes[NGF_FILTER_COUNT] = {
+  static const VkSamplerMipmapMode vkmipmodes[NGF_FILTER_COUNT] = {
       VK_SAMPLER_MIPMAP_MODE_NEAREST,
       VK_SAMPLER_MIPMAP_MODE_LINEAR};
   return vkmipmodes[filter];
@@ -398,7 +402,7 @@ static VkImageViewType get_vk_image_view_type(ngf_image_type t, size_t nlayers) 
   } else {
     NGFI_DIAG_ERROR("Invalid image type");
     assert(false);
-    return VK_IMAGE_TYPE_2D;
+    return VK_IMAGE_VIEW_TYPE_2D;
   }
 }
 
@@ -683,12 +687,8 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
 #elif defined(__ANDROID__)
   return true;  // All Android queues surfaces support present.
 #else
-#if defined(XCB_NONE)
-  static xcb_connection_t* XCB_CONNECTION = NULL;
-  static xcb_visualid_t    XCB_VISUALID   = {0};
-#endif
 
-  if (XCB_CONNECTION == NULL) {
+  if (_vk.xcb_connection == NULL) {
     int                screen_idx = 0;
     xcb_screen_t*      screen     = NULL;
     xcb_connection_t*  connection = xcb_connect(NULL, &screen_idx);
@@ -698,14 +698,14 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
       if (screen_idx-- == 0) { screen = it.data; }
     }
     assert(screen);
-    XCB_CONNECTION = connection;
-    XCB_VISUALID   = screen->root_visual;
+    _vk.xcb_connection = connection;
+    _vk.xcb_visualid   = screen->root_visual;
   }
   return vkGetPhysicalDeviceXcbPresentationSupportKHR(
       phys_dev,
       queue_family_index,
-      XCB_CONNECTION,
-      XCB_VISUALID);
+      _vk.xcb_connection,
+      _vk.xcb_visualid);
 #endif
 }
 
@@ -993,7 +993,7 @@ static ngf_error ngfvk_create_swapchain(
         .type   = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
-        .sample_count = get_vk_sample_count(swapchain_info->sample_count),
+        .sample_count = (ngf_sample_count)get_vk_sample_count(swapchain_info->sample_count),
         .format       = swapchain_info->depth_format,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
@@ -2181,7 +2181,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
         .pNext      = NULL,
         .flags      = 0,
         .window     = (xcb_window_t)swapchain_info->native_handle,
-        .connection = XCB_CONNECTION};
+        .connection = _vk.xcb_connection};
 #endif
     vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
     if (vk_err != VK_SUCCESS) {
@@ -2745,7 +2745,6 @@ ngf_error ngf_create_graphics_pipeline(
       .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
       .pNext                   = NULL,
       .flags                   = 0u,
-      .flags                   = 0u,
       .depthClampEnable        = VK_FALSE,
       .rasterizerDiscardEnable = info->rasterization->discard,
       .polygonMode             = get_vk_polygon_mode(info->rasterization->polygon_mode),
@@ -2809,7 +2808,7 @@ ngf_error ngf_create_graphics_pipeline(
                                  ? get_vk_blend_factor(info->blend->dst_color_blend_factor)
                                  : VK_BLEND_FACTOR_ZERO,
       .colorBlendOp =
-          info->blend->enable ? get_vk_blend_factor(info->blend->blend_op_color) : VK_BLEND_OP_ADD,
+          info->blend->enable ? get_vk_blend_op(info->blend->blend_op_color) : VK_BLEND_OP_ADD,
       .srcAlphaBlendFactor = info->blend->enable
                                  ? get_vk_blend_factor(info->blend->src_alpha_blend_factor)
                                  : VK_BLEND_FACTOR_ONE,
@@ -2817,7 +2816,7 @@ ngf_error ngf_create_graphics_pipeline(
                                  ? get_vk_blend_factor(info->blend->dst_alpha_blend_factor)
                                  : VK_BLEND_FACTOR_ZERO,
       .alphaBlendOp =
-          info->blend->enable ? get_vk_blend_factor(info->blend->blend_op_alpha) : VK_BLEND_OP_ADD,
+          info->blend->enable ? get_vk_blend_op(info->blend->blend_op_alpha) : VK_BLEND_OP_ADD,
       .colorWriteMask = VK_COLOR_COMPONENT_R_BIT |  // TODO: set color write mask
                         VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
                         VK_COLOR_COMPONENT_A_BIT};
