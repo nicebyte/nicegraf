@@ -1,14 +1,18 @@
 #pragma once
 
 #if defined(_WIN32)||defined(_WIN64)
-  #define   VK_SURFACE_EXT             "VK_KHR_win32_surface"
+  #define   VK_GET_DEVICE_PRES_FN       vkGetPhysicalDeviceWin32PresentationSupportKHR
+  #define   VK_GET_DEVICE_PRES_FN_TYPE  PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR
+  #define   VK_SURFACE_EXT              "VK_KHR_win32_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateWin32SurfaceKHR
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateWin32SurfaceKHR
   #define   VK_USE_PLATFORM_WIN32_KHR
   #define   WIN32_LEAN_AND_MEAN
   #include <windows.h>
 #elif defined(__ANDROID__)
-  #define   VK_SURFACE_EXT             "VK_KHR_android_surface"
+  #define   VK_GET_DEVICE_PRES_FN       vkGetPhysicalDeviceAndroidPresentationSupportKHR
+  #define   VK_GET_DEVICE_PRES_FN_TYPE  PFN_vkGetPhysicalDeviceAndroidPresentationSupportKHR
+  #define   VK_SURFACE_EXT              "VK_KHR_android_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateAndroidSurfaceKHR
   #define   VK_USE_PLATFORM_ANDROID_KHR
@@ -16,7 +20,9 @@
   #include <xcb/xcb.h>
   #include <dlfcn.h>
   #include <X11/Xlib-xcb.h>
-  #define   VK_SURFACE_EXT             "VK_KHR_xcb_surface"
+  #define   VK_GET_DEVICE_PRES_FN       vkGetPhysicalDeviceXcbPresentationSupportKHR
+  #define   VK_GET_DEVICE_PRES_FN_TYPE  PFN_vkGetPhysicalDeviceXcbPresentationSupportKHR
+  #define   VK_SURFACE_EXT              "VK_KHR_xcb_surface"
   #define   VK_CREATE_SURFACE_FN        vkCreateXcbSurfaceKHR
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateXcbSurfaceKHR
   #define   VK_USE_PLATFORM_XCB_KHR
@@ -47,14 +53,14 @@ extern PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperti
 extern PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties;
 extern PFN_vkGetPhysicalDeviceSparseImageFormatProperties vkGetPhysicalDeviceSparseImageFormatProperties;
-extern PFN_vkGetPhysicalDeviceWin32PresentationSupportKHR vkGetPhysicalDeviceWin32PresentationSupportKHR;
-extern PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR;
+extern VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+extern VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 extern PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
 extern PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
 extern PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR;
 extern PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR;
 extern PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR vkGetPhysicalDeviceSurfaceCapabilitiesKHR;
-PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
+extern PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerEXT;
 
 extern PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
 extern PFN_vkAllocateDescriptorSets vkAllocateDescriptorSets;

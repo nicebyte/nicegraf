@@ -73,19 +73,25 @@ ngf_library(NAME ngf_metadata_parser
             SRCS ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/metadata_parser.c)
 
+set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.c
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c)
+
+if (NOT APPLE)
+    set(NGF_INTERNAL_SRCS ${NGF_INTERNAL_SRCS}
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c)
+endif()
+
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf_internal
-            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c
+            SRCS ${NGF_INTERNAL_SRCS}
             DEPS ngf_metadata_parser)
 
 # nicegraf utility library.
