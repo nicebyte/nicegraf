@@ -50,7 +50,7 @@ extern "C" {
  * Contains information about various device features, limits, etc.
  */
 typedef struct ngf_device_capabilities {
-  /* *
+  /**
    * This flag is set to `true` if the platform supports [0; 1]
    * range for the clip-space z coordinate. We enforce clip-space
    * z to be in this range on all platforms that support it.
@@ -112,8 +112,8 @@ typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, cons
 typedef struct ngf_diagnostic_info {
   ngf_diagnostic_log_verbosity verbosity; /**< Diagnostic log verbosity. */
   void*                        userdata;  /**< Arbitrary pointer that will
-                                                    be passed as-is to the
-                                                    callback. */
+                                               be passed as-is to the
+                                               callback. */
   ngf_diagnostic_callback callback;       /**< Pointer to the diagnostic
                                                message callback function.*/
 } ngf_diagnostic_info;
@@ -708,8 +708,10 @@ typedef enum ngf_attachment_store_op {
  */
 typedef union ngf_clear_info {
   float    clear_color[4];
-  float    clear_depth;
-  uint32_t clear_stencil;
+  struct {
+    float    clear_depth;
+    uint32_t clear_stencil;
+  } clear_depth_stencil;
 } ngf_clear;
 
 /**
@@ -738,11 +740,30 @@ typedef struct ngf_attachment {
 } ngf_attachment;
 
 /**
+ * Describes the type and format of a render target attachment. 
+ */
+typedef struct ngf_attachment_description {
+  ngf_attachment_type type;         /**< What the attachment shall be used for. */
+  ngf_image_format    format;       /**< Format of the associated image. */
+  ngf_sample_count    sample_count; /**< Number of samples per pixel in the associated image. */
+} ngf_attachment_description;
+
+/**
+ * A list of attachment descriptions.
+ */
+typedef struct ngf_attachment_descriptions {
+  uint32_t                          nattachments;
+  const ngf_attachment_description* attachment_descriptions;
+} ngf_attachment_descriptions;
+
+/**
  * Specifies information about a rendertarget.
  */
 typedef struct ngf_render_target_info {
-  const ngf_attachment* attachments;
-  uint32_t              nattachments;
+  const ngf_attachment_descriptions* attachment_descriptions; /**< List of attachment descriptions
+                                                                   for this render target. */
+  const ngf_image_ref*               attachment_image_refs;   /**< Image references corresponding
+                                                                   to each attachment in the list. */
 } ngf_render_target_info;
 
 /**
@@ -751,12 +772,23 @@ typedef struct ngf_render_target_info {
 typedef struct ngf_render_target_t* ngf_render_target;
 
 /**
+ * Information about a render pass.
+ */
+typedef struct ngf_pass_info {
+  ngf_render_target              render_target;
+  const ngf_attachment_load_op*  load_ops;
+  const ngf_attachment_store_op* store_ops;
+  const ngf_clear*               clears;
+} ngf_pass_info;
+
+
+/**
  * Swapchain configuration.
  */
 typedef struct ngf_swapchain_info {
   ngf_image_format color_format;  /**< Swapchain image format. */
   ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
-  ngf_sample_count sample_count;      /**< Number of samples per pixel (0 for non-multisampled) */
+  ngf_sample_count sample_count;  /**< Number of samples per pixel (0 for non-multisampled) */
   uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
   uint32_t         width;         /**< Width of swapchain images in pixels. */
   uint32_t         height;        /**< Height of swapchain images in pixels. */
@@ -934,20 +966,20 @@ typedef struct ngf_specialization_info {
  * Specifies information for creation of a graphics pipeline.
  */
 typedef struct ngf_graphics_pipeline_info {
-  ngf_shader_stage                shader_stages[5];
-  uint32_t                        nshader_stages;
-  const ngf_rasterization_info*   rasterization;
-  const ngf_multisample_info*     multisample;
-  const ngf_depth_stencil_info*   depth_stencil;
-  const ngf_blend_info*           blend;
-  uint32_t                        dynamic_state_mask;
-  const ngf_vertex_input_info*    input_info;
-  ngf_primitive_type              primitive_type;
-  const ngf_pipeline_layout_info* layout;
-  const ngf_specialization_info*  spec_info;
-  ngf_render_target               compatible_render_target;
-  const ngf_plmd_cis_map*         image_to_combined_map;
-  const ngf_plmd_cis_map*         sampler_to_combined_map;
+  ngf_shader_stage                   shader_stages[5];
+  uint32_t                           nshader_stages;
+  const ngf_rasterization_info*      rasterization;
+  const ngf_multisample_info*        multisample;
+  const ngf_depth_stencil_info*      depth_stencil;
+  const ngf_blend_info*              blend;
+  uint32_t                           dynamic_state_mask;
+  const ngf_vertex_input_info*       input_info;
+  ngf_primitive_type                 primitive_type;
+  const ngf_pipeline_layout_info*    layout;
+  const ngf_specialization_info*     spec_info;
+  const ngf_attachment_descriptions* compatible_render_target;
+  const ngf_plmd_cis_map*            image_to_combined_map;
+  const ngf_plmd_cis_map*            sampler_to_combined_map;
 } ngf_graphics_pipeline_info;
 
 /**
@@ -1244,41 +1276,19 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 
 /**
  * Obtain a render target associated with the the current context's
- * swapchain. If the current context does not have a swapchain, the result will
- * be a null pointer. Otherwise, it will be a render target that has a
+ * swapchain. If the current context does not have a swapchain, the result shall
+ * be a null pointer. Otherwise, it shall be a render target that has a
  * color attachment associated with the context's swapchain. If the swapchain
- * was created with an accompanying depth buffer, the render target will
+ * was created with an accompanying depth buffer, the render target shall
  * have an attachment for that as well.
  *
- * It is the responsibility of the caller to free the returned render target
- * object. Doing so does not affect the swapchain.
- *
- * @param color_load_op specifies the operation to perform on the color
- *  attachment of the render target at the beginning of a rend render pass.
- * @param depth_load_op if the context's swap chain has an accompanying depth
- *  buffer, specifies the operation to perform on it at the beginning of a
- *  render pass. Otherwise, this value is ignored.
- * @param color_store_op specifies the operation to perform on the color
- *  attachment of the render target at the end of a render pass.
-* @param depth_store_op specifies the operation to perform on the depth
- *  attachment of the render target at the end of a render pass.
- * @param clear_color If `color_load_op` is `NGF_LOAD_OP_CLEAR`, specifies the
- *  color to clear the color attachment of the render target to. Otherwise,
-    this value is ignored.
- * @param clear_depth If the current context's swapchain has an accompanying
- *   depth buffer AND the `depth_load_op` parameter of this function was set to
- *   `NGF_LOAD_OP_CLEAR`, this paramener specifies the value to clear the depth
- *   buffer to. Otherwise, this parameter is ignored.
- *
+ * Calling this function multiple times within the same context returns the handle
+ * to the same object.
+ * 
+ * The caller should not attempt to destroy the returned render target. It shall
+ * be destroyed automatically, together with the parent context.
  */
-ngf_error ngf_default_render_target(
-    ngf_attachment_load_op  color_load_op,
-    ngf_attachment_load_op  depth_load_op,
-    ngf_attachment_store_op color_store_op,
-    ngf_attachment_store_op depth_store_op,
-    const ngf_clear*        clear_color,
-    const ngf_clear*        clear_depth,
-    ngf_render_target*      result) NGF_NOEXCEPT;
+ngf_error ngf_default_render_target(ngf_render_target* result) NGF_NOEXCEPT;
 
 /**
  * Create a new rendertarget with the given configuration.
@@ -1321,7 +1331,7 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) NGF_NOEXCEPT;
  * It is an error to bind a mapped buffer using any command. If a buffer that
  * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure
  * any new data in the mapped range becomes visible to the subsequent commands,
- * then call \ref ngf_buffer_unmap. Then it will be safe to bind the buffer.
+ * then call \ref ngf_buffer_unmap. Then it shall be safe to bind the buffer.
  * Writing into any region that could be in use by previously submitted commands
  * results in undefined behavior.
  * @param buf The buffer to be mapped.
@@ -1526,7 +1536,7 @@ void ngf_cmd_bind_index_buffer(
     ngf_render_encoder     buf,
     const ngf_index_buffer idxbuf,
     ngf_type               index_type) NGF_NOEXCEPT;
-void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_render_target target) NGF_NOEXCEPT;
+void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_pass_info* pass_info) NGF_NOEXCEPT;
 void ngf_cmd_end_pass(ngf_render_encoder buf) NGF_NOEXCEPT;
 void ngf_cmd_draw(
     ngf_render_encoder buf,
