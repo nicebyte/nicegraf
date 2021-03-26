@@ -302,7 +302,7 @@ typedef struct ngf_graphics_pipeline_t {
 
 typedef struct ngf_render_target_t {
   VkFramebuffer frame_buffer;
-  VkRenderPass  render_passes[1];  // TODO: render passes for different load/store op combos.
+  VkRenderPass  compat_render_pass;
   uint32_t      ncolor_attachments;
   uint32_t      nattachments;
   ngf_attachment_description* attachment_descs;
@@ -1917,17 +1917,19 @@ VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_key) {
         ngfi_sa_alloc(ngfi_tmp_store(), attachment_pass_descs_size);
     memcpy(attachment_pass_descs, rt->attachment_pass_descs, attachment_pass_descs_size);
     for (uint32_t i = 0; i < rt->nattachments; ++i) {
-      attachment_pass_descs[i].load_op  = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
+      attachment_pass_descs[i].load_op = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
       attachment_pass_descs[i].store_op = NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(i, ops_key);
     }
     const ngf_attachment_descriptions attachment_descs = {
-        .attachment_descriptions = rt->attachment_descs,
-        .nattachments            = rt->nattachments};
+      .attachment_descriptions = rt->attachment_descs,
+      .nattachments = rt->nattachments
+    };
     ngfvk_renderpass_from_attachment_descs(&attachment_descs, attachment_pass_descs, &result);
-    const ngfvk_renderpass_cache_entry cache_entry = {
-        .rt         = rt,
-        .ops_key    = ops_key,
-        .renderpass = result};
+    const ngfvk_renderpass_cache_entry cache_entry  = {
+      .rt = rt,
+      .ops_key = ops_key,
+      .renderpass = result
+    };
     NGFI_DARRAY_APPEND(CURRENT_CONTEXT->renderpass_cache, cache_entry);
   }
 
@@ -3160,31 +3162,28 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
         info->attachment_image_refs->image->vkview;  // TODO: use the specified subresource.
   }
 
-  for (uint32_t rp = 0u; rp < NGFI_ARRAYSIZE(rt->render_passes);
-       ++rp) {  // TODO: create individual renderpasses for load/store combos.
-    const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_CLEAR;
-    const ngf_attachment_store_op store_op = NGF_STORE_OP_STORE;
+  const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_CLEAR;
+  const ngf_attachment_store_op store_op = NGF_STORE_OP_STORE;
 
-    for (uint32_t a = 0u; a < info->attachment_descriptions->nattachments; ++a) {
-      ngfvk_attachment_pass_desc* attachment_pass_desc = &vk_attachment_pass_descs[a];
-      attachment_pass_desc->load_op                    = get_vk_load_op(load_op);
-      attachment_pass_desc->store_op                   = get_vk_load_op(store_op);
-    }
-    const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
-        info->attachment_descriptions,
-        vk_attachment_pass_descs,
-        &rt->render_passes[rp]);
-    if (renderpass_create_result != VK_SUCCESS) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_render_target_cleanup;
-    }
+  for (uint32_t a = 0u; a < info->attachment_descriptions->nattachments; ++a) {
+    ngfvk_attachment_pass_desc* attachment_pass_desc = &vk_attachment_pass_descs[a];
+    attachment_pass_desc->load_op                    = get_vk_load_op(load_op);
+    attachment_pass_desc->store_op                   = get_vk_load_op(store_op);
+  }
+  const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
+      info->attachment_descriptions,
+      vk_attachment_pass_descs,
+      &rt->compat_render_pass);
+  if (renderpass_create_result != VK_SUCCESS) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_render_target_cleanup;
   }
 
-  rt->width                 = info->attachment_image_refs[0].image->extent.width;
-  rt->height                = info->attachment_image_refs[0].image->extent.height;
-  rt->ncolor_attachments    = ncolor_attachments;
-  rt->nattachments          = info->attachment_descriptions->nattachments;
-  rt->attachment_descs      = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
+  rt->width              = info->attachment_image_refs[0].image->extent.width;
+  rt->height             = info->attachment_image_refs[0].image->extent.height;
+  rt->ncolor_attachments = ncolor_attachments;
+  rt->nattachments       = info->attachment_descriptions->nattachments;
+  rt->attachment_descs   = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
   rt->attachment_pass_descs = vk_attachment_pass_descs;
 
   memcpy(
@@ -3197,7 +3196,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
       .pNext           = NULL,
       .flags           = 0u,
-      .renderPass      = rt->render_passes[0],
+      .renderPass      = rt->compat_render_pass,
       .attachmentCount = info->attachment_descriptions->nattachments,
       .pAttachments    = attachment_views,
       .width           = rt->width,
@@ -3222,10 +3221,8 @@ void ngf_destroy_render_target(ngf_render_target target) {
         NGFI_DARRAY_APPEND(res->retire_framebuffers, target->frame_buffer);
       }
     }
-    for (uint32_t rp = 0u; rp < NGFI_ARRAYSIZE(target->render_passes); ++rp) {
-      if (target->render_passes[rp] != VK_NULL_HANDLE) {
-        NGFI_DARRAY_APPEND(res->retire_render_passes, target->render_passes[rp]);
-      }
+    if (target->compat_render_pass != VK_NULL_HANDLE) {
+      NGFI_DARRAY_APPEND(res->retire_render_passes, target->compat_render_pass);
     }
     NGFI_FREEN(target->attachment_descs, target->nattachments);
     NGFI_FREEN(target->attachment_pass_descs, target->nattachments);
@@ -3271,13 +3268,19 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_pass_info* pass_info) 
       }
     }
   }
+  const VkRenderPass render_pass = ngfvk_lookup_renderpass(
+      pass_info->render_target,
+      ngfvk_renderpass_ops_key(
+          pass_info->render_target->nattachments,
+          pass_info->load_ops,
+          pass_info->store_ops));
   const VkRenderPassBeginInfo begin_info = {
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
       .pNext           = NULL,
       .framebuffer     = fb,
       .clearValueCount = clear_value_count,
       .pClearValues    = vk_clears,
-      .renderPass      = target->render_passes[0],
+      .renderPass      = render_pass,
       .renderArea      = {.offset = {0u, 0u}, .extent = render_extent}};
   buf->active_rt         = target;
   buf->renderpass_active = true;
