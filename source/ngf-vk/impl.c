@@ -220,6 +220,12 @@ typedef struct ngfvk_attachment_pass_desc {
   bool                is_resolve;
 } ngfvk_attachment_pass_desc;
 
+typedef struct ngfvk_renderpass_cache_entry {
+  ngf_render_target rt;
+  uint64_t          ops_key;
+  VkRenderPass      renderpass;
+} ngfvk_renderpass_cache_entry;
+
 #pragma endregion
 
 #pragma region external_struct_definitions
@@ -278,6 +284,7 @@ typedef struct ngf_context_t {
   ngf_frame_token        current_frame_token;
   NGFI_DARRAY_OF(ngfvk_command_superpool) command_superpools;
   NGFI_DARRAY_OF(ngfvk_desc_superpool) desc_superpools;
+  NGFI_DARRAY_OF(ngfvk_renderpass_cache_entry) renderpass_cache;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -290,7 +297,7 @@ typedef struct ngf_graphics_pipeline_t {
   VkPipeline vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_COUNT];
   NGFI_DARRAY_OF(ngfvk_desc_set_layout) descriptor_set_layouts;
   VkPipelineLayout vk_pipeline_layout;
-  VkRenderPass compatible_render_pass;
+  VkRenderPass     compatible_render_pass;
 } ngf_graphics_pipeline_t;
 
 typedef struct ngf_render_target_t {
@@ -299,6 +306,7 @@ typedef struct ngf_render_target_t {
   uint32_t      ncolor_attachments;
   uint32_t      nattachments;
   ngf_attachment_description* attachment_descs;
+  ngfvk_attachment_pass_desc* attachment_pass_descs;
   bool                        is_default;
   uint32_t                    width;
   uint32_t                    height;
@@ -306,7 +314,7 @@ typedef struct ngf_render_target_t {
 
 #pragma endregion
 
-#pragma region               global_vars
+#pragma region global_vars
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 
 static struct {
@@ -793,9 +801,7 @@ static void ngfvk_destroy_swapchain(ngfvk_swapchain* swapchain) {
     vkDestroySwapchainKHR(_vk.device, swapchain->vk_swapchain, NULL);
   }
 
-  if (swapchain->depth_image) {
-    ngf_destroy_image(swapchain->depth_image);
-  }
+  if (swapchain->depth_image) { ngf_destroy_image(swapchain->depth_image); }
 }
 
 static ngf_error ngfvk_create_swapchain(
@@ -1014,7 +1020,7 @@ static ngf_error ngfvk_create_swapchain(
       .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
       .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
       .finalLayout    = is_multisampled ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                     : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
+                                        : VK_IMAGE_LAYOUT_PRESENT_SRC_KHR};
   const VkAttachmentDescription depth_attachment_desc = {
       .flags          = 0u,
       .format         = requested_depth_format,
@@ -1759,9 +1765,9 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   }
 }
 
-VkResult
-ngfvk_renderpass_from_attachment_descs(const ngf_attachment_descriptions* attachment_descs,
-                                       const ngfvk_attachment_pass_desc*  attachment_pass_descs,
+VkResult ngfvk_renderpass_from_attachment_descs(
+    const ngf_attachment_descriptions* attachment_descs,
+    const ngfvk_attachment_pass_desc*  attachment_pass_descs,
     VkRenderPass*                      result) {
   const size_t vk_attachment_descs_size_bytes =
       sizeof(VkAttachmentDescription) * attachment_descs->nattachments;
@@ -1773,14 +1779,15 @@ ngfvk_renderpass_from_attachment_descs(const ngf_attachment_descriptions* attach
       ngfi_sa_alloc(ngfi_tmp_store(), vk_color_attachment_references_size_bytes);
   VkAttachmentReference* vk_resolve_attachment_refs =
       ngfi_sa_alloc(ngfi_tmp_store(), vk_color_attachment_references_size_bytes);
-  uint32_t              ncolor_attachments = 0u;
+  uint32_t              ncolor_attachments   = 0u;
   uint32_t              nresolve_attachments = 0u;
   VkAttachmentReference depth_stencil_attachment_ref;
   bool                  have_depth_stencil_attachment = false;
   bool                  have_sampled_attachments      = false;
 
   for (uint32_t a = 0u; a < attachment_descs->nattachments; ++a) {
-    const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs->attachment_descriptions[a];
+    const ngf_attachment_description* ngf_attachment_desc =
+        &attachment_descs->attachment_descriptions[a];
     const ngfvk_attachment_pass_desc* attachment_pass_desc = &attachment_pass_descs[a];
     VkAttachmentDescription*          vk_attachment_desc   = &vk_attachment_descs[a];
 
@@ -1867,13 +1874,14 @@ ngfvk_renderpass_from_attachment_descs(const ngf_attachment_descriptions* attach
 
 // Returns a bitstring uniquely identifying the series of load/store op combos
 // for each attachment.
-uint64_t ngfvk_renderpass_ops_key(uint32_t nattachments,
-                                  const ngf_attachment_load_op* load_ops,
-                                  const ngf_attachment_store_op* store_ops) {
+uint64_t ngfvk_renderpass_ops_key(
+    uint32_t                       nattachments,
+    const ngf_attachment_load_op*  load_ops,
+    const ngf_attachment_store_op* store_ops) {
   assert(nattachments < (8u * sizeof(uint64_t) / 3u));
   uint64_t result = 0u;
   for (uint32_t i = 0u; i < nattachments; ++i) {
-    const uint64_t load_op_bits = (uint64_t)load_ops[i];
+    const uint64_t load_op_bits  = (uint64_t)load_ops[i];
     const uint64_t store_op_bits = (uint64_t)store_ops[i];
     assert(load_op_bits <= 3);
     assert(store_op_bits <= 1);
@@ -1883,9 +1891,48 @@ uint64_t ngfvk_renderpass_ops_key(uint32_t nattachments,
   return result;
 }
 
+// Macros for accessing load/store ops encoded in a renderpass ops key.
 #define NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) ((ops_key >> (3u * idx)) & 7u)
-#define NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(idx, ops_key) (ngf_attachment_load_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) >> 1u)
-#define NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(idx, ops_key) (ngf_attachment_store_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) & 1u)
+#define NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(idx, ops_key) \
+  (ngf_attachment_load_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) >> 1u)
+#define NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(idx, ops_key) \
+  (ngf_attachment_store_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) & 1u)
+
+// Looks up a renderpass object from the current context's renderpass cache, and creates
+// one if it doesn't exist.
+VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_key) {
+  VkRenderPass result = VK_NULL_HANDLE;
+  NGFI_DARRAY_FOREACH(CURRENT_CONTEXT->renderpass_cache, r) {
+    const ngfvk_renderpass_cache_entry* cache_entry =
+        &NGFI_DARRAY_AT(CURRENT_CONTEXT->renderpass_cache, r);
+    if (cache_entry->rt == rt && cache_entry->ops_key == ops_key) {
+      result = cache_entry->renderpass;
+      break;
+    }
+  }
+
+  if (result == VK_NULL_HANDLE) {
+    const size_t attachment_pass_descs_size = sizeof(ngfvk_attachment_pass_desc) * rt->nattachments;
+    ngfvk_attachment_pass_desc* attachment_pass_descs =
+        ngfi_sa_alloc(ngfi_tmp_store(), attachment_pass_descs_size);
+    memcpy(attachment_pass_descs, rt->attachment_pass_descs, attachment_pass_descs_size);
+    for (uint32_t i = 0; i < rt->nattachments; ++i) {
+      attachment_pass_descs[i].load_op  = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
+      attachment_pass_descs[i].store_op = NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(i, ops_key);
+    }
+    const ngf_attachment_descriptions attachment_descs = {
+        .attachment_descriptions = rt->attachment_descs,
+        .nattachments            = rt->nattachments};
+    ngfvk_renderpass_from_attachment_descs(&attachment_descs, attachment_pass_descs, &result);
+    const ngfvk_renderpass_cache_entry cache_entry = {
+        .rt         = rt,
+        .ops_key    = ops_key,
+        .renderpass = result};
+    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->renderpass_cache, cache_entry);
+  }
+
+  return result;
+}
 
 #pragma endregion
 
@@ -2119,8 +2166,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     // Populate device capabilities.
     DEVICE_CAPS.clipspace_z_zero_to_one = true;
     DEVICE_CAPS.uniform_buffer_offset_alignment =
-          phys_dev_properties.limits.minUniformBufferOffsetAlignment;
-
+        phys_dev_properties.limits.minUniformBufferOffsetAlignment;
 
     // Done!
   }
@@ -2277,6 +2323,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   NGFI_DARRAY_RESET(ctx->command_superpools, 3);
   NGFI_DARRAY_RESET(ctx->desc_superpools, 3);
+  NGFI_DARRAY_RESET(ctx->renderpass_cache, 8);
 
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
@@ -2319,6 +2366,11 @@ void ngf_destroy_context(ngf_context ctx) {
       ngfvk_destroy_desc_superpool(&NGFI_DARRAY_AT(ctx->desc_superpools, p));
     }
     NGFI_DARRAY_DESTROY(ctx->desc_superpools);
+
+    NGFI_DARRAY_FOREACH(ctx->renderpass_cache, r) {
+      vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(ctx->renderpass_cache, r).renderpass, NULL);
+    }
+    NGFI_DARRAY_DESTROY(ctx->renderpass_cache);
 
     ngfvk_destroy_swapchain(&ctx->swapchain);
     if (ctx->surface != VK_NULL_HANDLE) { vkDestroySurfaceKHR(_vk.instance, ctx->surface, NULL); }
@@ -2524,8 +2576,8 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   // Submit pending gfx commands & present.
   const uint32_t nsubmitted_gfx_cmdbuffers =
       NGFI_DARRAY_SIZE(frame_res->cmd_bufs) - (have_deferred_barriers ? 0 : 1);
-  const bool needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
-  const bool have_pending_gfx_cmds = nsubmitted_gfx_cmdbuffers > 0;
+  const bool             needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
+  const bool             have_pending_gfx_cmds = nsubmitted_gfx_cmdbuffers > 0;
   const VkCommandBuffer* cmd_bufs =
       have_pending_gfx_cmds
           ? (have_deferred_barriers ? frame_res->cmd_bufs.data : &frame_res->cmd_bufs.data[1])
@@ -2571,7 +2623,6 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
     const VkResult present_result = vkQueuePresentKHR(_vk.present_queue, &present_info);
     if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
   }
-
 
   // Retire resources.
   ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[next_fi];
@@ -2940,14 +2991,16 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Create a compatible render pass object.
-  ngfvk_attachment_pass_desc* attachment_pass_descs = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngfvk_attachment_pass_desc) * info->compatible_render_target->nattachments);
+  ngfvk_attachment_pass_desc* attachment_pass_descs = ngfi_sa_alloc(
+      ngfi_tmp_store(),
+      sizeof(ngfvk_attachment_pass_desc) * info->compatible_render_target->nattachments);
   for (uint32_t i = 0u; i < info->compatible_render_target->nattachments; ++i) {
-    attachment_pass_descs[i].load_op = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_pass_descs[i].store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_pass_descs[i].final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_pass_descs[i].load_op        = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment_pass_descs[i].store_op       = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment_pass_descs[i].final_layout   = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment_pass_descs[i].initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment_pass_descs[i].is_resolve = false;
-    attachment_pass_descs[i].layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_pass_descs[i].is_resolve     = false;
+    attachment_pass_descs[i].layout         = VK_IMAGE_LAYOUT_UNDEFINED;
   }
 
   vk_err = ngfvk_renderpass_from_attachment_descs(
@@ -2959,7 +3012,6 @@ ngf_error ngf_create_graphics_pipeline(
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_graphics_pipeline_cleanup;
   }
-
 
   // Create all the required pipeline flavors.
   for (size_t f = 0u; f < NGFVK_PIPELINE_FLAVOR_COUNT; ++f) {
@@ -3049,7 +3101,7 @@ ngf_error ngf_default_render_target(ngf_render_target* result) {
     // TODO: implement
   } else {
     NGFI_DIAG_WARNING("Current context cannot provide a default render target.");
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    err     = NGF_ERROR_OBJECT_CREATION_FAILED;
     *result = NULL;
   }
 
@@ -3066,11 +3118,11 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   ngf_error err = NGF_ERROR_OK;
 
   ngfvk_attachment_pass_desc* vk_attachment_pass_descs =
-    ngfi_sa_alloc(ngfi_tmp_store(),
-                  info->attachment_descriptions->nattachments * sizeof(ngfvk_attachment_pass_desc));
+      NGFI_ALLOCN(ngfvk_attachment_pass_desc, info->attachment_descriptions->nattachments);
 
-  VkImageView*          attachment_views =
-      ngfi_sa_alloc(ngfi_tmp_store(), info->attachment_descriptions->nattachments * sizeof(VkImageView));
+  VkImageView* attachment_views = ngfi_sa_alloc(
+      ngfi_tmp_store(),
+      info->attachment_descriptions->nattachments * sizeof(VkImageView));
   if (vk_attachment_pass_descs == NULL || attachment_views == NULL) {
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_render_target_cleanup;
@@ -3101,13 +3153,15 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     attachment_pass_desc->initial_layout = is_attachment_sampled
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                : attachment_pass_desc->layout;
-    attachment_pass_desc->final_layout = is_attachment_sampled
-                                             ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                             : attachment_pass_desc->layout;
-    attachment_views[a] = info->attachment_image_refs->image->vkview; // TODO: use the specified subresource.
+    attachment_pass_desc->final_layout   = is_attachment_sampled
+                                               ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                               : attachment_pass_desc->layout;
+    attachment_views[a] =
+        info->attachment_image_refs->image->vkview;  // TODO: use the specified subresource.
   }
 
-  for (uint32_t rp = 0u; rp < NGFI_ARRAYSIZE(rt->render_passes); ++rp) {  // TODO: create individual renderpasses for load/store combos.
+  for (uint32_t rp = 0u; rp < NGFI_ARRAYSIZE(rt->render_passes);
+       ++rp) {  // TODO: create individual renderpasses for load/store combos.
     const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_CLEAR;
     const ngf_attachment_store_op store_op = NGF_STORE_OP_STORE;
 
@@ -3116,23 +3170,27 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       attachment_pass_desc->load_op                    = get_vk_load_op(load_op);
       attachment_pass_desc->store_op                   = get_vk_load_op(store_op);
     }
-    const VkResult renderpass_create_result =
-        ngfvk_renderpass_from_attachment_descs(info->attachment_descriptions,
-                                               vk_attachment_pass_descs,
-                                               &rt->render_passes[rp]);
+    const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
+        info->attachment_descriptions,
+        vk_attachment_pass_descs,
+        &rt->render_passes[rp]);
     if (renderpass_create_result != VK_SUCCESS) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_render_target_cleanup;
     }
   }
 
-  rt->width              = info->attachment_image_refs[0].image->extent.width;
-  rt->height             = info->attachment_image_refs[0].image->extent.height;
-  rt->ncolor_attachments = ncolor_attachments;
-  rt->nattachments       = info->attachment_descriptions->nattachments;
-  rt->attachment_descs   = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
-  memcpy(rt->attachment_descs, info->attachment_descriptions->attachment_descriptions,
-         sizeof(ngf_attachment_description)*info->attachment_descriptions->nattachments);
+  rt->width                 = info->attachment_image_refs[0].image->extent.width;
+  rt->height                = info->attachment_image_refs[0].image->extent.height;
+  rt->ncolor_attachments    = ncolor_attachments;
+  rt->nattachments          = info->attachment_descriptions->nattachments;
+  rt->attachment_descs      = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
+  rt->attachment_pass_descs = vk_attachment_pass_descs;
+
+  memcpy(
+      rt->attachment_descs,
+      info->attachment_descriptions->attachment_descriptions,
+      sizeof(ngf_attachment_description) * info->attachment_descriptions->nattachments);
 
   // Create a framebuffer.
   const VkFramebufferCreateInfo fb_info = {
@@ -3170,6 +3228,7 @@ void ngf_destroy_render_target(ngf_render_target target) {
       }
     }
     NGFI_FREEN(target->attachment_descs, target->nattachments);
+    NGFI_FREEN(target->attachment_pass_descs, target->nattachments);
     NGFI_FREE(target);
   }
 }
@@ -3177,36 +3236,37 @@ void ngf_destroy_render_target(ngf_render_target target) {
 #define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
 
 void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_pass_info* pass_info) {
-  ngf_cmd_buffer         buf       = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_swapchain* swapchain = &CURRENT_CONTEXT->swapchain;
-  const ngf_render_target target  = pass_info->render_target;
+  ngfi_sa_reset(ngfi_tmp_store());
+  ngf_cmd_buffer          buf       = NGFVK_ENC2CMDBUF(enc);
+  const ngfvk_swapchain*  swapchain = &CURRENT_CONTEXT->swapchain;
+  const ngf_render_target target    = pass_info->render_target;
 
-  const VkFramebuffer    fb =
+  const VkFramebuffer fb =
       target->is_default ? swapchain->framebuffers[swapchain->image_idx] : target->frame_buffer;
   const VkExtent2D render_extent = {
       target->is_default ? CURRENT_CONTEXT->swapchain_info.width : target->width,
       target->is_default ? CURRENT_CONTEXT->swapchain_info.height : target->height};
 
   const uint32_t clear_value_count = pass_info->clears ? target->nattachments : 0u;
-  VkClearValue* vk_clears =
+  VkClearValue*  vk_clears =
       clear_value_count > 0
-          ? ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkClearValue) * clear_value_count)
-          : NULL;
+           ? ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkClearValue) * clear_value_count)
+           : NULL;
   if (clear_value_count > 0) {
     for (size_t i = 0; i < clear_value_count; ++i) {
-      VkClearValue* vk_clear_val = &vk_clears[i];
-      const ngf_clear* clear = &pass_info->clears[i];
+      VkClearValue*    vk_clear_val = &vk_clears[i];
+      const ngf_clear* clear        = &pass_info->clears[i];
       if (target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH16 &&
           target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH32 &&
           target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
         VkClearColorValue* clear_color_var = &vk_clear_val->color;
-        clear_color_var->float32[0] = clear->clear_color[0];
-        clear_color_var->float32[1] = clear->clear_color[1];
-        clear_color_var->float32[2] = clear->clear_color[2];
-        clear_color_var->float32[3] = clear->clear_color[3];
+        clear_color_var->float32[0]        = clear->clear_color[0];
+        clear_color_var->float32[1]        = clear->clear_color[1];
+        clear_color_var->float32[2]        = clear->clear_color[2];
+        clear_color_var->float32[3]        = clear->clear_color[3];
       } else {
         VkClearDepthStencilValue* clear_depth_stencil_val = &vk_clear_val->depthStencil;
-        clear_depth_stencil_val->depth = clear->clear_depth_stencil.clear_depth;
+        clear_depth_stencil_val->depth                    = clear->clear_depth_stencil.clear_depth;
         clear_depth_stencil_val->stencil = clear->clear_depth_stencil.clear_stencil;
       }
     }
@@ -3310,7 +3370,7 @@ void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) {
   const uint32_t target_height = (buf->active_rt->is_default)
                                      ? CURRENT_CONTEXT->swapchain_info.height
                                      : buf->active_rt->height;
-  const VkRect2D scissor_rect = {
+  const VkRect2D scissor_rect  = {
       .offset = {r->x, ((int32_t)target_height - r->y) - (int32_t)r->height},
       .extent = {r->width, r->height}};
   vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
@@ -3538,8 +3598,8 @@ ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attri
       get_vk_buffer_usage(info->buffer_usage) | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   const VkMemoryPropertyFlags vk_mem_flags    = get_vk_memory_flags(info->storage_type);
   const uint32_t              vma_usage_flags = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
-                                       ? VMA_MEMORY_USAGE_GPU_ONLY
-                                       : VMA_MEMORY_USAGE_CPU_ONLY;
+                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
+                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
 
   ngf_error err = ngfvk_create_buffer(
       info->size,
@@ -3594,8 +3654,8 @@ ngf_error ngf_create_index_buffer(const ngf_index_buffer_info* info, ngf_index_b
       get_vk_buffer_usage(info->buffer_usage) | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   const VkMemoryPropertyFlags vk_mem_flags    = get_vk_memory_flags(info->storage_type);
   const uint32_t              vma_usage_flags = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
-                                       ? VMA_MEMORY_USAGE_GPU_ONLY
-                                       : VMA_MEMORY_USAGE_CPU_ONLY;
+                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
+                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
 
   ngf_error err = ngfvk_create_buffer(
       info->size,
@@ -3646,8 +3706,8 @@ ngf_create_uniform_buffer(const ngf_uniform_buffer_info* info, ngf_uniform_buffe
       get_vk_buffer_usage(info->buffer_usage) | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
   const VkMemoryPropertyFlags vk_mem_flags    = get_vk_memory_flags(info->storage_type);
   const uint32_t              vma_usage_flags = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
-                                       ? VMA_MEMORY_USAGE_GPU_ONLY
-                                       : VMA_MEMORY_USAGE_CPU_ONLY;
+                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
+                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
 
   ngf_error err = ngfvk_create_buffer(
       info->size,
@@ -3827,21 +3887,21 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-      .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      .newLayout = is_sampled_from
-                       ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                       : (is_depth_only
-                              ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
-                              : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                  : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)),
+      .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+      .newLayout           = is_sampled_from
+                                 ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                 : (is_depth_only
+                                        ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
+                                        : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)),
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .image               = (VkImage)img->alloc.obj_handle,
       .subresourceRange    = {
-          .aspectMask = is_depth_only ? VK_IMAGE_ASPECT_DEPTH_BIT
-                                      : (is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
+          .aspectMask     = is_depth_only ? VK_IMAGE_ASPECT_DEPTH_BIT
+                                             : (is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
                                                              VK_IMAGE_ASPECT_STENCIL_BIT)
-                                                          : VK_IMAGE_ASPECT_COLOR_BIT),
+                                                                 : VK_IMAGE_ASPECT_COLOR_BIT),
           .baseMipLevel   = 0u,
           .levelCount     = vk_image_info.mipLevels,
           .baseArrayLayer = 0u,
