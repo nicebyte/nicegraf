@@ -1865,6 +1865,28 @@ ngfvk_renderpass_from_attachment_descs(const ngf_attachment_descriptions* attach
   return vkCreateRenderPass(_vk.device, &renderpass_ci, NULL, result);
 }
 
+// Returns a bitstring uniquely identifying the series of load/store op combos
+// for each attachment.
+uint64_t ngfvk_renderpass_ops_key(uint32_t nattachments,
+                                  const ngf_attachment_load_op* load_ops,
+                                  const ngf_attachment_store_op* store_ops) {
+  assert(nattachments < (8u * sizeof(uint64_t) / 3u));
+  uint64_t result = 0u;
+  for (uint32_t i = 0u; i < nattachments; ++i) {
+    const uint64_t load_op_bits = (uint64_t)load_ops[i];
+    const uint64_t store_op_bits = (uint64_t)store_ops[i];
+    assert(load_op_bits <= 3);
+    assert(store_op_bits <= 1);
+    const uint64_t attachment_ops_combo = (load_op_bits << 1u) | store_op_bits;
+    result |= attachment_ops_combo << (i * 3u);
+  }
+  return result;
+}
+
+#define NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) ((ops_key >> (3u * idx)) & 7u)
+#define NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(idx, ops_key) (ngf_attachment_load_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) >> 1u)
+#define NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(idx, ops_key) (ngf_attachment_store_op)(NGFVK_ATTACHMENT_OPS_COMBO(idx, ops_key) & 1u)
+
 #pragma endregion
 
 #pragma region external_funcs
