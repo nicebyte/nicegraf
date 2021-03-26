@@ -217,7 +217,6 @@ typedef struct ngfvk_attachment_pass_desc {
   VkImageLayout       final_layout;
   VkAttachmentLoadOp  load_op;
   VkAttachmentStoreOp store_op;
-  bool                is_sampled;
   bool                is_resolve;
 } ngfvk_attachment_pass_desc;
 
@@ -1816,7 +1815,7 @@ ngfvk_renderpass_from_attachment_descs(const ngf_attachment_descriptions* attach
         depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
       }
     }
-    have_sampled_attachments |= attachment_pass_desc->is_sampled;
+    have_sampled_attachments |= ngf_attachment_desc->is_sampled;
   }
   if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
     // TODO: insert diag. log here.
@@ -2926,7 +2925,6 @@ ngf_error ngf_create_graphics_pipeline(
     attachment_pass_descs[i].final_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment_pass_descs[i].initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment_pass_descs[i].is_resolve = false;
-    attachment_pass_descs[i].is_sampled = false;
     attachment_pass_descs[i].layout = VK_IMAGE_LAYOUT_UNDEFINED;
   }
 
@@ -3077,7 +3075,6 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
 
     const ngf_image attachment_img   = info->attachment_image_refs->image;
     const bool is_attachment_sampled = attachment_img->usage_flags | NGF_IMAGE_USAGE_SAMPLE_FROM;
-    attachment_pass_desc->is_sampled = is_attachment_sampled;
     attachment_pass_desc->is_resolve = false;
     attachment_pass_desc->initial_layout = is_attachment_sampled
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
