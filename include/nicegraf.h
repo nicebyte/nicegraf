@@ -746,6 +746,8 @@ typedef struct ngf_attachment_description {
   ngf_attachment_type type;         /**< What the attachment shall be used for. */
   ngf_image_format    format;       /**< Format of the associated image. */
   ngf_sample_count    sample_count; /**< Number of samples per pixel in the associated image. */
+  bool                is_sampled;   /**< Whether this attachment's associated image is sampled from a
+                                         shader at any point. */
 } ngf_attachment_description;
 
 /**
