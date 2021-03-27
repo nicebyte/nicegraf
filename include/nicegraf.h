@@ -754,8 +754,8 @@ typedef struct ngf_attachment_description {
  * A list of attachment descriptions.
  */
 typedef struct ngf_attachment_descriptions {
-  uint32_t                          nattachments;
-  const ngf_attachment_description* attachment_descriptions;
+  uint32_t                          ndescs;
+  const ngf_attachment_description* descs;
 } ngf_attachment_descriptions;
 
 /**
@@ -1283,14 +1283,17 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
  * color attachment associated with the context's swapchain. If the swapchain
  * was created with an accompanying depth buffer, the render target shall
  * have an attachment for that as well.
- *
- * Calling this function multiple times within the same context returns the handle
- * to the same object.
  * 
  * The caller should not attempt to destroy the returned render target. It shall
  * be destroyed automatically, together with the parent context.
  */
 ngf_error ngf_default_render_target(ngf_render_target* result) NGF_NOEXCEPT;
+
+/**
+ * Populates the argument with a list of attachment descriptions for the default render
+ * target.
+ */
+ngf_error ngf_default_render_target_attachment_descs(ngf_attachment_descriptions* result) NGF_NOEXCEPT;
 
 /**
  * Create a new rendertarget with the given configuration.
