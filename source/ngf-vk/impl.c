@@ -3123,6 +3123,13 @@ ngf_default_render_target_cleanup:
   return err;
 }
 
+ngf_error ngf_default_render_target_attachment_descs(ngf_attachment_descriptions* result) {
+  result->ndescs =
+      CURRENT_CONTEXT->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED ? 2u : 1u;
+  result->descs = CURRENT_CONTEXT->default_attachment_descs;
+  return NGF_ERROR_OK;
+}
+
 ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result) {
   ngf_render_target rt = NGFI_ALLOC(ngf_render_target_t);
   if (rt == NULL) { return NGF_ERROR_OUT_OF_MEM; }
