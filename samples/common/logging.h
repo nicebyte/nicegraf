@@ -65,6 +65,8 @@ inline void logd(const char* fmt, ...) {
   va_start(args, fmt);
   vlogd(fmt, args);
   va_end(args);
+#else
+  (fmt,nullptr);
 #endif
 }
 
