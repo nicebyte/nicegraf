@@ -33,10 +33,7 @@
 #include <arpa/inet.h>
 #endif
 
-void ngf_util_create_default_graphics_pipeline_data(
-    const ngf_irect2d*               window_size,
-    ngf_util_graphics_pipeline_data* result) {
-  NGFI_IGNORE_VAR(window_size);
+void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result) {
   ngf_blend_info bi;
   bi.enable                        = false;
   result->blend_info               = bi;
