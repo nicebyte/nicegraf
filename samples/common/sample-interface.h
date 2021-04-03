@@ -23,7 +23,6 @@
 #pragma once
 
 #include "nicegraf.h"
-#include "nicegraf_wrappers.h"
 
 #include <stdint.h>
 
