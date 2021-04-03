@@ -23,7 +23,7 @@
 #include "diagnostic-callback.h"
 #include "nicegraf-exception.h"
 #include "nicegraf.h"
-#include "nicegraf_wrappers.h"
+#include "nicegraf-wrappers.h"
 #include "platform/window.h"
 #include "sample-interface.h"
 
