@@ -20,9 +20,8 @@
  * IN THE SOFTWARE.
  */
 
-#include "nicegraf_util.h"
-
 #include "ngf-common/macros.h"
+#include "nicegraf_util.h"
 
 #include <assert.h>
 #include <string.h>
