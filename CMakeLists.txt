@@ -172,9 +172,17 @@ endif()
 
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
+    # Determine the backend to build the samples with based on the platform.
+    if (NOT APPLE)
+        set(NGF_SAMPLES_BACKEND nicegraf_vk)
+    else()
+        set(NGF_SAMPLES_BACKEND nicegraf_mtl)
+    endif()
+
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc)
     if (TARGET nicegraf_shaderc)
         set_target_properties(nicegraf_shaderc PROPERTIES FOLDER "samples")
+        string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
         if (WIN32)
             set(NGF_SAMPLES_PLATFORM_SOURCE ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/windows/window.cpp)
         else()
@@ -191,13 +199,14 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                          ${NGF_SAMPLES_PLATFORM_SOURCE}
                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
         set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
+        target_compile_definitions(ngf-samples-common PUBLIC ${NGF_SAMPLES_BACKEND_DEFINE})
 
         function (ngf_sample)
             cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
             file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
             ngf_binary(NAME ${SAMPLE_NAME}
                        SRCS ${SAMPLE_SRCS}
-                       DEPS ngf-samples-common nicegraf_vk nicegraf_util
+                       DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf_util
                        PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME})
             set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
         endfunction()
