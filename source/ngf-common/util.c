@@ -21,7 +21,7 @@
  */
 
 #include "ngf-common/macros.h"
-#include "nicegraf_util.h"
+#include "nicegraf-util.h"
 
 #include <assert.h>
 #include <string.h>

@@ -90,18 +90,18 @@ if (NOT APPLE)
 endif()
 
 # A library with various utilities shared internally across different backends.
-ngf_library(NAME nicegraf_internal
+ngf_library(NAME nicegraf-internal
             SRCS ${NGF_INTERNAL_SRCS}
             DEPS ngf_metadata_parser)
 
 # nicegraf utility library.
-ngf_library(NAME nicegraf_util
-            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf_util.h
+ngf_library(NAME nicegraf-util
+            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf-util.h
                  ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.c
-            DEPS nicegraf_internal)
+            DEPS nicegraf-internal)
 
 # Common dependencies used by nicegraf on all platforms.
-set(NICEGRAF_COMMON_DEPS nicegraf_internal ngf_metadata_parser)
+set(NICEGRAF_COMMON_DEPS nicegraf-internal ngf_metadata_parser)
 
 if (APPLE)
   # Nicegraf with Metal backend.
@@ -163,7 +163,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
-               DEPS nicegraf_internal)
+               DEPS nicegraf-internal)
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
     if (NOT WIN32)
         target_link_libraries(ngf_tests pthread)
@@ -210,7 +210,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
             file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
             ngf_binary(NAME ${SAMPLE_NAME}
                        SRCS ${SAMPLE_SRCS}
-                       DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf_util
+                       DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf-util
                        PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME})
             set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
         endfunction()
