@@ -22,8 +22,8 @@
 
 #pragma once
 
-#include <vector>
 #include <stdint.h>
+#include <vector>
 
 #if defined(_WIN64) || defined(_WIN32)
 #define NGF_SAMPLES_PATH_SEPARATOR "\\"

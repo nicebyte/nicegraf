@@ -25,7 +25,7 @@
  #include <fstream>
  #include <stdexcept>
 
- namespace ngf_common {
+ namespace ngf_samples {
 
 std::vector<uint8_t> load_file(const char* file_name) {
   std::basic_ifstream<uint8_t> fs(file_name, std::ios::binary | std::ios::in);
