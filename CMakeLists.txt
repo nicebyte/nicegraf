@@ -191,6 +191,10 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         ngf_library(NAME ngf-samples-common
                     SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.h
+                         ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.h
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/nicegraf-exception.h
                          ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
