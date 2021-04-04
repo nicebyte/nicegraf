@@ -253,17 +253,18 @@ typedef struct ngf_image_t {
 } ngf_image_t;
 
 typedef struct ngf_context_t {
-  ngfvk_frame_resources*     frame_res;
-  ngfvk_swapchain            swapchain;
-  ngf_swapchain_info         swapchain_info;
-  VmaAllocator               allocator;
-  VkSurfaceKHR               surface;
-  uint32_t                   frame_id;
-  uint32_t                   max_inflight_frames;
-  ngfi_block_allocator*      bind_op_chunk_allocator;
-  ngf_frame_token            current_frame_token;
-  ngf_attachment_description default_attachment_descs[2];
-  ngf_render_target          default_render_target;
+  ngfvk_frame_resources*      frame_res;
+  ngfvk_swapchain             swapchain;
+  ngf_swapchain_info          swapchain_info;
+  VmaAllocator                allocator;
+  VkSurfaceKHR                surface;
+  uint32_t                    frame_id;
+  uint32_t                    max_inflight_frames;
+  ngfi_block_allocator*       bind_op_chunk_allocator;
+  ngf_frame_token             current_frame_token;
+  ngf_attachment_description  default_attachment_descs[2];
+  ngf_attachment_descriptions default_attachment_descriptions_list;
+  ngf_render_target           default_render_target;
   NGFI_DARRAY_OF(ngfvk_command_superpool) command_superpools;
   NGFI_DARRAY_OF(ngfvk_desc_superpool) desc_superpools;
   NGFI_DARRAY_OF(ngfvk_renderpass_cache_entry) renderpass_cache;
@@ -2335,8 +2336,7 @@ ngf_create_context_cleanup:
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
   assert(ctx);
-  if (new_width == 0u || new_height == 0u ||
-      ctx == NULL || ctx->default_render_target == NULL) {
+  if (new_width == 0u || new_height == 0u || ctx == NULL || ctx->default_render_target == NULL) {
     return NGF_ERROR_INVALID_OPERATION;
   }
 
@@ -2909,7 +2909,8 @@ ngf_error ngf_create_graphics_pipeline(
 
   uint32_t ncolor_attachments = 0u;
   for (uint32_t i = 0; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
-    if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR) ++ncolor_attachments;
+    if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR)
+      ++ncolor_attachments;
   }
   VkPipelineColorBlendAttachmentState blend_states[16];
   for (size_t i = 0u; i < 16u; ++i) { blend_states[i] = attachment_blend_state; }
@@ -3106,11 +3107,16 @@ ngf_render_target ngf_default_render_target() {
   }
 }
 
-ngf_error ngf_default_render_target_attachment_descs(ngf_attachment_descriptions* result) {
-  result->ndescs =
-      CURRENT_CONTEXT->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED ? 2u : 1u;
-  result->descs = CURRENT_CONTEXT->default_attachment_descs;
-  return NGF_ERROR_OK;
+const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() {
+  if (CURRENT_CONTEXT->default_render_target) {
+    CURRENT_CONTEXT->default_attachment_descriptions_list.ndescs =
+        CURRENT_CONTEXT->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED ? 2u : 1u;
+    CURRENT_CONTEXT->default_attachment_descriptions_list.descs =
+        CURRENT_CONTEXT->default_attachment_descs;
+    return &CURRENT_CONTEXT->default_attachment_descriptions_list;
+  } else {
+    return NULL;
+  }
 }
 
 ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result) {
