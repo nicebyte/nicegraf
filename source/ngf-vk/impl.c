@@ -709,6 +709,9 @@ static ngf_error ngfvk_create_vk_image_view(
       image_format == VK_FORMAT_D16_UNORM || image_format == VK_FORMAT_D16_UNORM_S8_UINT ||
       image_format == VK_FORMAT_D24_UNORM_S8_UINT || image_format == VK_FORMAT_D32_SFLOAT ||
       image_format == VK_FORMAT_D32_SFLOAT_S8_UINT;
+  const bool is_stencil = image_format == VK_FORMAT_D24_UNORM_S8_UINT ||
+                          image_format == VK_FORMAT_D16_UNORM_S8_UINT ||
+                          image_format == VK_FORMAT_D32_SFLOAT_S8_UINT;
   const VkImageViewCreateInfo image_view_info = {
       .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
       .pNext    = NULL,
@@ -722,7 +725,9 @@ static ngf_error ngfvk_create_vk_image_view(
            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
            .a = VK_COMPONENT_SWIZZLE_IDENTITY},
       .subresourceRange = {
-          .aspectMask     = is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT,
+          .aspectMask     = is_depth ? (VK_IMAGE_ASPECT_DEPTH_BIT |
+                                    (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0))
+                                     : VK_IMAGE_ASPECT_COLOR_BIT,
           .baseMipLevel   = 0u,
           .levelCount     = nmips,
           .baseArrayLayer = 0u,
@@ -2252,9 +2257,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       ngfvk_attachment_pass_desc* depth_attachment_pass_desc =
           &ctx->default_render_target->attachment_pass_descs[attachment_desc_idx];
       depth_attachment_pass_desc->initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-      depth_attachment_pass_desc->layout         = is_depth_only
-                                                       ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
-                                                       : VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      depth_attachment_pass_desc->layout         = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
       depth_attachment_pass_desc->final_layout   = depth_attachment_pass_desc->layout;
       depth_attachment_pass_desc->is_resolve     = false;
       depth_attachment_pass_desc->load_op        = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -3146,8 +3149,6 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       attachment_pass_desc->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       break;
     case NGF_ATTACHMENT_DEPTH:
-      attachment_pass_desc->layout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
-      break;
     case NGF_ATTACHMENT_DEPTH_STENCIL:
       attachment_pass_desc->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
       break;
@@ -3899,19 +3900,16 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
       .newLayout           = is_sampled_from
                                  ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                 : (is_depth_only
-                                        ? VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL
-                                        : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-                                                            : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)),
+                                 : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                                     : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL),
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .image               = (VkImage)img->alloc.obj_handle,
       .subresourceRange    = {
-          .aspectMask     = is_depth_only ? VK_IMAGE_ASPECT_DEPTH_BIT
-                                             : (is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
-                                                             VK_IMAGE_ASPECT_STENCIL_BIT)
-                                                                 : VK_IMAGE_ASPECT_COLOR_BIT),
-          .baseMipLevel   = 0u,
+          .aspectMask = is_depth_stencil ? (VK_IMAGE_ASPECT_DEPTH_BIT |
+                                            (is_depth_only ? 0 : VK_IMAGE_ASPECT_STENCIL_BIT))
+                                            : VK_IMAGE_ASPECT_COLOR_BIT,
+  .baseMipLevel = 0u,
           .levelCount     = vk_image_info.mipLevels,
           .baseArrayLayer = 0u,
           .layerCount     = vk_image_info.arrayLayers}};
