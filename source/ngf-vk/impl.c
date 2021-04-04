@@ -2908,8 +2908,8 @@ ngf_error ngf_create_graphics_pipeline(
                         VK_COLOR_COMPONENT_A_BIT};
 
   uint32_t ncolor_attachments = 0u;
-  for (uint32_t i = 0; i < info->compatible_render_target->ndescs; ++i) {
-    if (info->compatible_render_target->descs[i].type == NGF_ATTACHMENT_COLOR) ++ncolor_attachments;
+  for (uint32_t i = 0; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
+    if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR) ++ncolor_attachments;
   }
   VkPipelineColorBlendAttachmentState blend_states[16];
   for (size_t i = 0u; i < 16u; ++i) { blend_states[i] = attachment_blend_state; }
@@ -3006,8 +3006,8 @@ ngf_error ngf_create_graphics_pipeline(
   // Create a compatible render pass object.
   ngfvk_attachment_pass_desc* attachment_pass_descs = ngfi_sa_alloc(
       ngfi_tmp_store(),
-      sizeof(ngfvk_attachment_pass_desc) * info->compatible_render_target->ndescs);
-  for (uint32_t i = 0u; i < info->compatible_render_target->ndescs; ++i) {
+      sizeof(ngfvk_attachment_pass_desc) * info->compatible_rt_attachment_descs->ndescs);
+  for (uint32_t i = 0u; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
     attachment_pass_descs[i].load_op        = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment_pass_descs[i].store_op       = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachment_pass_descs[i].final_layout   = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -3017,8 +3017,8 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   vk_err = ngfvk_renderpass_from_attachment_descs(
-      info->compatible_render_target->ndescs,
-      info->compatible_render_target->descs,
+      info->compatible_rt_attachment_descs->ndescs,
+      info->compatible_rt_attachment_descs->descs,
       attachment_pass_descs,
       &pipeline->compatible_render_pass);
 
