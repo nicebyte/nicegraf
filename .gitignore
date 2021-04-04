@@ -1,3 +1,4 @@
 build/*
 tests/build/*
 tests/ngf_tests
+samples-bin/*
