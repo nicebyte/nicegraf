@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "nicegraf_util.h"
+#include "nicegraf-util.h"
 
 #include <stdexcept>
 
