@@ -128,7 +128,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
      */
     ngf_frame_token frame_token;
     ngf_begin_frame(&frame_token);
-    ngf_samples::sample_draw_frame(frame_token, 0, 0, .0, sample_opaque_data);
+    ngf_samples::sample_draw_frame(frame_token, fb_width, fb_height, .0, sample_opaque_data);
     ngf_samples::sample_draw_ui(sample_opaque_data);
     ngf_end_frame(frame_token);
   }
