@@ -2335,9 +2335,10 @@ ngf_create_context_cleanup:
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
   assert(ctx);
-  if (new_height == 0u || new_height == 0u) return NGF_ERROR_INVALID_OPERATION;
+  if (new_height == 0u || new_height == 0u || ctx == NULL) {
+    return NGF_ERROR_INVALID_OPERATION;
+  }
 
-  if (ctx == NULL) { return NGF_ERROR_INVALID_OPERATION; }
   ngf_error err = NGF_ERROR_OK;
   ngfvk_destroy_swapchain(&ctx->swapchain);
   ctx->swapchain_info.width          = NGFI_MAX(1, new_width);
@@ -3096,10 +3097,12 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   }
 }
 
-ngf_error ngf_default_render_target(ngf_render_target* result) {
-  assert(result);
-  *result = CURRENT_CONTEXT->default_render_target;
-  return NGF_ERROR_OK;
+ngf_render_target ngf_default_render_target() {
+  if (CURRENT_CONTEXT) {
+    return CURRENT_CONTEXT->default_render_target;
+  } else {
+    return NULL;
+  }
 }
 
 ngf_error ngf_default_render_target_attachment_descs(ngf_attachment_descriptions* result) {

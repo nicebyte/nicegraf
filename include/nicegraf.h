@@ -1287,7 +1287,7 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
  * The caller should not attempt to destroy the returned render target. It shall
  * be destroyed automatically, together with the parent context.
  */
-ngf_error ngf_default_render_target(ngf_render_target* result) NGF_NOEXCEPT;
+ngf_render_target ngf_default_render_target() NGF_NOEXCEPT;
 
 /**
  * Populates the argument with a list of attachment descriptions for the default render
