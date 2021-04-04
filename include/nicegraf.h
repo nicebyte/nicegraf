@@ -1290,10 +1290,11 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 ngf_render_target ngf_default_render_target() NGF_NOEXCEPT;
 
 /**
- * Populates the argument with a list of attachment descriptions for the default render
- * target.
+ * Obtain the attachment descriptions for the default render target.
+ * The caller should not attempt to free the returned pointer or modify the contents of the memory
+ * it points to.
  */
-ngf_error ngf_default_render_target_attachment_descs(ngf_attachment_descriptions* result) NGF_NOEXCEPT;
+const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT;
 
 /**
  * Create a new rendertarget with the given configuration.
