@@ -3014,10 +3014,10 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
     attachment_pass_descs[i].load_op        = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment_pass_descs[i].store_op       = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_pass_descs[i].final_layout   = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_pass_descs[i].final_layout   = VK_IMAGE_LAYOUT_GENERAL;
     attachment_pass_descs[i].initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment_pass_descs[i].is_resolve     = false;
-    attachment_pass_descs[i].layout         = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment_pass_descs[i].layout         = VK_IMAGE_LAYOUT_GENERAL;
   }
 
   vk_err = ngfvk_renderpass_from_attachment_descs(
@@ -3811,13 +3811,16 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const bool is_xfer_dst      = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
   const bool is_attachment    = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
   const bool is_transient     = info->usage_hint & NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
-  const bool is_depth_stencil = info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+  const bool is_depth_stencil = 
+    info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
+    info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
+    info->format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
   const bool is_depth_only =
       info->format == NGF_IMAGE_FORMAT_DEPTH32 || info->format == NGF_IMAGE_FORMAT_DEPTH16;
 
   const VkImageUsageFlagBits attachment_usage_bits =
-      is_depth_only || is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                                        : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+      is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                       : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   const VkImageUsageFlagBits usage_flags =
       (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
       (is_attachment ? attachment_usage_bits : 0u) |
