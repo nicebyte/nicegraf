@@ -715,31 +715,6 @@ typedef union ngf_clear_info {
 } ngf_clear;
 
 /**
- * Specifies information about a rendertarget attachment.
- */
-typedef struct ngf_attachment {
-  ngf_image_ref       image_ref; /**< Associated image subresource.*/
-  ngf_attachment_type type;      /**< Attachment type. */
-
-  /**
-   * Indicates what to do with this attachment at the beginning of a render
-   * pass.
-   */
-  ngf_attachment_load_op load_op;
-
-  /**
-   * Indicates what to do with this attachment at the end of a render pass.
-   */
-  ngf_attachment_store_op store_op;
-
-  /**
-   * If the `load_op` field  is NGF_LOAD_OP_CLEAR, contains the value(s) to
-   * clear the attachment to, otherwise this field is ignored.
-   */
-  ngf_clear clear;
-} ngf_attachment;
-
-/**
  * Describes the type and format of a render target attachment. 
  */
 typedef struct ngf_attachment_description {
@@ -893,7 +868,7 @@ typedef struct {
  */
 typedef struct {
   uint32_t                        ndescriptor_set_layouts;
-  ngf_descriptor_set_layout_info* descriptor_set_layouts;
+  const ngf_descriptor_set_layout_info* descriptor_set_layouts;
 } ngf_pipeline_layout_info;
 
 /**
