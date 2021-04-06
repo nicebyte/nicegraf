@@ -29,13 +29,13 @@
 
 namespace ngf_samples {
 
-struct sample_data {
+struct fullscreen_triangle_data {
   ngf::graphics_pipeline pipeline;
   ngf::cmd_buffer        cmdbuf;
 };
 
 void* sample_initialize(uint32_t , uint32_t ) {
-  auto data = new sample_data{};
+  auto data = new fullscreen_triangle_data{};
 
   /**
    * Load the shader stages.
@@ -92,7 +92,7 @@ void sample_draw_frame(
     uint32_t        h,
     float           /*time*/,
     void*           userdata) {
-    auto data = static_cast<sample_data*>(userdata);
+    auto data = static_cast<fullscreen_triangle_data*>(userdata);
 
     /**
      * Obtain the raw cmd buffer handle to pass to C functions.
@@ -155,7 +155,7 @@ void sample_draw_ui(void*) {
 }
 
 void sample_shutdown(void* userdata) {
-  auto data = static_cast<sample_data*>(userdata);
+  auto data = static_cast<fullscreen_triangle_data*>(userdata);
   delete data;
   printf("shutting down\n");
 }
