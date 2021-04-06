@@ -114,17 +114,6 @@ if (APPLE)
               DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
               COPTS "-fobjc-arc")
 else()
-  # Import the EGL library for context creation.
-  set(EGL_NO_GLEW ON)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/EGL/EGL)
-
-  # Nicegraf with GL backend.
-  ngf_library(NAME nicegraf_gl
-              SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-gl/impl_43.c
-                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-gl/gl_43_core.c
-              DEPS egl)
-
   # Try searching for Vulkan SDK.
   find_package(Vulkan)
 
