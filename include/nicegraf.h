@@ -88,7 +88,7 @@ typedef enum ngf_diagnostic_log_verbosity {
  * Type of a diagnostic log entry.
  */
 typedef enum ngf_diagnostic_message_type {
-  NGF_DIAGNOSTIC_INFO,    /**< Informational message, not actionalble. */
+  NGF_DIAGNOSTIC_INFO,    /**< Informational message, not actionable. */
   NGF_DIAGNOSTIC_WARNING, /**< Message warns of a potential issue with an API
                              call. */
   NGF_DIAGNOSTIC_ERROR    /**< Message provides details of an API call failure or a
@@ -669,7 +669,6 @@ typedef struct {
 typedef enum ngf_attachment_type {
   NGF_ATTACHMENT_COLOR = 0,
   NGF_ATTACHMENT_DEPTH,
-  NGF_ATTACHMENT_STENCIL,
   NGF_ATTACHMENT_DEPTH_STENCIL
 } ngf_attachment_type;
 
