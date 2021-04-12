@@ -1609,6 +1609,10 @@ void ngf_cmd_begin_pass(ngf_render_encoder enc,
         rt->is_default
         ? CURRENT_CONTEXT->frame.resolve_attachment_texture()
         : nil;
+        if (mtl_desc.resolveTexture) {
+          // Override user-specified store action
+          mtl_desc.storeAction = MTLStoreActionMultisampleResolve;
+        }
         pass_descriptor.colorAttachments[color_attachment_idx++] =
         mtl_desc;
         break;
