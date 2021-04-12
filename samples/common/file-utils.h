@@ -33,6 +33,6 @@
 
 namespace ngf_samples {
 
-std::vector<uint8_t> load_file(const char* file_name);
+std::vector<char> load_file(const char* file_name);
 
 }

@@ -27,13 +27,13 @@
 
  namespace ngf_samples {
 
-std::vector<uint8_t> load_file(const char* file_name) {
-  std::basic_ifstream<uint8_t> fs(file_name, std::ios::binary | std::ios::in);
+std::vector<char> load_file(const char* file_name) {
+  std::basic_ifstream<char> fs(file_name, std::ios::binary | std::ios::in);
   if (!fs.is_open()) {
     throw std::runtime_error{ file_name };
   }
-  return std::vector<uint8_t> { std::istreambuf_iterator<uint8_t>(fs),
-                                std::istreambuf_iterator<uint8_t>() };
+  return std::vector<char> { std::istreambuf_iterator<char>(fs),
+                             std::istreambuf_iterator<char>() };
 }
 
 }  // namespace ngf_common
