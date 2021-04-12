@@ -45,10 +45,10 @@ load_shader_stage(const char* shader_file_name, const char* entry_point_name, ng
 
   const std::string file_name = shaders_root_dir + std::string(shader_file_name) + "." +
                                 stage_to_file_ext_map[type] + SHADER_EXTENSION;
-  const std::vector<uint8_t> content    = load_file(file_name.c_str());
+  const std::vector<char> content    = load_file(file_name.c_str());
   ngf_shader_stage_info      stage_info = {
       .type             = type,
-      .content          = content.data(),
+      .content          = reinterpret_cast<const uint8_t*>(content.data()),
       .content_length   = (uint32_t)content.size(),
       .debug_name       = "",
       .entry_point_name = entry_point_name};

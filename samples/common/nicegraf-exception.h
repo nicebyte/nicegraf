@@ -28,9 +28,9 @@
 
 namespace ngf_samples {
 
-class nicegraf_exception : public std::exception {
+class nicegraf_exception : public std::runtime_error {
   public:
-  explicit nicegraf_exception(ngf_error err) : std::exception(ngf_util_get_error_name(err)) {
+  explicit nicegraf_exception(ngf_error err) : std::runtime_error(ngf_util_get_error_name(err)) {
   }
 };
 
