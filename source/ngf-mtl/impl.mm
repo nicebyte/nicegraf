@@ -846,6 +846,7 @@ ngf_error ngf_create_context(const ngf_context_info *info,
                    info->swapchain_info->width,
                    info->swapchain_info->height);
     ctx->default_rt = default_rt.release();
+    ctx->default_rt->is_default = true;
   }
  
   ctx->frame_sync_sem =
