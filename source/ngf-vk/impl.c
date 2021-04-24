@@ -45,6 +45,7 @@
 #pragma endregion
 
 #pragma region internal_struct_definitions
+
 // Singleton for holding vulkan instance, device and
 // queue handles.
 // This is shared by all contexts.
@@ -205,6 +206,8 @@ typedef struct ngfvk_renderpass_cache_entry {
   uint64_t          ops_key;
   VkRenderPass      renderpass;
 } ngfvk_renderpass_cache_entry;
+
+#define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
 
 #pragma endregion
 
@@ -2431,9 +2434,66 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf, ngf_render_encoder* enc) {
-  enc->__handle = (uintptr_t)((void*)cmd_buf);
-  return ngfvk_encoder_start(cmd_buf);
+ngf_error ngf_cmd_buffer_start_render(
+    ngf_cmd_buffer       cmd_buf,
+    const ngf_pass_info* pass_info,
+    ngf_render_encoder*  enc) {
+  enc->__handle       = (uintptr_t)((void*)cmd_buf);
+  const ngf_error err = ngfvk_encoder_start(cmd_buf);
+  if (err != NGF_ERROR_OK) return err;
+
+  const ngfvk_swapchain*  swapchain = &CURRENT_CONTEXT->swapchain;
+  const ngf_render_target target    = pass_info->render_target;
+
+  const VkFramebuffer fb =
+      target->is_default ? swapchain->framebuffers[swapchain->image_idx] : target->frame_buffer;
+  const VkExtent2D render_extent = {
+      target->is_default ? CURRENT_CONTEXT->swapchain_info.width : target->width,
+      target->is_default ? CURRENT_CONTEXT->swapchain_info.height : target->height};
+
+  const uint32_t clear_value_count = pass_info->clears ? target->nattachments : 0u;
+  VkClearValue*  vk_clears =
+      clear_value_count > 0
+           ? ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkClearValue) * clear_value_count)
+           : NULL;
+  if (clear_value_count > 0) {
+    for (size_t i = 0; i < clear_value_count; ++i) {
+      VkClearValue*    vk_clear_val = &vk_clears[i];
+      const ngf_clear* clear        = &pass_info->clears[i];
+      if (target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH16 &&
+          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH32 &&
+          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+        VkClearColorValue* clear_color_var = &vk_clear_val->color;
+        clear_color_var->float32[0]        = clear->clear_color[0];
+        clear_color_var->float32[1]        = clear->clear_color[1];
+        clear_color_var->float32[2]        = clear->clear_color[2];
+        clear_color_var->float32[3]        = clear->clear_color[3];
+      } else {
+        VkClearDepthStencilValue* clear_depth_stencil_val = &vk_clear_val->depthStencil;
+        clear_depth_stencil_val->depth                    = clear->clear_depth_stencil.clear_depth;
+        clear_depth_stencil_val->stencil = clear->clear_depth_stencil.clear_stencil;
+      }
+    }
+  }
+  const VkRenderPass render_pass = ngfvk_lookup_renderpass(
+      pass_info->render_target,
+      ngfvk_renderpass_ops_key(
+          pass_info->render_target,
+          pass_info->load_ops,
+          pass_info->store_ops));
+  const VkRenderPassBeginInfo begin_info = {
+      .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+      .pNext           = NULL,
+      .framebuffer     = fb,
+      .clearValueCount = clear_value_count,
+      .pClearValues    = vk_clears,
+      .renderPass      = render_pass,
+      .renderArea      = {.offset = {0u, 0u}, .extent = render_extent}};
+  cmd_buf->active_rt         = target;
+  cmd_buf->renderpass_active = true;
+  vkCmdBeginRenderPass(cmd_buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* enc) {
@@ -2442,6 +2502,9 @@ ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* en
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+  vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
+  buf->renderpass_active = false;
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
 }
 
@@ -3233,69 +3296,6 @@ void ngf_destroy_render_target(ngf_render_target target) {
     NGFI_FREEN(target->attachment_pass_descs, target->nattachments);
     NGFI_FREE(target);
   }
-}
-
-#define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
-
-void ngf_cmd_begin_pass(ngf_render_encoder enc, const ngf_pass_info* pass_info) {
-  ngfi_sa_reset(ngfi_tmp_store());
-  ngf_cmd_buffer          buf       = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_swapchain*  swapchain = &CURRENT_CONTEXT->swapchain;
-  const ngf_render_target target    = pass_info->render_target;
-
-  const VkFramebuffer fb =
-      target->is_default ? swapchain->framebuffers[swapchain->image_idx] : target->frame_buffer;
-  const VkExtent2D render_extent = {
-      target->is_default ? CURRENT_CONTEXT->swapchain_info.width : target->width,
-      target->is_default ? CURRENT_CONTEXT->swapchain_info.height : target->height};
-
-  const uint32_t clear_value_count = pass_info->clears ? target->nattachments : 0u;
-  VkClearValue*  vk_clears =
-      clear_value_count > 0
-           ? ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkClearValue) * clear_value_count)
-           : NULL;
-  if (clear_value_count > 0) {
-    for (size_t i = 0; i < clear_value_count; ++i) {
-      VkClearValue*    vk_clear_val = &vk_clears[i];
-      const ngf_clear* clear        = &pass_info->clears[i];
-      if (target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH16 &&
-          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH32 &&
-          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
-        VkClearColorValue* clear_color_var = &vk_clear_val->color;
-        clear_color_var->float32[0]        = clear->clear_color[0];
-        clear_color_var->float32[1]        = clear->clear_color[1];
-        clear_color_var->float32[2]        = clear->clear_color[2];
-        clear_color_var->float32[3]        = clear->clear_color[3];
-      } else {
-        VkClearDepthStencilValue* clear_depth_stencil_val = &vk_clear_val->depthStencil;
-        clear_depth_stencil_val->depth                    = clear->clear_depth_stencil.clear_depth;
-        clear_depth_stencil_val->stencil = clear->clear_depth_stencil.clear_stencil;
-      }
-    }
-  }
-  const VkRenderPass render_pass = ngfvk_lookup_renderpass(
-      pass_info->render_target,
-      ngfvk_renderpass_ops_key(
-          pass_info->render_target,
-          pass_info->load_ops,
-          pass_info->store_ops));
-  const VkRenderPassBeginInfo begin_info = {
-      .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-      .pNext           = NULL,
-      .framebuffer     = fb,
-      .clearValueCount = clear_value_count,
-      .pClearValues    = vk_clears,
-      .renderPass      = render_pass,
-      .renderArea      = {.offset = {0u, 0u}, .extent = render_extent}};
-  buf->active_rt         = target;
-  buf->renderpass_active = true;
-  vkCmdBeginRenderPass(buf->active_bundle.vkcmdbuf, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
-}
-
-void ngf_cmd_end_pass(ngf_render_encoder enc) {
-  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-  vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
-  buf->renderpass_active = false;
 }
 
 void ngf_cmd_draw(
