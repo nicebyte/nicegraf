@@ -2748,6 +2748,7 @@ ngf_error ngf_create_graphics_pipeline(
     ngf_graphics_pipeline*            result) {
   assert(info);
   assert(result);
+  ngfi_sa_reset(ngfi_tmp_store());
   VkVertexInputBindingDescription*   vk_binding_descs = NULL;
   VkVertexInputAttributeDescription* vk_attrib_descs  = NULL;
   ngf_error                          err              = NGF_ERROR_OK;
