@@ -161,8 +161,7 @@ void sample_draw_frame(
   ngf_cmd_buffer_info cmd_info;
   ngf_create_cmd_buffer(&cmd_info, &cmd_buf);
   ngf_start_cmd_buffer(cmd_buf, frame_token);
-  {
-  ngf::render_encoder renc { cmd_buf };
+
   const ngf_attachment_load_op offscreen_load_op = NGF_LOAD_OP_CLEAR;
   const ngf_attachment_store_op offscreen_store_op = NGF_STORE_OP_STORE;
   const ngf_clear offscreen_clear_color  = {
@@ -174,12 +173,14 @@ void sample_draw_frame(
     .store_ops = &offscreen_store_op,
     .clears = &offscreen_clear_color
   };
-  ngf_cmd_begin_pass(renc, &offscreen_pass_info);
-  ngf_cmd_bind_gfx_pipeline(renc, state->offscreen_pipeline);
-  ngf_cmd_viewport(renc, &offsc_viewport);
-  ngf_cmd_scissor(renc, &offsc_viewport);
-  ngf_cmd_draw(renc, false, 0u, 3u, 1u);
-  ngf_cmd_end_pass(renc);
+
+  {
+    ngf::render_encoder renc { cmd_buf, offscreen_pass_info };
+    ngf_cmd_bind_gfx_pipeline(renc, state->offscreen_pipeline);
+    ngf_cmd_viewport(renc, &offsc_viewport);
+    ngf_cmd_scissor(renc, &offsc_viewport);
+    ngf_cmd_draw(renc, false, 0u, 3u, 1u);
+  }
   const ngf_attachment_load_op blit_load_ops[] = {NGF_LOAD_OP_CLEAR, NGF_LOAD_OP_CLEAR};
   const ngf_attachment_store_op blit_store_ops[] = {NGF_STORE_OP_DONTCARE, NGF_STORE_OP_DONTCARE};
   const ngf_clear blit_clears[] = {
@@ -192,15 +193,16 @@ void sample_draw_frame(
     .store_ops = blit_store_ops,
     .clears = blit_clears
   };
-  ngf_cmd_begin_pass(renc, &blit_pass_info);
-  ngf_cmd_bind_gfx_pipeline(renc, state->blit_pipeline);
-  ngf_cmd_viewport(renc, &onsc_viewport);
-  ngf_cmd_scissor(renc, &onsc_viewport);
-  ngf::cmd_bind_resources(renc,
-    ngf::descriptor_set<0>::binding<1>::texture(state->rt_texture.get()),
-    ngf::descriptor_set<0>::binding<2>::sampler(state->sampler.get()));
-  ngf_cmd_draw(renc, false, 0u, 3u, 1u);
-  ngf_cmd_end_pass(renc);
+  {
+    ngf::render_encoder renc {cmd_buf, blit_pass_info};
+    ngf_cmd_bind_gfx_pipeline(renc, state->blit_pipeline);
+    ngf_cmd_viewport(renc, &onsc_viewport);
+    ngf_cmd_scissor(renc, &onsc_viewport);
+    ngf::cmd_bind_resources(
+        renc,
+        ngf::descriptor_set<0>::binding<1>::texture(state->rt_texture.get()),
+        ngf::descriptor_set<0>::binding<2>::sampler(state->sampler.get()));
+    ngf_cmd_draw(renc, false, 0u, 3u, 1u);
   }
   ngf_submit_cmd_buffers(1u, &cmd_buf);
   ngf_destroy_cmd_buffer(cmd_buf);
