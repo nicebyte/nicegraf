@@ -24,7 +24,7 @@
 #include "ngf-common/macros.h"
 #include "ngf-common/native_binding_map.h"
 #include "ngf-common/cmdbuf_state.h"
-#include "nicegraf_wrappers.h"
+#include "nicegraf-wrappers.h"
 
 #include <memory>
 #include <new>
@@ -380,8 +380,34 @@ static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
 #pragma mark ngf_struct_definitions
 
 struct ngf_render_target_t {
-  mutable MTLRenderPassDescriptor *pass_descriptor = nil;
-  uint32_t ncolor_attachments = 0u;
+   ngf_render_target_t(const ngf_attachment_descriptions &attachment_descs,
+                       const ngf_image_ref *img_refs,
+                       uint32_t width,
+                       uint32_t height) :
+    width (width),
+    height(height) {
+      const uint32_t nattachments = attachment_descs.ndescs;
+      ngf_attachment_description* descs =
+      NGFI_ALLOCN(ngf_attachment_description, nattachments);
+      memcpy(descs, attachment_descs.descs,
+             sizeof(ngf_attachment_description) * nattachments);
+      this->attachment_descs.descs = descs;
+      this->attachment_descs.ndescs = nattachments;
+      if (img_refs) {
+        image_refs = NGFI_ALLOCN(ngf_image_ref, nattachments);
+        memcpy(image_refs, img_refs, sizeof(ngf_image_ref) * nattachments);
+      }
+  }
+  
+  ~ngf_render_target_t() {
+    if(attachment_descs.descs) {
+      NGFI_FREEN(image_refs, attachment_descs.ndescs);
+      NGFI_FREEN(attachment_descs.descs, attachment_descs.ndescs);
+    }
+  }
+  
+  ngf_attachment_descriptions attachment_descs;
+  ngf_image_ref *image_refs = nullptr;
   bool is_default = false;
   NSUInteger width;
   NSUInteger height;
@@ -475,8 +501,10 @@ struct ngf_image_t {
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
 class ngfmtl_object_nursery {
 public:
-  explicit ngfmtl_object_nursery(NgfObjType *memory) : ptr_(memory) {
-    new(memory) NgfObjType();
+  template <class... Args>
+  explicit ngfmtl_object_nursery(NgfObjType *memory,
+                                 Args&&... a) : ptr_(memory) {
+    new(memory) NgfObjType(std::forward<Args>(a)...);
   }
   ~ngfmtl_object_nursery() { if(ptr_ != nullptr) { Dtor(ptr_); } }
   NgfObjType* operator->() { return ptr_; }
@@ -683,14 +711,15 @@ struct ngf_context_t {
   id<MTLCommandBuffer> pending_cmd_buffer = nil;
   id<MTLCommandBuffer> last_cmd_buffer = nil;
   dispatch_semaphore_t frame_sync_sem = nil;
+  ngf_render_target default_rt;
 };
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
 
-#define NGFMTL_NURSERY(type, name) \
+#define NGFMTL_NURSERY(type, name, ...) \
 ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
-    name(NGFI_ALLOC(ngf_##type##_t));
+name(NGFI_ALLOC(ngf_##type##_t), ##__VA_ARGS__);
 
 #pragma mark ngf_function_implementations
 
@@ -764,68 +793,12 @@ ngf_error ngf_end_frame(ngf_frame_token) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_default_render_target(
-    ngf_attachment_load_op  color_load_op,
-    ngf_attachment_load_op  depth_load_op,
-    ngf_attachment_store_op color_store_op,
-    ngf_attachment_store_op depth_store_op,
-    const ngf_clear        *clear_color,
-    const ngf_clear        *clear_depth,
-    ngf_render_target     *result) NGF_NOEXCEPT {
-  assert(result);
-  if (CURRENT_CONTEXT->swapchain) {
-    NGFMTL_NURSERY(render_target, rt);
-    rt->is_default = true;
-    rt->ncolor_attachments = 1u;
-    rt->pass_descriptor = [MTLRenderPassDescriptor new];
-    rt->pass_descriptor.colorAttachments[0].texture = nil;
-    rt->pass_descriptor.colorAttachments[0].loadAction =
-        get_mtl_load_action(color_load_op);
-    rt->pass_descriptor.colorAttachments[0].storeAction =
-        CURRENT_CONTEXT->swapchain.is_multusampled()
-          ? MTLStoreActionMultisampleResolve
-          : get_mtl_store_action(color_store_op);
-    if (color_load_op == NGF_LOAD_OP_CLEAR) {
-      assert(clear_color);
-      rt->pass_descriptor.colorAttachments[0].clearColor =
-          MTLClearColorMake(clear_color->clear_color[0],
-                            clear_color->clear_color[1],
-                            clear_color->clear_color[2],
-                            clear_color->clear_color[3]);
-    }
-    const ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.depth_format;
-    if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-      rt->pass_descriptor.depthAttachment =
-          [MTLRenderPassDepthAttachmentDescriptor new];
-      rt->pass_descriptor.depthAttachment.loadAction =
-        get_mtl_load_action(depth_load_op);
-      rt->pass_descriptor.depthAttachment.storeAction =
-          CURRENT_CONTEXT->swapchain.is_multusampled()
-            ? MTLStoreActionDontCare
-            : get_mtl_store_action(depth_store_op);
-      if (depth_load_op == NGF_LOAD_OP_CLEAR) {
-        assert(clear_depth);
-        rt->pass_descriptor.depthAttachment.clearDepth =
-            clear_depth->clear_depth;
-      }
-      if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
-        rt->pass_descriptor.stencilAttachment =
-            [MTLRenderPassStencilAttachmentDescriptor new];
-        rt->pass_descriptor.stencilAttachment.loadAction =
-            get_mtl_load_action(depth_load_op);
-        rt->pass_descriptor.stencilAttachment.storeAction =
-            get_mtl_store_action(depth_store_op);
-      }
-    } else {
-      rt->pass_descriptor.depthAttachment = nil;
-      rt->pass_descriptor.stencilAttachment = nil;
-    }
-    *result = rt.release();
-    return NGF_ERROR_OK;
-  } else {
-    NGFI_DIAG_ERROR("Current context provides no default render target");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
+  return CURRENT_CONTEXT->default_rt;
+}
+
+const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
+  return &CURRENT_CONTEXT->default_rt->attachment_descs;
 }
 
 ngf_error ngf_create_context(const ngf_context_info *info,
@@ -843,16 +816,45 @@ ngf_error ngf_create_context(const ngf_context_info *info,
   } else {
     ctx->queue = [ctx->device newCommandQueue];
   }
-
+  
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
     ngf_error err = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device);
     if (err != NGF_ERROR_OK) return err;
+    ngf_attachment_descriptions attachment_descs;
+    ngf_attachment_description desc_array[3];
+    attachment_descs.descs = desc_array;
+    attachment_descs.ndescs = 1;
+    desc_array[0].format = ctx->swapchain_info.color_format;
+    desc_array[0].is_sampled = false;
+    desc_array[0].type = NGF_ATTACHMENT_COLOR;
+    desc_array[0].sample_count = ctx->swapchain_info.sample_count;
+    if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
+      attachment_descs.ndescs++;
+      desc_array[1].format = ctx->swapchain_info.depth_format;
+      desc_array[1].is_sampled = false;
+      desc_array[1].type =
+      ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8
+      ? NGF_ATTACHMENT_DEPTH_STENCIL
+      : NGF_ATTACHMENT_DEPTH;
+      desc_array[1].sample_count = ctx->swapchain_info.sample_count;
+    }
+    
+    NGFMTL_NURSERY(render_target, default_rt,
+                   attachment_descs,
+                   nullptr,
+                   info->swapchain_info->width,
+                   info->swapchain_info->height);
+    ctx->default_rt = default_rt.release();
+    ctx->default_rt->is_default = true;
   }
  
   ctx->frame_sync_sem =
       dispatch_semaphore_create(ctx->swapchain_info.capacity_hint);
-  *result = ctx.release(); 
+  *result = ctx.release();
+  
+
+  
   return NGF_ERROR_OK;
 }
 
@@ -940,66 +942,36 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT {
   }
 }
 
-void _ngf_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
-                                const ngf_attachment &info) NGF_NOEXCEPT {
-  attachment.texture     = info.image_ref.image->texture;
-  attachment.level       = info.image_ref.mip_level;
-  attachment.slice       = info.image_ref.layer;
-  attachment.loadAction  = get_mtl_load_action(info.load_op);
-  attachment.storeAction = get_mtl_store_action(info.store_op);
+void ngfmtl_attachment_set_common(MTLRenderPassAttachmentDescriptor *attachment,
+                                  uint32_t i,
+                                  ngf_attachment_type type,
+                                  const ngf_render_target rt,
+                                  ngf_attachment_load_op load_op,
+                                  ngf_attachment_store_op store_op) NGF_NOEXCEPT {
+  if (!rt->is_default) {
+    attachment.texture     = rt->image_refs[i].image->texture;
+    attachment.level       = rt->image_refs[i].mip_level;
+    attachment.slice       = rt->image_refs[i].layer;
+  } else {
+    attachment.texture =
+    type == NGF_ATTACHMENT_COLOR
+    ? CURRENT_CONTEXT->frame.color_attachment_texture()
+    : CURRENT_CONTEXT->frame.depth_attachment_texture();
+    attachment.level = 0;
+    attachment.slice = 0;
+  }
+  attachment.loadAction  = get_mtl_load_action(load_op);
+  attachment.storeAction = get_mtl_store_action(store_op);
 }
 
 ngf_error ngf_create_render_target(const ngf_render_target_info *info,
                                    ngf_render_target *result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
-  NGFMTL_NURSERY(render_target, rt);
-  rt->pass_descriptor = [MTLRenderPassDescriptor new];
-  rt->is_default = false;
-  uint32_t color_attachment_idx = 0u;
-  rt->pass_descriptor.depthAttachment.texture = nil;
-  rt->pass_descriptor.stencilAttachment.texture = nil;
-  for (uint32_t a = 0u; a < info->nattachments; ++a) {
-    const ngf_attachment &attachment = info->attachments[a];
-    rt->width = attachment.image_ref.image->texture.width;
-    rt->height = attachment.image_ref.image->texture.height;
-    switch(attachment.type) {
-    case NGF_ATTACHMENT_COLOR: {
-      auto desc = [MTLRenderPassColorAttachmentDescriptor new];
-      _ngf_attachment_set_common(desc, attachment);
-      desc.clearColor = MTLClearColorMake(attachment.clear.clear_color[0],
-                                          attachment.clear.clear_color[1],
-                                          attachment.clear.clear_color[2],
-                                          attachment.clear.clear_color[3]);
-      rt->pass_descriptor.colorAttachments[color_attachment_idx++] =
-          desc;
-      break;
-    }
-    case NGF_ATTACHMENT_DEPTH: {
-      auto desc = [MTLRenderPassDepthAttachmentDescriptor new];
-      _ngf_attachment_set_common(desc, attachment);
-      desc.clearDepth = attachment.clear.clear_depth;
-      rt->pass_descriptor.depthAttachment = desc;
-      if (attachment.image_ref.image->texture.pixelFormat ==
-          MTLPixelFormatDepth32Float_Stencil8) {
-        rt->pass_descriptor.stencilAttachment =
-        [MTLRenderPassStencilAttachmentDescriptor new];
-        _ngf_attachment_set_common(rt->pass_descriptor.stencilAttachment,
-                                   attachment);
-      }
-      break;
-    }
-    case NGF_ATTACHMENT_STENCIL: {
-      assert(false); // TODO: implement
-      break;
-    }
-    case NGF_ATTACHMENT_DEPTH_STENCIL: {
-      assert(false); // TODO: implement
-      break;
-    }
-    }
-  }
-  rt->ncolor_attachments = color_attachment_idx;
+  NGFMTL_NURSERY(render_target, rt, *info->attachment_descriptions,
+                 info->attachment_image_refs,
+                 (uint32_t)info->attachment_image_refs[0].image->texture.width,
+                 (uint32_t)info->attachment_image_refs[0].image->texture.height);
   *result = rt.release();
   return NGF_ERROR_OK;
 }
@@ -1041,50 +1013,44 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   assert(result);
   
   auto *mtl_pipe_desc = [MTLRenderPipelineDescriptor new];
-  const ngf_render_target_t &compatible_rt = *info->compatible_render_target;
-  for (uint32_t ca = 0u; ca < compatible_rt.ncolor_attachments; ++ca) {
-    if (compatible_rt.is_default) {
-      mtl_pipe_desc.colorAttachments[ca].pixelFormat =
-          get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.color_format).format;
-    }
-    else {
-      mtl_pipe_desc.colorAttachments[ca].pixelFormat =
-        compatible_rt.pass_descriptor.colorAttachments[ca].texture.pixelFormat;
-    }
-    mtl_pipe_desc.colorAttachments[ca].blendingEnabled = info->blend->enable;
-    if (info->blend->enable) {
-      mtl_pipe_desc.colorAttachments[ca].sourceRGBBlendFactor =
+  const ngf_attachment_descriptions &attachment_descs =
+    *info->compatible_rt_attachment_descs;
+  uint32_t ncolor_attachments = 0u;
+  for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
+    const ngf_attachment_description &attachment_desc =
+    attachment_descs.descs[i];
+    if (attachment_desc.type  == NGF_ATTACHMENT_COLOR) {
+      MTLRenderPipelineColorAttachmentDescriptor *mtl_attachment_desc =
+      mtl_pipe_desc.colorAttachments[ncolor_attachments++];
+      mtl_attachment_desc.pixelFormat =
+      get_mtl_pixel_format(attachment_desc.format).format;
+      mtl_attachment_desc.blendingEnabled = info->blend->enable;
+      if (info->blend->enable) {
+        mtl_attachment_desc.sourceRGBBlendFactor =
         get_mtl_blend_factor(info->blend->src_color_blend_factor);
-      mtl_pipe_desc.colorAttachments[ca].destinationRGBBlendFactor =
+        mtl_attachment_desc.destinationRGBBlendFactor =
         get_mtl_blend_factor(info->blend->dst_color_blend_factor);
-      mtl_pipe_desc.colorAttachments[ca].sourceAlphaBlendFactor =
+        mtl_attachment_desc.sourceAlphaBlendFactor =
         get_mtl_blend_factor(info->blend->src_alpha_blend_factor);
-      mtl_pipe_desc.colorAttachments[ca].destinationAlphaBlendFactor =
+        mtl_attachment_desc.destinationAlphaBlendFactor =
         get_mtl_blend_factor(info->blend->dst_alpha_blend_factor);
-      mtl_pipe_desc.colorAttachments[ca].rgbBlendOperation =
+        mtl_attachment_desc.rgbBlendOperation =
         get_mtl_blend_operation(info->blend->blend_op_color);
-      mtl_pipe_desc.colorAttachments[ca].alphaBlendOperation =
+        mtl_attachment_desc.alphaBlendOperation =
         get_mtl_blend_operation(info->blend->blend_op_alpha);
+      }
+    } else if (attachment_desc.type == NGF_ATTACHMENT_DEPTH) {
+      mtl_pipe_desc.depthAttachmentPixelFormat =
+      get_mtl_pixel_format(attachment_desc.format).format;
     }
   }
   
   mtl_pipe_desc.rasterSampleCount = info->multisample->sample_count;
 
-  if (compatible_rt.pass_descriptor.depthAttachment.texture) {
-    mtl_pipe_desc.depthAttachmentPixelFormat =
-        compatible_rt.pass_descriptor.depthAttachment.texture.pixelFormat;
-  } else if (compatible_rt.is_default &&
-             CURRENT_CONTEXT->swapchain_info.depth_format !=
-                 NGF_IMAGE_FORMAT_UNDEFINED) {
-    mtl_pipe_desc.depthAttachmentPixelFormat =
-        get_mtl_pixel_format(CURRENT_CONTEXT->swapchain_info.depth_format).format;
-  }
-
   mtl_pipe_desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
 
   if (mtl_pipe_desc.depthAttachmentPixelFormat ==
           MTLPixelFormatDepth32Float_Stencil8) {
-    // TODO support other stencil formats
     mtl_pipe_desc.stencilAttachmentPixelFormat =
         MTLPixelFormatDepth32Float_Stencil8;
   }
@@ -1171,8 +1137,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   if (pipeline->layout.descriptor_set_layouts == nullptr) {
     return NGF_ERROR_OUT_OF_MEM;
   }
-  memset(pipeline->layout.descriptor_set_layouts, 0,
-         sizeof(ngf_descriptor_set_layout_info));
+  memset(descriptor_set_layouts, 0, sizeof(ngf_descriptor_set_layout_info));
   for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
     descriptor_set_layouts[s].ndescriptors =
         info->layout->descriptor_set_layouts[s].ndescriptors;
@@ -1556,20 +1521,118 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) NGF_NO
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buffer,
+                                      const ngf_pass_info* pass_info,
                                       ngf_render_encoder *enc) NGF_NOEXCEPT {
   enc->__handle = 0u;
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  enc->__handle = (uintptr_t)cmd_buf;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
+  enc->__handle = (uintptr_t)cmd_buffer;
+  assert(pass_info);
+  const ngf_render_target rt = pass_info->render_target;
+  assert(rt);
+  assert(cmd_buffer);
+
+  cmd_buffer->renderpass_active = true;
+
+  /* End any current Metal render/blit encoders.*/
+  if (cmd_buffer->active_rce) {
+   [cmd_buffer->active_rce endEncoding];
+   cmd_buffer->active_rce = nil;
+  } else if (cmd_buffer->active_bce) {
+   [cmd_buffer->active_bce endEncoding];
+   cmd_buffer->active_bce = nil;
+  }
+  uint32_t color_attachment_idx = 0u;
+  auto pass_descriptor = [MTLRenderPassDescriptor new];
+  pass_descriptor.renderTargetWidth = rt->width;
+  pass_descriptor.renderTargetHeight=  rt->height;
+  pass_descriptor.depthAttachment = nil;
+  pass_descriptor.stencilAttachment =  nil;
+  for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
+   const ngf_attachment_description &attachment_desc =
+   rt->attachment_descs.descs[i];
+   const ngf_attachment_load_op load_op = pass_info->load_ops[i];
+   const ngf_attachment_store_op store_op = pass_info->store_ops[i];
+   const ngf_clear_info* clear_info =
+     load_op == NGF_LOAD_OP_CLEAR && pass_info->clears
+     ? &pass_info->clears[i]
+     : nullptr;
+   switch(attachment_desc.type) {
+     case NGF_ATTACHMENT_COLOR: {
+       auto mtl_desc = [MTLRenderPassColorAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_desc,
+                                    i,
+                                    attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info) {
+         mtl_desc.clearColor = MTLClearColorMake(clear_info->clear_color[0],
+                                                 clear_info->clear_color[1],
+                                                 clear_info->clear_color[2],
+                                                 clear_info->clear_color[3]);
+       }
+       mtl_desc.resolveTexture =
+       rt->is_default
+       ? CURRENT_CONTEXT->frame.resolve_attachment_texture()
+       : nil;
+       if (mtl_desc.resolveTexture) {
+         // Override user-specified store action
+         mtl_desc.storeAction = MTLStoreActionMultisampleResolve;
+       }
+       pass_descriptor.colorAttachments[color_attachment_idx++] =
+       mtl_desc;
+       break;
+     }
+     case NGF_ATTACHMENT_DEPTH: {
+       auto mtl_desc = [MTLRenderPassDepthAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_desc, i, attachment_desc.type, rt,
+                                    load_op, store_op);
+       if (clear_info)  {
+         mtl_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
+       }
+       pass_descriptor.depthAttachment = mtl_desc;
+       break;
+     }
+     case NGF_ATTACHMENT_DEPTH_STENCIL: {
+       auto mtl_depth_desc = [MTLRenderPassDepthAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_depth_desc, i, attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info)  {
+         mtl_depth_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
+       }
+       pass_descriptor.depthAttachment = mtl_depth_desc;
+       auto mtl_stencil_desc = [MTLRenderPassStencilAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_stencil_desc, i, attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info) {
+         mtl_stencil_desc.clearStencil =
+         clear_info->clear_depth_stencil.clear_stencil;
+       }
+       pass_descriptor.stencilAttachment = mtl_stencil_desc;
+       break;
+     }
+   }
+  }
+
+  cmd_buffer->active_rce =
+     [cmd_buffer->mtl_cmd_buffer
+      renderCommandEncoderWithDescriptor:pass_descriptor];
+  cmd_buffer->active_rt = rt;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
-  if (cmd_buf->active_rce){
-    [cmd_buf->active_rce endEncoding];
-    cmd_buf->active_rce = nil;
+  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
+  cmd_buffer->renderpass_active = false;
+  [cmd_buffer->active_rce endEncoding];
+  cmd_buffer->active_rce = nil;
+  cmd_buffer->active_pipe = nullptr;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  if (cmd_buffer->active_rce){
+    [cmd_buffer->active_rce endEncoding];
+    cmd_buffer->active_rce = nil;
   }
   return NGF_ERROR_OK;
 }
@@ -1590,46 +1653,6 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT {
     cmd_buf->active_bce = nil;
   }
   return NGF_ERROR_OK;
-}
-
-void ngf_cmd_begin_pass(ngf_render_encoder enc,
-                        const ngf_render_target rt) NGF_NOEXCEPT {
-  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
-  cmd_buffer->renderpass_active = true;
-  if (cmd_buffer->active_rce) {
-    [cmd_buffer->active_rce endEncoding];
-    cmd_buffer->active_rce = nil;
-  } else if (cmd_buffer->active_bce) {
-    [cmd_buffer->active_bce endEncoding];
-    cmd_buffer->active_bce = nil;
-  }
-  if (rt->is_default) {
-    assert(CURRENT_CONTEXT->frame.color_drawable);
-    rt->pass_descriptor.colorAttachments[0].texture =
-      CURRENT_CONTEXT->frame.color_attachment_texture();
-    rt->pass_descriptor.colorAttachments[0].resolveTexture =
-      CURRENT_CONTEXT->frame.resolve_attachment_texture();
-    ngf_image_format dfmt = CURRENT_CONTEXT->swapchain_info.depth_format;
-    if (dfmt != NGF_IMAGE_FORMAT_UNDEFINED) {
-      id<MTLTexture> depth_tex = CURRENT_CONTEXT->frame.depth_attachment_texture();
-      rt->pass_descriptor.depthAttachment.texture = depth_tex;
-      if (dfmt == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
-        rt->pass_descriptor.stencilAttachment.texture = depth_tex;
-      }
-    }
-  }
-  cmd_buffer->active_rce =
-      [cmd_buffer->mtl_cmd_buffer
-       renderCommandEncoderWithDescriptor:rt->pass_descriptor];
-  cmd_buffer->active_rt = rt;
-}
-
-void ngf_cmd_end_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
-  cmd_buffer->renderpass_active = false;
-  [cmd_buffer->active_rce endEncoding];
-  cmd_buffer->active_rce = nil;
-  cmd_buffer->active_pipe = nullptr;
 }
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
