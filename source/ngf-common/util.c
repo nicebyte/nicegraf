@@ -20,9 +20,8 @@
  * IN THE SOFTWARE.
  */
 
-#include "nicegraf_util.h"
-
 #include "ngf-common/macros.h"
+#include "nicegraf-util.h"
 
 #include <assert.h>
 #include <string.h>
@@ -34,13 +33,11 @@
 #include <arpa/inet.h>
 #endif
 
-void ngf_util_create_default_graphics_pipeline_data(
-    const ngf_irect2d*               window_size,
-    ngf_util_graphics_pipeline_data* result) {
-  NGFI_IGNORE_VAR(window_size);
+void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result) {
   ngf_blend_info bi;
-  bi.enable                        = false;
-  result->blend_info               = bi;
+  bi.enable          = false;
+  result->blend_info = bi;
+
   ngf_stencil_info default_stencil = {
       .fail_op       = NGF_STENCIL_OP_KEEP,
       .pass_op       = NGF_STENCIL_OP_KEEP,
@@ -59,23 +56,29 @@ void ngf_util_create_default_graphics_pipeline_data(
       .front_stencil = default_stencil,
       .back_stencil  = default_stencil};
   result->depth_stencil_info = dsi;
-  ngf_vertex_input_info vii  = {.nattribs = 0, .nvert_buf_bindings = 0};
-  result->vertex_input_info  = vii;
-  ngf_multisample_info msi   = {.sample_count = NGF_SAMPLE_COUNT_1, .alpha_to_coverage = false};
-  result->multisample_info   = msi;
-  ngf_rasterization_info ri  = {
+
+  ngf_vertex_input_info vii = {.nattribs = 0, .nvert_buf_bindings = 0};
+  result->vertex_input_info = vii;
+
+  ngf_multisample_info msi = {.sample_count = NGF_SAMPLE_COUNT_1, .alpha_to_coverage = false};
+  result->multisample_info = msi;
+
+  ngf_rasterization_info ri = {
       .cull_mode    = NGF_CULL_MODE_NONE,
       .discard      = false,
       .front_face   = NGF_FRONT_FACE_COUNTER_CLOCKWISE,
       .polygon_mode = NGF_POLYGON_MODE_FILL};
-  result->rasterization_info  = ri;
+  result->rasterization_info = ri;
+
   ngf_specialization_info spi = {
       .specializations  = NULL,
       .nspecializations = 0u,
       .value_buffer     = NULL};
-  result->spec_info              = spi;
-  ngf_pipeline_layout_info pli   = {.ndescriptor_set_layouts = 0u, .descriptor_set_layouts = NULL};
-  result->layout_info            = pli;
+  result->spec_info = spi;
+
+  ngf_pipeline_layout_info pli = {.ndescriptor_set_layouts = 0u, .descriptor_set_layouts = NULL};
+  result->layout_info          = pli;
+
   ngf_graphics_pipeline_info gpi = {
       .blend          = &result->blend_info,
       .depth_stencil  = &result->depth_stencil_info,
