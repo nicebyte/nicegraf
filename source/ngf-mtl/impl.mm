@@ -1521,20 +1521,118 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) NGF_NO
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buf,
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buffer,
+                                      const ngf_pass_info* pass_info,
                                       ngf_render_encoder *enc) NGF_NOEXCEPT {
   enc->__handle = 0u;
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  enc->__handle = (uintptr_t)cmd_buf;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
+  enc->__handle = (uintptr_t)cmd_buffer;
+  assert(pass_info);
+  const ngf_render_target rt = pass_info->render_target;
+  assert(rt);
+  assert(cmd_buffer);
+
+  cmd_buffer->renderpass_active = true;
+
+  /* End any current Metal render/blit encoders.*/
+  if (cmd_buffer->active_rce) {
+   [cmd_buffer->active_rce endEncoding];
+   cmd_buffer->active_rce = nil;
+  } else if (cmd_buffer->active_bce) {
+   [cmd_buffer->active_bce endEncoding];
+   cmd_buffer->active_bce = nil;
+  }
+  uint32_t color_attachment_idx = 0u;
+  auto pass_descriptor = [MTLRenderPassDescriptor new];
+  pass_descriptor.renderTargetWidth = rt->width;
+  pass_descriptor.renderTargetHeight=  rt->height;
+  pass_descriptor.depthAttachment = nil;
+  pass_descriptor.stencilAttachment =  nil;
+  for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
+   const ngf_attachment_description &attachment_desc =
+   rt->attachment_descs.descs[i];
+   const ngf_attachment_load_op load_op = pass_info->load_ops[i];
+   const ngf_attachment_store_op store_op = pass_info->store_ops[i];
+   const ngf_clear_info* clear_info =
+     load_op == NGF_LOAD_OP_CLEAR && pass_info->clears
+     ? &pass_info->clears[i]
+     : nullptr;
+   switch(attachment_desc.type) {
+     case NGF_ATTACHMENT_COLOR: {
+       auto mtl_desc = [MTLRenderPassColorAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_desc,
+                                    i,
+                                    attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info) {
+         mtl_desc.clearColor = MTLClearColorMake(clear_info->clear_color[0],
+                                                 clear_info->clear_color[1],
+                                                 clear_info->clear_color[2],
+                                                 clear_info->clear_color[3]);
+       }
+       mtl_desc.resolveTexture =
+       rt->is_default
+       ? CURRENT_CONTEXT->frame.resolve_attachment_texture()
+       : nil;
+       if (mtl_desc.resolveTexture) {
+         // Override user-specified store action
+         mtl_desc.storeAction = MTLStoreActionMultisampleResolve;
+       }
+       pass_descriptor.colorAttachments[color_attachment_idx++] =
+       mtl_desc;
+       break;
+     }
+     case NGF_ATTACHMENT_DEPTH: {
+       auto mtl_desc = [MTLRenderPassDepthAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_desc, i, attachment_desc.type, rt,
+                                    load_op, store_op);
+       if (clear_info)  {
+         mtl_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
+       }
+       pass_descriptor.depthAttachment = mtl_desc;
+       break;
+     }
+     case NGF_ATTACHMENT_DEPTH_STENCIL: {
+       auto mtl_depth_desc = [MTLRenderPassDepthAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_depth_desc, i, attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info)  {
+         mtl_depth_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
+       }
+       pass_descriptor.depthAttachment = mtl_depth_desc;
+       auto mtl_stencil_desc = [MTLRenderPassStencilAttachmentDescriptor new];
+       ngfmtl_attachment_set_common(mtl_stencil_desc, i, attachment_desc.type,
+                                    rt,
+                                    load_op, store_op);
+       if (clear_info) {
+         mtl_stencil_desc.clearStencil =
+         clear_info->clear_depth_stencil.clear_stencil;
+       }
+       pass_descriptor.stencilAttachment = mtl_stencil_desc;
+       break;
+     }
+   }
+  }
+
+  cmd_buffer->active_rce =
+     [cmd_buffer->mtl_cmd_buffer
+      renderCommandEncoderWithDescriptor:pass_descriptor];
+  cmd_buffer->active_rt = rt;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
-  if (cmd_buf->active_rce){
-    [cmd_buf->active_rce endEncoding];
-    cmd_buf->active_rce = nil;
+  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
+  cmd_buffer->renderpass_active = false;
+  [cmd_buffer->active_rce endEncoding];
+  cmd_buffer->active_rce = nil;
+  cmd_buffer->active_pipe = nullptr;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  if (cmd_buffer->active_rce){
+    [cmd_buffer->active_rce endEncoding];
+    cmd_buffer->active_rce = nil;
   }
   return NGF_ERROR_OK;
 }
@@ -1555,113 +1653,6 @@ ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT {
     cmd_buf->active_bce = nil;
   }
   return NGF_ERROR_OK;
-}
-
-void ngf_cmd_begin_pass(ngf_render_encoder enc,
-                        const ngf_pass_info *pass_info) NGF_NOEXCEPT {
-  assert(pass_info);
-  const ngf_render_target rt = pass_info->render_target;
-  assert(rt);
-  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
-  assert(cmd_buffer);
-  
-  cmd_buffer->renderpass_active = true;
-  
-  /* End any current Metal render/blit encoders.
-   */
-  if (cmd_buffer->active_rce) {
-    [cmd_buffer->active_rce endEncoding];
-    cmd_buffer->active_rce = nil;
-  } else if (cmd_buffer->active_bce) {
-    [cmd_buffer->active_bce endEncoding];
-    cmd_buffer->active_bce = nil;
-  }
-  uint32_t color_attachment_idx = 0u;
-  auto pass_descriptor = [MTLRenderPassDescriptor new];
-  pass_descriptor.renderTargetWidth = rt->width;
-  pass_descriptor.renderTargetHeight=  rt->height;
-  pass_descriptor.depthAttachment = nil;
-  pass_descriptor.stencilAttachment =  nil;
-  for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
-    const ngf_attachment_description &attachment_desc =
-    rt->attachment_descs.descs[i];
-    const ngf_attachment_load_op load_op = pass_info->load_ops[i];
-    const ngf_attachment_store_op store_op = pass_info->store_ops[i];
-    const ngf_clear_info* clear_info =
-      load_op == NGF_LOAD_OP_CLEAR && pass_info->clears
-      ? &pass_info->clears[i]
-      : nullptr;
-    switch(attachment_desc.type) {
-      case NGF_ATTACHMENT_COLOR: {
-        auto mtl_desc = [MTLRenderPassColorAttachmentDescriptor new];
-        ngfmtl_attachment_set_common(mtl_desc,
-                                     i,
-                                     attachment_desc.type,
-                                     rt,
-                                     load_op, store_op);
-        if (clear_info) {
-          mtl_desc.clearColor = MTLClearColorMake(clear_info->clear_color[0],
-                                                  clear_info->clear_color[1],
-                                                  clear_info->clear_color[2],
-                                                  clear_info->clear_color[3]);
-        }
-        mtl_desc.resolveTexture =
-        rt->is_default
-        ? CURRENT_CONTEXT->frame.resolve_attachment_texture()
-        : nil;
-        if (mtl_desc.resolveTexture) {
-          // Override user-specified store action
-          mtl_desc.storeAction = MTLStoreActionMultisampleResolve;
-        }
-        pass_descriptor.colorAttachments[color_attachment_idx++] =
-        mtl_desc;
-        break;
-      }
-      case NGF_ATTACHMENT_DEPTH: {
-        auto mtl_desc = [MTLRenderPassDepthAttachmentDescriptor new];
-        ngfmtl_attachment_set_common(mtl_desc, i, attachment_desc.type, rt,
-                                     load_op, store_op);
-        if (clear_info)  {
-          mtl_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
-        }
-        pass_descriptor.depthAttachment = mtl_desc;
-        break;
-      }
-      case NGF_ATTACHMENT_DEPTH_STENCIL: {
-        auto mtl_depth_desc = [MTLRenderPassDepthAttachmentDescriptor new];
-        ngfmtl_attachment_set_common(mtl_depth_desc, i, attachment_desc.type,
-                                     rt,
-                                     load_op, store_op);
-        if (clear_info)  {
-          mtl_depth_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth;
-        }
-        pass_descriptor.depthAttachment = mtl_depth_desc;
-        auto mtl_stencil_desc = [MTLRenderPassStencilAttachmentDescriptor new];
-        ngfmtl_attachment_set_common(mtl_stencil_desc, i, attachment_desc.type,
-                                     rt,
-                                     load_op, store_op);
-        if (clear_info) {
-          mtl_stencil_desc.clearStencil =
-          clear_info->clear_depth_stencil.clear_stencil;
-        }
-        pass_descriptor.stencilAttachment = mtl_stencil_desc;
-        break;
-      }
-    }
-  }
-
-  cmd_buffer->active_rce =
-      [cmd_buffer->mtl_cmd_buffer
-       renderCommandEncoderWithDescriptor:pass_descriptor];
-  cmd_buffer->active_rt = rt;
-}
-
-void ngf_cmd_end_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
-  cmd_buffer->renderpass_active = false;
-  [cmd_buffer->active_rce endEncoding];
-  cmd_buffer->active_rce = nil;
-  cmd_buffer->active_pipe = nullptr;
 }
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc,
