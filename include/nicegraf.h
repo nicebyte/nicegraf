@@ -1471,7 +1471,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
  * @param buf The buffer to create the encoder for. Must be in the "ready"
  *            state, will be transitioned to the "recording" state.
  */
-ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf, ngf_render_encoder* enc) NGF_NOEXCEPT;
+ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer buf, const ngf_pass_info* pass_info,
+                                      ngf_render_encoder* enc) NGF_NOEXCEPT;
 
 /**
  * Starts a new encoder for transfer commands associated with the given
@@ -1516,8 +1517,6 @@ void ngf_cmd_bind_index_buffer(
     ngf_render_encoder     buf,
     const ngf_index_buffer idxbuf,
     ngf_type               index_type) NGF_NOEXCEPT;
-void ngf_cmd_begin_pass(ngf_render_encoder buf, const ngf_pass_info* pass_info) NGF_NOEXCEPT;
-void ngf_cmd_end_pass(ngf_render_encoder buf) NGF_NOEXCEPT;
 void ngf_cmd_draw(
     ngf_render_encoder buf,
     bool               indexed,

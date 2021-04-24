@@ -124,8 +124,8 @@ NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
 class render_encoder {
   public:
-  explicit render_encoder(ngf_cmd_buffer cmd_buf) {
-    ngf_cmd_buffer_start_render(cmd_buf, &enc_);
+  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info) {
+    ngf_cmd_buffer_start_render(cmd_buf, &pass_info, &enc_);
   }
 
   ~render_encoder() {

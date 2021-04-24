@@ -110,8 +110,6 @@ void sample_draw_frame(
     /**
      * Start a new render encoder.
      */
-    ngf_render_encoder renc;
-    ngf_cmd_buffer_start_render(cmdbuf, &renc);
     constexpr ngf_attachment_load_op load_ops[2] = { NGF_LOAD_OP_CLEAR, NGF_LOAD_OP_CLEAR };
     constexpr ngf_attachment_store_op store_ops[2] = { NGF_STORE_OP_STORE, NGF_STORE_OP_DONTCARE }; 
     constexpr ngf_clear clears[2] = {
@@ -128,7 +126,8 @@ void sample_draw_frame(
       .store_ops = store_ops,
       .clears = clears,
     };
-    ngf_cmd_begin_pass(renc, &pass);
+    ngf_render_encoder renc;
+    ngf_cmd_buffer_start_render(cmdbuf, &pass, &renc);
     ngf_cmd_bind_gfx_pipeline(renc, data->pipeline.get());
     const ngf_irect2d viewport {0, 0, w, h};
     ngf_cmd_viewport(renc, &viewport);
@@ -141,11 +140,6 @@ void sample_draw_frame(
 
     /**
      * Finish the render pass. 
-     */
-    ngf_cmd_end_pass(renc);
-
-    /**
-     * End the encoder and submit the pending commands.  
      */
     ngf_render_encoder_end(renc);
     ngf_submit_cmd_buffers(1, &cmdbuf);
