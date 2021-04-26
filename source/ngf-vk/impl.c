@@ -3218,7 +3218,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       assert(false);
     }
 
-    const ngf_image attachment_img   = info->attachment_image_refs->image;
+    const ngf_image attachment_img   = info->attachment_image_refs[a].image;
     const bool is_attachment_sampled = attachment_img->usage_flags | NGF_IMAGE_USAGE_SAMPLE_FROM;
     attachment_pass_desc->is_resolve = false;
     attachment_pass_desc->initial_layout = is_attachment_sampled
@@ -3227,8 +3227,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     attachment_pass_desc->final_layout   = is_attachment_sampled
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                : attachment_pass_desc->layout;
-    attachment_views[a] =
-        info->attachment_image_refs->image->vkview;  // TODO: use the specified subresource.
+    attachment_views[a] = attachment_img->vkview;  // TODO: use the specified subresource.
   }
 
   const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_CLEAR;
