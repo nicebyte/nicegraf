@@ -141,7 +141,7 @@ else()
     # Add Vulkan header directory to nicegraf_vk include paths.
     target_include_directories(nicegraf_vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
   else()
-    message(WARNING "nicegraf Vulkan backend will not be built because Vulkan SDK was not found.")
+    message(WARNING "Vulkan headers not found - will not build nicegraf-vk.")
   endif()
 endif()
 

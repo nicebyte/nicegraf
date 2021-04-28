@@ -2,13 +2,16 @@ cmake_minimum_required(VERSION 3.0.2)
 
 project(vma)
 
-find_package(Vulkan REQUIRED)
-get_property(VK_INCLUDE_PATH TARGET Vulkan::Vulkan PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
+find_package(VulkanHeaders REQUIRED)
 
-add_library(vma STATIC
-    ${CMAKE_CURRENT_LIST_DIR}/src/vk_mem_alloc.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/vk_mem_alloc.h)
+if ( ${VulkanHeaders_FOUND} )
+    add_library(vma STATIC
+        ${CMAKE_CURRENT_LIST_DIR}/src/vk_mem_alloc.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/src/vk_mem_alloc.h)
 
-target_include_directories(vma PRIVATE ${VK_INCLUDE_PATH})
-target_include_directories(vma PUBLIC
-    ${CMAKE_CURRENT_LIST_DIR}/src)
+    target_include_directories(vma PRIVATE ${VulkanHeaders_INCLUDE_DIR})
+    target_include_directories(vma PUBLIC
+        ${CMAKE_CURRENT_LIST_DIR}/src)
+else()
+    message(WARNING "Vulkan headers not found - will not build VMA.")
+endif()
