@@ -27,6 +27,8 @@ project(nicegraf)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
 # These are the compiler flags that are used on all nicegraf targets.
 if(WIN32)
     set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
@@ -115,10 +117,10 @@ if (APPLE)
               COPTS "-fobjc-arc")
 else()
   # Try searching for Vulkan SDK.
-  find_package(Vulkan)
+  find_package(VulkanHeaders)
 
   # Only build the Vulkan backend if the Vulkan SDK is present.
-  if ( Vulkan_FOUND )
+  if ( ${VulkanHeaders_FOUND} )
     # Import VMA for handling vulkan memory allocation.
     add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
@@ -137,8 +139,7 @@ else()
                 DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 
     # Add Vulkan header directory to nicegraf_vk include paths.
-    get_property(VK_INCLUDE_PATH TARGET Vulkan::Vulkan PROPERTY INTERFACE_INCLUDE_DIRECTORIES)
-    target_include_directories(nicegraf_vk PRIVATE ${VK_INCLUDE_PATH})
+    target_include_directories(nicegraf_vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
   else()
     message(WARNING "nicegraf Vulkan backend will not be built because Vulkan SDK was not found.")
   endif()
