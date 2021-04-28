@@ -2184,8 +2184,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     // Create the default rendertarget object.
     const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
     const bool default_rt_is_multisampled = swapchain_info->sample_count > 1u;
-    const bool default_rt_no_stencil =
-        swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 || NGF_IMAGE_FORMAT_DEPTH16;
+    const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
+                                       swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
 
     ctx->default_render_target = NGFI_ALLOC(struct ngf_render_target_t);
     if (ctx->default_render_target == NULL) {
@@ -3219,7 +3219,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     }
 
     const ngf_image attachment_img   = info->attachment_image_refs[a].image;
-    const bool is_attachment_sampled = attachment_img->usage_flags | NGF_IMAGE_USAGE_SAMPLE_FROM;
+    const bool is_attachment_sampled = attachment_img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM;
     attachment_pass_desc->is_resolve = false;
     attachment_pass_desc->initial_layout = is_attachment_sampled
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
@@ -3236,7 +3236,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   for (uint32_t a = 0u; a < info->attachment_descriptions->ndescs; ++a) {
     ngfvk_attachment_pass_desc* attachment_pass_desc = &vk_attachment_pass_descs[a];
     attachment_pass_desc->load_op                    = get_vk_load_op(load_op);
-    attachment_pass_desc->store_op                   = get_vk_load_op(store_op);
+    attachment_pass_desc->store_op                   = get_vk_store_op(store_op);
   }
   const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
       info->attachment_descriptions->ndescs,
