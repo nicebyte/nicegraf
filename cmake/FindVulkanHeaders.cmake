@@ -67,17 +67,10 @@ if(DEFINED VULKAN_HEADERS_INSTALL_DIR)
       NAMES vulkan/vulkan.h
       HINTS ${VULKAN_HEADERS_INSTALL_DIR}/include
       NO_CMAKE_FIND_ROOT_PATH)
-  find_path(VulkanRegistry_DIR
-      NAMES vk.xml
-      HINTS ${VULKAN_HEADERS_INSTALL_DIR}/share/vulkan/registry
-      NO_CMAKE_FIND_ROOT_PATH)
 else()
   # If VULKAN_HEADERS_INSTALL_DIR, or one of its variants was not specified,
   # do a normal search without hints.
   find_path(VulkanHeaders_INCLUDE_DIR NAMES vulkan/vulkan.h HINTS "${CMAKE_CURRENT_SOURCE_DIR}/external/Vulkan-Headers/include" NO_CMAKE_FIND_ROOT_PATH)
-  get_filename_component(VULKAN_REGISTRY_PATH_HINT ${VulkanHeaders_INCLUDE_DIR} DIRECTORY)
-  find_path(VulkanRegistry_DIR NAMES vk.xml HINTS ${VULKAN_REGISTRY_PATH_HINT}/share/vulkan/registry
-    "${VULKAN_REGISTRY_PATH_HINT}/registry" NO_CMAKE_FIND_ROOT_PATH)
 endif()
 
 set(VulkanHeaders_INCLUDE_DIRS ${VulkanHeaders_INCLUDE_DIR})
@@ -87,11 +80,6 @@ include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(VulkanHeaders
     DEFAULT_MSG
     VulkanHeaders_INCLUDE_DIR)
-set(FPHSA_NAME_MISMATCHED TRUE)
-find_package_handle_standard_args(VulkanRegistry
-    DEFAULT_MSG
-    VulkanRegistry_DIR)
-unset(FPHSA_NAME_MISMATCHED)
 
 mark_as_advanced(VulkanHeaders_INCLUDE_DIR VulkanRegistry_DIR)
 
