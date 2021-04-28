@@ -871,6 +871,8 @@ ngf_error ngf_resize_context(ngf_context ctx,
   assert(ctx);
   ctx->swapchain_info.width = new_width;
   ctx->swapchain_info.height = new_height;
+  ctx->default_rt->width = new_width;
+  ctx->default_rt->height = new_height;
   return ctx->swapchain.resize(ctx->swapchain_info);
 }
 
