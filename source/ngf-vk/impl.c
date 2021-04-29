@@ -331,22 +331,21 @@ static VkSamplerMipmapMode get_vk_mipmode(ngf_sampler_filter filter) {
   return vkmipmodes[filter];
 }
 
-static VkSampleCountFlagBits get_vk_sample_count(uint32_t sample_count) {
+static VkSampleCountFlagBits get_vk_sample_count(ngf_sample_count sample_count) {
   switch (sample_count) {
-  case 0u:
-  case 1u:
+  case NGF_SAMPLE_COUNT_1:
     return VK_SAMPLE_COUNT_1_BIT;
-  case 2u:
+  case NGF_SAMPLE_COUNT_2:
     return VK_SAMPLE_COUNT_2_BIT;
-  case 4u:
+  case NGF_SAMPLE_COUNT_4:
     return VK_SAMPLE_COUNT_4_BIT;
-  case 8u:
+  case NGF_SAMPLE_COUNT_8:
     return VK_SAMPLE_COUNT_8_BIT;
-  case 16u:
+  case NGF_SAMPLE_COUNT_16:
     return VK_SAMPLE_COUNT_16_BIT;
-  case 32u:
+  case NGF_SAMPLE_COUNT_32:
     return VK_SAMPLE_COUNT_32_BIT;
-  case 64u:
+  case NGF_SAMPLE_COUNT_64:
     return VK_SAMPLE_COUNT_64_BIT;
   default:
     assert(false);  // TODO: return error?
@@ -983,7 +982,7 @@ static ngf_error ngfvk_create_swapchain(
         .type   = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
-        .sample_count = (ngf_sample_count)get_vk_sample_count(swapchain_info->sample_count),
+        .sample_count = swapchain_info->sample_count,
         .format       = swapchain_info->depth_format,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
