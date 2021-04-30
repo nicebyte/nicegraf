@@ -3294,6 +3294,11 @@ void ngf_destroy_render_target(ngf_render_target target) {
     NGFI_FREEN(target->attachment_descs, target->nattachments);
     NGFI_FREEN(target->attachment_pass_descs, target->nattachments);
     NGFI_FREE(target);
+
+    // clear out the entire renderpass cache to make sure the entries associated
+    // with this target don't stick around.
+    // TODO: clear out all caches across all contexts.
+    NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->renderpass_cache);
   }
 }
 
