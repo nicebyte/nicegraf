@@ -110,7 +110,7 @@ if (APPLE)
   find_library(APPLE_METAL Metal)
   find_library(APPLE_COCOA Cocoa)
   find_library(APPLE_QUARTZ Quartz)
-  ngf_library(NAME nicegraf_mtl
+  ngf_library(NAME nicegraf-mtl
               SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                    ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
               DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
@@ -132,14 +132,14 @@ else()
     endif()
 
     # Vulkan backend.
-    ngf_library(NAME nicegraf_vk
+    ngf_library(NAME nicegraf-vk
                 SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
                 DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 
-    # Add Vulkan header directory to nicegraf_vk include paths.
-    target_include_directories(nicegraf_vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
+    # Add Vulkan header directory to nicegraf-vk include paths.
+    target_include_directories(nicegraf-vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
   else()
     message(WARNING "Vulkan headers not found - will not build nicegraf-vk.")
   endif()
@@ -210,10 +210,9 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
 
     # Determine the backend to build the samples with based on the platform.
     if (WIN32)
-        set(NGF_SAMPLES_BACKEND nicegraf_vk)
+        set(NGF_SAMPLES_BACKEND nicegraf-vk)
         set(NGF_SAMPLES_PLATFORM_SOURCE ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/windows/window.cpp)
     else()
-        #set(NGF_SAMPLES_BACKEND nicegraf_mtl)
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
     string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
