@@ -24,6 +24,7 @@
 #include "ngf-common/macros.h"
 #include "ngf-common/native_binding_map.h"
 #include "ngf-common/cmdbuf_state.h"
+#include "ngf-common/stack_alloc.h"
 #include "nicegraf-wrappers.h"
 
 #include <memory>
@@ -1523,9 +1524,55 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer *cmd_buffers) NGF_NO
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buffer,
-                                      const ngf_pass_info* pass_info,
-                                      ngf_render_encoder *enc) NGF_NOEXCEPT {
+ngf_error ngf_cmd_begin_render_pass_simple(ngf_cmd_buffer cmd_buf,
+                                           ngf_render_target rt,
+                                           float clear_color_r,
+                                           float clear_color_g,
+                                           float clear_color_b,
+                                           float clear_color_a,
+                                           float clear_depth,
+                                           uint32_t clear_stencil,
+                                           ngf_render_encoder* enc) NGF_NOEXCEPT {
+  ngfi_sa_reset(ngfi_tmp_store());
+  const uint32_t nattachments = rt->attachment_descs.ndescs;
+  auto load_ops =
+      (ngf_attachment_load_op*)
+      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_load_op) *
+                    nattachments);
+  auto store_ops =
+      (ngf_attachment_store_op*)
+      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_store_op) * nattachments);
+  auto clears =
+    (ngf_clear*)
+    ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_clear) * nattachments);
+  
+  for (size_t i = 0u; i < nattachments; ++i) {
+    load_ops[i] = NGF_LOAD_OP_CLEAR;
+    if (rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR) {
+      clears[i].clear_color[0] = clear_color_r;
+      clears[i].clear_color[0] = clear_color_g;
+      clears[i].clear_color[0] = clear_color_b;
+      clears[i].clear_color[0] = clear_color_a;
+    } else if (rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_DEPTH) {
+      clears[i].clear_depth_stencil.clear_depth = clear_depth;
+      clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
+    } else {
+      assert(false);
+    }
+    store_ops[i] = rt->attachment_descs.descs[i].is_sampled ? NGF_STORE_OP_STORE : NGF_STORE_OP_DONTCARE;
+  }
+  const ngf_pass_info pass_info = {
+    .render_target = rt,
+    .load_ops = load_ops,
+    .store_ops = store_ops,
+    .clears = clears
+  };
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+}
+
+ngf_error ngf_cmd_begin_render_pass(ngf_cmd_buffer cmd_buffer,
+                                    const ngf_pass_info* pass_info,
+                                    ngf_render_encoder *enc) NGF_NOEXCEPT {
   enc->__handle = 0u;
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)cmd_buffer;
@@ -1625,7 +1672,7 @@ ngf_error ngf_cmd_buffer_start_render(ngf_cmd_buffer cmd_buffer,
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
+ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   auto cmd_buffer = (ngf_cmd_buffer)enc.__handle;
   cmd_buffer->renderpass_active = false;
   [cmd_buffer->active_rce endEncoding];
@@ -1639,15 +1686,15 @@ ngf_error ngf_render_encoder_end(ngf_render_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf,
-                                    ngf_xfer_encoder *enc) NGF_NOEXCEPT {
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf,
+                                  ngf_xfer_encoder *enc) NGF_NOEXCEPT {
   enc->__handle = 0u;
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   enc->__handle = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) NGF_NOEXCEPT {
+ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   if (cmd_buf->active_bce) {
