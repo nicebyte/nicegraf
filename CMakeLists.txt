@@ -81,13 +81,14 @@ set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native_binding_map.c
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c)
+
 
 if (NOT APPLE)
     set(NGF_INTERNAL_SRCS ${NGF_INTERNAL_SRCS}
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c)
 endif()
 
