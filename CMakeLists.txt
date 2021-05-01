@@ -216,6 +216,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
     string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
+    string(REPLACE "-" "_" NGF_SAMPLES_BACKEND_DEFINE ${NGF_SAMPLES_BACKEND_DEFINE})
 
     ngf_library(NAME ngf-samples-common
                 SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
