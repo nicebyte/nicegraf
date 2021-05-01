@@ -2441,7 +2441,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float             clear_color_b,
     float             clear_color_a,
     float             clear_depth,
-    int               clear_stencil,
+    uint32_t          clear_stencil,
     ngf_render_encoder* enc) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_attachment_load_op* load_ops =

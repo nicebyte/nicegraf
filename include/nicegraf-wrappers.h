@@ -136,7 +136,7 @@ class render_encoder {
       float             clear_color_b,
       float             clear_color_a,
       float             clear_depth,
-      int               clear_stencil) {
+      uint32_t          clear_stencil) {
     ngf_cmd_begin_render_pass_simple(
         cmd_buf,
         rt,
