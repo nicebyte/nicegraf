@@ -2433,7 +2433,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_render(
+ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       cmd_buf,
     const ngf_pass_info* pass_info,
     ngf_render_encoder*  enc) {
@@ -2495,19 +2495,19 @@ ngf_error ngf_cmd_buffer_start_render(
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_buffer_start_xfer(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* enc) {
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* enc) {
   enc->__handle = (uintptr_t)((void*)cmd_buf);
   return ngfvk_encoder_start(cmd_buf);
 }
 
-ngf_error ngf_render_encoder_end(ngf_render_encoder enc) {
+ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   vkCmdEndRenderPass(buf->active_bundle.vkcmdbuf);
   buf->renderpass_active = false;
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
 }
 
-ngf_error ngf_xfer_encoder_end(ngf_xfer_encoder enc) {
+ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) {
   return ngfvk_encoder_end((ngf_cmd_buffer)((void*)enc.__handle));
 }
 
