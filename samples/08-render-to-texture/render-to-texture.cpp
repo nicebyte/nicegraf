@@ -161,40 +161,15 @@ void sample_draw_frame(
   ngf_cmd_buffer_info cmd_info;
   ngf_create_cmd_buffer(&cmd_info, &cmd_buf);
   ngf_start_cmd_buffer(cmd_buf, frame_token);
-
-  const ngf_attachment_load_op offscreen_load_op = NGF_LOAD_OP_CLEAR;
-  const ngf_attachment_store_op offscreen_store_op = NGF_STORE_OP_STORE;
-  const ngf_clear offscreen_clear_color  = {
-    .clear_color = { 0.0f }
-  };
-  const ngf_pass_info offscreen_pass_info {
-    .render_target = state->offscreen_rt,
-    .load_ops = &offscreen_load_op,
-    .store_ops = &offscreen_store_op,
-    .clears = &offscreen_clear_color
-  };
-
   {
-    ngf::render_encoder renc { cmd_buf, offscreen_pass_info };
+    ngf::render_encoder renc { cmd_buf, state->offscreen_rt, .0f, 0.0f, 0.0f, 0.0f, 1.0, 0u};
     ngf_cmd_bind_gfx_pipeline(renc, state->offscreen_pipeline);
     ngf_cmd_viewport(renc, &offsc_viewport);
     ngf_cmd_scissor(renc, &offsc_viewport);
     ngf_cmd_draw(renc, false, 0u, 3u, 1u);
   }
-  const ngf_attachment_load_op blit_load_ops[] = {NGF_LOAD_OP_CLEAR, NGF_LOAD_OP_CLEAR};
-  const ngf_attachment_store_op blit_store_ops[] = {NGF_STORE_OP_DONTCARE, NGF_STORE_OP_DONTCARE};
-  const ngf_clear blit_clears[] = {
-    {.clear_color={.0f}},
-    {.clear_depth_stencil={.clear_depth=1.f,.clear_stencil=0u}}
-  };
-  const ngf_pass_info blit_pass_info = {
-    .render_target = ngf_default_render_target(),
-    .load_ops = blit_load_ops,
-    .store_ops = blit_store_ops,
-    .clears = blit_clears
-  };
   {
-    ngf::render_encoder renc {cmd_buf, blit_pass_info};
+    ngf::render_encoder renc {cmd_buf, ngf_default_render_target(), .0, 0.0, 0.0, 0.0, 1.0, 0u};
     ngf_cmd_bind_gfx_pipeline(renc, state->blit_pipeline);
     ngf_cmd_viewport(renc, &onsc_viewport);
     ngf_cmd_scissor(renc, &onsc_viewport);
