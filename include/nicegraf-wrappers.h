@@ -125,11 +125,11 @@ NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 class render_encoder {
   public:
   explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info) {
-    ngf_cmd_buffer_start_render(cmd_buf, &pass_info, &enc_);
+    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_);
   }
 
   ~render_encoder() {
-    if (enc_.__handle) ngf_render_encoder_end(enc_);
+    if (enc_.__handle) ngf_cmd_end_render_pass(enc_);
   }
 
   render_encoder(render_encoder&& other) {
@@ -156,11 +156,11 @@ class render_encoder {
 class xfer_encoder {
   public:
   explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
-    ngf_cmd_buffer_start_xfer(cmd_buf, &enc_);
+    ngf_cmd_begin_xfer_pass(cmd_buf, &enc_);
   }
 
   ~xfer_encoder() {
-    if (enc_.__handle) ngf_xfer_encoder_end(enc_);
+    if (enc_.__handle) ngf_cmd_end_xfer_pass(enc_);
   }
 
   xfer_encoder(xfer_encoder&& other) {
