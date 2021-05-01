@@ -128,6 +128,27 @@ class render_encoder {
     ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_);
   }
 
+  explicit render_encoder(
+      ngf_cmd_buffer    cmd_buf,
+      ngf_render_target rt,
+      float             clear_color_r,
+      float             clear_color_g,
+      float             clear_color_b,
+      float             clear_color_a,
+      float             clear_depth,
+      int               clear_stencil) {
+    ngf_cmd_begin_render_pass_simple(
+        cmd_buf,
+        rt,
+        clear_color_r,
+        clear_color_g,
+        clear_color_b,
+        clear_color_a,
+        clear_depth,
+        clear_stencil,
+        &enc_);
+  }
+
   ~render_encoder() {
     if (enc_.__handle) ngf_cmd_end_render_pass(enc_);
   }

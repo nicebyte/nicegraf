@@ -2433,6 +2433,47 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_cmd_begin_render_pass_simple(
+    ngf_cmd_buffer      cmd_buf,
+    ngf_render_target   rt,
+    float             clear_color_r,
+    float             clear_color_g,
+    float             clear_color_b,
+    float             clear_color_a,
+    float             clear_depth,
+    int               clear_stencil,
+    ngf_render_encoder* enc) {
+  ngfi_sa_reset(ngfi_tmp_store());
+  ngf_attachment_load_op* load_ops =
+      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_load_op) * rt->nattachments);
+  ngf_attachment_store_op* store_ops =
+      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_store_op) * rt->nattachments);
+  ngf_clear* clears = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_clear) * rt->nattachments);
+  
+  for (size_t i = 0u; i < rt->nattachments; ++i) {
+    load_ops[i] = NGF_LOAD_OP_CLEAR;
+    if (rt->attachment_descs[i].type == NGF_ATTACHMENT_COLOR) {
+      clears[i].clear_color[0] = clear_color_r;
+      clears[i].clear_color[0] = clear_color_g;
+      clears[i].clear_color[0] = clear_color_b;
+      clears[i].clear_color[0] = clear_color_a;
+    } else if (rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH) {
+      clears[i].clear_depth_stencil.clear_depth = clear_depth;
+      clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
+    } else {
+      assert(false);
+    }
+    store_ops[i] = rt->attachment_descs[i].is_sampled ? NGF_STORE_OP_STORE : NGF_STORE_OP_DONTCARE;
+  }
+  const ngf_pass_info pass_info = {
+    .render_target = rt,
+    .load_ops = load_ops,
+    .store_ops = store_ops,
+    .clears = clears
+  };
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+}
+
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       cmd_buf,
     const ngf_pass_info* pass_info,

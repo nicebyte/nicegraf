@@ -1466,13 +1466,32 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf, ngf_frame_token token) NGF_NO
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NOEXCEPT;
 
 /**
- * Starts a new encoder for rendering commands associated with the given
- * command buffer.
+ * Starts a new render pass and returns an encoder to record the associated commands
+ * to.
  * @param buf The buffer to create the encoder for. Must be in the "ready"
  *            state, will be transitioned to the "recording" state.
+ * @param pass_info Specifies renderpass parameters.
  */
 ngf_error ngf_cmd_begin_render_pass(ngf_cmd_buffer buf, const ngf_pass_info* pass_info,
                                       ngf_render_encoder* enc) NGF_NOEXCEPT;
+
+/**
+ * Similar to the above but with some choices pre-made:
+ *   - All color attachments of the render target are cleared to the specified color.
+ *   - Depth and stencil attachments are cleared to the specified respective values.
+ *   - The store action for any attachment that is not marked as sampled_from, is set to
+ *     NGF_STORE_OP_DONTCARE.
+ *   - The store action for attachments marked as sampled_from, is set to NGF_STORE_OP_STORE.
+ */
+ngf_error ngf_cmd_begin_render_pass_simple(ngf_cmd_buffer buf, 
+                                           ngf_render_target rt,
+                                           float clear_color_r,
+                                           float clear_color_g,
+                                           float clear_color_b,
+                                           float clear_color_a,
+                                           float clear_depth,
+                                           int   clear_stencil,
+                                           ngf_render_encoder* enc) NGF_NOEXCEPT;
 
 /**
  * Starts a new encoder for transfer commands associated with the given
