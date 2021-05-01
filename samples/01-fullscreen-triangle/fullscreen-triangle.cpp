@@ -110,19 +110,11 @@ void sample_draw_frame(
   /**
    * Begin a new render pass, drawing to the default render target.
    */
-  constexpr ngf_attachment_load_op  load_ops[2]  = {NGF_LOAD_OP_CLEAR, NGF_LOAD_OP_CLEAR};
-  constexpr ngf_attachment_store_op store_ops[2] = {NGF_STORE_OP_STORE, NGF_STORE_OP_DONTCARE};
-  constexpr ngf_clear               clears[2]    = {
-      ngf_clear {.clear_color = {.0f}},
-      ngf_clear {.clear_depth_stencil = {1.0f}}};
-  ngf_pass_info pass = {
-      .render_target = ngf_default_render_target(),
-      .load_ops      = load_ops,
-      .store_ops     = store_ops,
-      .clears        = clears,
-  };
   ngf_render_encoder renc;
-  ngf_cmd_begin_render_pass(cmdbuf, &pass, &renc);
+  ngf_cmd_begin_render_pass_simple(cmdbuf, ngf_default_render_target(),
+                                   0.0f, 0.0f, 0.0f, 0.0f,
+                                   0.0f, 0,
+                                   &renc);
   ngf_cmd_bind_gfx_pipeline(renc, data->pipeline.get());
   const ngf_irect2d viewport {0, 0, w, h};
   ngf_cmd_viewport(renc, &viewport);
