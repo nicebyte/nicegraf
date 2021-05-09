@@ -88,8 +88,8 @@ set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
 
 if (NOT APPLE)
     set(NGF_INTERNAL_SRCS ${NGF_INTERNAL_SRCS}
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block_alloc.c)
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
 endif()
 
 # A library with various utilities shared internally across different backends.
@@ -149,7 +149,7 @@ endif()
 # Build tests only if explicitly requested.
 if (NGF_BUILD_TESTS STREQUAL "yes")
     ngf_binary(NAME ngf_tests
-               SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block_allocator_test.cpp
+               SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block-allocator-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
