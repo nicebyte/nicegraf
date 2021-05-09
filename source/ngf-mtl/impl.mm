@@ -1840,77 +1840,55 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                        return d.id == ngf_binding;
                      });
     assert(descriptor_it != set_layout.descriptors + set_layout.ndescriptors);
-    const uint32_t set_stage_flags = descriptor_it->stage_flags;
-    
-    const bool frag_stage_visible = set_stage_flags &
-                                    NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT,
-               vert_stage_visible = set_stage_flags &
-                                    NGF_DESCRIPTOR_VERTEX_STAGE_BIT;
     switch(bind_op.type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const  ngf_uniform_buffer_bind_info &buf_bind_op =
             bind_op.info.uniform_buffer;
         const ngf_uniform_buffer buf = buf_bind_op.buffer;
         size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
-        if (vert_stage_visible) {
-          [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
+        [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
+                                      offset:offset
+                                     atIndex:native_binding];
+        [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
                                         offset:offset
                                        atIndex:native_binding];
-        }
-        if (frag_stage_visible) {
-          [cmd_buf->active_rce setFragmentBuffer:buf->mtl_buffer
-                                          offset:offset
-                                         atIndex:native_binding];
-        }
         break;}
       case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
         // TODO use texture view
         const ngf_image_sampler_bind_info &img_bind_op =
             bind_op.info.image_sampler;
-        if (vert_stage_visible) {
-          [cmd_buf->active_rce
-           setVertexTexture:img_bind_op.image_subresource.image->texture
-           atIndex:native_binding];
-          [cmd_buf->active_rce
-           setVertexSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
-        if (frag_stage_visible) {
-          [cmd_buf->active_rce
-           setFragmentTexture:img_bind_op.image_subresource.image->texture
-           atIndex:native_binding];
-          [cmd_buf->active_rce
-           setFragmentSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
+        [cmd_buf->active_rce
+         setVertexTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setVertexSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setFragmentTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setFragmentSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
         break; }
       case NGF_DESCRIPTOR_TEXTURE: {// TODO use texture view
         const ngf_image_sampler_bind_info &img_bind_op =
             bind_op.info.image_sampler;
-        if (vert_stage_visible) {
-          [cmd_buf->active_rce
-           setVertexTexture:img_bind_op.image_subresource.image->texture
-           atIndex:native_binding];
-        }
-        if (frag_stage_visible) {
-          [cmd_buf->active_rce
-           setFragmentTexture:img_bind_op.image_subresource.image->texture
-           atIndex:native_binding];
-        }
+        [cmd_buf->active_rce
+         setVertexTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setFragmentTexture:img_bind_op.image_subresource.image->texture
+         atIndex:native_binding];
         break; }
       case NGF_DESCRIPTOR_SAMPLER: {
         const ngf_image_sampler_bind_info &img_bind_op =
             bind_op.info.image_sampler;
-        if (vert_stage_visible) {
-          [cmd_buf->active_rce
-           setVertexSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
-        if (frag_stage_visible) {
-          [cmd_buf->active_rce
-           setFragmentSamplerState:img_bind_op.sampler->sampler
-           atIndex:native_binding];
-        }
+        [cmd_buf->active_rce
+         setVertexSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
+        [cmd_buf->active_rce
+         setFragmentSamplerState:img_bind_op.sampler->sampler
+         atIndex:native_binding];
         break; }
       case NGF_DESCRIPTOR_TYPE_COUNT: assert(false);
     }
