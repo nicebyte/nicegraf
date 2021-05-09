@@ -20,7 +20,7 @@
  * IN THE SOFTWARE.
  */
 
-#include "block_alloc.h"
+#include "block-alloc.h"
 
 #include "dynamic_array.h"
 

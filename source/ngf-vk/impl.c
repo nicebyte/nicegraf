@@ -21,7 +21,7 @@
  */
 
 #define _CRT_SECURE_NO_WARNINGS
-#include "ngf-common/block_alloc.h"
+#include "ngf-common/block-alloc.h"
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
 #include "ngf-common/frame_token.h"
