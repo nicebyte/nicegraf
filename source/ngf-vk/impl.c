@@ -799,6 +799,8 @@ static ngf_error ngfvk_create_swapchain(
   VkResult         vk_err       = VK_SUCCESS;
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
+  memset(swapchain, 0, sizeof(ngfvk_swapchain));
+
   // Check available present modes and fall back on FIFO if the requested
   // present mode is not supported.
   {
@@ -1036,6 +1038,7 @@ static ngf_error ngfvk_create_swapchain(
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngfvk_create_swapchain_cleanup;
   }
+  memset(swapchain->image_semaphores, 0, sizeof(VkSemaphore) * swapchain->num_images);
   for (uint32_t s = 0u; s < swapchain->num_images; ++s) {
     const VkSemaphoreCreateInfo sem_info = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -2339,7 +2342,7 @@ ngf_create_context_cleanup:
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
   assert(ctx);
-  if (new_width == 0u || new_height == 0u || ctx == NULL || ctx->default_render_target == NULL) {
+  if (ctx == NULL || ctx->default_render_target == NULL) {
     return NGF_ERROR_INVALID_OPERATION;
   }
 
