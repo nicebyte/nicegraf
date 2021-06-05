@@ -2339,7 +2339,7 @@ ngf_create_context_cleanup:
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
   assert(ctx);
-  if (new_width == 0u || new_height == 0u || ctx == NULL || ctx->default_render_target == NULL) {
+  if (ctx == NULL || ctx->default_render_target == NULL) {
     return NGF_ERROR_INVALID_OPERATION;
   }
 
