@@ -120,22 +120,27 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
      */
     const uint32_t old_fb_width = fb_width, old_fb_height = fb_height;
     ngf_samples::window_get_size(window, &fb_width, &fb_height);
+    bool resize_successful = true;
     if (fb_width != old_fb_width || fb_height != old_fb_height) {
-      ngf_resize_context(context, fb_width, fb_height);
+      resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, fb_width, fb_height));
     }
 
     /**
      * Begin frame, call into sample-specific code to perform rendering, and end frame.
      */
-    const std::chrono::time_point frame_start = std::chrono::steady_clock::now();
-    ngf_frame_token frame_token;
-    ngf_begin_frame(&frame_token);
-    ngf_samples::sample_draw_frame(frame_token, fb_width, fb_height, .0, sample_opaque_data);
-    ngf_samples::sample_draw_ui(sample_opaque_data);
-    ngf_end_frame(frame_token);
-    const std::chrono::time_point frame_end = std::chrono::steady_clock::now();
-    const std::chrono::duration frame_dur = frame_end - frame_start;
-    printf("\r%f FPS", 1000.0f/std::chrono::duration_cast<std::chrono::milliseconds>(frame_dur).count());
+    if (resize_successful) {
+      const std::chrono::time_point frame_start = std::chrono::steady_clock::now();
+      ngf_frame_token               frame_token;
+      ngf_begin_frame(&frame_token);
+      ngf_samples::sample_draw_frame(frame_token, fb_width, fb_height, .0, sample_opaque_data);
+      ngf_samples::sample_draw_ui(sample_opaque_data);
+      ngf_end_frame(frame_token);
+      const std::chrono::time_point frame_end = std::chrono::steady_clock::now();
+      const std::chrono::duration   frame_dur = frame_end - frame_start;
+      printf(
+          "\r%f FPS",
+          1000.0f / std::chrono::duration_cast<std::chrono::milliseconds>(frame_dur).count());
+    }
   }
 
   /**
