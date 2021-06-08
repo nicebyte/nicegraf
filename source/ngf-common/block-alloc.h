@@ -22,7 +22,7 @@
 
 #pragma once
 
-#include "macros.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
