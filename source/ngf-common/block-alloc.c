@@ -24,6 +24,7 @@
 
 #include "dynamic_array.h"
 #include "list.h"
+#include "macros.h"
 
 #include <time.h>
 
