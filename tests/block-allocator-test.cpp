@@ -33,35 +33,35 @@ struct test_data {
 static constexpr uint32_t num_max_entries = 1000u;
 
 TEST_CASE("Basic block allocator functionality") {
-  ngfi_block_allocator *allocator =
-      ngfi_blkalloc_create(sizeof(test_data), num_max_entries);
+  ngfi_block_allocator* allocator = ngfi_blkalloc_create(sizeof(test_data), num_max_entries);
   REQUIRE(allocator != NULL);
-  test_data *data[num_max_entries] = {nullptr};
+  test_data* data[num_max_entries] = {nullptr};
   for (uint32_t i = 0u; i < num_max_entries; ++i) {
     data[i] = (test_data*)ngfi_blkalloc_alloc(allocator);
     REQUIRE(data[i] != NULL);
     data[i]->p2 = (void*)data[i];
   }
   // Max. number of entries reached, try adding a pool.
-  test_data *null_blk = (test_data*)ngfi_blkalloc_alloc(allocator);
+  test_data* null_blk = (test_data*)ngfi_blkalloc_alloc(allocator);
   REQUIRE(null_blk != NULL);
   for (uint32_t i = 0u; i < num_max_entries; ++i) {
     REQUIRE(data[i]->p2 == (void*)data[i]);
     ngfi_blkalloc_error err = ngfi_blkalloc_free(allocator, data[i]);
     REQUIRE(err == NGFI_BLK_NO_ERROR);
   }
-  test_data *blk = (test_data*)ngfi_blkalloc_alloc(allocator);
+  test_data* blk = (test_data*)ngfi_blkalloc_alloc(allocator);
   REQUIRE(blk != NULL);
-  ngfi_block_allocator *alloc2 =
-      ngfi_blkalloc_create(sizeof(test_data), num_max_entries);
-  ngfi_blkalloc_error err = ngfi_blkalloc_free(alloc2, blk);
+#if !defined(NDEBUG)
+  ngfi_block_allocator* alloc2 = ngfi_blkalloc_create(sizeof(test_data), num_max_entries);
+  ngfi_blkalloc_error   err    = ngfi_blkalloc_free(alloc2, blk);
   REQUIRE(err == NGFI_BLK_WRONG_ALLOCATOR);
   err = ngfi_blkalloc_free(allocator, blk);
   REQUIRE(err == NGFI_BLK_NO_ERROR);
   err = ngfi_blkalloc_free(allocator, blk);
   REQUIRE(err == NGFI_BLK_DOUBLE_FREE);
-  ngfi_blkalloc_destroy(allocator);
   ngfi_blkalloc_destroy(alloc2);
+#endif
+  ngfi_blkalloc_destroy(allocator);
 }
 
 TEST_CASE("Block allocator fuzz test", "[blkalloc_fuzz]") {
