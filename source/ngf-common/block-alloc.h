@@ -28,28 +28,50 @@
 extern "C" {
 #endif
 
-// A fast fixed-size block allocator.
+/* A fast fixed-size block allocator.
+ * Doles out memory in fixed-size blocks from a pool.
+ * A block allocator is created with a certain initial capacity. If the block
+ * capacity is exceeded, an additional block pool is allocated.
+ */
 typedef struct ngfi_block_allocator ngfi_block_allocator;
 
-// Creates a new block allocator with a given fixed `block_size` and a given
-// initial capacity of `nblocks`.
+/**
+ * Creates a new block allocator with a given fixed `block_size` and a given
+ * initial capacity of `nblocks` blocks.
+ */
 ngfi_block_allocator* ngfi_blkalloc_create(uint32_t block_size, uint32_t nblocks);
 
-// Destroys the given block allocator. All unfreed pointers obtained from the
-// destroyed allocator become invalid.
+/**
+ * Destroys the given block allocator. Calling this function will make all unfreed
+ * pointers obtained from the given allocator invalid.
+ */
 void ngfi_blkalloc_destroy(ngfi_block_allocator* alloc);
 
-// Allocates the next free block from the allocator. Returns NULL on error.
+/**
+ * Allocates the next free block from the allocator. Returns NULL on error.
+ */
 void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc);
 
 typedef enum {
   NGFI_BLK_NO_ERROR,
+
+  /**
+   * Indicates that a `free` operation failed because the given block had previously
+   * been freed. This error is checked for in debug builds only.
+   */
   NGFI_BLK_DOUBLE_FREE,
+  
+  /**
+   * Inidicates that a `free` operation failed because the given block was not allocated from
+   * the given allocator. This error is checked for in debug builds only.
+   */
   NGFI_BLK_WRONG_ALLOCATOR
 } ngfi_blkalloc_error;
 
-// Returns the given block to the allocator.
-// Freeing a NULL pointer does nothing.
+/**
+ * Returns the given block to the allocator.
+ * Freeing a NULL pointer does nothing.
+ */
 ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr);
 
 #ifdef __cplusplus
