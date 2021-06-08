@@ -27,6 +27,7 @@
 #include "macros.h"
 
 #include <time.h>
+#include <string.h>
 
 typedef struct ngfi_blkalloc_block {  // The block itself.
   ngfi_list_node free_list_node;      // Freelist node.
