@@ -32,7 +32,10 @@
 typedef struct ngfi_blkalloc_block {  // The block itself.
   ngfi_list_node free_list_node;      // Freelist node.
   uint32_t       marker_and_tag;      // Identifies the parent allocator.
+#pragma warning(push)
+#pragma warning(disable : 4200)
   uint8_t        data[];
+#pragma warning(pop)
 } ngfi_blkalloc_block;
 
 struct ngfi_block_allocator {
