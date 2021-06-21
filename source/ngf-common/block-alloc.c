@@ -30,11 +30,12 @@
 #include <string.h>
 
 typedef struct ngfi_blkalloc_block {  // The block itself.
-  ngfi_list_node free_list_node;      // Freelist node.
-  uint32_t       marker_and_tag;      // Identifies the parent allocator.
+  ngfi_list_node   free_list_node;    // Freelist node.
+  uint32_t         marker_and_tag;    // Identifies the parent allocator.
+  ngfi_max_align_t padding;
 #pragma warning(push)
 #pragma warning(disable : 4200)
-  uint8_t        data[];
+  uint8_t data[];
 #pragma warning(pop)
 } ngfi_blkalloc_block;
 
@@ -99,7 +100,7 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
 
   const size_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
   const size_t aligned_block_size =
-      unaligned_block_size + (unaligned_block_size % sizeof(ngfi_blkalloc_block*));
+      unaligned_block_size + (unaligned_block_size % NGFI_MAX_ALIGNMENT);
 
   allocator->block_size = aligned_block_size;
   allocator->nblocks    = nblocks;
