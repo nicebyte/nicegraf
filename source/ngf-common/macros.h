@@ -75,6 +75,10 @@ extern ngf_diagnostic_info ngfi_diag_info;
     return err_code;                                             \
   }
 
+typedef long double ngfi_max_align_t;
+
+#define NGFI_MAX_ALIGNMENT (sizeof(ngfi_max_align_t))
+
 #ifdef __cplusplus
 }
 #endif
