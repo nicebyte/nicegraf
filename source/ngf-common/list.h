@@ -83,6 +83,10 @@ static inline void ngfi_list_init(ngfi_list_node* node) {
                                                  (!node_name##_prev || node_name##_prev->next != (list)); \
                                                  node_name##_prev = node_name, node_name = node_name->next)
 
+#define NGFI_LIST_FOR_EACH_CONST(list, node_name) for (const ngfi_list_node* node_name = (list), *node_name##_prev = NULL; \
+                                                       (!node_name##_prev || node_name##_prev->next != (list)); \
+                                                       node_name##_prev = node_name, node_name = node_name->next)
+
 #ifdef __cplusplus
 }
 #endif
