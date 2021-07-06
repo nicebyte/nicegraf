@@ -1,97 +1,120 @@
-#include "native_binding_map.h"
+/**
+ * Copyright (c) 2021 nicegraf contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ */
 
+#include "ngf-common/native-binding-map.h"
+#include "ngf-common/list.h"
+#include "ngf-common/dynamic_array.h"
 #include "macros.h"
 
 #include <string.h>
 
-const ngfi_native_binding*
-ngfi_binding_map_lookup(const ngfi_native_binding_map binding_map, uint32_t set, uint32_t binding) {
-  const ngfi_native_binding* set_map = binding_map[set];
-  uint32_t                   b_idx   = 0u;
-  while (set_map[b_idx].ngf_binding_id != binding &&
-         set_map[b_idx].ngf_binding_id != (uint32_t)(-1))
-    ++b_idx;
-  if (set_map[b_idx].ngf_binding_id == (uint32_t)(-1)) { return NULL; }
-  return &set_map[b_idx];
+/* Native binding map for a single descriptor set. */
+typedef struct ngfi_set_native_binding_map {
+  uint32_t* map;
+  uint32_t nbindings;
+} ngfi_set_native_binding_map;
+
+/* Maps (set, binding) pair to a platform's native binding id. */
+struct ngfi_native_binding_map {
+  ngfi_set_native_binding_map* set_maps;
+  uint32_t nsets;
+};
+
+static int ngfi_bind_op_sorter(const void* a_void, const void* b_void) {
+  const ngfi_pending_bind_op* a = a_void;
+  const ngfi_pending_bind_op* b = b_void;
+  if (a->op.target_set < b->op.target_set) return -1;
+  else if (a->op.target_set == b->op.target_set) {
+    if (a->op.target_binding < b->op.target_binding) return -1;
+    else if (a->op.target_binding == b->op.target_binding) return 0;
+    else return 1;
+  } else return 1;
 }
 
-ngf_error ngfi_create_native_binding_map(
-    const ngf_pipeline_layout_info* layout,
-    const ngf_plmd_cis_map*         images_to_cis,
-    const ngf_plmd_cis_map*         samplers_to_cis,
-    ngfi_native_binding_map*        result) {
-  ngf_error               err          = NGF_ERROR_OK;
-  uint32_t                nmap_entries = layout->ndescriptor_set_layouts + 1;
-  ngfi_native_binding_map map          = NGFI_ALLOCN(ngfi_native_binding*, nmap_entries);
-  *result                              = map;
-  if (map == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto _ngf_create_native_binding_map_cleanup;
+ngfi_native_binding_map* ngfi_create_native_binding_map_from_pending_bind_ops(
+  const ngfi_pending_bind_op* pending_bind_ops_list) {
+  /* Create a sorted array of bind ops from the given list.
+     Sorting is necessary to ensure we process bind ops in the same order
+     regardless of the order they were added to the list - this ensures
+     consistency of the mapping. */
+  NGFI_DARRAY_OF(ngfi_pending_bind_op) bind_ops_array;
+  NGFI_DARRAY_RESET(bind_ops_array, 8);
+  NGFI_LIST_FOR_EACH_CONST(
+    &pending_bind_ops_list->pending_ops_list_node, node) {
+    const ngfi_pending_bind_op* bind_op =
+      NGFI_LIST_CONTAINER_OF(node, ngfi_pending_bind_op, pending_ops_list_node);
+    NGFI_DARRAY_APPEND(bind_ops_array, *bind_op);
   }
-  memset(map, 0, sizeof(ngfi_native_binding*) * (nmap_entries));
-  uint32_t total_c[NGF_DESCRIPTOR_TYPE_COUNT] = {0u};
-  for (uint32_t set = 0u; set < layout->ndescriptor_set_layouts; ++set) {
-    const ngf_descriptor_set_layout_info* set_layout = &layout->descriptor_set_layouts[set];
-    map[set] = NGFI_ALLOCN(ngfi_native_binding, set_layout->ndescriptors + 1u);
-    if (map[set] == NULL) {
-      err = NGF_ERROR_OUT_OF_MEM;
-      goto _ngf_create_native_binding_map_cleanup;
+  qsort(bind_ops_array.data, NGFI_DARRAY_SIZE(bind_ops_array),
+        sizeof(ngfi_pending_bind_op), ngfi_bind_op_sorter);
+  
+  /* Allocate entries in the lookup table. */
+  ngfi_native_binding_map* map = NGFI_ALLOC(ngfi_native_binding_map);
+  map->nsets = 0;
+  map->set_maps = NULL;
+  for (int i = (int)(NGFI_DARRAY_SIZE(bind_ops_array) - 1); i >= 0; --i) {
+    const ngf_resource_bind_op* op = &(NGFI_DARRAY_AT(bind_ops_array, i).op);
+    if (map->set_maps == NULL) {
+      NGFI_CHECK_FATAL(i == NGFI_DARRAY_SIZE(bind_ops_array) - 1, "unexpected error");
+      /* since we're starting at the far end of a sorted array, op->target_set
+         would be the largest set ID at this point, indicating the max required
+         number of sets. */
+      map->nsets = op->target_set + 1;
+      map->set_maps = NGFI_ALLOCN(ngfi_set_native_binding_map, map->nsets);
+      memset(map->set_maps, 0, sizeof(ngfi_set_native_binding_map) * map->nsets);
     }
-    map[set][set_layout->ndescriptors].ngf_binding_id = (uint32_t)(-1);
-    for (uint32_t b = 0u; b < set_layout->ndescriptors; ++b) {
-      const ngf_descriptor_info* desc_info = &set_layout->descriptors[b];
-      const ngf_descriptor_type  desc_type = desc_info->type;
-      ngfi_native_binding*       mapping   = &map[set][b];
-      mapping->ngf_binding_id              = desc_info->id;
-      mapping->native_binding_id           = total_c[desc_type]++;
-      if ((desc_info->type == NGF_DESCRIPTOR_SAMPLER && samplers_to_cis) ||
-          (desc_info->type == NGF_DESCRIPTOR_TEXTURE && images_to_cis)) {
-        const ngf_plmd_cis_map* cis_map =
-            desc_info->type == NGF_DESCRIPTOR_SAMPLER ? samplers_to_cis : images_to_cis;
-        const ngf_plmd_cis_map_entry* combined_list = NULL;
-        for (uint32_t i = 0u; i < cis_map->nentries; ++i) {
-          if (set == cis_map->entries[i]->separate_set_id &&
-              desc_info->id == cis_map->entries[i]->separate_binding_id) {
-            combined_list = cis_map->entries[i];
-            break;
-          }
-        }
-        if (combined_list) {
-          mapping->cis_bindings = NGFI_ALLOCN(uint32_t, combined_list->ncombined_ids);
-          if (mapping->cis_bindings == NULL) {
-            err = NGF_ERROR_OUT_OF_MEM;
-            goto _ngf_create_native_binding_map_cleanup;
-          }
-          memcpy(
-              mapping->cis_bindings,
-              combined_list->combined_ids,
-              sizeof(uint32_t) * combined_list->ncombined_ids);
-          mapping->ncis_bindings = combined_list->ncombined_ids;
-        } else {
-          mapping->cis_bindings  = NULL;
-          mapping->ncis_bindings = 0u;
-        }
-      } else {
-        mapping->cis_bindings  = NULL;
-        mapping->ncis_bindings = 0u;
-      }
+    const uint32_t current_set = op->target_set;
+    if (map->set_maps[current_set].nbindings == 0) {
+      map->set_maps[current_set].nbindings = op->target_binding + 1;
+      map->set_maps[current_set].map = NGFI_ALLOCN(uint32_t, map->set_maps[current_set].nbindings);
+      memset(map->set_maps[current_set].map, ~0,
+             sizeof(uint32_t) * (map->set_maps[current_set].nbindings));
     }
   }
-
-_ngf_create_native_binding_map_cleanup:
-  if (err != NGF_ERROR_OK) { ngfi_destroy_binding_map(map); }
-  return err;
+  
+  /* Assign binding ids. */
+  uint32_t num_descriptors_of_type[NGF_DESCRIPTOR_TYPE_COUNT] = {0};
+  NGFI_DARRAY_FOREACH(bind_ops_array, i) {
+    const ngf_resource_bind_op* op = &NGFI_DARRAY_AT(bind_ops_array, i).op;
+    map->set_maps[op->target_set].map[op->target_binding] =
+    num_descriptors_of_type[op->type]++;
+  }
+  NGFI_DARRAY_DESTROY(bind_ops_array);
+  return map;
 }
 
-void ngfi_destroy_binding_map(ngfi_native_binding_map map) {
-  if (map != NULL) {
-    for (uint32_t i = 0; map[i] != NULL; ++i) {
-      ngfi_native_binding* set = map[i];
-      if (set->ngf_binding_id != (uint32_t)-1 && set->cis_bindings) {
-        NGFI_FREEN(set->cis_bindings, set->ncis_bindings);
-      }
-      NGFI_FREE(set);
-    }
-    NGFI_FREE(map);
+void ngfi_destroy_native_binding_map(ngfi_native_binding_map* map) {
+  for (uint32_t i = 0; i < map->nsets; ++i) {
+    NGFI_FREEN(map->set_maps[i].map, map->set_maps[i].nbindings);
+  }
+  NGFI_FREEN(map->set_maps, map->nsets);
+  NGFI_FREE(map);
+}
+
+uint32_t ngfi_native_binding_map_lookup(const ngfi_native_binding_map* map,
+                                        uint32_t set, uint32_t binding) {
+  if (set < map->nsets && binding < map->set_maps[set].nbindings) {
+    return map->set_maps[set].map[binding];
+  } else {
+    return ~0u;
   }
 }
