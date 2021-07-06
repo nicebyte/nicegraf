@@ -20,32 +20,11 @@
  * IN THE SOFTWARE.
  */
 
-#pragma once
-
 #include "nicegraf.h"
-#include "ngf-common/pending-bind-op.h"
+#include "ngf-common/list.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+typedef struct ngfi_pending_bind_op {
+  ngfi_list_node       pending_ops_list_node;
+  ngf_resource_bind_op op;
+} ngfi_pending_bind_op;
 
-/* Maps (set, binding) pair to a platform's native binding id. */
-typedef struct ngfi_native_binding_map ngfi_native_binding_map;
-
-/* Derives a (set, binding) => (native binding) mapping from a list of
-   bind operations. */
-ngfi_native_binding_map* ngfi_create_native_binding_map_from_pending_bind_ops(
-  const ngfi_pending_bind_op* pending_bind_ops_list);
-
-/* Destroys a native binding map previously created with
-   ngfi_create_native_binding_map_... */
-void ngfi_destroy_native_binding_map(ngfi_native_binding_map* map);
-
-/* Looks up a native binding from the given map using the provided nicegraf
-   set and binding ids. Returns 0xFFFF...FF on failure. */
-uint32_t ngfi_native_binding_map_lookup(
-  const ngfi_native_binding_map* map, uint32_t set, uint32_t binding);
-
-#ifdef __cplusplus
-}
-#endif
