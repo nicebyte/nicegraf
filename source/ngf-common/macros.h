@@ -3,6 +3,7 @@
 #include "nicegraf.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #if defined(_WIN32) || defined(_WIN64)
 #define NGFI_THREADLOCAL __declspec(thread)
 #define WIN32_LEAN_AND_MEAN
@@ -74,6 +75,13 @@ extern ngf_diagnostic_info ngfi_diag_info;
     NGFI_DIAG_ERROR(err_fmtstring, ##__VA_ARGS__);               \
     return err_code;                                             \
   }
+
+// Convenience macro to immediately die on an unmet precondition.
+#define NGFI_CHECK_FATAL(cond, err_fmtstring, ...) \
+if (!(cond)) { \
+  NGFI_DIAG_ERROR(err_fmtstring, ##__VA_ARGS__); \
+  exit(1); \
+}
 
 typedef long double ngfi_max_align_t;
 
