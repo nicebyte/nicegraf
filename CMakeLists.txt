@@ -83,14 +83,9 @@ set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
+                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c)
-
-
-if (NOT APPLE)
-    set(NGF_INTERNAL_SRCS ${NGF_INTERNAL_SRCS}
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
-endif()
 
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf-internal
@@ -154,6 +149,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/native-binding-map-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf-internal)
     target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
