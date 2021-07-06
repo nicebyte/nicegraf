@@ -92,7 +92,7 @@ TEST_CASE("order maintained after remove") {
   std::shuffle(removal_order.begin(), removal_order.end(), g);
 
   auto validate = [](ngfi_list_node* head, const std::vector<int>& expected_tag_values) {
-    int num_iters = 0;
+    size_t num_iters = 0;
     NGFI_LIST_FOR_EACH(head, n) {
       const test_struct* s_ptr = NGFI_LIST_CONTAINER_OF(n, test_struct, test_list);
       REQUIRE(s_ptr->tag == expected_tag_values[num_iters++]);
