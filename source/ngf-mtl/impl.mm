@@ -22,7 +22,7 @@
 
 #include "nicegraf.h"
 #include "ngf-common/macros.h"
-#include "ngf-common/native_binding_map.h"
+#include "ngf-common/native-binding-map.h"
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/stack_alloc.h"
 #include "nicegraf-wrappers.h"
