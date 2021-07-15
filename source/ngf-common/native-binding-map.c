@@ -120,13 +120,13 @@ ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
       /* since we're starting at the far end of a sorted array, op->target_set
          would be the largest set ID at this point, indicating the max required
          number of sets. */
-      map->nsets = entry->set + 1;
+      map->nsets = (uint32_t)entry->set + 1u;
       map->sets  = NGFI_ALLOCN(ngfi_set_map, map->nsets);
       memset(map->sets, 0, sizeof(ngfi_set_map) * map->nsets);
     }
-    const uint32_t current_set = entry->set;
+    const uint32_t current_set = (uint32_t)entry->set;
     if (map->sets[current_set].nbindings == 0) {
-      map->sets[current_set].nbindings = entry->binding + 1;
+      map->sets[current_set].nbindings = (uint32_t)entry->binding + 1;
       map->sets[current_set].bindings  = NGFI_ALLOCN(uint32_t, map->sets[current_set].nbindings);
       memset(
           map->sets[current_set].bindings,
@@ -138,7 +138,7 @@ ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
   /* Assign binding ids. */
   NGFI_DARRAY_FOREACH(entries, i) {
     const struct native_binding_entry* entry       = &NGFI_DARRAY_AT(entries, i);
-    map->sets[entry->set].bindings[entry->binding] = entry->native_binding;
+    map->sets[entry->set].bindings[entry->binding] = (uint32_t)entry->native_binding;
   }
 
   return map;
