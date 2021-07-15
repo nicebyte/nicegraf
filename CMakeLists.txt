@@ -153,6 +153,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/native-binding-map-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf-internal)
