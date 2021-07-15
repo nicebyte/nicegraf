@@ -430,6 +430,7 @@ struct ngf_shader_stage_t {
   id<MTLLibrary> func_lib = nil;
   ngf_stage_type type;
   std::string entry_point_name;
+  std::string source_code;
 };
 
 struct ngf_graphics_pipeline_t {
@@ -444,7 +445,7 @@ struct ngf_graphics_pipeline_t {
   MTLCullMode      culling        = MTLCullModeBack;
   float            blend_color[4] {0};
   
-  ngfi_native_binding_map   binding_map = nullptr;
+  ngfi_native_binding_map* binding_map = nullptr;
   ngf_pipeline_layout_info layout;
 
   ~ngf_graphics_pipeline_t() {
@@ -458,7 +459,7 @@ struct ngf_graphics_pipeline_t {
       }
     }
     if (binding_map) {
-      ngfi_destroy_binding_map(binding_map);
+      ngfi_destroy_native_binding_map(binding_map);
     }
   }
 };
@@ -903,6 +904,8 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info *info,
   }
   
   stage->type = info->type;
+  stage->source_code =
+    std::string {(const char*)info->content, info->content_length};
 
   // Create a MTLLibrary for this stage.
   NSString *source = [[NSString alloc] initWithBytes:info->content
@@ -1078,8 +1081,16 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   
   // Set stage functions.
+  ngfi_native_binding_map* native_binding_map = nullptr;
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
     const ngf_shader_stage stage = info->shader_stages[s];
+    const char* serialized_map =
+    ngfi_find_serialized_native_binding_map(stage->source_code.c_str());
+    if (!native_binding_map && serialized_map) {
+      native_binding_map = ngfi_parse_serialized_native_binding_map(serialized_map);
+    } else if (native_binding_map && serialized_map) {
+      NGFI_DIAG_WARNING("more than a single instance of serialized native binding map found");
+    }
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
       mtl_pipe_desc.vertexFunction =
@@ -1092,6 +1103,11 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
                                spec_consts);
     }
   }
+  if (native_binding_map == nullptr) {
+    NGFI_DIAG_ERROR("Native binding map not found.");
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+
   
   // Configure vertex input.
   const ngf_vertex_input_info &vertex_input_info = *info->input_info;
@@ -1128,6 +1144,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
+  pipeline->binding_map = native_binding_map;
   memcpy(pipeline->blend_color,
          info->blend->blend_color,
          sizeof(pipeline->blend_color));
@@ -1153,14 +1170,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
            sizeof(ngf_descriptor_info) *
            descriptor_set_layouts[s].ndescriptors);
   }
-  ngf_error ngf_err =
-       ngfi_create_native_binding_map(info->layout,
-                                     nullptr,
-                                     nullptr,
-                                    &pipeline->binding_map);
-  if (ngf_err != NGF_ERROR_OK) {
-    return ngf_err;
-  }
+
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
@@ -1820,16 +1830,15 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op &bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
-    const ngfi_native_binding *nb =
-         ngfi_binding_map_lookup(cmd_buf->active_pipe->binding_map,
-                                bind_op.target_set,
-                                bind_op.target_binding);
-    if (nb == nullptr) {
+    const uint32_t native_binding =
+    ngfi_native_binding_map_lookup(cmd_buf->active_pipe->binding_map,
+                                   bind_op.target_set,
+                                   bind_op.target_binding);
+    if (native_binding == ~0) {
       // TODO: call debug callback.
       continue;
     }
     const uint32_t ngf_binding = bind_op.target_binding;
-    const uint32_t native_binding = nb->native_binding_id;
     const ngf_pipeline_layout_info &layout = cmd_buf->active_pipe->layout;
     const ngf_descriptor_set_layout_info &set_layout =
         layout.descriptor_set_layouts[bind_op.target_set];
