@@ -45,7 +45,6 @@ typedef struct ngf_util_graphics_pipeline_data {
   ngf_multisample_info       multisample_info;
   ngf_rasterization_info     rasterization_info;
   ngf_specialization_info    spec_info;
-  ngf_pipeline_layout_info   layout_info;
 } ngf_util_graphics_pipeline_data;
 
 /**
@@ -54,36 +53,6 @@ typedef struct ngf_util_graphics_pipeline_data {
  * @param result Pipeline configuration data will be stored here.
  */
 void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result);
-
-/**
- * Creates a simple pipeline layout with just a single descriptor set.
- * This function allocates memory for the descriptor_set_layout_info and
- * descriptor_info objects, and it is up to the caller to free that memory.
- * @param desc pointer to an array of descriptor configurations. All of these
- *  descriptors will be added to the set.
- * @param ndesc number of descriptors in the array.
- * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
- *               be populated by this function. The descriptor set within it
- *               must be freed by the caller when it is no longer necessary.
- */
-ngf_error ngf_util_create_simple_layout(
-    const ngf_descriptor_info* desc,
-    uint32_t                   ndesc,
-    ngf_pipeline_layout_info*  result);
-
-/**
- * Creates a pipeline layout from shader metadata produced by ngf_shaderc.
- * This function allocates memory for the descriptor_set_layout_info and
- * descriptor_info objects, and it is up to the caller to free that memory.
- * @param layout_metadata pointer to pipeline layout metadata obtained from an
- *                        ngf_plmd object.
- * @param result a pointer to a `ngf_pipeline_layout_info` structyre that will
- *               be populated by this function. The descriptor sets within it
- *               must be freed by the caller when it is no longer necessary.
- */
-ngf_error ngf_util_create_pipeline_layout_from_metadata(
-    const ngf_plmd_layout*    layout_metadata,
-    ngf_pipeline_layout_info* result);
 
 const char* ngf_util_get_error_name(const ngf_error err);
 

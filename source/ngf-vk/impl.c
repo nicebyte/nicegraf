@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <string.h>
 #include <vk_mem_alloc.h>
+#include <spirv_reflect.h>
 
 #pragma region constants
 
@@ -273,9 +274,10 @@ typedef struct ngf_context_t {
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
-  VkShaderModule        vk_module;
-  VkShaderStageFlagBits vk_stage_bits;
-  char*                 entry_point_name;
+  VkShaderModule         vk_module;
+  VkShaderStageFlagBits  vk_stage_bits;
+  SpvReflectShaderModule spv_reflect_module;
+  char*                  entry_point_name;
 } ngf_shader_stage_t;
 
 typedef struct ngf_graphics_pipeline_t {
@@ -360,13 +362,6 @@ static VkDescriptorType get_vk_descriptor_type(ngf_descriptor_type type) {
       VK_DESCRIPTOR_TYPE_SAMPLER,
       VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
   return types[type];
-}
-
-static VkShaderStageFlags get_vk_stage_flags(uint32_t flags) {
-  VkShaderStageFlags result = 0x0u;
-  if (flags & NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT) result |= VK_SHADER_STAGE_FRAGMENT_BIT;
-  if (flags & NGF_DESCRIPTOR_VERTEX_STAGE_BIT) result |= VK_SHADER_STAGE_VERTEX_BIT;
-  return result;
 }
 
 static VkImageType get_vk_image_type(ngf_image_type t) {
@@ -1851,7 +1846,31 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
   return result;
 }
 
+static int ngfvk_binding_comparator(const void* a, const void* b) {
+  const SpvReflectDescriptorBinding* a_binding = a;
+  const SpvReflectDescriptorBinding* b_binding = b;
+  if (a_binding->set < b_binding->set)
+    return -1;
+  else if (a_binding->set == b_binding->set) {
+    if (a_binding->binding < b_binding->binding)
+      return -1;
+    else if (a_binding->binding == b_binding->binding)
+      return 0;
+  }
+  return 1;
+}
+
+static ngf_descriptor_type ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
+  switch(spv_reflect_type) {
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER: return NGF_DESCRIPTOR_UNIFORM_BUFFER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return NGF_DESCRIPTOR_TEXTURE;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER: return NGF_DESCRIPTOR_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
+  default: return NGF_DESCRIPTOR_TYPE_COUNT;
+  }
+}
 #pragma endregion
+
 
 #pragma region external_funcs
 
@@ -2766,7 +2785,9 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_
       .pCode    = (uint32_t*)info->content,
       .codeSize = (info->content_length)};
   VkResult vkerr = vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vk_module);
-  if (vkerr != VK_SUCCESS) {
+  const SpvReflectResult spverr =
+      spvReflectCreateShaderModule(info->content_length, info->content, &stage->spv_reflect_module);
+  if (vkerr != VK_SUCCESS || spverr != SPV_REFLECT_RESULT_SUCCESS) {
     NGFI_FREE(stage);
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
@@ -2781,6 +2802,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_
 void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   if (stage) {
     vkDestroyShaderModule(_vk.device, stage->vk_module, NULL);
+    spvReflectDestroyShaderModule(&stage->spv_reflect_module);
     NGFI_FREEN(stage->entry_point_name, strlen(stage->entry_point_name) + 1u);
     NGFI_FREE(stage);
   }
@@ -2792,6 +2814,11 @@ ngf_error ngf_create_graphics_pipeline(
   assert(info);
   assert(result);
   ngfi_sa_reset(ngfi_tmp_store());
+  NGFI_DARRAY_OF(VkDescriptorSetLayout) vk_set_layouts;
+  NGFI_DARRAY_RESET(vk_set_layouts, 4);
+  NGFI_DARRAY_OF(SpvReflectDescriptorBinding) bindings;
+  NGFI_DARRAY_RESET(bindings, 4);
+
   VkVertexInputBindingDescription*   vk_binding_descs = NULL;
   VkVertexInputAttributeDescription* vk_attrib_descs  = NULL;
   ngf_error                          err              = NGF_ERROR_OK;
@@ -3053,39 +3080,66 @@ ngf_error ngf_create_graphics_pipeline(
       .dynamicStateCount = ndynamic_states,
       .pDynamicStates    = dynamic_states};
 
-  // Descriptor set layouts.
-  NGFI_DARRAY_RESET(pipeline->descriptor_set_layouts, info->layout->ndescriptor_set_layouts);
-  VkDescriptorSetLayout* vk_set_layouts = ngfi_sa_alloc(
-      ngfi_tmp_store(),
-      sizeof(VkDescriptorSetLayout) * info->layout->ndescriptor_set_layouts);
-  for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
+  // Extract and dedupe all descriptor bindings.
+  uint32_t ntotal_bindings = 0u;
+  for (uint32_t i = 0u; i < info->nshader_stages; ++i) {
+    ntotal_bindings += info->shader_stages[i]->spv_reflect_module.descriptor_binding_count;
+  }
+  uint32_t bindings_offset = 0;
+  NGFI_DARRAY_RESIZE(bindings, ntotal_bindings);
+  for (uint32_t i = 0u; i < info->nshader_stages; ++i) {
+    const SpvReflectShaderModule* spv_module    = &info->shader_stages[i]->spv_reflect_module;
+    const uint32_t                binding_count = spv_module->descriptor_binding_count;
+    memcpy(
+        &NGFI_DARRAY_AT(bindings, bindings_offset),
+        spv_module->descriptor_bindings,
+        sizeof(SpvReflectDescriptorBinding) * binding_count);
+    ntotal_bindings += info->shader_stages[i]->spv_reflect_module.descriptor_binding_count;
+  }
+  qsort(bindings.data, ntotal_bindings, sizeof(SpvReflectDescriptorBinding), ngfvk_binding_comparator);
+  uint32_t nunique_bindings = 0u;
+  for (uint32_t cur = 0u; cur < NGFI_DARRAY_SIZE(bindings); ++cur) {
+    if (nunique_bindings == 0 ||
+        (NGFI_DARRAY_AT(bindings, nunique_bindings - 1).set != NGFI_DARRAY_AT(bindings, cur).set ||
+         NGFI_DARRAY_AT(bindings, nunique_bindings - 1).binding != NGFI_DARRAY_AT(bindings, cur).binding)) {
+      NGFI_DARRAY_AT(bindings, nunique_bindings++) = NGFI_DARRAY_AT(bindings, cur);
+    }
+  }
+
+  // Create descriptor set layouts.
+  NGFI_DARRAY_RESET(pipeline->descriptor_set_layouts, 4);
+  for (uint32_t cur = 0u; cur < nunique_bindings; ++cur) {
+    const uint32_t first_binding_in_set = cur;
+    while (cur < nunique_bindings &&
+           NGFI_DARRAY_AT(bindings, first_binding_in_set).set == NGFI_DARRAY_AT(bindings, cur++).set);
+    const uint32_t nbindings_in_set = cur - first_binding_in_set;
     VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
         NGFI_ALLOCN(  // TODO: use temp storage here
             VkDescriptorSetLayoutBinding,
-            info->layout->descriptor_set_layouts[s].ndescriptors);
+            nbindings_in_set);
     ngfvk_desc_set_layout set_layout;
     memset(&set_layout, 0, sizeof(set_layout));
-    for (uint32_t b = 0u; b < info->layout->descriptor_set_layouts[s].ndescriptors; ++b) {
-      VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[b];
-      const ngf_descriptor_info*    d    = &info->layout->descriptor_set_layouts[s].descriptors[b];
-      vk_d->binding                      = d->id;
-      vk_d->descriptorCount              = 1u;
-      vk_d->descriptorType               = get_vk_descriptor_type(d->type);
-      vk_d->descriptorCount              = 1u;
-      vk_d->stageFlags                   = get_vk_stage_flags(d->stage_flags);
+    for (uint32_t i = first_binding_in_set; i < cur; ++i) {
+      VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[i];
+      const SpvReflectDescriptorBinding* d = &NGFI_DARRAY_AT(bindings, i);
+      const ngf_descriptor_type ngf_desc_type = ngfvk_get_ngf_descriptor_type(d->descriptor_type);
+      vk_d->binding                      = d->binding;
+      vk_d->descriptorCount              = d->count;
+      vk_d->descriptorType               = get_vk_descriptor_type(ngf_desc_type);
+      vk_d->stageFlags                   = VK_SHADER_STAGE_ALL;
       vk_d->pImmutableSamplers           = NULL;
-      set_layout.counts[d->type]++;
+      set_layout.counts[ngf_desc_type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext        = NULL,
         .flags        = 0u,
-        .bindingCount = info->layout->descriptor_set_layouts[s].ndescriptors,
+        .bindingCount = nbindings_in_set,
         .pBindings    = vk_descriptor_bindings};
     vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &set_layout.vk_handle);
     NGFI_DARRAY_APPEND(pipeline->descriptor_set_layouts, set_layout);
-    vk_set_layouts[s] = set_layout.vk_handle;
-    NGFI_FREEN(vk_descriptor_bindings, info->layout->descriptor_set_layouts[s].ndescriptors);
+    NGFI_DARRAY_APPEND(vk_set_layouts, set_layout.vk_handle);
+    NGFI_FREEN(vk_descriptor_bindings, nbindings_in_set);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_graphics_pipeline_cleanup;
@@ -3099,7 +3153,7 @@ ngf_error ngf_create_graphics_pipeline(
       .pNext                  = NULL,
       .flags                  = 0u,
       .setLayoutCount         = ndescriptor_sets,
-      .pSetLayouts            = vk_set_layouts,
+      .pSetLayouts            = vk_set_layouts.data,
       .pushConstantRangeCount = 0u,
       .pPushConstantRanges    = NULL};
   vk_err = vkCreatePipelineLayout(
@@ -3183,6 +3237,8 @@ ngf_create_graphics_pipeline_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_graphics_pipeline(pipeline); }
   NGFI_FREE(vk_binding_descs);
   NGFI_FREE(vk_attrib_descs);
+  NGFI_DARRAY_DESTROY(bindings);
+  NGFI_DARRAY_DESTROY(vk_set_layouts);
   return err;
 }
 
