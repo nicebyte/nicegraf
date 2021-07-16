@@ -822,53 +822,6 @@ typedef enum {
 } ngf_descriptor_type;
 
 /**
- * Descriptor visibility flags.
- */
-typedef enum ngf_descriptor_stage {
-  NGF_DESCRIPTOR_VERTEX_STAGE_BIT   = 0x01,
-  NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT = 0x02,
-} ngf_descriptor_stage_flags;
-
-/**
- * Descriptor configuration.
- * A descriptor is an opaque object through which resources such as buffers and
- * textures can be accessed.
- * This structure specifies details about a descriptor.
- */
-typedef struct {
-  ngf_descriptor_type type; /**< Type of the descriptor.*/
-  uint32_t            id;   /**< Associated binding point.*/
-
-  /**
-   * Specifies which stage(s) the descriptor is accessible from.
-   * This needs to be a combination of \ref ngf_descriptor_stage flags.
-   */
-  uint32_t stage_flags;
-} ngf_descriptor_info;
-
-/**
- * Descriptor set layout configuration.
- * Descriptors are bound in groups called descriptor sets.
- * The number of descriptors in such a group, and their types and
- * associated bindings are called a "descriptor set layout".
- * Think of it as a schema for a descriptor set.
- */
-typedef struct {
-  const ngf_descriptor_info* descriptors;
-  uint32_t                   ndescriptors;
-} ngf_descriptor_set_layout_info;
-
-/**
- * Pipeline layout description.
- * Specifies layouts for descriptor sets that are required to be bound by a
- * pipeline.
- */
-typedef struct {
-  uint32_t                        ndescriptor_set_layouts;
-  const ngf_descriptor_set_layout_info* descriptor_set_layouts;
-} ngf_pipeline_layout_info;
-
-/**
  * Specifies a buffer bind operation.
  */
 typedef struct {
@@ -949,7 +902,6 @@ typedef struct ngf_graphics_pipeline_info {
   uint32_t                           dynamic_state_mask;
   const ngf_vertex_input_info*       input_info;
   ngf_primitive_type                 primitive_type;
-  const ngf_pipeline_layout_info*    layout;
   const ngf_specialization_info*     spec_info;
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
 } ngf_graphics_pipeline_info;
