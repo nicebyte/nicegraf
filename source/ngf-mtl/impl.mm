@@ -446,18 +446,7 @@ struct ngf_graphics_pipeline_t {
   float            blend_color[4] {0};
   
   ngfi_native_binding_map* binding_map = nullptr;
-  ngf_pipeline_layout_info layout;
-
   ~ngf_graphics_pipeline_t() {
-    for (uint32_t s = 0u;
-         layout.descriptor_set_layouts != nullptr &&
-         s < layout.ndescriptor_set_layouts;
-         ++s) {
-      if (layout.descriptor_set_layouts[s].descriptors != nullptr) {
-        NGFI_FREEN(layout.descriptor_set_layouts[s].descriptors,
-                  layout.descriptor_set_layouts[s].ndescriptors);
-      }
-    }
     if (binding_map) {
       ngfi_destroy_native_binding_map(binding_map);
     }
@@ -1148,29 +1137,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   memcpy(pipeline->blend_color,
          info->blend->blend_color,
          sizeof(pipeline->blend_color));
-  pipeline->layout.ndescriptor_set_layouts =
-      info->layout->ndescriptor_set_layouts;
-  ngf_descriptor_set_layout_info *descriptor_set_layouts =
-      NGFI_ALLOCN(ngf_descriptor_set_layout_info,
-                 info->layout->ndescriptor_set_layouts);
-  pipeline->layout.descriptor_set_layouts = descriptor_set_layouts;
-  if (pipeline->layout.descriptor_set_layouts == nullptr) {
-    return NGF_ERROR_OUT_OF_MEM;
-  }
-  memset(descriptor_set_layouts, 0, sizeof(ngf_descriptor_set_layout_info));
-  for (uint32_t s = 0u; s < info->layout->ndescriptor_set_layouts; ++s) {
-    descriptor_set_layouts[s].ndescriptors =
-        info->layout->descriptor_set_layouts[s].ndescriptors;
-    ngf_descriptor_info *descriptors  =
-        NGFI_ALLOCN(ngf_descriptor_info, descriptor_set_layouts[s].ndescriptors);
-    descriptor_set_layouts[s].descriptors = descriptors;
-    if (descriptors == nullptr) return NGF_ERROR_OUT_OF_MEM;
-    memcpy(descriptors,
-           info->layout->descriptor_set_layouts[s].descriptors,
-           sizeof(ngf_descriptor_info) *
-           descriptor_set_layouts[s].ndescriptors);
-  }
-
+  
   NSError *err = nil;
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
@@ -1838,17 +1805,6 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       // TODO: call debug callback.
       continue;
     }
-    const uint32_t ngf_binding = bind_op.target_binding;
-    const ngf_pipeline_layout_info &layout = cmd_buf->active_pipe->layout;
-    const ngf_descriptor_set_layout_info &set_layout =
-        layout.descriptor_set_layouts[bind_op.target_set];
-    const auto descriptor_it =
-        std::find_if(set_layout.descriptors,
-                     set_layout.descriptors + set_layout.ndescriptors,
-                     [ngf_binding](const ngf_descriptor_info &d){
-                       return d.id == ngf_binding;
-                     });
-    assert(descriptor_it != set_layout.descriptors + set_layout.ndescriptors);
     switch(bind_op.type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const  ngf_uniform_buffer_bind_info &buf_bind_op =
