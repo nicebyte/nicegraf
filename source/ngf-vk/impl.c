@@ -2831,6 +2831,7 @@ ngf_error ngf_create_graphics_pipeline(
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_graphics_pipeline_cleanup;
   }
+  NGFI_DARRAY_RESET(pipeline->descriptor_set_layouts, 4);
 
   // Build up Vulkan specialization structure, if necessary.
   VkSpecializationInfo           vk_spec_info;
@@ -3085,8 +3086,8 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < info->nshader_stages; ++i) {
     ntotal_bindings += info->shader_stages[i]->spv_reflect_module.descriptor_binding_count;
   }
-  uint32_t bindings_offset = 0;
   NGFI_DARRAY_RESIZE(bindings, ntotal_bindings);
+  uint32_t bindings_offset = 0u;
   for (uint32_t i = 0u; i < info->nshader_stages; ++i) {
     const SpvReflectShaderModule* spv_module    = &info->shader_stages[i]->spv_reflect_module;
     const uint32_t                binding_count = spv_module->descriptor_binding_count;
@@ -3094,7 +3095,7 @@ ngf_error ngf_create_graphics_pipeline(
         &NGFI_DARRAY_AT(bindings, bindings_offset),
         spv_module->descriptor_bindings,
         sizeof(SpvReflectDescriptorBinding) * binding_count);
-    ntotal_bindings += info->shader_stages[i]->spv_reflect_module.descriptor_binding_count;
+    bindings_offset += binding_count;
   }
   qsort(bindings.data, ntotal_bindings, sizeof(SpvReflectDescriptorBinding), ngfvk_binding_comparator);
   uint32_t nunique_bindings = 0u;
@@ -3107,22 +3108,42 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Create descriptor set layouts.
-  NGFI_DARRAY_RESET(pipeline->descriptor_set_layouts, 4);
-  for (uint32_t cur = 0u; cur < nunique_bindings; ++cur) {
+  uint32_t last_set_id = 0;
+  for (uint32_t cur = 0u; cur < nunique_bindings;) {
+    ngfvk_desc_set_layout set_layout;
+    memset(&set_layout, 0, sizeof(set_layout));
+    const uint32_t current_set_id = NGFI_DARRAY_AT(bindings, cur).set;
+    if (current_set_id - last_set_id > 1u) {
+      // there is a gap in descriptor sets, fill it in with empty layouts;
+      for (uint32_t i = last_set_id + 1; i < current_set_id; ++i) {
+        const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
+            .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            .pNext        = NULL,
+            .flags        = 0u,
+            .bindingCount = 0u,
+            .pBindings    = NULL};
+        vk_err = vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &set_layout.vk_handle);
+        NGFI_DARRAY_APPEND(pipeline->descriptor_set_layouts, set_layout);
+        NGFI_DARRAY_APPEND(vk_set_layouts, set_layout.vk_handle);
+      }
+    }
+    memset(&set_layout, 0, sizeof(set_layout));
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings &&
-           NGFI_DARRAY_AT(bindings, first_binding_in_set).set == NGFI_DARRAY_AT(bindings, cur++).set);
+           current_set_id == NGFI_DARRAY_AT(bindings, cur).set) cur++;
     const uint32_t nbindings_in_set = cur - first_binding_in_set;
     VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
         NGFI_ALLOCN(  // TODO: use temp storage here
             VkDescriptorSetLayoutBinding,
             nbindings_in_set);
-    ngfvk_desc_set_layout set_layout;
-    memset(&set_layout, 0, sizeof(set_layout));
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
-      VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[i];
+      VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
       const SpvReflectDescriptorBinding* d = &NGFI_DARRAY_AT(bindings, i);
       const ngf_descriptor_type ngf_desc_type = ngfvk_get_ngf_descriptor_type(d->descriptor_type);
+      if (ngf_desc_type == NGF_DESCRIPTOR_TYPE_COUNT) {
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_graphics_pipeline_cleanup;
+      }
       vk_d->binding                      = d->binding;
       vk_d->descriptorCount              = d->count;
       vk_d->descriptorType               = get_vk_descriptor_type(ngf_desc_type);
@@ -3144,6 +3165,7 @@ ngf_error ngf_create_graphics_pipeline(
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_create_graphics_pipeline_cleanup;
     }
+    last_set_id = current_set_id;
   }
 
   // Pipeline layout.
