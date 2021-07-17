@@ -233,9 +233,12 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/nicegraf-exception.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/window.h
                      ${NGF_SAMPLES_PLATFORM_SOURCE}
-                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
+                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
+                PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
     target_compile_definitions(ngf-samples-common PUBLIC ${NGF_SAMPLES_BACKEND_DEFINE})
 
