@@ -102,16 +102,6 @@ void* sample_initialize(uint32_t, uint32_t) {
   blit_pipe_info.shader_stages[0] = blit_vertex_stage.get();
   blit_pipe_info.shader_stages[1] = blit_fragment_stage.get();
   blit_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  blit_pipeline_data.layout_info.ndescriptor_set_layouts = 1u;
-  const ngf_descriptor_info descriptors[] = {
-    {.type = NGF_DESCRIPTOR_TEXTURE,.id = 1u, .stage_flags = NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT},
-    {.type = NGF_DESCRIPTOR_SAMPLER, .id = 2u, .stage_flags = NGF_DESCRIPTOR_FRAGMENT_STAGE_BIT },
-  };
-  const ngf_descriptor_set_layout_info desc_set_layout = {
-    .descriptors = descriptors,
-    .ndescriptors = 2u
-  };
-  blit_pipeline_data.layout_info.descriptor_set_layouts = &desc_set_layout;
   NGF_SAMPLES_CHECK(state->blit_pipeline.initialize(blit_pipe_info));
 
   /**
