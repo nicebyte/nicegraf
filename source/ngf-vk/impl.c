@@ -1792,6 +1792,14 @@ static uint64_t ngfvk_renderpass_ops_key(
     const uint64_t attachment_ops_combo = (load_op_bits << 1u) | store_op_bits;
     result |= attachment_ops_combo << (i * 3u);
   }
+  // For default RT, the load/store ops of the resolve attachments are not
+  // specified by the client code explicitly. We always treat them as
+  // DONT_CARE / STORE.
+  if (rt->is_default &&
+      nattachments < num_rt_attachments &&
+      rt->attachment_pass_descs[nattachments].is_resolve) {
+    result = result | ((uint64_t)0x1u << (3u * nattachments));
+  }
   return result;
 }
 
@@ -1825,10 +1833,8 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
     memcpy(attachment_pass_descs, rt->attachment_pass_descs, rt_attachment_pass_descs_size);
 
     for (uint32_t i = 0; i < rt->nattachments; ++i) {
-      if (!rt->attachment_pass_descs[i].is_resolve) {
-        attachment_pass_descs[i].load_op  = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
-        attachment_pass_descs[i].store_op = NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(i, ops_key);
-      }
+      attachment_pass_descs[i].load_op  = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
+      attachment_pass_descs[i].store_op = NGFVK_ATTACHMENT_STORE_OP_FROM_KEY(i, ops_key);
     }
 
     ngfvk_renderpass_from_attachment_descs(
