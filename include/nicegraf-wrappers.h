@@ -24,7 +24,6 @@
 #include "nicegraf.h"
 
 #include <optional>
-#include <queue>
 #include <string.h>
 #include <tuple>
 #include <utility>
@@ -430,118 +429,6 @@ template<typename T> class streamed_uniform {
   uint32_t       frame_;
   size_t         current_offset_;
   uint32_t       nframes_;
-};
-
-// This is a helper for disposing of staging buffers at an appropriate time.
-// After a buffer is enqueued, it will be destroyed once it is no
-// longer needed.
-class resource_dispose_queue {
-  template<class ResHandleType> struct entry {
-    uint32_t      frame;
-    ResHandleType handle;
-  };
-
-  public:
-  // Disposes of previously enqueued buffers that are no longer needed by
-  // any commands.
-  // Do not call this more than once per frame.
-  void update() {
-    update_queue(idx_buf_queue_);
-    update_queue(attr_buf_queue_);
-    update_queue(uniform_buf_queue_);
-    update_queue(pixel_buf_queue_);
-    frame_++;
-  }
-
-  void enqueue(index_buffer buf) {
-    idx_buf_queue_.emplace(entry<index_buffer> {frame_, std::move(buf)});
-  }
-
-  void enqueue(attrib_buffer buf) {
-    attr_buf_queue_.emplace(entry<attrib_buffer> {frame_, std::move(buf)});
-  }
-
-  void enqueue(uniform_buffer buf) {
-    uniform_buf_queue_.emplace(entry<uniform_buffer> {frame_, std::move(buf)});
-  }
-
-  void enqueue(pixel_buffer buf) {
-    pixel_buf_queue_.emplace(entry<pixel_buffer> {frame_, std::move(buf)});
-  }
-
-  template<class T>
-  ngf_error write_buffer(
-      ngf_xfer_encoder enc,
-      T&               target_buffer,
-      const void*      source_data,
-      size_t           source_size,
-      size_t           source_offset,
-      size_t           target_offset) {
-    ngf_buffer_info staging_buffer_info {
-        source_size,
-        NGF_BUFFER_STORAGE_HOST_WRITEABLE,
-        NGF_BUFFER_USAGE_XFER_SRC};
-    T         staging_buffer;
-    ngf_error err = staging_buffer.initialize(staging_buffer_info);
-    if (err != NGF_ERROR_OK) return err;
-    void* mapped_staging_buffer =
-        buffer_map_range(staging_buffer.get(), 0, source_size, NGF_BUFFER_MAP_WRITE_BIT);
-    memcpy(mapped_staging_buffer, source_data, source_size);
-    buffer_flush_range(staging_buffer.get(), 0, source_size);
-    buffer_unmap(staging_buffer.get());
-    cmd_copy_buffer(
-        enc,
-        staging_buffer.get(),
-        target_buffer.get(),
-        source_size,
-        source_offset,
-        target_offset);
-    enqueue(std::move(staging_buffer));
-    return NGF_ERROR_OK;
-  }
-
-  ngf_error write_image(
-      ngf_xfer_encoder enc,
-      const void*      source_data,
-      size_t           source_size,
-      size_t           source_offset,
-      ngf_image_ref    target,
-      ngf_offset3d     target_offset,
-      ngf_extent3d     target_extent) {
-    const ngf_pixel_buffer_info staging_buffer_info {source_size, NGF_PIXEL_BUFFER_USAGE_WRITE};
-    ngf::pixel_buffer           staging_buffer;
-    const ngf_error             err = staging_buffer.initialize(staging_buffer_info);
-    if (err != NGF_ERROR_OK) { return err; }
-    void* mapped_staging_buffer =
-        buffer_map_range(staging_buffer.get(), 0, source_size, NGF_BUFFER_MAP_WRITE_BIT);
-    memcpy(mapped_staging_buffer, source_data, source_size);
-    buffer_flush_range(staging_buffer.get(), 0, source_size);
-    buffer_unmap(staging_buffer.get());
-    ngf_cmd_write_image(
-        enc,
-        staging_buffer.get(),
-        source_offset,
-        target,
-        &target_offset,
-        &target_extent);
-    enqueue(std::move(staging_buffer));
-    return NGF_ERROR_OK;
-  }
-
-  private:
-  template<class T> void update_queue(std::queue<entry<T>>& q) {
-    while (!q.empty() && frame_ > q.front().frame) {
-      entry<T> e = std::move(q.front());
-      q.pop();
-      e.handle.reset(nullptr);
-    }
-  }
-
-  std::queue<entry<index_buffer>>   idx_buf_queue_;
-  std::queue<entry<attrib_buffer>>  attr_buf_queue_;
-  std::queue<entry<uniform_buffer>> uniform_buf_queue_;
-  std::queue<entry<pixel_buffer>>   pixel_buf_queue_;
-  uint32_t                          frame_ = 0u;
 };
 
 }  // namespace ngf
