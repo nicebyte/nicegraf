@@ -2491,7 +2491,8 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     } else {
       assert(false);
     }
-    store_ops[i] = NGF_STORE_OP_STORE;//rt->attachment_descs[i].is_sampled ? NGF_STORE_OP_STORE : NGF_STORE_OP_DONTCARE;
+    const bool is_multisampled = (rt->attachment_descs[i].sample_count > 1u);
+    store_ops[i] = is_multisampled ? NGF_STORE_OP_DONTCARE : NGF_STORE_OP_STORE;
   }
   const ngf_pass_info pass_info = {
     .render_target = rt,
