@@ -1,39 +1,43 @@
 #include "platform/window.h"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include "imgui_impl_win32.h"
+
+extern IMGUI_IMPL_API LRESULT
+ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 namespace ngf_samples {
 
 window_event_callback* WINDOW_EVENT_CALLBACK = nullptr;
 
 static LRESULT CALLBACK window_proc(HWND hwnd, UINT msgtype, WPARAM wparam, LPARAM lparam) {
-  if (WINDOW_EVENT_CALLBACK) {
-    window_event event;
-    switch (msgtype) {
-    case WM_MOUSEMOVE:
-      event.type               = window_event_type::pointer;
-      event.pointer_state.x    = lparam & 0xffff;
-      event.pointer_state.y    = (lparam >> 16) & 0xffff;
-      event.pointer_state.down = wparam & MK_LBUTTON;
-      WINDOW_EVENT_CALLBACK(event, nullptr);
-      break;
-    case WM_SIZE:
-      event.type                          = window_event_type::resize;
-      event.framebuffer_dimensions.width  = lparam & 0xffff;
-      event.framebuffer_dimensions.height = (lparam >> 16) & 0xffff;
-      WINDOW_EVENT_CALLBACK(event, nullptr);
-      break;
-    case WM_CLOSE:
-      event.type = window_event_type::close;
-      WINDOW_EVENT_CALLBACK(event, nullptr);
-      break;
-    default:
-      return DefWindowProc(hwnd, msgtype, wparam, lparam);
-    }
-  } else {
-    return DefWindowProc(hwnd, msgtype, wparam, lparam);
-  }
-  return 0;
+  ImGui_ImplWin32_WndProcHandler(hwnd, msgtype, wparam, lparam);
+  if (!ImGui::GetIO().WantCaptureKeyboard && !ImGui::GetIO().WantCaptureMouse) {
+    if (WINDOW_EVENT_CALLBACK) {
+      window_event event;
+      switch (msgtype) {
+      case WM_MOUSEMOVE:
+        event.type               = window_event_type::pointer;
+        event.pointer_state.x    = lparam & 0xffff;
+        event.pointer_state.y    = (lparam >> 16) & 0xffff;
+        event.pointer_state.down = wparam & MK_LBUTTON;
+        WINDOW_EVENT_CALLBACK(event, nullptr);
+        break;
+      case WM_SIZE:
+        event.type                          = window_event_type::resize;
+        event.framebuffer_dimensions.width  = lparam & 0xffff;
+        event.framebuffer_dimensions.height = (lparam >> 16) & 0xffff;
+        WINDOW_EVENT_CALLBACK(event, nullptr);
+        break;
+      case WM_CLOSE:
+        event.type = window_event_type::close;
+        WINDOW_EVENT_CALLBACK(event, nullptr);
+        break;
+      default:break;
+      }
+    } 
+  } 
+  return DefWindowProc(hwnd, msgtype, wparam, lparam);
 }
 
 void window_set_event_callback(window_event_callback cb) {
@@ -95,10 +99,12 @@ window window_create(
   SetForegroundWindow(win);
   SetFocus(win);
 
+  ImGui_ImplWin32_Init(win);
   return reinterpret_cast<window>(win);
 }
 
 bool window_poll_events() {
+  ImGui_ImplWin32_NewFrame();
   MSG  msg;
   bool should_quit = false;
   while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -110,6 +116,7 @@ bool window_poll_events() {
 }
 
 void window_destroy(window win) {
+  ImGui_ImplWin32_Shutdown();
   DestroyWindow(reinterpret_cast<HWND>(win));
 }
 
