@@ -36,10 +36,17 @@ namespace ngf_samples {
  * This function is called once at startup, to let the sample set up whatever it needs.
  * This function may assume that a nicegraf context has already been created and made current on
  * the calling thread.
- * It gets passed the dimensions of the window to be rendered to.
+ * It gets passed the dimensions of the window to be rendered to, as well as the sample count
+ * of the main rendertarget.
+ * It also gets a transfer encoder, which can samples can use to upload some resources to the
+ * GPU.
  * The function shall return a pointer that will be passed in to other callbacks.
  */
-void* sample_initialize(uint32_t initial_window_width, uint32_t initial_window_height);
+void* sample_initialize(
+    uint32_t         initial_window_width,
+    uint32_t         initial_window_height,
+    ngf_sample_count main_render_target_sample_count,
+    ngf_xfer_encoder xfer_encoder);
 
 /**
  * This function gets called every frame, to render the frame contents.
@@ -49,11 +56,12 @@ void* sample_initialize(uint32_t initial_window_width, uint32_t initial_window_h
  * match screen resolution. `userdata` is the pointer returned previously by `sample_initialize`.
  */
 void sample_draw_frame(
-    ngf_frame_token frame_token,
-    uint32_t        width,
-    uint32_t        height,
-    float           time,
-    void*           userdata);
+    ngf_render_encoder main_render_pass,
+    ngf_frame_token    frame_token,
+    uint32_t           width,
+    uint32_t           height,
+    float              time,
+    void*              userdata);
 
 /**
  * This function gets called every frame, to render the UI of the sample. It should mostly consist

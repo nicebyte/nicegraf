@@ -40,7 +40,11 @@ struct render_to_texture_data {
 
 };
 
-void* sample_initialize(uint32_t, uint32_t) {
+void* sample_initialize(
+    uint32_t,
+    uint32_t,
+    ngf_sample_count main_render_target_sample_count,
+    ngf_xfer_encoder /*xfer_encoder*/) {
   auto state = new render_to_texture_data{};
   
   /* Create the image to render to. */
@@ -95,7 +99,7 @@ void* sample_initialize(uint32_t, uint32_t) {
    */
   ngf_util_graphics_pipeline_data blit_pipeline_data;
   ngf_util_create_default_graphics_pipeline_data(&blit_pipeline_data);
-  blit_pipeline_data.multisample_info.sample_count = NGF_SAMPLE_COUNT_8;
+  blit_pipeline_data.multisample_info.sample_count = main_render_target_sample_count;
   ngf_graphics_pipeline_info &blit_pipe_info =
       blit_pipeline_data.pipeline_info;
   blit_pipe_info.nshader_stages = 2u;
@@ -138,39 +142,38 @@ void* sample_initialize(uint32_t, uint32_t) {
 }
 
 void sample_draw_frame(
+    ngf_render_encoder main_render_pass,
     ngf_frame_token frame_token,
     uint32_t        w,
     uint32_t        h,
     float           ,
-    void*           userdata) {
+    void* userdata) {
   auto state = reinterpret_cast<render_to_texture_data*>(userdata);
 
-  ngf_irect2d offsc_viewport { 0, 0, 512, 512 };
-  ngf_irect2d onsc_viewport {0, 0, w, h };
-  ngf_cmd_buffer cmd_buf = nullptr;
+  ngf_irect2d         offsc_viewport {0, 0, 512, 512};
+  ngf_irect2d         onsc_viewport {0, 0, w, h};
+  ngf_cmd_buffer      offscr_cmd_buf = nullptr;
   ngf_cmd_buffer_info cmd_info;
-  ngf_create_cmd_buffer(&cmd_info, &cmd_buf);
-  ngf_start_cmd_buffer(cmd_buf, frame_token);
+  ngf_create_cmd_buffer(&cmd_info, &offscr_cmd_buf);
+  ngf_start_cmd_buffer(offscr_cmd_buf, frame_token);
   {
-    ngf::render_encoder renc { cmd_buf, state->offscreen_rt, .0f, 0.0f, 0.0f, 0.0f, 1.0, 0u};
+    ngf::render_encoder renc {offscr_cmd_buf, state->offscreen_rt, .0f, 0.0f, 0.0f, 0.0f, 1.0, 0u};
     ngf_cmd_bind_gfx_pipeline(renc, state->offscreen_pipeline);
     ngf_cmd_viewport(renc, &offsc_viewport);
     ngf_cmd_scissor(renc, &offsc_viewport);
     ngf_cmd_draw(renc, false, 0u, 3u, 1u);
   }
-  {
-    ngf::render_encoder renc {cmd_buf, ngf_default_render_target(), .0, 0.0, 0.0, 0.0, 1.0, 0u};
-    ngf_cmd_bind_gfx_pipeline(renc, state->blit_pipeline);
-    ngf_cmd_viewport(renc, &onsc_viewport);
-    ngf_cmd_scissor(renc, &onsc_viewport);
-    ngf::cmd_bind_resources(
-        renc,
-        ngf::descriptor_set<0>::binding<1>::texture(state->rt_texture.get()),
-        ngf::descriptor_set<0>::binding<2>::sampler(state->sampler.get()));
-    ngf_cmd_draw(renc, false, 0u, 3u, 1u);
-  }
-  ngf_submit_cmd_buffers(1u, &cmd_buf);
-  ngf_destroy_cmd_buffer(cmd_buf);
+  ngf_submit_cmd_buffers(1, &offscr_cmd_buf);
+  ngf_destroy_cmd_buffer(offscr_cmd_buf);
+
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->blit_pipeline);
+  ngf_cmd_viewport(main_render_pass, &onsc_viewport);
+  ngf_cmd_scissor(main_render_pass, &onsc_viewport);
+  ngf::cmd_bind_resources(
+      main_render_pass,
+      ngf::descriptor_set<0>::binding<1>::texture(state->rt_texture.get()),
+      ngf::descriptor_set<0>::binding<2>::sampler(state->sampler.get()));
+  ngf_cmd_draw(main_render_pass, false, 0u, 3u, 1u);
 }
 
 void sample_draw_ui(void*) {

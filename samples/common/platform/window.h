@@ -26,8 +26,6 @@
 
 namespace ngf_samples {
 
-using window = uintptr_t;
-
 enum class window_event_type { pointer, resize, close };
 
 struct window_event {
@@ -47,15 +45,24 @@ struct window_event {
 
 using window_event_callback = void(const window_event&, void*);
 
-void   window_set_event_callback(window_event_callback cb);
-window window_create(
-    const char* title,
-    uint32_t    initial_framebuffer_width,
-    uint32_t    initial_framebuffer_height);
-void      window_get_size(window win, uint32_t* w, uint32_t* h);
-bool      window_is_closed(window win);
-uintptr_t window_native_handle(window win);
-bool      window_poll_events();
-void      window_destroy(window win);
+class window {
+  public:
+  window(
+      const char* title,
+      uint32_t    initial_framebuffer_width,
+      uint32_t    initial_framebuffer_height);
+  ~window();
+  void      get_size(uint32_t* w, uint32_t* h) const;
+  bool      is_closed() const;
+  uintptr_t native_handle() const {
+    return handle_;
+  }
+  void set_event_callback(window_event_callback cb);
+
+  private:
+  uintptr_t handle_;
+};
+
+bool poll_events();
 
 }  // namespace ngf_samples

@@ -21,14 +21,20 @@
  */
 
 #include "imgui-backend.h"
-#include "shader-loader.h"
+
 #include "nicegraf-util.h"
+#include "shader-loader.h"
+
 #include <assert.h>
 #include <vector>
 
 namespace ngf_samples {
 
-ngf_imgui::ngf_imgui(ngf_xfer_encoder enc) {
+ngf_imgui::ngf_imgui(
+    ngf_xfer_encoder     enc,
+    const unsigned char* font_atlas_bytes,
+    uint32_t             font_atlas_width,
+    uint32_t             font_atlas_height) {
 #if !defined(NGF_NO_IMGUI)
   vertex_stage_   = load_shader_stage("imgui", "VSMain", NGF_STAGE_VERTEX);
   fragment_stage_ = load_shader_stage("imgui", "PSMain", NGF_STAGE_FRAGMENT);
@@ -82,47 +88,48 @@ ngf_imgui::ngf_imgui(ngf_xfer_encoder enc) {
   };
   pipeline_data.vertex_input_info.nvert_buf_bindings = 1u;
   pipeline_data.vertex_input_info.vert_buf_bindings  = &binding_desc;
-
+  pipeline_data.pipeline_info.compatible_rt_attachment_descs =
+      ngf_default_render_target_attachment_descs();
   err = pipeline_.initialize(pipeline_data.pipeline_info);
   assert(err == NGF_ERROR_OK);
 
-  // Generate data for the font texture.
-  ImGuiIO&       io = ImGui::GetIO();
-  unsigned char* font_pixels;
-  int            width, height;
-  io.Fonts->GetTexDataAsRGBA32(&font_pixels, &width, &height);
-
   // Create and populate font texture.
   const ngf_image_info font_texture_info = {
-      NGF_IMAGE_TYPE_IMAGE_2D,                                // type
-      {(uint32_t)width, (uint32_t)height, 1u},                // extent
-      1u,                                                     // nmips
-      NGF_IMAGE_FORMAT_RGBA8,                                 // image_format
-      NGF_SAMPLE_COUNT_1,                                     // samples
-      NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST  // usage_hint
+      NGF_IMAGE_TYPE_IMAGE_2D,                                        // type
+      {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u},  // extent
+      1u,                                                             // nmips
+      NGF_IMAGE_FORMAT_RGBA8,                                         // image_format
+      NGF_SAMPLE_COUNT_1,                                             // samples
+      NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST          // usage_hint
   };
   err = font_texture_.initialize(font_texture_info);
   assert(err == NGF_ERROR_OK);
   ImGui::GetIO().Fonts->TexID = (ImTextureID)(uintptr_t)font_texture_.get();
   const ngf_pixel_buffer_info pbuffer_info {
-      4u * (size_t)width * (size_t)height,
+      4u * (size_t)font_atlas_width * (size_t)font_atlas_height,
       NGF_PIXEL_BUFFER_USAGE_WRITE};
   err = texture_data_.initialize(pbuffer_info);
   assert(err == NGF_ERROR_OK);
   void* mapped_texture_data = ngf_pixel_buffer_map_range(
       texture_data_.get(),
       0,
-      4 * (size_t)width * (size_t)height,
+      4 * (size_t)font_atlas_width * (size_t)font_atlas_height,
       NGF_BUFFER_MAP_WRITE_BIT);
-  memcpy(mapped_texture_data, font_pixels, 4 * (size_t)width * (size_t)height);
-  ngf_pixel_buffer_flush_range(texture_data_.get(), 0, 4 * (size_t)width * (size_t)height);
+  memcpy(
+      mapped_texture_data,
+      font_atlas_bytes,
+      4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
+  ngf_pixel_buffer_flush_range(
+      texture_data_.get(),
+      0,
+      4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
   ngf_pixel_buffer_unmap(texture_data_.get());
   ngf_image_ref font_texture_ref;
   font_texture_ref.image     = font_texture_.get();
   font_texture_ref.layer     = 0u;
   font_texture_ref.mip_level = 0u;
   const ngf_offset3d font_texture_offset {0, 0, 0};
-  const ngf_extent3d font_texture_dims {(uint32_t)width, (uint32_t)height, 1};
+  const ngf_extent3d font_texture_dims {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1};
   ngf_cmd_write_image(
       enc,
       texture_data_.get(),
@@ -148,7 +155,6 @@ ngf_imgui::ngf_imgui(ngf_xfer_encoder enc) {
   tex_sampler_.initialize(sampler_info);
 #endif
 }
-
 
 void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ImGui::Render();
@@ -185,8 +191,8 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf::cmd_bind_resources(
       enc,
       uniform_data_.bind_op_at_current_offset(0u, 0u),
-      ngf::descriptor_set<0>::binding<0>::texture(font_texture_.get()),
-      ngf::descriptor_set<0>::binding<1>::sampler(tex_sampler_.get()));
+      ngf::descriptor_set<0>::binding<1>::texture(font_texture_.get()),
+      ngf::descriptor_set<0>::binding<2>::sampler(tex_sampler_.get()));
 
   // Set viewport.
   ngf_irect2d viewport_rect = {0u, 0u, (uint32_t)fb_width, (uint32_t)fb_height};

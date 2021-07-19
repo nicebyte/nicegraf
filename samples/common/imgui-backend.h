@@ -39,7 +39,11 @@ class ngf_imgui {
    * the font texture by recording the appropriate commands into the given
    * transfer encoder.
    */
-  explicit ngf_imgui(ngf_xfer_encoder font_xfer_encoder);
+  ngf_imgui(
+      ngf_xfer_encoder     font_xfer_encoder,
+      const unsigned char* font_atlast_bytes,
+      uint32_t             font_atlas_width,
+      uint32_t             font_atlas_height);
 
   /**
    * Records commands for rendering the contents ofteh current ImGui draw data into the
