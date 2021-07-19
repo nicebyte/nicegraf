@@ -2404,6 +2404,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_image_views);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffers);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
