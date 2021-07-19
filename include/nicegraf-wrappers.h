@@ -31,7 +31,7 @@
 namespace ngf {
 
 /**
- * A move-only RAII wrapper over Nicegraf objects that provides
+ * A move-only RAII wrapper over nicegraf handles that provides
  * unique ownership semantics
  */
 template<class T, class ObjectManagementFuncs> class ngf_handle {

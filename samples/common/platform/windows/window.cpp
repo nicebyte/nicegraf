@@ -40,11 +40,11 @@ static LRESULT CALLBACK window_proc(HWND hwnd, UINT msgtype, WPARAM wparam, LPAR
   return DefWindowProc(hwnd, msgtype, wparam, lparam);
 }
 
-void window_set_event_callback(window_event_callback cb) {
+void window::set_event_callback(window_event_callback cb) {
   WINDOW_EVENT_CALLBACK = cb;
 }
 
-window window_create(
+window::window(
     const char* title,
     uint32_t    initial_framebuffer_width,
     uint32_t    initial_framebuffer_height) {
@@ -100,10 +100,10 @@ window window_create(
   SetFocus(win);
 
   ImGui_ImplWin32_Init(win);
-  return reinterpret_cast<window>(win);
+  handle_ = reinterpret_cast<uintptr_t>(win);
 }
 
-bool window_poll_events() {
+bool poll_events() {
   ImGui_ImplWin32_NewFrame();
   MSG  msg;
   bool should_quit = false;
@@ -115,23 +115,19 @@ bool window_poll_events() {
   return !should_quit;
 }
 
-void window_destroy(window win) {
+window::~window() {
   ImGui_ImplWin32_Shutdown();
-  DestroyWindow(reinterpret_cast<HWND>(win));
+  DestroyWindow(reinterpret_cast<HWND>(handle_));
 }
 
-bool window_is_closed(window win) {
+bool window::is_closed() const {
   // TODO: check PID and class too.
-  return !IsWindow(reinterpret_cast<HWND>(win));
+  return !IsWindow(reinterpret_cast<HWND>(handle_));
 }
 
-uintptr_t window_native_handle(window win) {
-  return win;
-}
-
-void window_get_size(window win, uint32_t* w, uint32_t* h) {
+void window::get_size(uint32_t* w, uint32_t* h) const {
   RECT rect;
-  GetClientRect(reinterpret_cast<HWND>(win), &rect);
+  GetClientRect(reinterpret_cast<HWND>(handle_), &rect);
   *h = rect.bottom - rect.top;
   *w = rect.right - rect.left;
 }
