@@ -21,15 +21,15 @@
  */
 
 #include "diagnostic-callback.h"
-#include "nicegraf-exception.h"
-#include "nicegraf.h"
-#include "nicegraf-wrappers.h"
 #include "imgui-backend.h"
+#include "nicegraf-exception.h"
+#include "nicegraf-wrappers.h"
+#include "nicegraf.h"
 #include "platform/window.h"
 #include "sample-interface.h"
 
+#include <optional>
 #include <stdio.h>
-#include <chrono>
 
 /*
  * Below we define the "common main" function, where all nicegraf samples begin
@@ -67,35 +67,50 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   NGF_SAMPLES_CHECK(ngf_initialize(&init_info));
 
   /**
+   * Initialize imgui and generate its font atlas.
+   */
+  ImGuiContext* imgui_ctx = ImGui::CreateContext();
+  ImGui::SetCurrentContext(imgui_ctx);
+  unsigned char* imgui_font_atlas_bytes;
+  int            imgui_font_atlas_width, imgui_font_atlas_height;
+  ImGui::GetIO().Fonts->GetTexDataAsRGBA32(
+      &imgui_font_atlas_bytes,
+      &imgui_font_atlas_width,
+      &imgui_font_atlas_height);
+
+  /**
    * Create a window.
    * The `width` and `height` here refer to the dimensions of the window's "client area", i.e. the
    * area that can actually be rendered to (excludes borders and any other decorative elements). The
    * dimensions we request are a hint, we need to get the actual dimensions after the window is
    * created.
+   * Note that we deliberately create the window before setting up the nicegraf context. This is
+   * done so that when the destructors are invoked, the context is destroyed before the window -
+   * changing this sequence of events might lead to misbehavior.
    */
   constexpr uint32_t  window_width_hint = 800, window_height_hint = 600;
-  ngf_samples::window window =
-      ngf_samples::window_create("nicegraf sample", window_width_hint, window_height_hint);
-  uint32_t fb_width, fb_height;
-  ngf_samples::window_get_size(window, &fb_width, &fb_height);
+  ngf_samples::window window {"nicegraf sample", window_width_hint, window_height_hint};
+  uint32_t            fb_width, fb_height;
+  window.get_size(&fb_width, &fb_height);
 
   /**
    * Configure the swapchain and create a nicegraf context.
    * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with 8 samples
    * per pixel.
    */
-  const ngf_swapchain_info swapchain_info = {
+  const ngf_sample_count   main_render_target_sample_count = NGF_SAMPLE_COUNT_8;
+  const ngf_swapchain_info swapchain_info                  = {
       .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
       .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
-      .sample_count  = NGF_SAMPLE_COUNT_8,
+      .sample_count  = main_render_target_sample_count,
       .capacity_hint = 3u,
       .width         = fb_width,
       .height        = fb_height,
-      .native_handle = ngf_samples::window_native_handle(window),
+      .native_handle = window.native_handle(),
       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
   const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
-  ngf_context            context;
-  NGF_SAMPLES_CHECK(ngf_create_context(&ctx_info, &context));
+  ngf::context           context;
+  NGF_SAMPLES_CHECK(context.initialize(ctx_info));
 
   /**
    * Make the newly created context current on this thread.
@@ -105,47 +120,136 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   NGF_SAMPLES_CHECK(ngf_set_context(context));
 
   /**
-   * At this point, the sample can do any initialization specific to itself.
-   * The initialization returns an opaque pointer, which we pass on when calling into
-   * sample-specific code.
+   * This is the nicegraf-based rendering backend for ImGui - we will initialize it
+   * on first frame.
    */
-  void* sample_opaque_data = ngf_samples::sample_initialize(fb_width, fb_height);
+  std::optional<ngf_samples::ngf_imgui> imgui_backend;
+
+  /**
+   * Main command buffer that samples will record rendering commands into.
+   */
+  ngf::cmd_buffer main_cmd_buffer;
+  NGF_SAMPLES_CHECK(main_cmd_buffer.initialize(ngf_cmd_buffer_info {}));
+
+  /**
+   * Pointer to sample-specific data, returned by sample_initialize.
+   * It shall be passed to the sample on every frame.
+   */
+  void* sample_opaque_data = nullptr;
 
   /**
    * Main loop. Exit when either the window closes or `poll_events` returns false, indicating that
    * the application has received a request to exit.
    */
-  while (!ngf_samples::window_is_closed(window) && ngf_samples::window_poll_events()) {
+  bool first_frame = true;
+  while (!window.is_closed() && ngf_samples::poll_events()) {
+    ImGui::NewFrame();
     /**
      * Query the updated size of the window and handle resize events.
      */
     const uint32_t old_fb_width = fb_width, old_fb_height = fb_height;
-    ngf_samples::window_get_size(window, &fb_width, &fb_height);
+    window.get_size(&fb_width, &fb_height);
     bool resize_successful = true;
     if (fb_width != old_fb_width || fb_height != old_fb_height) {
       resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, fb_width, fb_height));
     }
 
-    /**
-     * Begin frame, call into sample-specific code to perform rendering, and end frame.
-     */
     if (resize_successful) {
+      /**
+       * Begin the frame and start the main command buffer.
+       */
       ngf_frame_token frame_token;
-      ngf_begin_frame(&frame_token);
-      ngf_samples::sample_draw_frame(frame_token, fb_width, fb_height, .0, sample_opaque_data);
+      NGF_SAMPLES_CHECK(ngf_begin_frame(&frame_token));
+      NGF_SAMPLES_CHECK(ngf_start_cmd_buffer(main_cmd_buffer, frame_token));
+
+      /**
+       * On first frame, initialize the sample and the ImGui rendering backend.
+       */
+      if (first_frame) {
+        /**
+         * Start a new transfer command encoder for uploading resources to the GPU.
+         */
+        ngf_xfer_encoder xfer_encoder {};
+        NGF_SAMPLES_CHECK(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_encoder));
+
+        /**
+         * Initialize the sample, and save the opaque data pointer.
+         */
+        sample_opaque_data = ngf_samples::sample_initialize(
+            fb_width,
+            fb_height,
+            main_render_target_sample_count,
+            xfer_encoder);
+
+        /**
+         * Initialize the ImGui rendering backend.
+         */
+        imgui_backend.emplace(
+            xfer_encoder,
+            imgui_font_atlas_bytes,
+            imgui_font_atlas_width,
+            imgui_font_atlas_height);
+
+        /**
+         * Finish the transfer encoder.
+         */
+        NGF_SAMPLES_CHECK(ngf_cmd_end_xfer_pass(xfer_encoder));
+
+        first_frame = false;
+      }
+
+      /**
+       * Begin the main render pass.
+       */
+      ngf_render_encoder main_render_pass;
+      ngf_cmd_begin_render_pass_simple(
+          main_cmd_buffer,
+          ngf_default_render_target(),
+          0.0f,
+          0.0f,
+          0.0f,
+          0.0f,
+          0.0f,
+          0,
+          &main_render_pass);
+
+      /**
+       * Call into the sample code to draw a single frame.
+       */
+      ngf_samples::sample_draw_frame(
+          main_render_pass,
+          frame_token,
+          fb_width,
+          fb_height,
+          .0,
+          sample_opaque_data);
+
+      /**
+       * Call into the sample-specific code to execute ImGui UI commands.
+       */
       ngf_samples::sample_draw_ui(sample_opaque_data);
-      ngf_end_frame(frame_token);
+      ImGui::ShowDemoWindow();
+
+      /**
+       * Draw the UI on top of everything else.
+       */
+      imgui_backend->record_rendering_commands(main_render_pass);
+
+      /**
+       * Finish the main render pass, submit the command buffer and end the frame.
+       */
+      NGF_SAMPLES_CHECK(ngf_cmd_end_render_pass(main_render_pass));
+      ngf_cmd_buffer submitted_cmd_bufs[] = { main_cmd_buffer.get() };
+      NGF_SAMPLES_CHECK(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
+      NGF_SAMPLES_CHECK(ngf_end_frame(frame_token));
     }
   }
 
   /**
-   * De-initialize any sample-specific data, destroy the nicegraf context and destroy the window, in
-   * that order. Destroying the window before destroying the context associated with it may result
-   * in misbehavior.
+   * De-initialize any sample-specific data, shut down ImGui.
    */
   ngf_samples::sample_shutdown(sample_opaque_data);
-  ngf_destroy_context(context);
-  ngf_samples::window_destroy(window);
+  ImGui::DestroyContext(imgui_ctx);
 
   return 0;
 }

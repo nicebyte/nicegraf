@@ -31,10 +31,13 @@ namespace ngf_samples {
 
 struct fullscreen_triangle_data {
   ngf::graphics_pipeline pipeline;
-  ngf::cmd_buffer        cmdbuf;
 };
 
-void* sample_initialize(uint32_t, uint32_t) {
+void* sample_initialize(
+    uint32_t,
+    uint32_t,
+    ngf_sample_count main_render_target_sample_count,
+    ngf_xfer_encoder /*xfer_encoder*/) {
   auto data = new fullscreen_triangle_data {};
 
   /**
@@ -64,7 +67,7 @@ void* sample_initialize(uint32_t, uint32_t) {
   /**
    * Set multisampling state.
    */
-  pipeline_data.multisample_info.sample_count = NGF_SAMPLE_COUNT_8;
+  pipeline_data.multisample_info.sample_count = main_render_target_sample_count;
 
   /**
    * Set the compatible render target description.
@@ -77,59 +80,27 @@ void* sample_initialize(uint32_t, uint32_t) {
    */
   data->pipeline.initialize(pipeline_data.pipeline_info);
 
-  /**
-   * Initialize the command buffer object.
-   */
-  const ngf_cmd_buffer_info cmd_buf_info {};
-  data->cmdbuf.initialize(cmd_buf_info);
-
   return static_cast<void*>(data);
 }
 
 void sample_draw_frame(
-    ngf_frame_token token,
-    uint32_t        w,
-    uint32_t        h,
+    ngf_render_encoder main_render_pass,
+    ngf_frame_token /*token*/,
+    uint32_t w,
+    uint32_t h,
     float /*time*/,
     void* userdata) {
   auto data = static_cast<fullscreen_triangle_data*>(userdata);
 
-  /**
-   * Obtain the raw cmd buffer handle to pass to C functions.
-   */
-  ngf_cmd_buffer cmdbuf = data->cmdbuf.get();
-
-  /**
-   * Start recording a new batch of commands into the command buffer.
-   * This operation requires a frame token, which is returned by `ngf_begin_frame`.
-   * The token specifies the frame that this series of commands is intended to be
-   * executed within.
-   */
-  ngf_start_cmd_buffer(cmdbuf, token);
-
-  /**
-   * Begin a new render pass, drawing to the default render target.
-   */
-  ngf_render_encoder renc;
-  ngf_cmd_begin_render_pass_simple(cmdbuf, ngf_default_render_target(),
-                                   0.0f, 0.0f, 0.0f, 0.0f,
-                                   0.0f, 0,
-                                   &renc);
-  ngf_cmd_bind_gfx_pipeline(renc, data->pipeline.get());
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, data->pipeline.get());
   const ngf_irect2d viewport {0, 0, w, h};
-  ngf_cmd_viewport(renc, &viewport);
-  ngf_cmd_scissor(renc, &viewport);
+  ngf_cmd_viewport(main_render_pass, &viewport);
+  ngf_cmd_scissor(main_render_pass, &viewport);
 
   /**
    * Make a drawcall.
    */
-  ngf_cmd_draw(renc, false, 0, 3, 1);
-
-  /**
-   * Finish the render pass.
-   */
-  ngf_cmd_end_render_pass(renc);
-  ngf_submit_cmd_buffers(1, &cmdbuf);
+  ngf_cmd_draw(main_render_pass, false, 0, 3, 1);
 }
 
 void sample_draw_ui(void*) {
