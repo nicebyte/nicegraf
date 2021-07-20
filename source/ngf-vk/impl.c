@@ -2483,9 +2483,9 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     load_ops[i] = NGF_LOAD_OP_CLEAR;
     if (rt->attachment_descs[i].type == NGF_ATTACHMENT_COLOR) {
       clears[i].clear_color[0] = clear_color_r;
-      clears[i].clear_color[0] = clear_color_g;
-      clears[i].clear_color[0] = clear_color_b;
-      clears[i].clear_color[0] = clear_color_a;
+      clears[i].clear_color[1] = clear_color_g;
+      clears[i].clear_color[2] = clear_color_b;
+      clears[i].clear_color[3] = clear_color_a;
     } else if (rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH) {
       clears[i].clear_depth_stencil.clear_depth = clear_depth;
       clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
