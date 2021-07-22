@@ -85,6 +85,7 @@ void* sample_initialize(
 
 void sample_draw_frame(
     ngf_render_encoder main_render_pass,
+    float /*time_delta*/,
     ngf_frame_token /*token*/,
     uint32_t w,
     uint32_t h,

@@ -28,6 +28,7 @@
 #include "platform/window.h"
 #include "sample-interface.h"
 
+#include <chrono>
 #include <optional>
 #include <stdio.h>
 
@@ -142,7 +143,12 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * the application has received a request to exit.
    */
   bool first_frame = true;
+  auto prev_frame_start = std::chrono::system_clock::now();
   while (!window.is_closed() && ngf_samples::poll_events()) {
+    auto frame_start = std::chrono::system_clock::now();
+    const std::chrono::duration<float> time_delta = frame_start - prev_frame_start;
+    float time_delta_f = time_delta.count();
+    prev_frame_start = frame_start;
     ImGui::NewFrame();
     /**
      * Query the updated size of the window and handle resize events.
@@ -218,6 +224,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        */
       ngf_samples::sample_draw_frame(
           main_render_pass,
+          time_delta_f,
           frame_token,
           fb_width,
           fb_height,
@@ -228,7 +235,6 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        * Call into the sample-specific code to execute ImGui UI commands.
        */
       ngf_samples::sample_draw_ui(sample_opaque_data);
-      ImGui::ShowDemoWindow();
 
       /**
        * Draw the UI on top of everything else.
