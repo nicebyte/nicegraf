@@ -22,9 +22,9 @@
 
 #pragma once
 
-#include "nicegraf.h"
-#include "nicegraf-wrappers.h"
 #include "imgui.h"
+#include "nicegraf-wrappers.h"
+#include "nicegraf.h"
 
 namespace ngf_samples {
 
@@ -57,20 +57,18 @@ class ngf_imgui {
   };
 
 #if !defined(NGF_NO_IMGUI)
-  ngf::graphics_pipeline              pipeline_;
-  ngf::streamed_uniform<uniform_data> uniform_data_;
-  ngf::image                          font_texture_;
-  ngf::sampler                        tex_sampler_;
-  ngf::attrib_buffer                  attrib_buffer_;
-  ngf::index_buffer                   index_buffer_;
-  ngf::pixel_buffer                   texture_data_;
-  ngf::shader_stage                   vertex_stage_;
-  ngf::shader_stage                   fragment_stage_;
-  ngf::render_target                  default_rt_;
+  ngf::graphics_pipeline                     pipeline_;
+  ngf::streamed_uniform_buffer<uniform_data> uniform_data_;
+  ngf::image                                 font_texture_;
+  ngf::sampler                               tex_sampler_;
+  ngf::attrib_buffer                         attrib_buffer_;
+  ngf::index_buffer                          index_buffer_;
+  ngf::pixel_buffer                          texture_data_;
+  ngf::shader_stage                          vertex_stage_;
+  ngf::shader_stage                          fragment_stage_;
+  ngf::render_target                         default_rt_;
 #endif
 };
 
-}
-
-
+}  // namespace ngf_samples
 
