@@ -22,7 +22,7 @@
 
 #include "diagnostic-callback.h"
 #include "imgui-backend.h"
-#include "nicegraf-exception.h"
+#include "check.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 #include "platform/window.h"

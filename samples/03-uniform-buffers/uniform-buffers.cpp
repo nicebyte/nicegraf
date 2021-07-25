@@ -20,7 +20,7 @@
  * IN THE SOFTWARE.
  */
 
-#include "nicegraf-exception.h"
+#include "check.h"
 #include "nicegraf-util.h"
 #include "nicegraf-wrappers.h"
 #include "sample-interface.h"
