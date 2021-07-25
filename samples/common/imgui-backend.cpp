@@ -39,12 +39,10 @@ ngf_imgui::ngf_imgui(
   vertex_stage_   = load_shader_stage("imgui", "VSMain", NGF_STAGE_VERTEX);
   fragment_stage_ = load_shader_stage("imgui", "PSMain", NGF_STAGE_FRAGMENT);
 
+  ngf_error err = NGF_ERROR_OK;
+
   // Initialize the streamed uniform object.
-  ngf_error                                          err = NGF_ERROR_OK;
-  std::optional<ngf::streamed_uniform<uniform_data>> maybe_streamed_uniform;
-  std::tie(maybe_streamed_uniform, err) = ngf::streamed_uniform<uniform_data>::create(3);
-  assert(err == NGF_ERROR_OK);
-  uniform_data_ = std::move(maybe_streamed_uniform.value());
+  uniform_data_ = std::move(ngf::streamed_uniform_buffer<uniform_data>::create(3).value_or_abort());
 
   // Initial pipeline configuration with OpenGL-style defaults.
   ngf_util_graphics_pipeline_data pipeline_data;

@@ -23,7 +23,7 @@
 #include "shader-loader.h"
 
 #include "file-utils.h"
-#include "nicegraf-exception.h"
+#include "check.h"
 
 #include <fstream>
 #include <string>

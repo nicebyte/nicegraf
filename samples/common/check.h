@@ -23,21 +23,19 @@
 #pragma once
 
 #include "nicegraf-util.h"
-
-#include <stdexcept>
+#include <stdio.h>
+#include <stdlib.h>
 
 namespace ngf_samples {
 
-class nicegraf_exception : public std::runtime_error {
-  public:
-  explicit nicegraf_exception(ngf_error err) : std::runtime_error(ngf_util_get_error_name(err)) {
-  }
-};
-
-#define NGF_SAMPLES_CHECK(call)                                                         \
-  {                                                                             \
-    const ngf_error err = call;                                                 \
-    if (err != NGF_ERROR_OK) { throw ::ngf_samples::nicegraf_exception {err}; } \
+#define NGF_SAMPLES_CHECK(expr)                    \
+  {                                                \
+    const ngf_error err = (expr);                  \
+    if (err != NGF_ERROR_OK) {                     \
+      fprintf(stderr, "nicegraf error %d\n", err); \
+      fflush(stderr);                              \
+      abort();                                     \
+    }                                              \
   }
 
 }  // namespace ngf_samples

@@ -24,7 +24,7 @@
 #include "nicegraf-wrappers.h"
 #include "nicegraf-util.h"
 #include "shader-loader.h"
-#include "nicegraf-exception.h"
+#include "check.h"
 
 #include <stdio.h>
 
