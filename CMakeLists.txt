@@ -125,7 +125,7 @@ else()
     # Import VMA for handling vulkan memory allocation.
     add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/SPIRV-Reflect)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/SPIRV-reflect)
 
     # Some vulkan-specific dependencies.
     set(NICEGRAF_VK_DEPS vma spvreflect)
