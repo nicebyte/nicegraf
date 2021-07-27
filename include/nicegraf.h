@@ -470,6 +470,7 @@ typedef enum ngf_buffer_storage_type {
    * Memory that can be written to by the host.
    */
   NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+
   /**
    * Memory that can be both read from and written to by the
    * host.
@@ -1463,13 +1464,30 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, const ngf_graphics_pipeline pipeline)
     NGF_NOEXCEPT;
+
+/**
+ * Sets the viewport to be used in subsequent rendering commands.
+ * The viewport defines a region of the destination framebuffer that the resulting rendering
+ * is scaled to fit into.
+ */
 void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d* r) NGF_NOEXCEPT;
+
+/**
+ * Sets the scissor region to be used in the subsequent rendering commands.
+ * The scissor defines a region of the framebuffer that can be affected by the rendering commands.
+ * Any pixels outside of that region are not written to.
+ */
 void ngf_cmd_scissor(ngf_render_encoder buf, const ngf_irect2d* r) NGF_NOEXCEPT;
+
 void ngf_cmd_stencil_reference(ngf_render_encoder buf, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front, uint32_t back)
     NGF_NOEXCEPT;
 void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 void ngf_cmd_line_width(ngf_render_encoder buf, float line_width) NGF_NOEXCEPT;
+
+/**
+ * Bind resources for the shader to read. See ngf_resource_bind_op for more information.
+ */
 void ngf_cmd_bind_gfx_resources(
     ngf_render_encoder          buf,
     const ngf_resource_bind_op* bind_operations,
@@ -1484,12 +1502,17 @@ void ngf_cmd_bind_index_buffer(
     ngf_render_encoder     buf,
     const ngf_index_buffer idxbuf,
     ngf_type               index_type) NGF_NOEXCEPT;
+
+/**
+ * Execute a draw call.
+ */
 void ngf_cmd_draw(
     ngf_render_encoder buf,
     bool               indexed,
     uint32_t           first_element,
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT;
+
 void ngf_cmd_copy_attrib_buffer(
     ngf_xfer_encoder        enc,
     const ngf_attrib_buffer src,
