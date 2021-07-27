@@ -1550,7 +1550,7 @@ void ngf_cmd_write_image(
  * Generate mipmaps from level 0 of the given image and write the results to the remaining levels of
  * the given image. Requires the image to have been created with NGF_IMAGE_USAGE_MIPMAP_GENERATION.
  */
-ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img);
+ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
 
 #ifdef _MSC_VER
 #pragma endregion
