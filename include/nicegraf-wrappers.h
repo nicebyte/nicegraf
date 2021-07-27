@@ -403,17 +403,7 @@ template<typename T> class streamed_uniform_buffer {
   }
   streamed_uniform_buffer(const streamed_uniform_buffer&) = delete;
 
-  streamed_uniform_buffer& operator=(streamed_uniform_buffer&& other) {
-    buf_                  = std::move(other.buf_);
-    frame_                = other.frame_;
-    other.frame_          = 0u;
-    current_offset_       = other.current_offset_;
-    other.current_offset_ = 0u;
-    nframes_              = other.nframes_;
-    other.nframes_        = 0u;
-    return *this;
-  }
-
+  streamed_uniform_buffer& operator=(streamed_uniform_buffer&& other) = default;
   streamed_uniform_buffer& operator=(const streamed_uniform_buffer&) = delete;
 
   static result_or_error<streamed_uniform_buffer> create(const uint32_t frames) {
