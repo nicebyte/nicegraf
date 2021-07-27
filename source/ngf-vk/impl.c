@@ -254,6 +254,7 @@ typedef struct ngf_image_t {
   VkFormat       vkformat;
   ngf_extent3d   extent;
   uint32_t       usage_flags;
+  uint32_t       nlevels;
 } ngf_image_t;
 
 typedef struct ngf_context_t {
@@ -3692,6 +3693,136 @@ void ngf_cmd_write_image(
       &post_xfer_barrier);
 }
 
+ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
+  if (!(img->usage_flags & NGF_IMAGE_USAGE_MIPMAP_GENERATION)) {
+    NGFI_DIAG_ERROR("mipmap generation was requested for an image that was created without "
+                    "the NGF_IMAGE_USAGE_MIPMAP_GENERATION usage flag.");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(xfenc);
+  assert(buf);
+
+  // TODO: ensure the pixel format is valid for mip generation.
+
+  uint32_t src_w = img->extent.width, src_h = img->extent.height, dst_w = 0, dst_h = 0;
+
+  for (uint32_t src_level = 0u; src_level < img->nlevels - 1; ++src_level) {
+    const uint32_t             dst_level           = src_level + 1u;
+    dst_w = src_w > 1u ? (src_w >> 1u) : 1u;
+    dst_h = src_h > 1u ? (src_h >> 1u) : 1u;
+    const VkImageMemoryBarrier pre_blit_barriers[] = {
+        {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext               = NULL,
+         .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+         .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+         .oldLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+         .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image               = (VkImage)img->alloc.obj_handle,
+         .subresourceRange =
+             {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel   = src_level,
+              .levelCount     = 1u,
+              .baseArrayLayer = 0u,
+              .layerCount     = 1u}},
+        {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext               = NULL,
+         .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+         .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+         .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image               = (VkImage)img->alloc.obj_handle,
+         .subresourceRange    = {
+             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+             .baseMipLevel   = dst_level,
+             .levelCount     = 1u,
+             .baseArrayLayer = 0u,
+             .layerCount     = 1u}}};
+    vkCmdPipelineBarrier(
+        buf->active_bundle.vkcmdbuf,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        0u,
+        0u,
+        NULL,
+        0u,
+        NULL,
+        2u,
+        pre_blit_barriers);
+    const VkImageBlit blit_region = {
+        .srcSubresource =
+            {.mipLevel       = src_level,
+             .baseArrayLayer = 0u,
+             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+             .layerCount     = 1u},
+        .dstSubresource =
+            {.mipLevel       = dst_level,
+             .baseArrayLayer = 0u,
+             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+             .layerCount     = 1u},
+        .srcOffsets = {{0, 0, 0}, {src_w, src_h, 1}},
+        .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
+    vkCmdBlitImage(
+        buf->active_bundle.vkcmdbuf,
+        (VkImage)img->alloc.obj_handle,
+        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        (VkImage)img->alloc.obj_handle,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &blit_region,
+        VK_FILTER_LINEAR);
+    const VkImageMemoryBarrier post_blit_barriers[] = {
+        {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext               = NULL,
+         .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+         .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+         .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+         .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image               = (VkImage)img->alloc.obj_handle,
+         .subresourceRange =
+             {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+              .baseMipLevel   = src_level,
+              .levelCount     = 1u,
+              .baseArrayLayer = 0u,
+              .layerCount     = 1u}},
+        {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+         .pNext               = NULL,
+         .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+         .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+         .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+         .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+         .image               = (VkImage)img->alloc.obj_handle,
+         .subresourceRange    = {
+             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+             .baseMipLevel   = dst_level,
+             .levelCount     = 1u,
+             .baseArrayLayer = 0u,
+             .layerCount     = 1u}}};
+    vkCmdPipelineBarrier(
+        buf->active_bundle.vkcmdbuf,
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+        0u,
+        0u,
+        NULL,
+        0u,
+        NULL,
+        2u,
+        post_blit_barriers);
+    src_w = dst_w;
+    src_h = dst_h;
+  }
+  return NGF_ERROR_OK;
+}
+
 static ngf_error ngfvk_create_buffer(
     size_t                size,
     VkBufferUsageFlags    vk_usage_flags,
@@ -3942,6 +4073,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const bool is_sampled_from  = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
   const bool is_xfer_dst      = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
   const bool is_attachment    = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
+  const bool enable_auto_mips = info->usage_hint & NGF_IMAGE_USAGE_MIPMAP_GENERATION;
   const bool is_transient     = info->usage_hint & NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
   const bool is_depth_stencil = info->format == NGF_IMAGE_FORMAT_DEPTH16 ||
                                 info->format == NGF_IMAGE_FORMAT_DEPTH32 ||
@@ -3956,7 +4088,8 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
       (is_attachment ? attachment_usage_bits : 0u) |
       (is_transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0) |
-      (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u);
+      (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u) |
+      (enable_auto_mips ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u);
 
   ngf_error err = NGF_ERROR_OK;
   *result       = NGFI_ALLOC(ngf_image_t);
@@ -4047,6 +4180,8 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
           .levelCount     = vk_image_info.mipLevels,
           .baseArrayLayer = 0u,
           .layerCount     = vk_image_info.arrayLayers}};
+
+  img->nlevels = info->nmips;
 
   pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
   NGFI_DARRAY_APPEND(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, barrier);

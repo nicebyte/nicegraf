@@ -440,10 +440,10 @@ typedef struct ngf_vertex_input_info {
 } ngf_vertex_input_info;
 
 typedef enum ngf_sample_count {
-  NGF_SAMPLE_COUNT_1 = 1,
-  NGF_SAMPLE_COUNT_2 = 2,
-  NGF_SAMPLE_COUNT_4 = 4,
-  NGF_SAMPLE_COUNT_8 = 8,
+  NGF_SAMPLE_COUNT_1  = 1,
+  NGF_SAMPLE_COUNT_2  = 2,
+  NGF_SAMPLE_COUNT_4  = 4,
+  NGF_SAMPLE_COUNT_8  = 8,
   NGF_SAMPLE_COUNT_16 = 16,
   NGF_SAMPLE_COUNT_32 = 32,
   NGF_SAMPLE_COUNT_64 = 64,
@@ -619,7 +619,8 @@ typedef enum ngf_image_usage {
   NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
   NGF_IMAGE_USAGE_ATTACHMENT  = 0x02, /**< Can be used as an attachment for a
                                            render target.*/
-  NGF_IMAGE_USAGE_XFER_DST = 0x04 /**< Can be used as a destination for a transfer operation. **/
+  NGF_IMAGE_USAGE_XFER_DST = 0x04, /**< Can be used as a destination for a transfer operation. **/
+  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 /**< Use this flag to enable auto mipmap generation. */
 } ngf_image_usage;
 
 /**
@@ -705,7 +706,7 @@ typedef enum ngf_attachment_store_op {
  * Specifies a rendertarget clear operation.
  */
 typedef union ngf_clear_info {
-  float    clear_color[4];
+  float clear_color[4];
   struct {
     float    clear_depth;
     uint32_t clear_stencil;
@@ -713,14 +714,14 @@ typedef union ngf_clear_info {
 } ngf_clear;
 
 /**
- * Describes the type and format of a render target attachment. 
+ * Describes the type and format of a render target attachment.
  */
 typedef struct ngf_attachment_description {
   ngf_attachment_type type;         /**< What the attachment shall be used for. */
   ngf_image_format    format;       /**< Format of the associated image. */
   ngf_sample_count    sample_count; /**< Number of samples per pixel in the associated image. */
-  bool                is_sampled;   /**< Whether this attachment's associated image is sampled from a
-                                         shader at any point. */
+  bool                is_sampled; /**< Whether this attachment's associated image is sampled from a
+                                       shader at any point. */
 } ngf_attachment_description;
 
 /**
@@ -737,7 +738,7 @@ typedef struct ngf_attachment_descriptions {
 typedef struct ngf_render_target_info {
   const ngf_attachment_descriptions* attachment_descriptions; /**< List of attachment descriptions
                                                                    for this render target. */
-  const ngf_image_ref*               attachment_image_refs;   /**< Image references corresponding
+  const ngf_image_ref* attachment_image_refs;                 /**< Image references corresponding
                                                                    to each attachment in the list. */
 } ngf_render_target_info;
 
@@ -756,13 +757,13 @@ typedef struct ngf_pass_info {
   const ngf_clear*               clears;
 } ngf_pass_info;
 
-
 /**
  * Swapchain configuration.
  */
 typedef struct ngf_swapchain_info {
   ngf_image_format color_format;  /**< Swapchain image format. */
-  ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
+  ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to
+                                     NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
   ngf_sample_count sample_count;  /**< Number of samples per pixel (0 for non-multisampled) */
   uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
   uint32_t         width;         /**< Width of swapchain images in pixels. */
@@ -978,7 +979,7 @@ typedef struct ngf_cmd_buffer_info {
  *
  * Every newly created command buffer is in the "new" state. It can be transitioned
  * to the "ready" state by calling `ngf_start_cmd_buffer` on it.
- * 
+ *
  * When a command buffer is in the "ready" state, you may begin recording a new
  * series of rendering commands into it.
  *
@@ -1011,7 +1012,7 @@ typedef struct ngf_cmd_buffer_info {
  * It is, however, possible to begin recording a new, completely separate batch
  * of commands by calling \ref ngf_cmd_buffer_start which implicitly
  * transitions the buffer to the "ready" state if it is already "submitted".
- * This does not affect any previously submitted commands. 
+ * This does not affect any previously submitted commands.
  *
  * Calling a command buffer function on a buffer that is in a state not
  * expected by that function will result in an error. For example, calling
@@ -1206,7 +1207,7 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
  * color attachment associated with the context's swapchain. If the swapchain
  * was created with an accompanying depth buffer, the render target shall
  * have an attachment for that as well.
- * 
+ *
  * The caller should not attempt to destroy the returned render target. It shall
  * be destroyed automatically, together with the parent context.
  */
@@ -1402,8 +1403,8 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT;
  * identified by the specified token.
  * The command buffer is required to be in the "ready" state.
  * @param buf The command buffer to operate on
- * @param token The token for the frame within which the recorded commands are going 
- *              to be submitted. 
+ * @param token The token for the frame within which the recorded commands are going
+ *              to be submitted.
  */
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf, ngf_frame_token token) NGF_NOEXCEPT;
 
@@ -1421,8 +1422,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
  *            state, will be transitioned to the "recording" state.
  * @param pass_info Specifies renderpass parameters.
  */
-ngf_error ngf_cmd_begin_render_pass(ngf_cmd_buffer buf, const ngf_pass_info* pass_info,
-                                      ngf_render_encoder* enc) NGF_NOEXCEPT;
+ngf_error ngf_cmd_begin_render_pass(
+    ngf_cmd_buffer       buf,
+    const ngf_pass_info* pass_info,
+    ngf_render_encoder*  enc) NGF_NOEXCEPT;
 
 /**
  * Similar to the above but with some choices pre-made:
@@ -1432,15 +1435,16 @@ ngf_error ngf_cmd_begin_render_pass(ngf_cmd_buffer buf, const ngf_pass_info* pas
  *     NGF_STORE_OP_DONTCARE.
  *   - The store action for attachments marked as sampled_from, is set to NGF_STORE_OP_STORE.
  */
-ngf_error ngf_cmd_begin_render_pass_simple(ngf_cmd_buffer buf, 
-                                           ngf_render_target rt,
-                                           float clear_color_r,
-                                           float clear_color_g,
-                                           float clear_color_b,
-                                           float clear_color_a,
-                                           float clear_depth,
-                                           uint32_t  clear_stencil,
-                                           ngf_render_encoder* enc) NGF_NOEXCEPT;
+ngf_error ngf_cmd_begin_render_pass_simple(
+    ngf_cmd_buffer      buf,
+    ngf_render_target   rt,
+    float               clear_color_r,
+    float               clear_color_g,
+    float               clear_color_b,
+    float               clear_color_a,
+    float               clear_depth,
+    uint32_t            clear_stencil,
+    ngf_render_encoder* enc) NGF_NOEXCEPT;
 
 /**
  * Starts a new encoder for transfer commands associated with the given
@@ -1541,6 +1545,12 @@ void ngf_cmd_write_image(
     ngf_image_ref          dst,
     const ngf_offset3d*    offset,
     const ngf_extent3d*    extent) NGF_NOEXCEPT;
+
+/**
+ * Generate mipmaps from level 0 of the given image and write the results to the remaining levels of
+ * the given image. Requires the image to have been created with NGF_IMAGE_USAGE_MIPMAP_GENERATION.
+ */
+ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img);
 
 #ifdef _MSC_VER
 #pragma endregion
