@@ -487,6 +487,7 @@ struct ngf_sampler_t {
 struct ngf_image_t {
   id<MTLTexture> texture = nil;
   ngf_image_format format;
+  uint32_t usage_flags = 0u;
 };
 
 template <class NgfObjType, void(*Dtor)(NgfObjType*)>
@@ -1455,6 +1456,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   NGFMTL_NURSERY(image, image);
   image->texture =
       [MTL_DEVICE newTextureWithDescriptor:mtl_img_desc];
+  image->usage_flags = info->usage_hint;
   image->format = info->format;
   *result = image.release();
   return NGF_ERROR_OK;
@@ -1940,6 +1942,20 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                                                 (NSUInteger)offset->z)];
 }
 
+ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT {
+  if (!(img->usage_flags & NGF_IMAGE_USAGE_MIPMAP_GENERATION)) {
+    NGFI_DIAG_ERROR("mipmap generation was requested for an image that was created "
+                    "without the NGF_IMAGE_USAGE_MIPMAP_GENERATION flag");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  auto buf = (ngf_cmd_buffer)xfenc.__handle;
+  assert(buf->active_rce == nil);
+  if (buf->active_bce == nil) {
+    buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder];
+  }
+  [buf->active_bce generateMipmapsForTexture:img->texture];
+  return NGF_ERROR_OK;
+}
 #define PLACEHOLDER_CMD(name, ...) \
 void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) {}
 
