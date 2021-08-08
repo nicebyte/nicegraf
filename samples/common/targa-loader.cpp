@@ -109,12 +109,12 @@ void load_targa(
   *height_px = hdr->img.height;
 
   /* if the output buffer pointer is null, we're done. */
-  if (out_buf == nullptr) { throw std::runtime_error("buffer overflow"); }
+  if (out_buf == nullptr) { return; }
 
   /* compute expected output size and check if it fits into the provided
      output buffer. */
   const size_t expected_output_size = 4u * hdr->img.width * hdr->img.height;
-  if (expected_output_size >= out_buf_size) { throw std::runtime_error("buffer overflow"); }
+  if (expected_output_size > out_buf_size) { throw std::runtime_error("buffer overflow"); }
 
   /* verify that footer is valid. */
   const char* expected_sig = "TRUEVISION-XFILE.";
