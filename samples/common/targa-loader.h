@@ -26,31 +26,22 @@
 
 namespace ngf_samples {
 
-enum class load_targa_result : uint8_t {
-  success = 0,
-  buffer_overflow,
-  ill_formed_data,
-  unsupported_format_feature
-};
-
 /**
- * Decodes an RLE-encoded true color targa file with an alpha
- * channel into the target buffer.
+ * Decodes an RLE-encoded true color targa file with an optional
+ * alpha channel into the target buffer.
  * Assumes the source file uses sRGB color space.
  * If `out_buf` is non-NULL, raw RGBA values, in sRGB, with
  * premultiplied alpha, will be written to it. The width and
  * height of the image are returned in the output parameters.
  * If `out_buf` is NULL, no decoding is performed, however
  * the width and height of the image are still returned.
- * The function returns 0 on success, and a non-zero value on
- * error.
  */
-load_targa_result load_targa(
+void load_targa(
     const void* in_buf,
     size_t      in_buf_size,
-    size_t      out_buf_size,
     void*       out_buf,
-    size_t*     width_px,
-    size_t*     height_px);
+    size_t      out_buf_size,
+    uint32_t*   width_px,
+    uint32_t*   height_px);
 
 }  // namespace ngf_samples
