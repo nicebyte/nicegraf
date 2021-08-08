@@ -134,7 +134,7 @@ typedef struct ngfvk_bind_op_chunk_list {
 
 typedef struct {
   VmaAllocator  parent_allocator;
-  uint64_t      obj_handle;
+  uintptr_t     obj_handle;
   VmaAllocation vma_alloc;
 } ngfvk_alloc;
 
@@ -1532,7 +1532,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   // descriptor sets and put them into the array as necessary.
   const size_t     vk_desc_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
   VkDescriptorSet* vk_desc_sets = ngfi_sa_alloc(ngfi_tmp_store(), vk_desc_sets_size_bytes);
-  memset(vk_desc_sets, VK_NULL_HANDLE, vk_desc_sets_size_bytes);
+  memset(vk_desc_sets, (uintptr_t)VK_NULL_HANDLE, vk_desc_sets_size_bytes);
 
   const uint32_t nbind_operations = cmd_buf->pending_bind_ops.size;
 
@@ -4194,7 +4194,7 @@ ngf_create_image_cleanup:
 
 void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
-    if (img->alloc.obj_handle != VK_NULL_HANDLE) {
+    if (img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
       const uint32_t fi = CURRENT_CONTEXT->frame_id;
       NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_images, img->alloc);
       NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_image_views, img->vkview);
