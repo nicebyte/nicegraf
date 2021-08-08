@@ -236,6 +236,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        */
       ngf_samples::sample_draw_ui(sample_opaque_data);
 
+      ImGui::ShowDemoWindow();
+
       /**
        * Draw the UI on top of everything else.
        */
