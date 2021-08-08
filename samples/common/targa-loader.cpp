@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <math.h>
+#include <stdexcept>
 
 namespace ngf_samples {
 namespace tga {
@@ -89,13 +90,13 @@ uint8_t linear_to_srgb(float linear_value) {
 
 }  // namespace
 
-load_targa_result load_targa(
+void load_targa(
     const void* in_buf,
     size_t      in_buf_size,
-    size_t      out_buf_size,
     void*       out_buf,
-    size_t*     width_px,
-    size_t*     height_px) {
+    size_t      out_buf_size,
+    uint32_t*   width_px,
+    uint32_t*   height_px) {
   auto in_bytes  = (const char*)in_buf;
   auto out_bytes = (char*)out_buf;
 
@@ -108,24 +109,25 @@ load_targa_result load_targa(
   *height_px = hdr->img.height;
 
   /* if the output buffer pointer is null, we're done. */
-  if (out_buf == nullptr) { return load_targa_result::success; }
+  if (out_buf == nullptr) { throw std::runtime_error("buffer overflow"); }
 
   /* compute expected output size and check if it fits into the provided
      output buffer. */
   const size_t expected_output_size = 4u * hdr->img.width * hdr->img.height;
-  if (expected_output_size >= out_buf_size) { return load_targa_result::buffer_overflow; }
+  if (expected_output_size >= out_buf_size) { throw std::runtime_error("buffer overflow"); }
 
   /* verify that footer is valid. */
   const char* expected_sig = "TRUEVISION-XFILE.";
   for (size_t si = 0; si < sizeof(ftr->sig); ++si) {
-    if (ftr->sig[si] != expected_sig[si]) return load_targa_result::ill_formed_data;
+    if (ftr->sig[si] != expected_sig[si]) { throw std::runtime_error("tga signature not found"); }
   }
 
-  /* only rle-encoded true-color images with alpha are allowed. */
-  const bool has_alpha = (hdr->img.descriptor & 0x07) != 0;
-  if (!has_alpha || hdr->type != tga::img_type::true_color_rle) {
-    return load_targa_result::unsupported_format_feature;
+  /* only rle-encoded true-color images are allowed. */
+  if (hdr->type != tga::img_type::true_color_rle) {
+    throw std::runtime_error("unsupported tga feature detected");
   }
+
+  const bool has_alpha = (hdr->img.descriptor & 0x07) != 0;
 
   /* obtain extension data offset. */
   const size_t ext_offset = ftr->ext_offset;
@@ -134,13 +136,14 @@ load_targa_result load_targa(
      premultiplied.
      if no extension section is present, assume non-premultiplied
      alpha. */
-  const uint8_t attr_type = ext_offset == 0 ? 3 : in_bytes[ext_offset + 494];
-  if (attr_type != 3 && attr_type != 4) { return load_targa_result::ill_formed_data; }
+  const uint8_t attr_type = !has_alpha || ext_offset == 0 ? 3 : in_bytes[ext_offset + 494];
+  if (attr_type != 3 && attr_type != 4) { throw std::runtime_error("invalid attribute type"); }
   const bool is_premul_alpha = attr_type == 4;
 
   /* read and decode image data, writing result to output. */
-  const char* img_data       = in_bytes + sizeof(tga::header) + hdr->id_length;
-  size_t      written_pixels = 0;
+  const char*  img_data       = in_bytes + sizeof(tga::header) + hdr->id_length;
+  size_t       written_pixels = 0;
+  const size_t bytes_per_pel  = has_alpha ? 4 : 3;
   while (written_pixels < hdr->img.width * hdr->img.height &&
          img_data - in_bytes < (ptrdiff_t)in_buf_size) {
     const char   packet_hdr    = *img_data;
@@ -149,10 +152,10 @@ load_targa_result load_targa(
     ++img_data; /* advance img. data to point to start of packet data. */
     for (size_t p = 0u; p < packet_length; ++p) {
       /* pixel data is stored as BGRA. */
-      const char  a      = img_data[3];
+      const char  a      = has_alpha ? img_data[3] : 255;
       const float af     = (float)a / 255.0f;
       auto        premul = [&](uint8_t v) {
-        if (is_premul_alpha)
+        if (is_premul_alpha || !has_alpha)
           return v;
         else {
           /* need to convert from sRGB to linear, premultiply then convert back. */
@@ -167,13 +170,14 @@ load_targa_result load_targa(
       out_bytes[written_pixels * 4u + 2] = b;
       out_bytes[written_pixels * 4u + 3] = a;
       ++written_pixels;
-      if (!is_rle_packet) img_data += 4;
+      if (!is_rle_packet) img_data += bytes_per_pel;
     }
-    if (is_rle_packet) img_data += 4;
+    if (is_rle_packet) img_data += bytes_per_pel;
   }
 
-  return (img_data - in_bytes >= (ptrdiff_t)in_buf_size) ? load_targa_result::buffer_overflow
-                                                         : load_targa_result::success;
+  if (img_data - in_bytes >= (ptrdiff_t)in_buf_size) {
+    throw std::runtime_error("buffer overflow");
+  }
 }
 
 }  // namespace ngf_samples
