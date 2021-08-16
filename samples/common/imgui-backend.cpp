@@ -42,7 +42,7 @@ ngf_imgui::ngf_imgui(
   ngf_error err = NGF_ERROR_OK;
 
   // Initialize the streamed uniform object.
-  uniform_data_ = std::move(ngf::streamed_uniform_buffer<uniform_data>::create(3).value_or_abort());
+  uniform_data_.initialize(3);
 
   // Initial pipeline configuration with OpenGL-style defaults.
   ngf_util_graphics_pipeline_data pipeline_data;
@@ -126,15 +126,13 @@ ngf_imgui::ngf_imgui(
   font_texture_ref.image     = font_texture_.get();
   font_texture_ref.layer     = 0u;
   font_texture_ref.mip_level = 0u;
-  const ngf_offset3d font_texture_offset {0, 0, 0};
-  const ngf_extent3d font_texture_dims {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1};
   ngf_cmd_write_image(
       enc,
       texture_data_.get(),
       0,
       font_texture_ref,
-      &font_texture_offset,
-      &font_texture_dims);
+      ngf_offset3d{},
+      ngf_extent3d{(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u});
 
   // Create a sampler for the font texture.
   ngf_sampler_info sampler_info {

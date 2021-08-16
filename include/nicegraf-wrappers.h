@@ -30,36 +30,12 @@
 namespace ngf {
 
 /**
- * Convenience wrapper to allow functions to return either a value or a nicegraf error code.
- */
-template<class T> class result_or_error {
-  public:
-  result_or_error(ngf_error err) : err_ {err} {}
-  result_or_error(T&& val) : val_ {std::forward<T>(val)} {}
-  template<class C> result_or_error(const result_or_error<C>& other) : err_ {other.err_code()} {}
-
-  ngf_error err_code() const { return err_; }
-
-  T& value_or_abort() {
-    if (err_code() == NGF_ERROR_OK) {
-      return val_;
-    } else {
-      abort();
-    }
-  }
-
-  private:
-  ngf_error err_ = NGF_ERROR_OK;
-  T         val_;
-};
-
-/**
  * Convenience macro to allow easily propagating nicegraf errors.
  */
-#define NGF_RETURN_IF_ERROR(result_or_err_val)      \
-  {                                                 \
-    const auto& tmp = (result_or_err_val);          \
-    if (tmp.err_code() != NGF_ERROR_OK) return tmp; \
+#define NGF_RETURN_IF_ERROR(expr)        \
+  {                                      \
+    const ngf_error tmp = (expr);        \
+    if (tmp != NGF_ERROR_OK) return tmp; \
   }
 
 /**
@@ -93,13 +69,6 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
     destroy_if_necessary();
     return ObjectManagementFuncs::create(&info, &handle_);
-  }
-
-  static result_or_error<ngf_handle> create(const init_type& info) {
-    ngf_handle      h;
-    const ngf_error err = h.initialize(info);
-    return (err == NGF_ERROR_OK) ? result_or_error<ngf_handle>(std::move(h))
-                                 : result_or_error<ngf_handle>(err);
   }
 
   T get() {
@@ -255,14 +224,14 @@ template<uint32_t S> struct descriptor_set {
     }
 
     static ngf_resource_bind_op
-    uniform_buffer(const ngf_uniform_buffer buf, size_t offset, size_t range) {
+    uniforms(const ngf_uniform_buffer buf, size_t offset, size_t range) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding             = B;
       op.target_set                 = S;
-      op.info.uniform_buffer.buffer = buf;
-      op.info.uniform_buffer.offset = offset;
-      op.info.uniform_buffer.range  = range;
+      op.info.uniforms.buffer = buf;
+      op.info.uniforms.offset = offset;
+      op.info.uniforms.range  = range;
       return op;
     }
 
@@ -393,26 +362,27 @@ image_ref(const ngf_image img, uint32_t mip, uint32_t layer, ngf_cubemap_face fa
 }
 
 /**
- * A convenience class for streaming uniform data.
+ * A convenience class for dynamically updated structured uniform data.
  */
-template<typename T> class streamed_uniform_buffer {
+template<typename T> class uniform_multibuffer {
   public:
-  streamed_uniform_buffer() = default;
-  streamed_uniform_buffer(streamed_uniform_buffer&& other) {
+  uniform_multibuffer() = default;
+  uniform_multibuffer(uniform_multibuffer&& other) {
     *this = std::move(other);
   }
-  streamed_uniform_buffer(const streamed_uniform_buffer&) = delete;
+  uniform_multibuffer(const uniform_multibuffer&) = delete;
 
-  streamed_uniform_buffer& operator=(streamed_uniform_buffer&& other) = default;
-  streamed_uniform_buffer& operator=(const streamed_uniform_buffer&) = delete;
+  uniform_multibuffer& operator=(uniform_multibuffer&& other) = default;
+  uniform_multibuffer& operator=(const uniform_multibuffer&) = delete;
 
-  static result_or_error<streamed_uniform_buffer> create(const uint32_t frames) {
+  ngf_error initialize(const uint32_t frames) {
     const size_t alignment    = ngf_get_device_capabilities()->uniform_buffer_offset_alignment;
     const size_t aligned_size = sizeof(T) + (alignment - sizeof(T) % alignment);
-    auto         maybe_buffer = uniform_buffer::create(
-        ngf_buffer_info {aligned_size * frames, NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE, 0});
-    NGF_RETURN_IF_ERROR(maybe_buffer);
-    return streamed_uniform_buffer(std::move(maybe_buffer.value_or_abort()), frames, aligned_size);
+    NGF_RETURN_IF_ERROR(buf_.initialize(
+        ngf_buffer_info {aligned_size * frames, NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE, 0}));
+    nframes_                = frames;
+    aligned_per_frame_size_ = aligned_size;
+    return NGF_ERROR_OK;
   }
 
   void write(const T& data) {
@@ -435,26 +405,18 @@ template<typename T> class streamed_uniform_buffer {
     op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding             = binding;
     op.target_set                 = set;
-    op.info.uniform_buffer.buffer = buf_.get();
-    op.info.uniform_buffer.offset = current_offset_ + additional_offset;
-    op.info.uniform_buffer.range  = (range == 0) ? aligned_per_frame_size_ : range;
+    op.info.uniforms.buffer = buf_.get();
+    op.info.uniforms.offset = current_offset_ + additional_offset;
+    op.info.uniforms.range  = (range == 0) ? aligned_per_frame_size_ : range;
     return op;
   }
 
   private:
-  streamed_uniform_buffer(ngf::uniform_buffer buf, uint32_t nframes, size_t aligned_size)
-      : buf_(std::move(buf)),
-        frame_(0u),
-        current_offset_(0u),
-        aligned_per_frame_size_(aligned_size),
-        nframes_(nframes) {
-  }
-
   uniform_buffer buf_;
-  uint32_t       frame_;
-  size_t         current_offset_;
-  size_t         aligned_per_frame_size_;
-  uint32_t       nframes_;
+  uint32_t       frame_                  = 0;
+  size_t         current_offset_         = 0;
+  size_t         aligned_per_frame_size_ = 0;
+  uint32_t       nframes_                = 0;
 };
 
 }  // namespace ngf
