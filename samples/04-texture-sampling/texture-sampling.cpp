@@ -247,7 +247,7 @@ void sample_draw_frame(
     uint32_t h,
     float /*time*/,
     void* userdata) {
-  auto data = reinterpret_cast<texture_sampling::state*>(userdata);
+  auto state = reinterpret_cast<texture_sampling::state*>(userdata);
 
   /* Compute the perspective transform for the current frame. */
   const nm::float4x4 camera_to_clip = nm::perspective(
@@ -258,7 +258,7 @@ void sample_draw_frame(
 
   /* Build the world-to-camera transform for the current frame. */
   nm::float4x4 world_to_camera =
-      nm::translation(nm::float3 {data->pan, 0.0f, data->dolly}) * nm::rotation_x(data->tilt);
+      nm::translation(nm::float3 {state->pan, 0.0f, state->dolly}) * nm::rotation_x(state->tilt);
 
   /* Build the final transform matrices for this frame. */
   texture_sampling::matrices uniforms_for_this_frame;
@@ -268,19 +268,19 @@ void sample_draw_frame(
         nm::translation(nm::float3 {-3.0f + i * 2.05f, 0.0f, 0.0f});
     uniforms_for_this_frame.m[i] = camera_to_clip * world_to_camera * object_to_world;
   }
-  data->uniforms.write(uniforms_for_this_frame);
+  state->uniforms.write(uniforms_for_this_frame);
 
   ngf_irect2d viewport {0, 0, w, h};
-  ngf_cmd_bind_gfx_pipeline(main_render_pass, data->pipeline);
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
-  for (int i = 0; i < sizeof(data->samplers) / sizeof(data->samplers[0]); ++i) {
+  for (int i = 0; i < sizeof(state->samplers) / sizeof(state->samplers[0]); ++i) {
     ngf::cmd_bind_resources(
         main_render_pass,
-        data->uniforms
+        state->uniforms
             .bind_op_at_current_offset(0, 0, sizeof(nm::float4x4) * i, sizeof(nm::float4x4)),
-        ngf::descriptor_set<0>::binding<1>::sampler(data->samplers[i]),
-        ngf::descriptor_set<1>::binding<0>::texture(data->texture));
+        ngf::descriptor_set<0>::binding<1>::sampler(state->samplers[i]),
+        ngf::descriptor_set<1>::binding<0>::texture(state->texture));
     ngf_cmd_draw(main_render_pass, false, 0, 6, 1);
   }
 }
