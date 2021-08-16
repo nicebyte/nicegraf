@@ -29,16 +29,18 @@
 
 namespace ngf_samples {
 
-struct fullscreen_triangle_data {
+namespace fullscreen_triangle {
+struct state {
   ngf::graphics_pipeline pipeline;
 };
+}
 
 void* sample_initialize(
     uint32_t,
     uint32_t,
     ngf_sample_count main_render_target_sample_count,
     ngf_xfer_encoder /*xfer_encoder*/) {
-  auto data = new fullscreen_triangle_data {};
+  auto state = new fullscreen_triangle::state {};
 
   /**
    * Load the shader stages.
@@ -78,9 +80,9 @@ void* sample_initialize(
   /**
    * Initialize the pipeline object.
    */
-  data->pipeline.initialize(pipeline_data.pipeline_info);
+  state->pipeline.initialize(pipeline_data.pipeline_info);
 
-  return static_cast<void*>(data);
+  return static_cast<void*>(state);
 }
 
 void sample_draw_frame(
@@ -91,9 +93,9 @@ void sample_draw_frame(
     uint32_t h,
     float /*time*/,
     void* userdata) {
-  auto data = static_cast<fullscreen_triangle_data*>(userdata);
+  auto state = static_cast<fullscreen_triangle::state*>(userdata);
 
-  ngf_cmd_bind_gfx_pipeline(main_render_pass, data->pipeline.get());
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline.get());
   const ngf_irect2d viewport {0, 0, w, h};
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
@@ -108,9 +110,8 @@ void sample_draw_ui(void*) {
 }
 
 void sample_shutdown(void* userdata) {
-  auto data = static_cast<fullscreen_triangle_data*>(userdata);
-  delete data;
-  printf("shutting down\n");
+  auto state = static_cast<fullscreen_triangle::state*>(userdata);
+  delete state;
 }
 
 }  // namespace ngf_samples
