@@ -4089,7 +4089,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       (is_attachment ? attachment_usage_bits : 0u) |
       (is_transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0) |
       (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u) |
-      (enable_auto_mips ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u);
+      (enable_auto_mips ? (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : 0u);
 
   ngf_error err = NGF_ERROR_OK;
   *result       = NGFI_ALLOC(ngf_image_t);
