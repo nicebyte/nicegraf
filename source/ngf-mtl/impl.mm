@@ -1914,8 +1914,8 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          const ngf_pixel_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
-                         const ngf_offset3d *offset,
-                         const ngf_extent3d *extent) NGF_NOEXCEPT {
+                         ngf_offset3d offset,
+                         ngf_extent3d extent) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) {
@@ -1926,20 +1926,20 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                                       texture_type == MTLTextureTypeCubeArray;
   const uint32_t       target_slice = (is_cubemap ? 6u : 1u) * dst.layer +
                                       (is_cubemap ? dst.cubemap_face : 0);
-  const uint32_t pitch = _get_pitch(extent->width, dst.image->format);
+  const uint32_t pitch = _get_pitch(extent.width, dst.image->format);
   [buf->active_bce copyFromBuffer:src->mtl_buffer
                      sourceOffset:src_offset
                 sourceBytesPerRow:pitch
-              sourceBytesPerImage:pitch * extent->height
-                       sourceSize:MTLSizeMake(extent->width,
-                                              extent->height,
-                                              extent->depth)
+              sourceBytesPerImage:pitch * extent.height
+                       sourceSize:MTLSizeMake(extent.width,
+                                              extent.height,
+                                              extent.depth)
                         toTexture:dst.image->texture
                  destinationSlice:target_slice
                  destinationLevel:dst.mip_level
-                destinationOrigin:MTLOriginMake((NSUInteger)offset->x,
-                                                (NSUInteger)offset->y,
-                                                (NSUInteger)offset->z)];
+                destinationOrigin:MTLOriginMake((NSUInteger)offset.x,
+                                                (NSUInteger)offset.y,
+                                                (NSUInteger)offset.z)];
 }
 
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT {
