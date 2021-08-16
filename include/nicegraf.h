@@ -845,7 +845,7 @@ typedef struct {
   uint32_t            target_binding;
   ngf_descriptor_type type;
   union {
-    ngf_uniform_buffer_bind_info uniform_buffer;
+    ngf_uniform_buffer_bind_info uniforms;
     ngf_image_sampler_bind_info  image_sampler;
   } info;
 } ngf_resource_bind_op;
@@ -1543,8 +1543,8 @@ void ngf_cmd_write_image(
     const ngf_pixel_buffer src,
     size_t                 src_offset,
     ngf_image_ref          dst,
-    const ngf_offset3d*    offset,
-    const ngf_extent3d*    extent) NGF_NOEXCEPT;
+    ngf_offset3d           offset,
+    ngf_extent3d           extent) NGF_NOEXCEPT;
 
 /**
  * Generate mipmaps from level 0 of the given image and write the results to the remaining levels of
