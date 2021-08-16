@@ -224,7 +224,7 @@ template<uint32_t S> struct descriptor_set {
     }
 
     static ngf_resource_bind_op
-    uniforms(const ngf_uniform_buffer buf, size_t offset, size_t range) {
+    uniform_buffer(const ngf_uniform_buffer buf, size_t offset, size_t range) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding             = B;
