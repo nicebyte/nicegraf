@@ -235,8 +235,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        * Call into the sample-specific code to execute ImGui UI commands.
        */
       ngf_samples::sample_draw_ui(sample_opaque_data);
-
-      ImGui::ShowDemoWindow();
+      ImGui::EndFrame();
 
       /**
        * Draw the UI on top of everything else.
