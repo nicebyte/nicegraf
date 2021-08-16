@@ -1597,7 +1597,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
 
       switch (bind_op->type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniform_buffer;
+        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniforms;
         VkDescriptorBufferInfo*             vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
@@ -3613,8 +3613,8 @@ void ngf_cmd_write_image(
     const ngf_pixel_buffer src,
     size_t                 src_offset,
     ngf_image_ref          dst,
-    const ngf_offset3d*    offset,
-    const ngf_extent3d*    extent) {
+    ngf_offset3d           offset,
+    ngf_extent3d           extent) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   const uint32_t dst_layer =
@@ -3655,8 +3655,8 @@ void ngf_cmd_write_image(
            .mipLevel       = dst.mip_level,
            .baseArrayLayer = dst_layer,
            .layerCount     = 1u},
-      .imageOffset = {.x = offset->x, .y = offset->y, .z = offset->z},
-      .imageExtent = {.width = extent->width, .height = extent->height, .depth = extent->depth}};
+      .imageOffset = {.x = offset.x, .y = offset.y, .z = offset.z},
+      .imageExtent = {.width = extent.width, .height = extent.height, .depth = extent.depth}};
   vkCmdCopyBufferToImage(
       buf->active_bundle.vkcmdbuf,
       (VkBuffer)src->data.alloc.obj_handle,
