@@ -5,7 +5,7 @@ struct PixelShaderInput {
   float2 uv : ATTR0;
 };
 
-[[vk::binding(0, 1)]] cbuffer UniformData {
+[[vk::binding(0, 0)]] cbuffer UniformData {
   float4x4 u_TransformMatrix;
 };
 
@@ -25,9 +25,9 @@ PixelShaderInput VSMain(uint vid : SV_VertexID) {
   return result;
 }
 
-[[vk::binding(0, 0)]] uniform Texture2D tex;
-[[vk::binding(1, 1)]] uniform sampler   smp;
+[[vk::binding(0, 1)]] uniform Texture2D tex;
+[[vk::binding(1, 0)]] uniform sampler   smp;
 
 float4 PSMain(PixelShaderInput input) : SV_TARGET {
-  return pow(tex.Sample(smp, input.uv), 1.0/2.2);
+  return tex.Sample(smp, input.uv);
 }

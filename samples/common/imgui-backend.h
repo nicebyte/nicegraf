@@ -58,7 +58,7 @@ class ngf_imgui {
 
 #if !defined(NGF_NO_IMGUI)
   ngf::graphics_pipeline                     pipeline_;
-  ngf::streamed_uniform_buffer<uniform_data> uniform_data_;
+  ngf::uniform_multibuffer<uniform_data> uniform_data_;
   ngf::image                                 font_texture_;
   ngf::sampler                               tex_sampler_;
   ngf::attrib_buffer                         attrib_buffer_;
