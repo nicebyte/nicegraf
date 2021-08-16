@@ -167,7 +167,7 @@ endif()
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
     # Set the folder to hold all samples binaries.
-    set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples-bin)
+    set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples/binaries)
 
     # Ensure we have the shader compiler available.
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc)
@@ -247,15 +247,17 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/nicegraf-exception.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/window.h
                      ${NGF_SAMPLES_PLATFORM_SOURCE}
                 DEPS ngf-imgui
-                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common)
+                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
+                             ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
     target_compile_definitions(ngf-samples-common PUBLIC ${NGF_SAMPLES_BACKEND_DEFINE})
 
@@ -277,4 +279,5 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     ngf_sample(NAME 01-fullscreen-triangle)
     ngf_sample(NAME 02-render-to-texture)
     ngf_sample(NAME 03-uniform-buffers)
+    ngf_sample(NAME 04-texture-sampling)
 endif()
