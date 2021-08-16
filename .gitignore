@@ -1,6 +1,8 @@
 build/*
 tests/build/*
 tests/ngf_tests
-samples-bin/*
+samples/binaries/*
+!samples/binaries/assets/
+!samples/binaries/assets/*
 /out/build/x64-Debug
 /.vs
