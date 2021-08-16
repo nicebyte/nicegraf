@@ -31,6 +31,7 @@
 
 namespace ngf_samples {
 
+namespace uniform_buffers {
 struct shader_uniform_values {
   float scale_a = 0.0f;
   float scale_b = 0.5f;
@@ -39,7 +40,7 @@ struct shader_uniform_values {
   float theta   = 0.0f;
 };
 
-struct uniform_buffers_data {
+struct state {
   ngf::graphics_pipeline polygon_pipeline;
   ngf::uniform_buffer    uniform_buffer;
   size_t                 uniform_buffer_offset     = 0u;
@@ -49,6 +50,7 @@ struct uniform_buffers_data {
   float                  growth_speed = 1.f;
   bool                   growing      = true;
 };
+}  // namespace uniform_buffers
 
 static float theta_for_n(int n) {
   return 2.0f * 3.1415926f / static_cast<float>(n);
@@ -64,7 +66,7 @@ void* sample_initialize(
     uint32_t,
     ngf_sample_count main_render_target_sample_count,
     ngf_xfer_encoder /*xfer_encoder*/) {
-  auto state = new uniform_buffers_data {};
+  auto state = new uniform_buffers::state {};
 
   /**
    * Pre-initialize some uniform variables.
@@ -111,7 +113,7 @@ void* sample_initialize(
    */
   const size_t uniform_buffer_offset_alignment =
       ngf_get_device_capabilities()->uniform_buffer_offset_alignment;
-  const size_t requested_data_size = sizeof(shader_uniform_values);
+  const size_t requested_data_size = sizeof(uniform_buffers::shader_uniform_values);
   state->aligned_uniform_data_size =
       requested_data_size +
       (uniform_buffer_offset_alignment - requested_data_size % uniform_buffer_offset_alignment);
@@ -133,16 +135,16 @@ void sample_draw_frame(
     uint32_t h,
     float,
     void* userdata) {
-  auto state = reinterpret_cast<uniform_buffers_data*>(userdata);
+  auto state = reinterpret_cast<uniform_buffers::state*>(userdata);
 
   /**
    * Update the values for the uniform buffer.
    */
-  shader_uniform_values& uniforms  = state->uniform_values;
-  const float            max_scale = uniforms.scale_b;
-  float                  min_scale = max_scale * min_scale_for_ngon(state->n);
-  const bool             growing   = state->growing;
-  uniforms.aspect                  = static_cast<float>(w) / static_cast<float>(h);
+  uniform_buffers::shader_uniform_values& uniforms  = state->uniform_values;
+  const float                             max_scale = uniforms.scale_b;
+  float                                   min_scale = max_scale * min_scale_for_ngon(state->n);
+  const bool                              growing   = state->growing;
+  uniforms.aspect                                   = static_cast<float>(w) / static_cast<float>(h);
   uniforms.time += time_delta;
   uniforms.scale_a += (growing ? 1.0f : -1.0f) * time_delta * (state->growth_speed);
   const bool evolve_ngon =
@@ -182,15 +184,7 @@ void sample_draw_frame(
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf::cmd_bind_resources(
       main_render_pass,
-      ngf_resource_bind_op {
-          .target_set     = 0,
-          .target_binding = 0,
-          .type           = NGF_DESCRIPTOR_UNIFORM_BUFFER,
-          .info           = {
-              .uniform_buffer = {
-                  .buffer = state->uniform_buffer,
-                  .offset = state->uniform_buffer_offset,
-                  .range  = state->aligned_uniform_data_size}}});
+      ngf::descriptor_set<0>::binding<0>::uniform_buffer(state->uniform_buffer, state->uniform_buffer_offset, state->aligned_uniform_data_size));
   ngf_cmd_draw(main_render_pass, false, 0u, (state->n) + 2u, 1u);
 
   /**
@@ -204,9 +198,8 @@ void sample_draw_ui(void*) {
 }
 
 void sample_shutdown(void* userdata) {
-  auto data = static_cast<uniform_buffers_data*>(userdata);
-  delete data;
-  printf("shutting down\n");
+  auto state = static_cast<uniform_buffers::state*>(userdata);
+  delete state;
 }
 
 }  // namespace ngf_samples
