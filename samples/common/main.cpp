@@ -27,6 +27,7 @@
 #include "nicegraf.h"
 #include "platform/window.h"
 #include "sample-interface.h"
+#include "logging.h"
 
 #include <chrono>
 #include <optional>
@@ -181,11 +182,21 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
         /**
          * Initialize the sample, and save the opaque data pointer.
          */
+        ngf_samples::logi("Initializing sample");
         sample_opaque_data = ngf_samples::sample_initialize(
             fb_width,
             fb_height,
             main_render_target_sample_count,
             xfer_encoder);
+        
+        /**
+         * Exit if sample failed to initialize.
+         */
+         if (sample_opaque_data == nullptr) {
+          ngf_samples::loge("Sample failed to initialize");
+          break;
+         }
+         ngf_samples::logi("Sample initialized");
 
         /**
          * Initialize the ImGui rendering backend.
@@ -255,6 +266,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * De-initialize any sample-specific data, shut down ImGui.
    */
+  ngf_samples::logi("Finishing execution");
   ngf_samples::sample_shutdown(sample_opaque_data);
   ImGui::DestroyContext(imgui_ctx);
 
