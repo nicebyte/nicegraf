@@ -5,12 +5,6 @@ struct Triangle_PSInput {
   float4 color    : ATTRIBUTE2;
 };
 
-struct EditorUniformData {
-  float  u_Time;
-  float  u_TimeDelta;
-  float2 u_ScreenSize;
-};
-
 Triangle_PSInput Triangle(uint vid, float scale, float2 offset, float depth) {
   float4 pos[] = {
     float4(-1.0, -1.0, 0.0, 1.0),
