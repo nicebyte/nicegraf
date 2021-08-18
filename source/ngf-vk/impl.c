@@ -3705,12 +3705,13 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
 
   // TODO: ensure the pixel format is valid for mip generation.
 
-  uint32_t src_w = img->extent.width, src_h = img->extent.height, dst_w = 0, dst_h = 0;
+  uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth, dst_w = 0, dst_h = 0, dst_d = 0;
 
   for (uint32_t src_level = 0u; src_level < img->nlevels - 1; ++src_level) {
     const uint32_t             dst_level           = src_level + 1u;
     dst_w = src_w > 1u ? (src_w >> 1u) : 1u;
     dst_h = src_h > 1u ? (src_h >> 1u) : 1u;
+    dst_d = src_d > 1u ? (src_d >> 1u) : 1u;
     const VkImageMemoryBarrier pre_blit_barriers[] = {
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
@@ -3764,8 +3765,8 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
              .layerCount     = 1u},
-        .srcOffsets = {{0, 0, 0}, {src_w, src_h, 1}},
-        .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, 1}}};
+        .srcOffsets = {{0, 0, 0}, {src_w, src_h, src_d}},
+        .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, dst_d}}};
     vkCmdBlitImage(
         buf->active_bundle.vkcmdbuf,
         (VkImage)img->alloc.obj_handle,
@@ -3819,6 +3820,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
         post_blit_barriers);
     src_w = dst_w;
     src_h = dst_h;
+    src_d = dst_d;
   }
   return NGF_ERROR_OK;
 }
