@@ -845,7 +845,7 @@ typedef struct {
   uint32_t            target_binding;
   ngf_descriptor_type type;
   union {
-    ngf_uniform_buffer_bind_info uniforms;
+    ngf_uniform_buffer_bind_info uniform_buffer;
     ngf_image_sampler_bind_info  image_sampler;
   } info;
 } ngf_resource_bind_op;
