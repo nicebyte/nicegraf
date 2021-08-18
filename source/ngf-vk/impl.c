@@ -3765,8 +3765,8 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
              .layerCount     = 1u},
-        .srcOffsets = {{0, 0, 0}, {src_w, src_h, src_d}},
-        .dstOffsets = {{0, 0, 0}, {dst_w, dst_h, dst_d}}};
+        .srcOffsets = {{0, 0, 0}, {(int32_t)src_w, (int32_t)src_h, (int32_t)src_d}},
+        .dstOffsets = {{0, 0, 0}, {(int32_t)dst_w, (int32_t)dst_h, (int32_t)dst_d}}};
     vkCmdBlitImage(
         buf->active_bundle.vkcmdbuf,
         (VkImage)img->alloc.obj_handle,
