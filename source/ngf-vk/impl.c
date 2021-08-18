@@ -1597,7 +1597,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
 
       switch (bind_op->type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniforms;
+        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniform_buffer;
         VkDescriptorBufferInfo*             vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
