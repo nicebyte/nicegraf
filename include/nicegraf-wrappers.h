@@ -229,9 +229,9 @@ template<uint32_t S> struct descriptor_set {
       op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding             = B;
       op.target_set                 = S;
-      op.info.uniforms.buffer = buf;
-      op.info.uniforms.offset = offset;
-      op.info.uniforms.range  = range;
+      op.info.uniform_buffer.buffer = buf;
+      op.info.uniform_buffer.offset = offset;
+      op.info.uniform_buffer.range  = range;
       return op;
     }
 
@@ -405,9 +405,9 @@ template<typename T> class uniform_multibuffer {
     op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding             = binding;
     op.target_set                 = set;
-    op.info.uniforms.buffer = buf_.get();
-    op.info.uniforms.offset = current_offset_ + additional_offset;
-    op.info.uniforms.range  = (range == 0) ? aligned_per_frame_size_ : range;
+    op.info.uniform_buffer.buffer = buf_.get();
+    op.info.uniform_buffer.offset = current_offset_ + additional_offset;
+    op.info.uniform_buffer.range  = (range == 0) ? aligned_per_frame_size_ : range;
     return op;
   }
 
