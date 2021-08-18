@@ -1810,7 +1810,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
     switch(bind_op.type) {
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const  ngf_uniform_buffer_bind_info &buf_bind_op =
-            bind_op.info.uniform_buffer;
+            bind_op.info.uniforms;
         const ngf_uniform_buffer buf = buf_bind_op.buffer;
         size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
