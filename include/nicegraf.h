@@ -486,15 +486,20 @@ typedef enum ngf_buffer_storage_type {
 } ngf_buffer_storage_type;
 
 /**
- * Flags for clarifying how the buffer is intended to be used.
+ * Flags for specifying how the buffer is intended to be used.
  */
 typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01, /** < Buffer may be used as a source for
-                                          transfer operations.
-                                      */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02, /** < Buffer may be used as a destination
-                                          for transfer operations.
-                                      */
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /** < Buffer may be used as a source for
+                                                transfer operations.
+                                            */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /** < Buffer may be used as a destination
+                                                for transfer operations.
+                                            */
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /** < Buffer may be bound as a uniform buffer. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER =
+      0x08, /** < Buffer may be used as the source of index data for indexed drawcalls. */
+  NGF_BUFFER_USAGE_VERTEX_BUFFER =
+      0x10, /** < Buffer may be used as the source of vertex attribute data. */
 } ngf_buffer_usage;
 
 /**
