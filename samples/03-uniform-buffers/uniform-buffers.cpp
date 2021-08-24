@@ -42,7 +42,7 @@ struct shader_uniform_values {
 
 struct state {
   ngf::graphics_pipeline polygon_pipeline;
-  ngf::uniform_buffer    uniform_buffer;
+  ngf::buffer    uniform_buffer;
   size_t                 uniform_buffer_offset     = 0u;
   size_t                 aligned_uniform_data_size = 0u;
   shader_uniform_values  uniform_values;
@@ -121,7 +121,7 @@ void* sample_initialize(
   const ngf_buffer_info uniform_buffer_info = {
       .size         = uniform_buffer_size,
       .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
-      .buffer_usage = 0u};
+      .buffer_usage = NGF_BUFFER_USAGE_UNIFORM_BUFFER};
   NGF_SAMPLES_CHECK(state->uniform_buffer.initialize(uniform_buffer_info));
 
   return static_cast<void*>(state);
@@ -166,14 +166,13 @@ void sample_draw_frame(
    * Write the updated values to the uniform buffer at current offset.
    * Map the range, write the data using memcpy, then flush and unmap.
    */
-  void* mapped_uniform_buffer_offset = ngf_uniform_buffer_map_range(
+  void* mapped_uniform_buffer_offset = ngf_buffer_map_range(
       state->uniform_buffer,
       state->uniform_buffer_offset,
-      state->aligned_uniform_data_size,
-      NGF_BUFFER_MAP_WRITE_BIT);
+      state->aligned_uniform_data_size);
   memcpy(mapped_uniform_buffer_offset, &state->uniform_values, sizeof(state->uniform_values));
-  ngf_uniform_buffer_flush_range(state->uniform_buffer, 0, state->aligned_uniform_data_size);
-  ngf_uniform_buffer_unmap(state->uniform_buffer);
+  ngf_buffer_flush_range(state->uniform_buffer, 0, state->aligned_uniform_data_size);
+  ngf_buffer_unmap(state->uniform_buffer);
 
   /**
    * Record the rendering commands.

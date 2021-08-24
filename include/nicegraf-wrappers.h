@@ -122,10 +122,7 @@ NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
 NGF_DEFINE_WRAPPER_TYPE(image);
 NGF_DEFINE_WRAPPER_TYPE(sampler);
 NGF_DEFINE_WRAPPER_TYPE(render_target);
-NGF_DEFINE_WRAPPER_TYPE(attrib_buffer);
-NGF_DEFINE_WRAPPER_TYPE(index_buffer);
-NGF_DEFINE_WRAPPER_TYPE(uniform_buffer);
-NGF_DEFINE_WRAPPER_TYPE(pixel_buffer);
+NGF_DEFINE_WRAPPER_TYPE(buffer);
 NGF_DEFINE_WRAPPER_TYPE(context);
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
@@ -223,8 +220,7 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
-    static ngf_resource_bind_op
-    uniform_buffer(const ngf_uniform_buffer buf, size_t offset, size_t range) {
+    static ngf_resource_bind_op uniform_buffer(const ngf_buffer buf, size_t offset, size_t range) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding             = B;
@@ -260,84 +256,6 @@ template<uint32_t S> struct descriptor_set {
 template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
   const ngf_resource_bind_op ops[] = {args...};
   ngf_cmd_bind_gfx_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
-}
-
-inline void* buffer_map_range(ngf_attrib_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  return ngf_attrib_buffer_map_range(buf, offset, size, flags);
-}
-
-inline void* buffer_map_range(ngf_index_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  return ngf_index_buffer_map_range(buf, offset, size, flags);
-}
-
-inline void* buffer_map_range(ngf_uniform_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  return ngf_uniform_buffer_map_range(buf, offset, size, flags);
-}
-
-inline void* buffer_map_range(ngf_pixel_buffer buf, size_t offset, size_t size, uint32_t flags) {
-  return ngf_pixel_buffer_map_range(buf, offset, size, flags);
-}
-
-inline void buffer_flush_range(ngf_attrib_buffer buf, size_t offset, size_t size) {
-  ngf_attrib_buffer_flush_range(buf, offset, size);
-}
-
-inline void buffer_flush_range(ngf_index_buffer buf, size_t offset, size_t size) {
-  ngf_index_buffer_flush_range(buf, offset, size);
-}
-
-inline void buffer_flush_range(ngf_uniform_buffer buf, size_t offset, size_t size) {
-  ngf_uniform_buffer_flush_range(buf, offset, size);
-}
-
-inline void buffer_flush_range(ngf_pixel_buffer buf, size_t offset, size_t size) {
-  ngf_pixel_buffer_flush_range(buf, offset, size);
-}
-
-inline void buffer_unmap(ngf_attrib_buffer buf) {
-  ngf_attrib_buffer_unmap(buf);
-}
-
-inline void buffer_unmap(ngf_index_buffer buf) {
-  ngf_index_buffer_unmap(buf);
-}
-
-inline void buffer_unmap(ngf_uniform_buffer buf) {
-  ngf_uniform_buffer_unmap(buf);
-}
-
-inline void buffer_unmap(ngf_pixel_buffer buf) {
-  ngf_pixel_buffer_unmap(buf);
-}
-
-inline void cmd_copy_buffer(
-    ngf_xfer_encoder        enc,
-    const ngf_attrib_buffer src,
-    ngf_attrib_buffer       dst,
-    size_t                  size,
-    size_t                  src_offset,
-    size_t                  dst_offset) {
-  ngf_cmd_copy_attrib_buffer(enc, src, dst, size, src_offset, dst_offset);
-}
-
-inline void cmd_copy_buffer(
-    ngf_xfer_encoder       enc,
-    const ngf_index_buffer src,
-    ngf_index_buffer       dst,
-    size_t                 size,
-    size_t                 src_offset,
-    size_t                 dst_offset) {
-  ngf_cmd_copy_index_buffer(enc, src, dst, size, src_offset, dst_offset);
-}
-
-inline void cmd_copy_buffer(
-    ngf_xfer_encoder         enc,
-    const ngf_uniform_buffer src,
-    ngf_uniform_buffer       dst,
-    size_t                   size,
-    size_t                   src_offset,
-    size_t                   dst_offset) {
-  ngf_cmd_copy_uniform_buffer(enc, src, dst, size, src_offset, dst_offset);
 }
 
 inline ngf_image_ref image_ref(const ngf_image img) {
@@ -378,21 +296,21 @@ template<typename T> class uniform_multibuffer {
   ngf_error initialize(const uint32_t frames) {
     const size_t alignment    = ngf_get_device_capabilities()->uniform_buffer_offset_alignment;
     const size_t aligned_size = sizeof(T) + (alignment - sizeof(T) % alignment);
-    NGF_RETURN_IF_ERROR(buf_.initialize(
-        ngf_buffer_info {aligned_size * frames, NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE, 0}));
+    NGF_RETURN_IF_ERROR(buf_.initialize(ngf_buffer_info {
+        aligned_size * frames,
+        NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+        NGF_BUFFER_USAGE_UNIFORM_BUFFER}));
     nframes_                = frames;
     aligned_per_frame_size_ = aligned_size;
     return NGF_ERROR_OK;
   }
 
   void write(const T& data) {
-    current_offset_      = (frame_)*aligned_per_frame_size_;
-    const uint32_t flags = NGF_BUFFER_MAP_WRITE_BIT;
-    void*          mapped_buf =
-        ngf_uniform_buffer_map_range(buf_.get(), current_offset_, aligned_per_frame_size_, flags);
+    current_offset_  = (frame_)*aligned_per_frame_size_;
+    void* mapped_buf = ngf_buffer_map_range(buf_.get(), current_offset_, aligned_per_frame_size_);
     memcpy(mapped_buf, (void*)&data, sizeof(T));
-    ngf_uniform_buffer_flush_range(buf_.get(), 0, aligned_per_frame_size_);
-    ngf_uniform_buffer_unmap(buf_.get());
+    ngf_buffer_flush_range(buf_.get(), 0, aligned_per_frame_size_);
+    ngf_buffer_unmap(buf_.get());
     frame_ = (frame_ + 1u) % nframes_;
   }
 
@@ -412,11 +330,11 @@ template<typename T> class uniform_multibuffer {
   }
 
   private:
-  uniform_buffer buf_;
-  uint32_t       frame_                  = 0;
-  size_t         current_offset_         = 0;
-  size_t         aligned_per_frame_size_ = 0;
-  uint32_t       nframes_                = 0;
+  buffer   buf_;
+  uint32_t frame_                  = 0;
+  size_t   current_offset_         = 0;
+  size_t   aligned_per_frame_size_ = 0;
+  uint32_t nframes_                = 0;
 };
 
 }  // namespace ngf
