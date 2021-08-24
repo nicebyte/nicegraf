@@ -74,14 +74,15 @@ void* sample_initialize(
 
   /* Create an appropriately sized staging buffer for the texture upload. */
   const size_t      texture_size_bytes = texture_width * texture_height * 4u;
-  ngf::pixel_buffer staging_buf;
-  NGF_SAMPLES_CHECK(staging_buf.initialize(
-      ngf_pixel_buffer_info {.size = texture_size_bytes, .usage = NGF_PIXEL_BUFFER_USAGE_WRITE}));
-  void* mapped_staging_buf = ngf_pixel_buffer_map_range(
+  ngf::buffer staging_buf;
+  NGF_SAMPLES_CHECK(staging_buf.initialize(ngf_buffer_info {
+      .size         = texture_size_bytes,
+      .storage_type = NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+      .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC}));
+  void* mapped_staging_buf = ngf_buffer_map_range(
       staging_buf.get(),
       0,
-      texture_size_bytes,
-      NGF_BUFFER_MAP_WRITE_BIT);
+      texture_size_bytes);
 
   /* Decode the loaded targa file, writing RGBA values directly into mapped memory. */
   load_targa(
@@ -93,8 +94,8 @@ void* sample_initialize(
       &texture_height);
 
   /* Flush and unmap the staging buffer. */
-  ngf_pixel_buffer_flush_range(staging_buf.get(), 0, texture_size_bytes);
-  ngf_pixel_buffer_unmap(staging_buf.get());
+  ngf_buffer_flush_range(staging_buf.get(), 0, texture_size_bytes);
+  ngf_buffer_unmap(staging_buf.get());
 
   /* Count the number of mipmaps we'll have to generate for trilinear filtering.
      Note that we keep generating mip levels until both dimensions are reduced to 1.

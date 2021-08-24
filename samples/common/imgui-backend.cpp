@@ -103,25 +103,25 @@ ngf_imgui::ngf_imgui(
   err = font_texture_.initialize(font_texture_info);
   assert(err == NGF_ERROR_OK);
   ImGui::GetIO().Fonts->TexID = (ImTextureID)(uintptr_t)font_texture_.get();
-  const ngf_pixel_buffer_info pbuffer_info {
+  const ngf_buffer_info pbuffer_info {
       4u * (size_t)font_atlas_width * (size_t)font_atlas_height,
-      NGF_PIXEL_BUFFER_USAGE_WRITE};
+      NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+      NGF_BUFFER_USAGE_XFER_SRC};
   err = texture_data_.initialize(pbuffer_info);
   assert(err == NGF_ERROR_OK);
-  void* mapped_texture_data = ngf_pixel_buffer_map_range(
+  void* mapped_texture_data = ngf_buffer_map_range(
       texture_data_.get(),
       0,
-      4 * (size_t)font_atlas_width * (size_t)font_atlas_height,
-      NGF_BUFFER_MAP_WRITE_BIT);
+      4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
   memcpy(
       mapped_texture_data,
       font_atlas_bytes,
       4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
-  ngf_pixel_buffer_flush_range(
+  ngf_buffer_flush_range(
       texture_data_.get(),
       0,
       4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
-  ngf_pixel_buffer_unmap(texture_data_.get());
+  ngf_buffer_unmap(texture_data_.get());
   ngf_image_ref font_texture_ref;
   font_texture_ref.image     = font_texture_.get();
   font_texture_ref.layer     = 0u;
@@ -258,32 +258,33 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   // Create new vertex and index buffers.
   ngf_buffer_info attrib_buffer_info {
       sizeof(ImDrawVert) * vertex_data.size(),  // data size
-      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE};
-  ngf_attrib_buffer attrib_buffer = nullptr;
-  ngf_create_attrib_buffer(&attrib_buffer_info, &attrib_buffer);
+      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+      NGF_BUFFER_USAGE_VERTEX_BUFFER};
+  ngf_buffer attrib_buffer = nullptr;
+  ngf_create_buffer(&attrib_buffer_info, &attrib_buffer);
   attrib_buffer_.reset(attrib_buffer);
-  void* mapped_attrib_buffer = ngf_attrib_buffer_map_range(
+  void* mapped_attrib_buffer = ngf_buffer_map_range(
       attrib_buffer,
       0,
-      attrib_buffer_info.size,
-      NGF_BUFFER_MAP_WRITE_BIT);
+      attrib_buffer_info.size);
   assert(mapped_attrib_buffer != nullptr);
   memcpy(mapped_attrib_buffer, vertex_data.data(), attrib_buffer_info.size);
-  ngf_attrib_buffer_flush_range(attrib_buffer, 0, attrib_buffer_info.size);
-  ngf_attrib_buffer_unmap(attrib_buffer);
+  ngf_buffer_flush_range(attrib_buffer, 0, attrib_buffer_info.size);
+  ngf_buffer_unmap(attrib_buffer);
 
   ngf_buffer_info index_buffer_info {
       sizeof(ImDrawIdx) * index_data.size(),
-      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE};
-  ngf_index_buffer index_buffer = nullptr;
-  ngf_create_index_buffer(&index_buffer_info, &index_buffer);
+      NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+      NGF_BUFFER_USAGE_INDEX_BUFFER};
+  ngf_buffer index_buffer = nullptr;
+  ngf_create_buffer(&index_buffer_info, &index_buffer);
   index_buffer_.reset(index_buffer);
   void* mapped_index_buffer =
-      ngf_index_buffer_map_range(index_buffer, 0, index_buffer_info.size, NGF_BUFFER_MAP_WRITE_BIT);
+      ngf_buffer_map_range(index_buffer, 0, index_buffer_info.size);
   assert(mapped_index_buffer != nullptr);
   memcpy(mapped_index_buffer, index_data.data(), index_buffer_info.size);
-  ngf_index_buffer_flush_range(index_buffer, 0, index_buffer_info.size);
-  ngf_index_buffer_unmap(index_buffer);
+  ngf_buffer_flush_range(index_buffer, 0, index_buffer_info.size);
+  ngf_buffer_unmap(index_buffer);
 
   ngf_cmd_bind_index_buffer(
       enc,

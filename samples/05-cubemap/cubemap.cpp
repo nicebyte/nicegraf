@@ -24,13 +24,13 @@
 #include "check.h"
 #include "file-utils.h"
 #include "imgui.h"
+#include "logging.h"
 #include "nicegraf-util.h"
 #include "nicegraf-wrappers.h"
 #include "nicemath.h"
 #include "sample-interface.h"
 #include "shader-loader.h"
 #include "targa-loader.h"
-#include "logging.h"
 
 #include <stdio.h>
 
@@ -62,47 +62,56 @@ void* sample_initialize(
   auto state = new cubemap::state {};
 
   /* Load contents of cubemap faces into a staging buffer. */
-  char file_name[] = "assets/cube0fx.tga";
-  uint32_t face_width = 0, face_height = 0;
-  ngf::pixel_buffer staging_buffer;
-  char* mapped_staging_buffer = nullptr;
-  uint32_t staging_buffer_size = 0u;
-  uint32_t bytes_per_face = 0u;
+  char        file_name[] = "assets/cube0fx.tga";
+  uint32_t    face_width = 0, face_height = 0;
+  ngf::buffer staging_buffer;
+  char*       mapped_staging_buffer = nullptr;
+  uint32_t    staging_buffer_size   = 0u;
+  uint32_t    bytes_per_face        = 0u;
   for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; face++) {
     sprintf(file_name, "assets/cube0f%d.tga", face);
     std::vector<char> cubemap_face_tga_data = load_file(file_name);
-    uint32_t width, height;
-    load_targa(cubemap_face_tga_data.data(), cubemap_face_tga_data.size(), nullptr, 0, &width, &height);
+    uint32_t          width, height;
+    load_targa(
+        cubemap_face_tga_data.data(),
+        cubemap_face_tga_data.size(),
+        nullptr,
+        0,
+        &width,
+        &height);
     if (face_width == 0 && face_height == 0) {
-      face_width = width;
-      face_height = height;
-      bytes_per_face = face_width * face_height * 4u;
+      face_width          = width;
+      face_height         = height;
+      bytes_per_face      = face_width * face_height * 4u;
       staging_buffer_size = bytes_per_face * NGF_CUBEMAP_FACE_COUNT;
-      staging_buffer.initialize(ngf_pixel_buffer_info {
-        .size = staging_buffer_size,
-        .usage = NGF_PIXEL_BUFFER_USAGE_WRITE
-      });
-      mapped_staging_buffer = (char*)ngf_pixel_buffer_map_range(
-          staging_buffer.get(),
-          0,
-          staging_buffer_size,
-          NGF_BUFFER_MAP_WRITE_BIT);
+      staging_buffer.initialize(ngf_buffer_info {
+          .size         = staging_buffer_size,
+          .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+          .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC});
+      mapped_staging_buffer =
+          (char*)ngf_buffer_map_range(staging_buffer.get(), 0, staging_buffer_size);
     } else if (face_width != width || face_height != height) {
       loge("All faces of the cubemap must have the same dimensions");
       return nullptr;
     }
     std::vector<char> cubemap_face_rgba_data;
     cubemap_face_rgba_data.resize(bytes_per_face);
-    load_targa(cubemap_face_tga_data.data(), cubemap_face_tga_data.size(),
-               cubemap_face_rgba_data.data(), cubemap_face_rgba_data.size(),
-               &width, &height);
-    memcpy(mapped_staging_buffer + face * cubemap_face_rgba_data.size(), cubemap_face_rgba_data.data(),
-           face_width * face_height * 4u);
+    load_targa(
+        cubemap_face_tga_data.data(),
+        cubemap_face_tga_data.size(),
+        cubemap_face_rgba_data.data(),
+        cubemap_face_rgba_data.size(),
+        &width,
+        &height);
+    memcpy(
+        mapped_staging_buffer + face * cubemap_face_rgba_data.size(),
+        cubemap_face_rgba_data.data(),
+        face_width * face_height * 4u);
   }
 
   /* Flush and unmap the staging buffer. */
-  ngf_pixel_buffer_flush_range(staging_buffer.get(), 0, staging_buffer_size);
-  ngf_pixel_buffer_unmap(staging_buffer.get());
+  ngf_buffer_flush_range(staging_buffer.get(), 0, staging_buffer_size);
+  ngf_buffer_unmap(staging_buffer.get());
 
   /* Create the cubemap texture. */
   NGF_SAMPLES_CHECK(state->texture.initialize(ngf_image_info {
@@ -199,10 +208,8 @@ void sample_draw_frame(
   ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
-  state->uniforms.write({
-    nm::rotation_y(state->yaw) * nm::rotation_x(state->pitch),
-    (float)w/(float)h
-  });
+  state->uniforms.write(
+      {nm::rotation_y(state->yaw) * nm::rotation_x(state->pitch), (float)w / (float)h});
   ngf::cmd_bind_resources(
       main_render_pass,
       state->uniforms.bind_op_at_current_offset(0, 0),

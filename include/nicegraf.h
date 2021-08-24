@@ -511,51 +511,11 @@ typedef struct ngf_buffer_info {
   uint32_t                buffer_usage;
 } ngf_buffer_info;
 
-/**
- * Options for mapping a buffer to host memory.
- */
-typedef enum ngf_buffer_map_flags {
-  NGF_BUFFER_MAP_READ_BIT  = 0x01, /** < Mapped memory is readable. */
-  NGF_BUFFER_MAP_WRITE_BIT = 0x02, /** < Mapped memory is writeable. */
-} ngf_buffer_map_flags;
 
-/**
- * Specifies the data necessary for the creation of a uniform buffer.
+/*
+ * A memory buffer.
  */
-typedef ngf_buffer_info ngf_uniform_buffer_info;
-
-/**
- * A uniform buffer.
- */
-typedef struct ngf_uniform_buffer_t* ngf_uniform_buffer;
-
-/**
- * Possible usages of a pixel buffer object.
- */
-typedef enum ngf_pixel_buffer_usage {
-  // TODO: NGF_PIXEL_BUFFER_USAGE_READ
-  /**
-   * This value indicates that a pixel buffer object will be used by the
-   * application to transfer pixel data to the device.
-   */
-  NGF_PIXEL_BUFFER_USAGE_WRITE
-} ngf_pixel_buffer_usage;
-
-/**
- * Information required to create a pixel buffer object.
- */
-typedef struct ngf_pixel_buffer_info {
-  size_t                 size;  /**< Size in bytes. */
-  ngf_pixel_buffer_usage usage; /**< Intended usage. */
-} ngf_pixel_buffer_info;
-
-/**
- * Pixel buffers are used to transfer pixel data between the host and the
- * device. They can be memory-mapped, similar to other types of buffers backed
- * by host-visible storage, and their contents can be transferred to images via
- * \ref ngf_cmd_write_image.
- */
-typedef struct ngf_pixel_buffer_t* ngf_pixel_buffer;
+typedef struct ngf_buffer_t* ngf_buffer;
 
 /**
  * Possible image types.
@@ -832,9 +792,9 @@ typedef enum {
  * Specifies a buffer bind operation.
  */
 typedef struct {
-  ngf_uniform_buffer buffer; /**< Which buffer to bind.*/
-  size_t             offset; /**< Offset at which to bind the buffer.*/
-  size_t             range;  /**< Bound range.*/
+  ngf_buffer buffer; /**< Which buffer to bind.*/
+  size_t     offset; /**< Offset at which to bind the buffer.*/
+  size_t     range;  /**< Bound range.*/
 } ngf_uniform_buffer_bind_info;
 
 /**
@@ -1055,19 +1015,6 @@ typedef struct {
   uintptr_t __handle;
 } ngf_xfer_encoder;
 
-typedef ngf_buffer_info ngf_attrib_buffer_info;
-typedef ngf_buffer_info ngf_index_buffer_info;
-
-/**
- * A vertex attribute buffer.
- */
-typedef struct ngf_attrib_buffer_t* ngf_attrib_buffer;
-
-/**
- * A vertex index buffer.
- */
-typedef struct ngf_index_buffer_t* ngf_index_buffer;
-
 /**
  * A token identifying a frame of rendering.
  */
@@ -1249,17 +1196,16 @@ ngf_error ngf_resolve_render_target(
 void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT;
 
 /**
- * Creates a new vertex attribute buffer.
- * @param info see \ref ngf_attrib_buffer_info
+ * Creates a new buffer.
+ * @param info see \ref ngf_buffer_info
  * @param result the new buffer handle will be stored here.
  */
-ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info* info, ngf_attrib_buffer* result)
-    NGF_NOEXCEPT;
+ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT;
 
 /**
- * Discards the given vertex attribute buffer.
+ * Discards the given buffer.
  */
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) NGF_NOEXCEPT;
+void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * Map a region of a given buffer to host memory.
@@ -1277,8 +1223,8 @@ void ngf_destroy_attrib_buffer(ngf_attrib_buffer buffer) NGF_NOEXCEPT;
  * @return A pointer to the mapped memory, or NULL if the buffer could not be
  *         mapped.
  */
-void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf, size_t offset, size_t size, uint32_t flags)
-    NGF_NOEXCEPT;
+void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
+
 /**
  * Ensure that any new data in the mapped range will be visible to subsequently
  * submitted commands.
@@ -1288,101 +1234,14 @@ void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf, size_t offset, size_t s
  *               the flushed region starts, in bytes.
  * @param size  Size of the flushed region in bytes.
  */
-void ngf_attrib_buffer_flush_range(ngf_attrib_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
+void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
 
 /**
  * Unmaps a previously mapped buffer. The pointer returned for that buffer
  * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
  * @param buf The buffer that needs to be unmapped.
  */
-void ngf_attrib_buffer_unmap(ngf_attrib_buffer buf) NGF_NOEXCEPT;
-
-/**
- * Creates a new vertex index buffer.
- * @param info see \ref ngf_index_buffer_info
- * @param result the new buffer handle will be stored here.
- */
-ngf_error
-ngf_create_index_buffer(const ngf_index_buffer_info* info, ngf_index_buffer* result) NGF_NOEXCEPT;
-
-/**
- * Discards the given vertex index buffer.
- */
-void ngf_destroy_index_buffer(ngf_index_buffer buffer) NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_map_range, but for index buffers.
- */
-void* ngf_index_buffer_map_range(ngf_index_buffer buf, size_t offset, size_t size, uint32_t flags)
-    NGF_NOEXCEPT;
-/**
- * Similar to \ref ngf_attrib_buffer_flush_range, but for index buffers.
- */
-void ngf_index_buffer_flush_range(ngf_index_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_unmap, but for index buffers.
- */
-void ngf_index_buffer_unmap(ngf_index_buffer buf) NGF_NOEXCEPT;
-
-/**
- * Creates a new uniform buffer.
- * @param info see \ref ngf_uniform_buffer_info
- * @param result the new buffer handle will be stored here.
- */
-ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info* info, ngf_uniform_buffer* result)
-    NGF_NOEXCEPT;
-
-/**
- * Discards the given uniform buffer.
- */
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_map_range, but for uniform buffers.
- */
-void* ngf_uniform_buffer_map_range(
-    ngf_uniform_buffer buf,
-    size_t             offset,
-    size_t             size,
-    uint32_t           flags) NGF_NOEXCEPT;
-/**
- * Similar to \ref ngf_attrib_buffer_flush_range, but for uniform buffers.
- */
-void ngf_uniform_buffer_flush_range(ngf_uniform_buffer buf, size_t offset, size_t size)
-    NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_unmap, but for uniform buffers.
- */
-void ngf_uniform_buffer_unmap(ngf_uniform_buffer buf) NGF_NOEXCEPT;
-
-/**
- * Creates a new pixel buffer.
- * @param info see \ref ngf_pixel_buffer_info.
- * @param result the new buffer handle will be stored in here.
- */
-ngf_error
-ngf_create_pixel_buffer(const ngf_pixel_buffer_info* info, ngf_pixel_buffer* result) NGF_NOEXCEPT;
-/**
- * Discards a given pixel buffer.
- */
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_map_range, but for pixel buffers.
- */
-void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf, size_t offset, size_t size, uint32_t flags)
-    NGF_NOEXCEPT;
-/**
- * Similar to \ref ngf_attrib_buffer_flush_range, but for pixel buffers.
- */
-void ngf_pixel_buffer_flush_range(ngf_pixel_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
-
-/**
- * Similar to \ref ngf_attrib_buffer_unmap, but for pixel buffers.
- */
-void ngf_pixel_buffer_unmap(ngf_pixel_buffer buf) NGF_NOEXCEPT;
+void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
 
 /**
  * Wait for all pending rendering commands to complete.
@@ -1503,14 +1362,12 @@ void ngf_cmd_bind_gfx_resources(
     uint32_t                    nbind_operations) NGF_NOEXCEPT;
 
 void ngf_cmd_bind_attrib_buffer(
-    ngf_render_encoder      buf,
-    const ngf_attrib_buffer vbuf,
-    uint32_t                binding,
-    uint32_t                offset) NGF_NOEXCEPT;
-void ngf_cmd_bind_index_buffer(
-    ngf_render_encoder     buf,
-    const ngf_index_buffer idxbuf,
-    ngf_type               index_type) NGF_NOEXCEPT;
+    ngf_render_encoder buf,
+    const ngf_buffer   vbuf,
+    uint32_t           binding,
+    uint32_t           offset) NGF_NOEXCEPT;
+void ngf_cmd_bind_index_buffer(ngf_render_encoder buf, const ngf_buffer idxbuf, ngf_type index_type)
+    NGF_NOEXCEPT;
 
 /**
  * Execute a draw call.
@@ -1522,34 +1379,21 @@ void ngf_cmd_draw(
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT;
 
-void ngf_cmd_copy_attrib_buffer(
-    ngf_xfer_encoder        enc,
-    const ngf_attrib_buffer src,
-    ngf_attrib_buffer       dst,
-    size_t                  size,
-    size_t                  src_offset,
-    size_t                  dst_offset) NGF_NOEXCEPT;
-void ngf_cmd_copy_index_buffer(
-    ngf_xfer_encoder       buf,
-    const ngf_index_buffer src,
-    ngf_index_buffer       dst,
-    size_t                 size,
-    size_t                 src_offset,
-    size_t                 dst_offset) NGF_NOEXCEPT;
-void ngf_cmd_copy_uniform_buffer(
-    ngf_xfer_encoder         enc,
-    const ngf_uniform_buffer src,
-    ngf_uniform_buffer       dst,
-    size_t                   size,
-    size_t                   src_offset,
-    size_t                   dst_offset) NGF_NOEXCEPT;
+void ngf_cmd_copy_buffer(
+    ngf_xfer_encoder enc,
+    const ngf_buffer src,
+    ngf_buffer       dst,
+    size_t           size,
+    size_t           src_offset,
+    size_t           dst_offset) NGF_NOEXCEPT;
+
 void ngf_cmd_write_image(
-    ngf_xfer_encoder       buf,
-    const ngf_pixel_buffer src,
-    size_t                 src_offset,
-    ngf_image_ref          dst,
-    ngf_offset3d           offset,
-    ngf_extent3d           extent) NGF_NOEXCEPT;
+    ngf_xfer_encoder buf,
+    const ngf_buffer src,
+    size_t           src_offset,
+    ngf_image_ref    dst,
+    ngf_offset3d     offset,
+    ngf_extent3d     extent) NGF_NOEXCEPT;
 
 /**
  * Generate mipmaps from level 0 of the given image and write the results to the remaining levels of
