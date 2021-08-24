@@ -458,28 +458,6 @@ struct ngf_buffer_t {
   size_t mapped_offset = 0;
 };
 
-struct ngf_attrib_buffer_t {
-  id<MTLBuffer> mtl_buffer = nil;
-  size_t mapped_offset = 0;
-};
-
-struct ngf_index_buffer_t {
-  id<MTLBuffer> mtl_buffer = nil;
-  size_t mapped_offset = 0;
-};
-
-struct ngf_uniform_buffer_t {
-  id<MTLBuffer> mtl_buffer = nil;
-  size_t mapped_offset = 0;
-  uint32_t current_idx = 0u;
-  size_t size = 0u;
-};
-
-struct ngf_pixel_buffer_t {
-  id<MTLBuffer> mtl_buffer = nil;
-  size_t mapped_offset = 0;
-};
-
 struct ngf_sampler_t {
   id<MTLSamplerState> sampler = nil;
 };
@@ -1223,31 +1201,29 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer,
   return (uint8_t*)buffer.contents + offset;
 }
 
-ngf_error ngf_create_attrib_buffer(const ngf_attrib_buffer_info *info,
-                                   ngf_attrib_buffer *result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(attrib_buffer, buf);
+ngf_error ngf_create_buffer(const ngf_buffer_info *info,
+                            ngf_buffer *result) NGF_NOEXCEPT {
+  NGFMTL_NURSERY(buffer, buf);
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result = buf.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_attrib_buffer(ngf_attrib_buffer buf) NGF_NOEXCEPT {
+void ngf_destroy_buffer(ngf_buffer buf) NGF_NOEXCEPT {
   if (buf != nullptr) {
-    buf->~ngf_attrib_buffer_t();
+    buf->~ngf_buffer_t();
     NGFI_FREE(buf);
   }
 }
 
-void* ngf_attrib_buffer_map_range(ngf_attrib_buffer buf,
-                                  size_t offset,
-                                  size_t size,
-                                  [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
+void* ngf_buffer_map_range(ngf_buffer buf, size_t offset,
+                           size_t size) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
 }
 
-void ngf_attrib_buffer_flush_range(
-    [[maybe_unused]] ngf_attrib_buffer buf,
+void ngf_buffer_flush_range(
+    [[maybe_unused]] ngf_buffer buf,
     [[maybe_unused]] size_t offset,
     [[maybe_unused]] size_t size) NGF_NOEXCEPT {
 #if TARGET_OS_OSX
@@ -1256,116 +1232,7 @@ void ngf_attrib_buffer_flush_range(
 #endif
 }
 
-void ngf_attrib_buffer_unmap([[maybe_unused]] ngf_attrib_buffer buf) NGF_NOEXCEPT {}
-
-ngf_error ngf_create_index_buffer(const ngf_index_buffer_info *info,
-                                  ngf_index_buffer *result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(index_buffer, buf);
-  buf->mtl_buffer = ngfmtl_create_buffer(*info);
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-void* ngf_index_buffer_map_range(ngf_index_buffer buf,
-                                 size_t offset,
-                                 size_t size,
-                                 [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
-  buf->mapped_offset = offset;
-  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
-}
-
-void ngf_index_buffer_flush_range(
-    [[maybe_unused]] ngf_index_buffer buf,
-    [[maybe_unused]] size_t offset,
-    [[maybe_unused]] size_t size) NGF_NOEXCEPT {
-#if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
-                                              size)];
-#endif
-}
-
-void ngf_index_buffer_unmap([[maybe_unused]] ngf_index_buffer buf) NGF_NOEXCEPT {}
-
-void ngf_destroy_index_buffer(ngf_index_buffer buf) NGF_NOEXCEPT {
-  if (buf != nullptr) {
-    buf->~ngf_index_buffer_t();
-    NGFI_FREE(buf);
-  }
-}
-
-ngf_error ngf_create_uniform_buffer(const ngf_uniform_buffer_info *info,
-                                    ngf_uniform_buffer *result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(uniform_buffer, buf);
-  buf->mtl_buffer = ngfmtl_create_buffer(*info);
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_uniform_buffer(ngf_uniform_buffer buf) NGF_NOEXCEPT {
-  if (buf != nullptr) {
-    buf->~ngf_uniform_buffer_t();
-    NGFI_FREE(buf);
-  }
-}
-
-void* ngf_uniform_buffer_map_range(ngf_uniform_buffer buf,
-                                   size_t offset,
-                                   size_t size,
-                                   [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
-  buf->mapped_offset = offset;
-  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
-}
-
-void ngf_uniform_buffer_flush_range([[maybe_unused]] ngf_uniform_buffer buf,
-                                    [[maybe_unused]] size_t offset,
-                                    [[maybe_unused]] size_t size) NGF_NOEXCEPT {
-#if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
-                                              size)];
-#endif
-}
-
-void ngf_uniform_buffer_unmap([[maybe_unused]] ngf_uniform_buffer buf) NGF_NOEXCEPT {}
-
-ngf_error ngf_create_pixel_buffer(const ngf_pixel_buffer_info *info,
-                                  ngf_pixel_buffer *result) NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
-  NGFMTL_NURSERY(pixel_buffer, buf);
-  ngf_buffer_info bufinfo = {
-    info->size,
-    NGF_BUFFER_STORAGE_HOST_WRITEABLE
-  };
-  buf->mtl_buffer = ngfmtl_create_buffer(bufinfo);
-  *result = buf.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_pixel_buffer(ngf_pixel_buffer buf) NGF_NOEXCEPT {
-  if (buf != nullptr) {
-    buf->~ngf_pixel_buffer_t();
-    NGFI_FREE(buf);
-  }
-}
-
-void* ngf_pixel_buffer_map_range(ngf_pixel_buffer buf,
-                                 size_t offset,
-                                 size_t size,
-                                 [[maybe_unused]] uint32_t flags) NGF_NOEXCEPT {
-  buf->mapped_offset = offset;
-  return (void*)_ngf_map_buffer(buf->mtl_buffer, offset, size);
-}
-
-void ngf_pixel_buffer_flush_range([[maybe_unused]] ngf_pixel_buffer buf,
-                                  [[maybe_unused]] size_t offset,
-                                  [[maybe_unused]] size_t size) NGF_NOEXCEPT {
-#if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset,
-                                              size)];
-#endif
-}
-
-void ngf_pixel_buffer_unmap([[maybe_unused]] ngf_pixel_buffer buf) NGF_NOEXCEPT {}
+void ngf_buffer_unmap([[maybe_unused]] ngf_buffer buf) NGF_NOEXCEPT {}
 
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler *result) NGF_NOEXCEPT {
@@ -1775,7 +1642,7 @@ void ngf_cmd_draw(ngf_render_encoder enc, bool indexed,
 }
 
 void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
-                                const ngf_attrib_buffer buf,
+                                const ngf_buffer buf,
                                 uint32_t binding,
                                 uint32_t offset) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
@@ -1785,7 +1652,7 @@ void ngf_cmd_bind_attrib_buffer(ngf_render_encoder enc,
 }
 
 void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
-                               const ngf_index_buffer buf,
+                               const ngf_buffer buf,
                                ngf_type type) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
   cmd_buf->bound_index_buffer = buf->mtl_buffer;
@@ -1811,8 +1678,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const  ngf_uniform_buffer_bind_info &buf_bind_op =
             bind_op.info.uniform_buffer;
-        const ngf_uniform_buffer buf = buf_bind_op.buffer;
-        size_t offset = buf->current_idx * buf->size + buf_bind_op.offset;
+        const ngf_buffer buf = buf_bind_op.buffer;
+        size_t offset = buf_bind_op.offset;
         [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                       offset:offset
                                      atIndex:native_binding];
@@ -1874,32 +1741,12 @@ void ngfmtl_cmd_copy_buffer(ngf_xfer_encoder enc,
                 destinationOffset:dst_offset size:size];
 }
 
-void ngf_cmd_copy_attrib_buffer(ngf_xfer_encoder enc,
-                                const ngf_attrib_buffer src,
-                                ngf_attrib_buffer dst,
-                                size_t size,
-                                size_t src_offset,
-                                size_t dst_offset) NGF_NOEXCEPT {
-  ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
-                       dst_offset);
-}
-
-void ngf_cmd_copy_index_buffer(ngf_xfer_encoder enc,
-                               const ngf_index_buffer src,
-                               ngf_index_buffer dst,
-                               size_t size,
-                               size_t src_offset,
-                               size_t dst_offset) NGF_NOEXCEPT {
-  ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
-                       dst_offset);
-}
-
-void ngf_cmd_copy_uniform_buffer(ngf_xfer_encoder enc,
-                                 const ngf_uniform_buffer src,
-                                 ngf_uniform_buffer dst,
-                                 size_t size,
-                                 size_t src_offset,
-                                 size_t dst_offset) NGF_NOEXCEPT {
+void ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
+                         const ngf_buffer src,
+                         ngf_buffer dst,
+                         size_t size,
+                         size_t src_offset,
+                         size_t dst_offset) NGF_NOEXCEPT {
   ngfmtl_cmd_copy_buffer(enc, src->mtl_buffer, dst->mtl_buffer, size, src_offset,
                        dst_offset);
 }
@@ -1911,7 +1758,7 @@ static uint32_t _get_pitch(const uint32_t width, const ngf_image_format format) 
 }
 
 void ngf_cmd_write_image(ngf_xfer_encoder enc,
-                         const ngf_pixel_buffer src,
+                         const ngf_buffer src,
                          size_t src_offset,
                          ngf_image_ref dst,
                          ngf_offset3d offset,
