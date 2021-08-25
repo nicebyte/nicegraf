@@ -347,7 +347,8 @@ static VkDescriptorType get_vk_descriptor_type(ngf_descriptor_type type) {
       VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
       VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
       VK_DESCRIPTOR_TYPE_SAMPLER,
-      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER};
+      VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+      VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER};
   return types[type];
 }
 
@@ -595,6 +596,7 @@ static VkBufferUsageFlags get_vk_buffer_usage(uint32_t usage) {
   if (usage & NGF_BUFFER_USAGE_UNIFORM_BUFFER) flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
   if (usage & NGF_BUFFER_USAGE_INDEX_BUFFER) flags |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
   if (usage & NGF_BUFFER_USAGE_VERTEX_BUFFER) flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  if (usage & NGF_BUFFER_USAGE_TEXEL_BUFFER) flags |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
   return flags;
 }
 
@@ -627,6 +629,7 @@ static VkAccessFlags get_vk_buffer_access_flags(ngf_buffer buf) {
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER) result |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER) result |= VK_ACCESS_INDEX_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER) result |= VK_ACCESS_UNIFORM_READ_BIT;
+  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER) result |= VK_ACCESS_SHADER_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_DST) result |= VK_ACCESS_TRANSFER_WRITE_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_SRC) result |= VK_ACCESS_TRANSFER_READ_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE) result |= VK_ACCESS_HOST_READ_BIT;
@@ -640,7 +643,8 @@ static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
   VkPipelineStageFlags result = 0x00;
   if ((buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER) ||
       (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER)) result |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER)
+  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER ||
+      buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER)
     result |= (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
   return result;
 }
@@ -1582,9 +1586,10 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
 
       switch (bind_op->type) {
-      case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-        const ngf_uniform_buffer_bind_info* bind_info = &bind_op->info.uniform_buffer;
-        VkDescriptorBufferInfo*             vk_bind_info =
+      case NGF_DESCRIPTOR_UNIFORM_BUFFER: 
+      case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+        const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
+        VkDescriptorBufferInfo*     vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
 
         vk_bind_info->buffer = (VkBuffer)bind_info->buffer->alloc.obj_handle;
@@ -1859,6 +1864,7 @@ static ngf_descriptor_type ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorTyp
   case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return NGF_DESCRIPTOR_TEXTURE;
   case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER: return NGF_DESCRIPTOR_SAMPLER;
   case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER: return NGF_DESCRIPTOR_TEXEL_BUFFER;
   default: return NGF_DESCRIPTOR_TYPE_COUNT;
   }
 }
