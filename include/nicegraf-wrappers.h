@@ -222,12 +222,23 @@ template<uint32_t S> struct descriptor_set {
 
     static ngf_resource_bind_op uniform_buffer(const ngf_buffer buf, size_t offset, size_t range) {
       ngf_resource_bind_op op;
-      op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
-      op.target_binding             = B;
-      op.target_set                 = S;
-      op.info.uniform_buffer.buffer = buf;
-      op.info.uniform_buffer.offset = offset;
-      op.info.uniform_buffer.range  = range;
+      op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
+      op.target_binding     = B;
+      op.target_set         = S;
+      op.info.buffer.buffer = buf;
+      op.info.buffer.offset = offset;
+      op.info.buffer.range  = range;
+      return op;
+    }
+
+    static ngf_resource_bind_op texel_buffer(const ngf_buffer buf, size_t offset, size_t range) {
+      ngf_resource_bind_op op;
+      op.type               = NGF_DESCRIPTOR_TEXEL_BUFFER;
+      op.target_binding     = B;
+      op.target_set         = S;
+      op.info.buffer.buffer = buf;
+      op.info.buffer.offset = offset;
+      op.info.buffer.range  = range;
       return op;
     }
 
@@ -323,9 +334,9 @@ template<typename T> class uniform_multibuffer {
     op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding             = binding;
     op.target_set                 = set;
-    op.info.uniform_buffer.buffer = buf_.get();
-    op.info.uniform_buffer.offset = current_offset_ + additional_offset;
-    op.info.uniform_buffer.range  = (range == 0) ? aligned_per_frame_size_ : range;
+    op.info.buffer.buffer = buf_.get();
+    op.info.buffer.offset = current_offset_ + additional_offset;
+    op.info.buffer.range  = (range == 0) ? aligned_per_frame_size_ : range;
     return op;
   }
 

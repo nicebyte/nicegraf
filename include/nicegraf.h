@@ -500,6 +500,8 @@ typedef enum ngf_buffer_usage {
       0x08, /** < Buffer may be used as the source of index data for indexed drawcalls. */
   NGF_BUFFER_USAGE_VERTEX_BUFFER =
       0x10, /** < Buffer may be used as the source of vertex attribute data. */
+
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /** Buffer may be bound as a uniform texel buffer. */
 } ngf_buffer_usage;
 
 /**
@@ -785,6 +787,7 @@ typedef enum {
   NGF_DESCRIPTOR_TEXTURE,
   NGF_DESCRIPTOR_SAMPLER,
   NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER,
+  NGF_DESCRIPTOR_TEXEL_BUFFER,
   NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
 
@@ -795,7 +798,7 @@ typedef struct {
   ngf_buffer buffer; /**< Which buffer to bind.*/
   size_t     offset; /**< Offset at which to bind the buffer.*/
   size_t     range;  /**< Bound range.*/
-} ngf_uniform_buffer_bind_info;
+} ngf_buffer_bind_info;
 
 /**
  * Specifies an image bind operation.
@@ -810,7 +813,7 @@ typedef struct {
   uint32_t            target_binding;
   ngf_descriptor_type type;
   union {
-    ngf_uniform_buffer_bind_info uniform_buffer;
+    ngf_buffer_bind_info buffer;
     ngf_image_sampler_bind_info  image_sampler;
   } info;
 } ngf_resource_bind_op;
