@@ -1599,22 +1599,22 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         vk_write->pBufferInfo = vk_bind_info;
         break;
       }
-      case NGF_DESCRIPTOR_TEXTURE:
+      case NGF_DESCRIPTOR_IMAGE:
       case NGF_DESCRIPTOR_SAMPLER:
-      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+      case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
         const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
         VkDescriptorImageInfo*             vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
         vk_bind_info->imageView   = VK_NULL_HANDLE;
         vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         vk_bind_info->sampler     = VK_NULL_HANDLE;
-        if (bind_op->type == NGF_DESCRIPTOR_TEXTURE ||
-            bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
+        if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
+            bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
           vk_bind_info->imageView   = bind_info->image_subresource.image->vkview;
           vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
         if (bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
-            bind_op->type == NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER) {
+            bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
           vk_bind_info->sampler = bind_info->sampler->vksampler;
         }
         vk_write->pImageInfo = vk_bind_info;
@@ -1861,9 +1861,9 @@ static int ngfvk_binding_comparator(const void* a, const void* b) {
 static ngf_descriptor_type ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
   switch(spv_reflect_type) {
   case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER: return NGF_DESCRIPTOR_UNIFORM_BUFFER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return NGF_DESCRIPTOR_TEXTURE;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return NGF_DESCRIPTOR_IMAGE;
   case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER: return NGF_DESCRIPTOR_SAMPLER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
   case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER: return NGF_DESCRIPTOR_TEXEL_BUFFER;
   default: return NGF_DESCRIPTOR_TYPE_COUNT;
   }

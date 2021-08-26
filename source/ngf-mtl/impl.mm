@@ -1687,7 +1687,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                         offset:offset
                                        atIndex:native_binding];
         break;}
-      case NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER: {
+      case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
         // TODO use texture view
         const ngf_image_sampler_bind_info &img_bind_op =
             bind_op.info.image_sampler;
@@ -1704,7 +1704,7 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
          setFragmentSamplerState:img_bind_op.sampler->sampler
          atIndex:native_binding];
         break; }
-      case NGF_DESCRIPTOR_TEXTURE: {// TODO use texture view
+      case NGF_DESCRIPTOR_IMAGE: {// TODO use texture view
         const ngf_image_sampler_bind_info &img_bind_op =
             bind_op.info.image_sampler;
         [cmd_buf->active_rce
