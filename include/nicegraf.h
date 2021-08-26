@@ -627,7 +627,7 @@ typedef struct {
   uint32_t         mip_level;    /**< Mip level within the image.*/
   uint32_t         layer;        /**< Layer within the image.*/
   ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
-                                      non-cubemap textures.*/
+                                      non-cubemap images.*/
 } ngf_image_ref;
 
 /**
@@ -784,9 +784,9 @@ typedef struct ngf_sampler_t* ngf_sampler;
  */
 typedef enum {
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
-  NGF_DESCRIPTOR_TEXTURE,
+  NGF_DESCRIPTOR_IMAGE,
   NGF_DESCRIPTOR_SAMPLER,
-  NGF_DESCRIPTOR_TEXTURE_AND_SAMPLER,
+  NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
   NGF_DESCRIPTOR_TEXEL_BUFFER,
   NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
@@ -925,7 +925,7 @@ typedef struct ngf_context_info {
 
   /**
    * A reference to another context; the newly created context will have access
-   * to the other one's resources (such as buffers and textures) and vice versa
+   * to the other one's resources (such as buffers and images) and vice versa
    * Can be NULL.
    */
   const ngf_context shared_context;
