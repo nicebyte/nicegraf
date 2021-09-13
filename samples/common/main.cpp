@@ -226,7 +226,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
           0.0f,
           0.0f,
           0.0f,
-          0.0f,
+          1.0f,
           0,
           &main_render_pass);
 
