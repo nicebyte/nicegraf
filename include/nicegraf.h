@@ -795,9 +795,10 @@ typedef enum {
  * Specifies a buffer bind operation.
  */
 typedef struct {
-  ngf_buffer buffer; /**< Which buffer to bind.*/
-  size_t     offset; /**< Offset at which to bind the buffer.*/
-  size_t     range;  /**< Bound range.*/
+  ngf_buffer       buffer; /**< Which buffer to bind.*/
+  size_t           offset; /**< Offset at which to bind the buffer.*/
+  size_t           range;  /**< Bound range.*/
+  ngf_image_format format; /**< Texel format (texel buffers only). */
 } ngf_buffer_bind_info;
 
 /**
