@@ -138,12 +138,19 @@ typedef struct {
   VmaAllocation vma_alloc;
 } ngfvk_alloc;
 
+typedef struct {
+  VkBufferViewCreateInfo vk_info;
+  VkBufferView           vk_handle;
+} ngfvk_buffer_view_info;
+
 typedef struct ngf_buffer_t {
   ngfvk_alloc             alloc;
   size_t                  size;
   size_t                  mapped_offset;
   uint32_t                ngf_usage_mask;
   ngf_buffer_storage_type storage_type;
+  bool                    have_associated_buffer_views;
+  NGFI_DARRAY_OF(ngfvk_buffer_view_info) associated_buffer_views;
 } ngf_buffer_t;
 
 // Vulkan resources associated with a given frame.
@@ -163,6 +170,7 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkRenderPass) retire_render_passes;
   NGFI_DARRAY_OF(VkSampler) retire_samplers;
   NGFI_DARRAY_OF(VkImageView) retire_image_views;
+  NGFI_DARRAY_OF(VkBufferView) retire_buffer_views;
   NGFI_DARRAY_OF(ngfvk_alloc) retire_images;
   NGFI_DARRAY_OF(ngfvk_alloc) retire_buffers;
   NGFI_DARRAY_OF(ngfvk_desc_pools_list*) reset_desc_pools_lists;
@@ -1148,6 +1156,10 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_image_views, s), NULL);
   }
 
+  NGFI_DARRAY_FOREACH(frame_res->retire_buffer_views, s) {
+    vkDestroyBufferView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_buffer_views, s), NULL);
+  }
+
   NGFI_DARRAY_FOREACH(frame_res->retire_buffers, a) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
     vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
@@ -1171,6 +1183,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
   NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
   NGFI_DARRAY_CLEAR(frame_res->retire_image_views);
+  NGFI_DARRAY_CLEAR(frame_res->retire_buffer_views);
   NGFI_DARRAY_CLEAR(frame_res->retire_images);
   NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
   NGFI_DARRAY_CLEAR(frame_res->retire_buffers);
@@ -1586,8 +1599,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
 
       switch (bind_op->type) {
-      case NGF_DESCRIPTOR_UNIFORM_BUFFER: 
-      case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+      case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
         VkDescriptorBufferInfo*     vk_bind_info =
             ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
@@ -1597,6 +1609,43 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         vk_bind_info->range  = bind_info->range;
 
         vk_write->pBufferInfo = vk_bind_info;
+        break;
+      }
+      case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+        const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
+        const VkFormat vk_format = get_vk_image_format(bind_info->format);
+        ngf_buffer buffer = bind_info->buffer;
+        if (!buffer->have_associated_buffer_views) {
+          NGFI_DARRAY_RESET(buffer->associated_buffer_views, 1);
+        }
+        VkBufferView* view_ptr = NULL;
+        NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
+          const VkBufferViewCreateInfo* vk_info = &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_info;
+          if (vk_info->offset == bind_info->offset &&
+              vk_info->range == bind_info->range &&
+              vk_info->format == vk_format) {
+            view_ptr = &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle;
+            break;
+          }
+        }
+        if (view_ptr == NULL) {
+          ngfvk_buffer_view_info new_buffer_view_info = {
+            .vk_handle = VK_NULL_HANDLE,
+            .vk_info = {
+              .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+              .flags = 0u,
+              .pNext = NULL,
+              .format = vk_format,
+              .offset = bind_info->offset,
+              .range = bind_info->range,
+              .buffer = (VkBuffer)buffer->alloc.obj_handle
+            }
+          };
+          vkCreateBufferView(_vk.device, &new_buffer_view_info.vk_info, NULL, &new_buffer_view_info.vk_handle);
+          NGFI_DARRAY_APPEND(buffer->associated_buffer_views, new_buffer_view_info);
+          view_ptr = &NGFI_DARRAY_BACKPTR(buffer->associated_buffer_views)->vk_handle;
+        }
+        vk_write->pTexelBufferView = view_ptr;
         break;
       }
       case NGF_DESCRIPTOR_IMAGE:
@@ -2321,6 +2370,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_render_passes, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_image_views, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffer_views, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_pools_lists, 8);
@@ -2396,6 +2446,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_render_passes);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_image_views);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffer_views);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffers);
       for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
@@ -3836,6 +3887,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
 
   buf->storage_type   = info->storage_type;
   buf->ngf_usage_mask = info->buffer_usage;
+  buf->have_associated_buffer_views = false;
 
   return err;
 }
@@ -3844,6 +3896,12 @@ void ngf_destroy_buffer(ngf_buffer buffer) {
   if (buffer) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buffer->alloc);
+    if (buffer->have_associated_buffer_views) {
+      NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
+        NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffer_views,
+                           NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle);
+      }
+    }
     NGFI_FREE(buffer);
   }
 }

@@ -231,7 +231,7 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
-    static ngf_resource_bind_op texel_buffer(const ngf_buffer buf, size_t offset, size_t range) {
+    static ngf_resource_bind_op texel_buffer(const ngf_buffer buf, size_t offset, size_t range, ngf_image_format fmt) {
       ngf_resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_TEXEL_BUFFER;
       op.target_binding     = B;
@@ -239,6 +239,7 @@ template<uint32_t S> struct descriptor_set {
       op.info.buffer.buffer = buf;
       op.info.buffer.offset = offset;
       op.info.buffer.range  = range;
+      op.info.buffer.format = fmt;
       return op;
     }
 
