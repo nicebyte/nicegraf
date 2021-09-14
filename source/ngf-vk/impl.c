@@ -654,6 +654,9 @@ static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER ||
       buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER)
     result |= (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_DST ||
+      buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_SRC)
+    result |= VK_PIPELINE_STAGE_TRANSFER_BIT;
   return result;
 }
 
@@ -1617,6 +1620,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         ngf_buffer buffer = bind_info->buffer;
         if (!buffer->have_associated_buffer_views) {
           NGFI_DARRAY_RESET(buffer->associated_buffer_views, 1);
+          buffer->have_associated_buffer_views = true;
         }
         VkBufferView* view_ptr = NULL;
         NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
