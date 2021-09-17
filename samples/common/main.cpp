@@ -45,6 +45,7 @@
 #define NGF_SAMPLES_COMMON_MAIN main
 #endif
 
+extern "C" {
 int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * We prefer a more verbose diagnostic output from nicegraf in debug builds.
@@ -271,4 +272,5 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   ImGui::DestroyContext(imgui_ctx);
 
   return 0;
+}
 }
