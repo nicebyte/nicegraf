@@ -23,6 +23,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 namespace ngf_samples {
 
