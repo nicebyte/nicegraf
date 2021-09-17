@@ -136,7 +136,7 @@ void load_targa(
      premultiplied.
      if no extension section is present, assume non-premultiplied
      alpha. */
-  const uint8_t attr_type = !has_alpha || ext_offset == 0 ? 3 : in_bytes[ext_offset + 494];
+  const char attr_type = !has_alpha || ext_offset == 0 ? 3 : in_bytes[ext_offset + 494];
   if (attr_type != 3 && attr_type != 4) { throw std::runtime_error("invalid attribute type"); }
   const bool is_premul_alpha = attr_type == 4;
 
@@ -152,8 +152,8 @@ void load_targa(
     ++img_data; /* advance img. data to point to start of packet data. */
     for (size_t p = 0u; p < packet_length; ++p) {
       /* pixel data is stored as BGRA. */
-      const char  a      = has_alpha ? img_data[3] : 255;
-      const float af     = (float)a / 255.0f;
+      const uint8_t  a     = has_alpha ? (uint8_t)img_data[3] : 0xff;
+      const float   af     = (float)a / 255.0f;
       auto        premul = [&](uint8_t v) {
         if (is_premul_alpha || !has_alpha)
           return v;
@@ -164,11 +164,11 @@ void load_targa(
           return linear_to_srgb(linear_premul);
         }
       };
-      const uint8_t b = premul(img_data[0]), g = premul(img_data[1]), r = premul(img_data[2]);
-      out_bytes[written_pixels * 4u + 0] = r;
-      out_bytes[written_pixels * 4u + 1] = g;
-      out_bytes[written_pixels * 4u + 2] = b;
-      out_bytes[written_pixels * 4u + 3] = a;
+      const uint8_t b = premul((uint8_t)img_data[0]), g = premul((uint8_t)img_data[1]), r = premul((uint8_t)img_data[2]);
+      out_bytes[written_pixels * 4u + 0] = (char)r;
+      out_bytes[written_pixels * 4u + 1] = (char)g;
+      out_bytes[written_pixels * 4u + 2] = (char)b;
+      out_bytes[written_pixels * 4u + 3] = (char)a;
       ++written_pixels;
       if (!is_rle_packet) img_data += bytes_per_pel;
     }
