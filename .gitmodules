@@ -1,5 +1,5 @@
 [submodule "samples/nicegraf-shaderc"]
-	path = samples/nicegraf-shaderc
+	path = samples/deps/nicegraf-shaderc
 	url = https://github.com/nicebyte/nicegraf-shaderc
 [submodule "samples/third-party/imgui"]
 	path = samples/deps/imgui
