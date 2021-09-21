@@ -2,8 +2,8 @@
 	path = samples/nicegraf-shaderc
 	url = https://github.com/nicebyte/nicegraf-shaderc
 [submodule "samples/third-party/imgui"]
-	path = samples/third-party/imgui
+	path = samples/deps/imgui
 	url = https://github.com/ocornut/imgui
 [submodule "samples/third-party/nicemath"]
-	path = samples/third-party/nicemath
+	path = samples/deps/nicemath
 	url = https://github.com/nicebyte/nicemath
