@@ -169,12 +169,15 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     # Set the folder to hold all samples binaries.
     set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples/binaries)
 
-    # Ensure we have the shader compiler available.
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc)
-    if (TARGET nicegraf_shaderc)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
+
+    # Ensure we have the required dependencies are available.
+    if (TARGET nicegraf_shaderc AND TARGET glfw)
         set_target_properties(nicegraf_shaderc PROPERTIES FOLDER "samples")
+        set_target_properties(glfw PROPERTIES FOLDER "samples")
     else()
-        message(FATAL_ERROR "Building samples requires nicegraf-shaderc. Make sure to run `git submodule update` from the repo root.")
+        message(FATAL_ERROR "Dependencies required for building samples not found. Make sure to run `git submodule update` from the repo root.")
     endif()
 
     # Custom target for generated shaders.
@@ -194,7 +197,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         set(output_files_list "")
         foreach(tech ${tech_names})
           list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.vs.21.msl")
-          list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.ps.12.msl")
+          list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.ps.21.msl")
           list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.vs.spv")
           list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.ps.spv")
           list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.pipeline")
@@ -204,7 +207,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         add_custom_command(OUTPUT ${output_files_list}
                            MAIN_DEPENDENCY ${source_path}
                            DEPENDS nicegraf_shaderc
-                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/nicegraf-shaderc/nicegraf_shaderc ARGS ${source_path} "-t" "msl12" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
+                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc/nicegraf_shaderc ARGS ${source_path} "-t" "msl21" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
                            WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/samples/shaders)
         set(generated_shaders_list "${output_files_list};${generated_shaders_list}")
       endif()
@@ -218,16 +221,13 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_widgets.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_demo.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.h)
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.h
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.h
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.cpp)
+
     # Determine the backend to build the samples with based on the platform.
     if (WIN32)
         set(NGF_SAMPLES_BACKEND nicegraf-vk)
-        set(NGF_SAMPLES_PLATFORM_SOURCE
-             ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/windows/window.cpp)
-        set(NGF_IMGUI_SRCS ${NGF_IMGUI_SRCS}
-                           ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_win32.h
-                           ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_win32.cpp)
-
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
@@ -236,6 +236,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
 
     ngf_library(NAME ngf-imgui
                 SRCS ${NGF_IMGUI_SRCS}
+                DEPS glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends)
 
@@ -253,9 +254,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/window.h
-                     ${NGF_SAMPLES_PLATFORM_SOURCE}
-                DEPS ngf-imgui
+                DEPS ngf-imgui glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")

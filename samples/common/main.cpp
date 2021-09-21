@@ -20,12 +20,22 @@
  * IN THE SOFTWARE.
  */
 
+
+#include <GLFW/glfw3.h>
+
+#if defined(_WIN32) || defined(_WIN64)
+#define GLFW_EXPOSE_NATIVE_WIN32
+#elif defined(APPLE)
+#define GLFW_EXPOSE_NATIVE_COCOA
+#endif
+#include <GLFW/glfw3native.h>
+
 #include "diagnostic-callback.h"
 #include "imgui-backend.h"
+#include "imgui_impl_glfw.h"
 #include "check.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
-#include "platform/window.h"
 #include "sample-interface.h"
 #include "logging.h"
 
@@ -82,6 +92,11 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       &imgui_font_atlas_height);
 
   /**
+   * Initialize glfw.
+   */
+   glfwInit();
+
+  /**
    * Create a window.
    * The `width` and `height` here refer to the dimensions of the window's "client area", i.e. the
    * area that can actually be rendered to (excludes borders and any other decorative elements). The
@@ -90,11 +105,34 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Note that we deliberately create the window before setting up the nicegraf context. This is
    * done so that when the destructors are invoked, the context is destroyed before the window -
    * changing this sequence of events might lead to misbehavior.
+   * Also note that we set special window hint to make sure GLFW does _not_ attempt to create
+   * an OpenGL (or other API) context for us - this is nicegraf's job.
    */
-  constexpr uint32_t  window_width_hint = 800, window_height_hint = 600;
-  ngf_samples::window window {"nicegraf sample", window_width_hint, window_height_hint};
-  uint32_t            fb_width, fb_height;
-  window.get_size(&fb_width, &fb_height);
+   constexpr uint32_t window_width_hint = 800, window_height_hint = 600;
+   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+   GLFWwindow*        window =
+       glfwCreateWindow(window_width_hint, window_height_hint, "nicegraf sample", nullptr, nullptr);
+   if (window == nullptr) {
+    ngf_samples::loge("Failed to create a window, exiting.");
+    return 0;
+   }
+   int fb_width, fb_height;
+   glfwGetWindowSize(window, &fb_width, &fb_height);
+
+  /**
+   * Make sure keyboard/mouse work with imgui.
+   */
+  ImGui_ImplGlfw_InitForOther(window, true);
+
+  /**
+   * Retrieve the native window handle to pass on to nicegraf.
+   */
+   uintptr_t native_window_handle = 0;
+#if defined(_WIN32) || defined(_WIN64)
+  native_window_handle = (uintptr_t)glfwGetWin32Window(window);
+#else
+#error "unimplemented"
+#endif
 
   /**
    * Configure the swapchain and create a nicegraf context.
@@ -107,9 +145,9 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
       .sample_count  = main_render_target_sample_count,
       .capacity_hint = 3u,
-      .width         = fb_width,
-      .height        = fb_height,
-      .native_handle = window.native_handle(),
+      .width         = (uint32_t)fb_width,
+      .height        = (uint32_t)fb_height,
+      .native_handle = native_window_handle,
       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
   const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
   ngf::context           context;
@@ -146,17 +184,19 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    */
   bool first_frame = true;
   auto prev_frame_start = std::chrono::system_clock::now();
-  while (!window.is_closed() && ngf_samples::poll_events()) {
+  while (!glfwWindowShouldClose(window)) {
+    glfwPollEvents();
     auto frame_start = std::chrono::system_clock::now();
     const std::chrono::duration<float> time_delta = frame_start - prev_frame_start;
     float time_delta_f = time_delta.count();
     prev_frame_start = frame_start;
+    ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     /**
      * Query the updated size of the window and handle resize events.
      */
-    const uint32_t old_fb_width = fb_width, old_fb_height = fb_height;
-    window.get_size(&fb_width, &fb_height);
+    const int old_fb_width = fb_width, old_fb_height = fb_height;
+    glfwGetWindowSize(window, &fb_width, &fb_height);
     bool resize_successful = true;
     if (fb_width != old_fb_width || fb_height != old_fb_height) {
       resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, fb_width, fb_height));
