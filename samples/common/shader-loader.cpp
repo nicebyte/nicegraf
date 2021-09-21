@@ -33,7 +33,7 @@ namespace ngf_samples {
 #if defined(NGF_SAMPLES_BACKEND_NICEGRAF_VK)
 #define SHADER_EXTENSION ".spv"
 #elif defined(NGF_SAMPLES_BACKEND_NICEGRAF_MTL)
-#define SHADER_EXTENSION ".12.msl"
+#define SHADER_EXTENSION ".21.msl"
 #else
 #error "build system needs to define samples backend"
 #endif
