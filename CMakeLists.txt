@@ -212,21 +212,21 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_custom_target(sample-shaders DEPENDS ${generated_shaders_list})
     set_target_properties(sample-shaders PROPERTIES FOLDER "samples")
 
-    set(NGF_IMGUI_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui_draw.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui_tables.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui_widgets.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui_demo.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui.cpp
-                       ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/imgui.h)
+    set(NGF_IMGUI_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_draw.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_tables.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_widgets.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_demo.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.cpp
+                       ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.h)
     # Determine the backend to build the samples with based on the platform.
     if (WIN32)
         set(NGF_SAMPLES_BACKEND nicegraf-vk)
         set(NGF_SAMPLES_PLATFORM_SOURCE
              ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/windows/window.cpp)
         set(NGF_IMGUI_SRCS ${NGF_IMGUI_SRCS}
-                           ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/backends/imgui_impl_win32.h
-                           ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/backends/imgui_impl_win32.cpp)
+                           ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_win32.h
+                           ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_win32.cpp)
 
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
@@ -236,8 +236,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
 
     ngf_library(NAME ngf-imgui
                 SRCS ${NGF_IMGUI_SRCS}
-                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui
-                             ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/imgui/backends)
+                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
+                             ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends)
 
     ngf_library(NAME ngf-samples-common
                 SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
@@ -257,7 +257,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${NGF_SAMPLES_PLATFORM_SOURCE}
                 DEPS ngf-imgui
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
-                             ${CMAKE_CURRENT_LIST_DIR}/samples/third-party/nicemath)
+                             ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
     target_compile_definitions(ngf-samples-common PUBLIC ${NGF_SAMPLES_BACKEND_DEFINE})
 
