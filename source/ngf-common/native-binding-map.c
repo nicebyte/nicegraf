@@ -103,18 +103,18 @@ ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
     }
     NGFI_DARRAY_APPEND(entries, current_entry);
   }
-  if (NGFI_DARRAY_SIZE(entries) == 0) return NULL;
-
-  qsort(
-      entries.data,
-      NGFI_DARRAY_SIZE(entries),
-      sizeof(struct native_binding_entry),
-      binding_entry_comparator);
-
+  if (NGFI_DARRAY_SIZE(entries) > 0) {
+    qsort(
+        entries.data,
+        NGFI_DARRAY_SIZE(entries) - 1,
+        sizeof(struct native_binding_entry),
+        binding_entry_comparator);
+  }
+  
   ngfi_native_binding_map* map = NGFI_ALLOC(ngfi_native_binding_map);
   map->nsets                   = 0;
   map->sets                    = NULL;
-  for (int i = (int)(NGFI_DARRAY_SIZE(entries) - 1); i >= 0; --i) {
+  for (int i = (int)NGFI_DARRAY_SIZE(entries) - 1; i >= 0; --i) {
     const struct native_binding_entry* entry = &(NGFI_DARRAY_AT(entries, i));
     if (map->sets == NULL) {
       /* since we're starting at the far end of a sorted array, op->target_set
