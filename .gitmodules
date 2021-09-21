@@ -7,7 +7,7 @@
 [submodule "samples/third-party/nicemath"]
 	path = samples/deps/nicemath
 	url = https://github.com/nicebyte/nicemath
-[submodule "samples/.\\deps\\glfw"]
-	path = samples/.\\deps\\glfw
+[submodule "samples/deps/glfw"]
+	path = samples/deps/glfw
 	url = https://github.com/glfw/glfw
 	branch = 3.3-stable
