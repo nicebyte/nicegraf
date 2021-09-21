@@ -124,8 +124,8 @@ else()
   if ( ${VulkanHeaders_FOUND} )
     # Import VMA for handling vulkan memory allocation.
     add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/vma)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/third_party/SPIRV-reflect)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/vma)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/SPIRV-reflect)
 
     # Some vulkan-specific dependencies.
     set(NICEGRAF_VK_DEPS vma spvreflect)
@@ -158,7 +158,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                DEPS nicegraf-internal)
-    target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/third_party/catch")
+    target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/deps/catch")
     if (NOT WIN32)
         target_link_libraries(ngf_tests pthread)
     endif()
