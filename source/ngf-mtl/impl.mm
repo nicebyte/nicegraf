@@ -1671,7 +1671,8 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
                                    bind_op.target_set,
                                    bind_op.target_binding);
     if (native_binding == ~0) {
-      // TODO: call debug callback.
+      NGFI_DIAG_ERROR("Failed to  find  native binding for set %d binding %d",
+                      bind_op.target_set, bind_op.target_binding);
       continue;
     }
     switch(bind_op.type) {
