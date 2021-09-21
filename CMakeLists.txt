@@ -228,6 +228,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     # Determine the backend to build the samples with based on the platform.
     if (WIN32)
         set(NGF_SAMPLES_BACKEND nicegraf-vk)
+    elseif(APPLE)
+        set(NGF_SAMPLES_BACKEND nicegraf-mtl)
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
