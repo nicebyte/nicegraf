@@ -22,7 +22,9 @@
 #pragma once
 
 #include "nicegraf.h"
+#include "nicegraf-util.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <utility>
@@ -307,7 +309,7 @@ template<typename T> class uniform_multibuffer {
 
   ngf_error initialize(const uint32_t frames) {
     const size_t alignment    = ngf_get_device_capabilities()->uniform_buffer_offset_alignment;
-    const size_t aligned_size = sizeof(T) + (alignment - sizeof(T) % alignment);
+    const size_t aligned_size = ngf_util_align_size(sizeof(T), alignment);
     NGF_RETURN_IF_ERROR(buf_.initialize(ngf_buffer_info {
         aligned_size * frames,
         NGF_BUFFER_STORAGE_HOST_WRITEABLE,
