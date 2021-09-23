@@ -37,7 +37,10 @@ namespace ngf_samples {
 namespace texture_sampling {
 
 struct matrices {
-  nm::float4x4 m[4];
+  struct {
+    nm::float4x4 matrix;
+    char _padding[256 - sizeof(nm::float4x4)];
+  } m[4];
 };
 
 struct state {
@@ -267,7 +270,7 @@ void sample_draw_frame(
        ++i) {
     const nm::float4x4 object_to_world =
         nm::translation(nm::float3 {-3.0f + i * 2.05f, 0.0f, 0.0f});
-    uniforms_for_this_frame.m[i] = camera_to_clip * world_to_camera * object_to_world;
+    uniforms_for_this_frame.m[i].matrix = camera_to_clip * world_to_camera * object_to_world;
   }
   state->uniforms.write(uniforms_for_this_frame);
 
@@ -279,7 +282,7 @@ void sample_draw_frame(
     ngf::cmd_bind_resources(
         main_render_pass,
         state->uniforms
-            .bind_op_at_current_offset(0, 0, sizeof(nm::float4x4) * i, sizeof(nm::float4x4)),
+            .bind_op_at_current_offset(0, 0, 256 * i, sizeof(nm::float4x4)),
         ngf::descriptor_set<0>::binding<1>::sampler(state->samplers[i]),
         ngf::descriptor_set<1>::binding<0>::texture(state->texture));
     ngf_cmd_draw(main_render_pass, false, 0, 6, 1);
