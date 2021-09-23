@@ -275,7 +275,7 @@ void sample_draw_frame(
   ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
-  for (int i = 0; i < sizeof(state->samplers) / sizeof(state->samplers[0]); ++i) {
+  for (uint32_t i = 0; i < sizeof(state->samplers) / sizeof(state->samplers[0]); ++i) {
     ngf::cmd_bind_resources(
         main_render_pass,
         state->uniforms
