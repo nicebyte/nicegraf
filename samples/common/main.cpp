@@ -25,8 +25,9 @@
 
 #if defined(_WIN32) || defined(_WIN64)
 #define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(APPLE)
+#elif defined(__APPLE__)
 #define GLFW_EXPOSE_NATIVE_COCOA
+#include "platform/macos/glfw-cocoa-contentview.h"
 #endif
 #include <GLFW/glfw3native.h>
 
@@ -55,7 +56,6 @@
 #define NGF_SAMPLES_COMMON_MAIN main
 #endif
 
-extern "C" {
 int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * We prefer a more verbose diagnostic output from nicegraf in debug builds.
@@ -130,6 +130,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    uintptr_t native_window_handle = 0;
 #if defined(_WIN32) || defined(_WIN64)
   native_window_handle = (uintptr_t)glfwGetWin32Window(window);
+#elif defined(__APPLE__)
+  native_window_handle = (uintptr_t)ngf_samples::get_glfw_contentview(window);
 #else
 #error "unimplemented"
 #endif
@@ -190,16 +192,17 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     const std::chrono::duration<float> time_delta = frame_start - prev_frame_start;
     float time_delta_f = time_delta.count();
     prev_frame_start = frame_start;
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
+
     /**
      * Query the updated size of the window and handle resize events.
      */
     const int old_fb_width = fb_width, old_fb_height = fb_height;
-    glfwGetWindowSize(window, &fb_width, &fb_height);
+    glfwGetFramebufferSize(window, &fb_width, &fb_height);
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
     bool resize_successful = true;
     if (fb_width != old_fb_width || fb_height != old_fb_height) {
-      resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, fb_width, fb_height));
+      resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, (uint32_t)fb_width, (uint32_t)fb_height));
     }
 
     if (resize_successful) {
@@ -225,8 +228,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          */
         ngf_samples::logi("Initializing sample");
         sample_opaque_data = ngf_samples::sample_initialize(
-            fb_width,
-            fb_height,
+            (uint32_t)fb_width,
+            (uint32_t)fb_height,
             main_render_target_sample_count,
             xfer_encoder);
         
@@ -278,8 +281,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
           main_render_pass,
           time_delta_f,
           frame_token,
-          fb_width,
-          fb_height,
+          (uint32_t)fb_width,
+          (uint32_t)fb_height,
           .0,
           sample_opaque_data);
 
@@ -312,5 +315,4 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   ImGui::DestroyContext(imgui_ctx);
 
   return 0;
-}
 }
