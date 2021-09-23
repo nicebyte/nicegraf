@@ -32,7 +32,7 @@ extern "C" {
 
 /**
  * Contains all the data describing a graphics pipeline, with the exception
- * of shader stages and pipeline layout.
+ * of shader stages.
  * Use the `pipeline_info` member of this struct to initialize a new pipeline
  * object.
  */
