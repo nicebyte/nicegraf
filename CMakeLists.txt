@@ -69,12 +69,6 @@ function (ngf_binary)
    ngf_target(TYPE exe ${ARGN})
 endfunction()
 
-# A helper library for parsing shader metadata produced by
-# nicegraf-shaderc.
-ngf_library(NAME ngf_metadata_parser
-            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/metadata_parser.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/metadata_parser.c)
-
 set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
@@ -94,8 +88,7 @@ endif()
 
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf-internal
-            SRCS ${NGF_INTERNAL_SRCS}
-            DEPS ngf_metadata_parser)
+            SRCS ${NGF_INTERNAL_SRCS})
 
 # nicegraf utility library.
 ngf_library(NAME nicegraf-util
@@ -104,7 +97,7 @@ ngf_library(NAME nicegraf-util
             DEPS nicegraf-internal)
 
 # Common dependencies used by nicegraf on all platforms.
-set(NICEGRAF_COMMON_DEPS nicegraf-internal ngf_metadata_parser)
+set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 
 if (APPLE)
   # Nicegraf with Metal backend.
