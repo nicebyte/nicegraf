@@ -69,26 +69,19 @@ function (ngf_binary)
    ngf_target(TYPE exe ${ARGN})
 endfunction()
 
-set(NGF_INTERNAL_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
-                      ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c)
-
-
-if (NOT APPLE)
-    set(NGF_INTERNAL_SRCS ${NGF_INTERNAL_SRCS}
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
-endif()
-
 # A library with various utilities shared internally across different backends.
 ngf_library(NAME nicegraf-internal
-            SRCS ${NGF_INTERNAL_SRCS})
+            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
+                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
 
 # nicegraf utility library.
 ngf_library(NAME nicegraf-util
