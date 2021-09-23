@@ -23,7 +23,6 @@
 #pragma once
 
 #include "nicegraf.h"
-#include "metadata_parser.h"
 
 #include <stdint.h>
 
