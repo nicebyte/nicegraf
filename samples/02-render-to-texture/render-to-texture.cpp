@@ -86,7 +86,7 @@ void* sample_initialize(
    * Load shader stages.
    */
   const ngf::shader_stage blit_vertex_stage = 
-    load_shader_stage("fullscreen-triangle", "VSMain", NGF_STAGE_VERTEX);
+    load_shader_stage("simple-texture", "VSMain", NGF_STAGE_VERTEX);
   const ngf::shader_stage blit_fragment_stage =
     load_shader_stage("simple-texture", "PSMain", NGF_STAGE_FRAGMENT);
   const ngf::shader_stage offscreen_vertex_stage =
