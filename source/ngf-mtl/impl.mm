@@ -377,6 +377,16 @@ static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
   return filters[f];
 }
 
+static uint32_t ngfmtl_get_bytesperpel(const ngf_image_format format) {
+  const mtl_format f = get_mtl_pixel_format(format);
+  const uint32_t bits = f.rbits + f.gbits + f.bbits + f.abits + f.dbits + f.sbits;
+  return bits / 8;
+}
+
+static uint32_t ngfmtl_get_pitch(const uint32_t width, const ngf_image_format format) {
+  return width * ngfmtl_get_bytesperpel(format);
+}
+
 
 #pragma mark ngf_struct_definitions
 
@@ -1676,7 +1686,30 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
       continue;
     }
     switch(bind_op.type) {
-      case NGF_DESCRIPTOR_TEXEL_BUFFER:
+      case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+        const  ngf_buffer_bind_info &buf_bind_op =
+            bind_op.info.buffer;
+        const ngf_buffer buf = buf_bind_op.buffer;
+        const size_t offset = buf_bind_op.offset;
+        auto texel_buf_descriptor = [MTLTextureDescriptor new];
+        texel_buf_descriptor.depth = 1;
+        texel_buf_descriptor.mipmapLevelCount = 1;
+        texel_buf_descriptor.pixelFormat =
+          get_mtl_pixel_format(buf_bind_op.format).format;
+        texel_buf_descriptor.textureType = MTLTextureTypeTextureBuffer;
+        texel_buf_descriptor.arrayLength = 1;
+        texel_buf_descriptor.sampleCount = 1;
+        texel_buf_descriptor.usage = MTLTextureUsageShaderRead;
+        texel_buf_descriptor.storageMode = buf->mtl_buffer.storageMode;
+        texel_buf_descriptor.width = buf->mtl_buffer.allocatedSize / ngfmtl_get_bytesperpel(buf_bind_op.format);
+        texel_buf_descriptor.height = 1;
+        auto t = [buf->mtl_buffer newTextureWithDescriptor:texel_buf_descriptor
+                                                    offset:offset
+                                               bytesPerRow:buf->mtl_buffer.allocatedSize];
+        [cmd_buf->active_rce setVertexTexture:t atIndex:native_binding];
+        [cmd_buf->active_rce setFragmentTexture:t atIndex:native_binding];
+        break;
+      }
       case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
         const  ngf_buffer_bind_info &buf_bind_op =
             bind_op.info.buffer;
@@ -1753,12 +1786,6 @@ void ngf_cmd_copy_buffer(ngf_xfer_encoder enc,
                        dst_offset);
 }
 
-static uint32_t _get_pitch(const uint32_t width, const ngf_image_format format) {
-  const mtl_format f = get_mtl_pixel_format(format);
-  const uint32_t bits = f.rbits + f.gbits + f.bbits + f.abits + f.dbits + f.sbits;
-  return width * bits / 8;
-}
-
 void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          const ngf_buffer src,
                          size_t src_offset,
@@ -1775,7 +1802,7 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                                       texture_type == MTLTextureTypeCubeArray;
   const uint32_t       target_slice = (is_cubemap ? 6u : 1u) * dst.layer +
                                       (is_cubemap ? dst.cubemap_face : 0);
-  const uint32_t pitch = _get_pitch(extent.width, dst.image->format);
+  const uint32_t pitch = ngfmtl_get_pitch(extent.width, dst.image->format);
   [buf->active_bce copyFromBuffer:src->mtl_buffer
                      sourceOffset:src_offset
                 sourceBytesPerRow:pitch
