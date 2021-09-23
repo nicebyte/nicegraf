@@ -31,16 +31,12 @@
 #include <new>
 #include <optional>
 #include <string>
-#pragma comment(lib, "Metal")
 #import <Metal/Metal.h>
-#pragma comment(lib, "QuartzCore")
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
-#pragma comment(lib, "AppKit")
 #import <AppKit/AppKit.h>
 using NGFMTL_VIEW_TYPE = NSView;
 #else
-#pragma comment(lib, "UIKit")
 #import <UIKit/UIKit.h>
 using NGFMTL_VIEW_TYPE = UIView;
 #endif
