@@ -225,11 +225,17 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.cpp)
 
-    # Determine the backend to build the samples with based on the platform.
+    # Determine the backend to build the samples with based on the platform, and
+    # any platform-specific source files.
+    set(NGF_PLATFORM_SOURCE "")
     if (WIN32)
         set(NGF_SAMPLES_BACKEND nicegraf-vk)
     elseif(APPLE)
         set(NGF_SAMPLES_BACKEND nicegraf-mtl)
+        set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
@@ -256,6 +262,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
+                     ${NGF_PLATFORM_SOURCE}
                 DEPS ngf-imgui glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
