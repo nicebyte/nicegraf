@@ -82,9 +82,9 @@ static int binding_entry_comparator(const void* a, const void* b) {
   return 1;
 }
 
-ngfi_native_binding_map*
-ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
-  int                         n = 0;
+ngfi_native_binding_map* ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
+  int                         n              = 0;
+  int                         consumed_bytes = 0;
   struct native_binding_entry current_entry;
   NGFI_DARRAY_OF(struct native_binding_entry) entries;
   NGFI_DARRAY_RESET(entries, 16);
@@ -97,12 +97,19 @@ ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
              &current_entry.native_binding,
              &n) == 3) {
     serialized_map += n;
+    consumed_bytes += n;
     if (current_entry.set == -1 && current_entry.binding == -1 &&
         current_entry.native_binding == -1) {
       break;
     }
     NGFI_DARRAY_APPEND(entries, current_entry);
   }
+
+  /**
+   * If we didn't consume any input at all, it was ill-formed.
+   */
+  if (consumed_bytes <= 0) { return NULL; }
+
   if (NGFI_DARRAY_SIZE(entries) > 0) {
     qsort(
         entries.data,
@@ -110,7 +117,7 @@ ngfi_parse_serialized_native_binding_map(const char* serialized_map) {
         sizeof(struct native_binding_entry),
         binding_entry_comparator);
   }
-  
+
   ngfi_native_binding_map* map = NGFI_ALLOC(ngfi_native_binding_map);
   map->nsets                   = 0;
   map->sets                    = NULL;
