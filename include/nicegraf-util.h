@@ -58,7 +58,7 @@ const char* ngf_util_get_error_name(const ngf_error err);
 /**
  * Rounds `value` up to the nearest multiple of `alignment`.
  */
-static size_t ngf_util_align_size(size_t value, size_t alignment) {
+static inline size_t ngf_util_align_size(size_t value, size_t alignment) {
     const size_t m = value % alignment;
     return value + (m > 0 ? (alignment - m) : 0u);
 }
