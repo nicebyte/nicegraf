@@ -60,7 +60,7 @@ struct state {
  * this constant controls the size of the grid.
  */
 constexpr int INSTANCES_GRID_SIZE = 128;
-constexpr size_t INSTANCE_DATA_SIZE = sizeof(float) * 3u * INSTANCES_GRID_SIZE * INSTANCES_GRID_SIZE;
+constexpr size_t INSTANCE_DATA_SIZE = sizeof(float) * 4u * INSTANCES_GRID_SIZE * INSTANCES_GRID_SIZE;
 
 /**
  * The model's raw vertex data (positions and UVs).
@@ -284,7 +284,7 @@ void* sample_initialize(
     for (uint32_t c = 0; c < vertex_attribs::INSTANCES_GRID_SIZE; ++c) {
       const uint32_t idx = r * (vertex_attribs::INSTANCES_GRID_SIZE) + c;
       assert(idx < instance_data_staging_buffer_info.size);
-      float*          p            = &mapped_per_instance_staging_buffer[3 * idx];
+      float*          p            = &mapped_per_instance_staging_buffer[4 * idx];
       constexpr float grid_offset  = -static_cast<float>(vertex_attribs::INSTANCES_GRID_SIZE >> 1);
       constexpr float grid_spacing = 4.0f;
       p[0]                         = grid_offset * grid_spacing + grid_spacing * c +
@@ -421,7 +421,7 @@ void sample_draw_frame(
           state->per_instance_data,
           0,
           vertex_attribs::INSTANCE_DATA_SIZE,
-          NGF_IMAGE_FORMAT_RGB32F),
+          NGF_IMAGE_FORMAT_RGBA32F),
       ngf::descriptor_set<0>::binding<2>::texture(state->object_texture.get()),
       ngf::descriptor_set<0>::binding<3>::sampler(state->trilinear_sampler.get()));
   ngf_cmd_draw(
