@@ -1145,24 +1145,24 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->culling = get_mtl_culling(info->rasterization->cull_mode);
   
   // Set up depth and stencil state.
-  if (info->depth_stencil->depth_test) {
-    auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
-    const ngf_depth_stencil_info &depth_stencil_info = *info->depth_stencil;
-    mtl_depth_stencil_desc.depthCompareFunction =
-        get_mtl_compare_function(depth_stencil_info.depth_compare);
-    mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
-    mtl_depth_stencil_desc.backFaceStencil =
-        ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
-    mtl_depth_stencil_desc.frontFaceStencil =
-        ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
-    pipeline->front_stencil_reference =
-        depth_stencil_info.front_stencil.reference;
-    pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
-    pipeline->depth_stencil =
-        [CURRENT_CONTEXT->device
-         newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
-  }
-  
+  auto *mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
+  const ngf_depth_stencil_info &depth_stencil_info = *info->depth_stencil;
+  mtl_depth_stencil_desc.depthCompareFunction =
+      depth_stencil_info.depth_test
+        ? get_mtl_compare_function(depth_stencil_info.depth_compare)
+        : MTLCompareFunctionAlways;
+  mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
+  mtl_depth_stencil_desc.backFaceStencil =
+      ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
+  mtl_depth_stencil_desc.frontFaceStencil =
+      ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
+  pipeline->front_stencil_reference =
+      depth_stencil_info.front_stencil.reference;
+  pipeline->back_stencil_reference = depth_stencil_info.back_stencil.reference;
+  pipeline->depth_stencil =
+      [CURRENT_CONTEXT->device
+       newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
+
   if (err) {
     NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
     return NGF_ERROR_OBJECT_CREATION_FAILED;
