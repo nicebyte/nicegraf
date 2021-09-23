@@ -117,7 +117,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     return 0;
    }
    int fb_width, fb_height;
-   glfwGetWindowSize(window, &fb_width, &fb_height);
+   glfwGetFramebufferSize(window, &fb_width, &fb_height);
 
   /**
    * Make sure keyboard/mouse work with imgui.
