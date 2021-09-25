@@ -118,7 +118,10 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    }
    int fb_width, fb_height;
    glfwGetFramebufferSize(window, &fb_width, &fb_height);
-   ngf_samples::logi("created a window with client area of size size %d x %d.", fb_width, fb_height);
+   ngf_samples::logi(
+       "created a window with client area of size size %d x %d.",
+       fb_width,
+       fb_height);
 
   /**
    * Make sure keyboard/mouse work with imgui.
@@ -305,6 +308,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       ngf_cmd_buffer submitted_cmd_bufs[] = { main_cmd_buffer.get() };
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_end_frame(frame_token));
+    } else {
+      ngf_samples::loge("failed to handle window resize!");
     }
   }
 
