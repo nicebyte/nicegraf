@@ -57,7 +57,7 @@ void* sample_initialize(
     NGF_SAMPLE_COUNT_1,
     NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT
   };
-  NGF_SAMPLES_CHECK(state->rt_texture.initialize(img_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->rt_texture.initialize(img_info));
  
   /* Create the offscreen render target.*/
   const ngf_attachment_description offscreen_color_attachment_description {
@@ -80,7 +80,7 @@ void* sample_initialize(
     &attachments_list,
     &img_ref
   };
-  NGF_SAMPLES_CHECK(state->offscreen_rt.initialize(rt_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->offscreen_rt.initialize(rt_info));
 
   /**
    * Load shader stages.
@@ -106,7 +106,7 @@ void* sample_initialize(
   blit_pipe_info.shader_stages[0] = blit_vertex_stage.get();
   blit_pipe_info.shader_stages[1] = blit_fragment_stage.get();
   blit_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  NGF_SAMPLES_CHECK(state->blit_pipeline.initialize(blit_pipe_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->blit_pipeline.initialize(blit_pipe_info));
 
   /**
    * Create pipeline for offscreen pass.
@@ -119,7 +119,7 @@ void* sample_initialize(
   offscreen_pipe_info.shader_stages[0] = offscreen_vertex_stage.get();
   offscreen_pipe_info.shader_stages[1] = offscreen_fragment_stage.get();
   offscreen_pipe_info.compatible_rt_attachment_descs = &attachments_list;
-  NGF_SAMPLES_CHECK(state->offscreen_pipeline.initialize(offscreen_pipe_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->offscreen_pipeline.initialize(offscreen_pipe_info));
  
   /* Create sampler.*/
   const ngf_sampler_info samp_info {
@@ -136,7 +136,7 @@ void* sample_initialize(
     1.0f,
     false
   };
-  NGF_SAMPLES_CHECK(state->sampler.initialize(samp_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->sampler.initialize(samp_info));
 
   return static_cast<void*>(state);
 }

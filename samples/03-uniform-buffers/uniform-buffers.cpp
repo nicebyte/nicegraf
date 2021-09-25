@@ -94,7 +94,7 @@ void* sample_initialize(
   polygon_pipe_info.shader_stages[1]                  = polygon_fragment_stage.get();
   polygon_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
   polygon_pipe_info.primitive_type                 = NGF_PRIMITIVE_TYPE_TRIANGLE_FAN;
-  NGF_SAMPLES_CHECK(state->polygon_pipeline.initialize(polygon_pipe_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->polygon_pipeline.initialize(polygon_pipe_info));
 
   /**
    * Create the uniform buffer.
@@ -122,7 +122,7 @@ void* sample_initialize(
       .size         = uniform_buffer_size,
       .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_UNIFORM_BUFFER};
-  NGF_SAMPLES_CHECK(state->uniform_buffer.initialize(uniform_buffer_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniform_buffer.initialize(uniform_buffer_info));
 
   return static_cast<void*>(state);
 }
