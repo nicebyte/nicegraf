@@ -118,6 +118,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    }
    int fb_width, fb_height;
    glfwGetFramebufferSize(window, &fb_width, &fb_height);
+   ngf_samples::logi("created a window with client area of size size %d x %d.", fb_width, fb_height);
 
   /**
    * Make sure keyboard/mouse work with imgui.
