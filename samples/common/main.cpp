@@ -77,7 +77,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
           .verbosity = diagnostics_verbosity,
           .userdata  = nullptr,
           .callback  = ngf_samples::sample_diagnostic_callback}};
-  NGF_SAMPLES_CHECK(ngf_initialize(&init_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
    * Initialize imgui and generate its font atlas.
@@ -153,14 +153,14 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
   const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
   ngf::context           context;
-  NGF_SAMPLES_CHECK(context.initialize(ctx_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(context.initialize(ctx_info));
 
   /**
    * Make the newly created context current on this thread.
    * Once a context has been made current on a thread, it cannot be switched * to another thread,
    * and another context cannot be made current on that * thread.
    */
-  NGF_SAMPLES_CHECK(ngf_set_context(context));
+  NGF_SAMPLES_CHECK_NGF_ERROR(ngf_set_context(context));
 
   /**
    * This is the nicegraf-based rendering backend for ImGui - we will initialize it
@@ -172,7 +172,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Main command buffer that samples will record rendering commands into.
    */
   ngf::cmd_buffer main_cmd_buffer;
-  NGF_SAMPLES_CHECK(main_cmd_buffer.initialize(ngf_cmd_buffer_info {}));
+  NGF_SAMPLES_CHECK_NGF_ERROR(main_cmd_buffer.initialize(ngf_cmd_buffer_info {}));
 
   /**
    * Pointer to sample-specific data, returned by sample_initialize.
@@ -210,8 +210,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        * Begin the frame and start the main command buffer.
        */
       ngf_frame_token frame_token;
-      NGF_SAMPLES_CHECK(ngf_begin_frame(&frame_token));
-      NGF_SAMPLES_CHECK(ngf_start_cmd_buffer(main_cmd_buffer, frame_token));
+      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_begin_frame(&frame_token));
+      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_start_cmd_buffer(main_cmd_buffer, frame_token));
 
       /**
        * On first frame, initialize the sample and the ImGui rendering backend.
@@ -221,7 +221,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          * Start a new transfer command encoder for uploading resources to the GPU.
          */
         ngf_xfer_encoder xfer_encoder {};
-        NGF_SAMPLES_CHECK(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_encoder));
+        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_encoder));
 
         /**
          * Initialize the sample, and save the opaque data pointer.
@@ -254,7 +254,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
         /**
          * Finish the transfer encoder.
          */
-        NGF_SAMPLES_CHECK(ngf_cmd_end_xfer_pass(xfer_encoder));
+        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_xfer_pass(xfer_encoder));
 
         first_frame = false;
       }
@@ -300,10 +300,10 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       /**
        * Finish the main render pass, submit the command buffer and end the frame.
        */
-      NGF_SAMPLES_CHECK(ngf_cmd_end_render_pass(main_render_pass));
+      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_render_pass(main_render_pass));
       ngf_cmd_buffer submitted_cmd_bufs[] = { main_cmd_buffer.get() };
-      NGF_SAMPLES_CHECK(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
-      NGF_SAMPLES_CHECK(ngf_end_frame(frame_token));
+      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
+      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_end_frame(frame_token));
     }
   }
 
