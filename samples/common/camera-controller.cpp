@@ -21,6 +21,8 @@
  */
 
 #include "camera-controller.h"
+
+#include "check.h"
 #include "imgui.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -29,19 +31,43 @@ namespace ngf_samples {
 
 camera_matrices compute_camera_matrices(const camera_state& state, float aspect_ratio) {
   const float      r = state.radius, azimuth = state.azimuth, incline = state.inclination;
-  const nm::float3 point_on_sphere {r * sinf(azimuth)*sinf(incline), r * cosf(incline), r * sinf(incline) * cosf(azimuth) };
+  const nm::float3 point_on_sphere {
+      r * sinf(azimuth) * sinf(incline),
+      r * cosf(incline),
+      r * sinf(incline) * cosf(azimuth)};
   return {
       nm::look_at(state.look_at + point_on_sphere, state.look_at, nm::float3 {0.0f, 1.0f, 0.0f}),
       nm::perspective(nm::deg2rad(state.vfov), aspect_ratio, 0.01f, 1000.0f)};
 }
 
-void camera_ui(camera_state& state) {
+void camera_ui(
+    camera_state&           state,
+    std::pair<float, float> look_at_range,
+    float                   look_at_speed,
+    std::pair<float, float> radius_range,
+    float                   radius_speed) {
+  NGF_SAMPLES_ASSERT(look_at_range.first < look_at_range.second);
+  NGF_SAMPLES_ASSERT(radius_range.first < radius_range.second);
   ImGui::Text("camera");
-  ImGui::SliderFloat3("look at", state.look_at.data, -10.0f, 10.0f, "%.1f", 0);
-  ImGui::SliderFloat("azimuth", &state.azimuth, 0.0f, (float)M_PI * 2.0f, "%.1f", 0);
-  ImGui::SliderFloat("inclination", &state.inclination, 0.0f, (float)M_PI, "%.1f", 0);
-  ImGui::SliderFloat("radius", &state.radius, 1.0f, 10.0f, "%.f", 0);
-  ImGui::DragFloat("fov", &state.vfov, 0.08f, 25.0f, 90.0f);
+  ImGui::DragFloat3(
+      "look at",
+      state.look_at.data,
+      look_at_speed,
+      look_at_range.first,
+      look_at_range.second,
+      "%.1f",
+      0);
+  ImGui::SliderFloat("azimuth", &state.azimuth, 0.0f, (float)M_PI * 2.0f, "%.1f", ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::SliderFloat("inclination", &state.inclination, 0.0f, (float)M_PI, "%.1f", ImGuiSliderFlags_NoRoundToFormat);
+  ImGui::DragFloat(
+      "radius",
+      &state.radius,
+      radius_speed,
+      radius_range.first,
+      radius_range.second,
+      "%.1f",
+      0);
+  ImGui::SliderFloat("fov", &state.vfov, 25.0f, 90.0f, "%.1f", 0);
 }
 
 }  // namespace ngf_samples
