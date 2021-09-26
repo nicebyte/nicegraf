@@ -27,11 +27,11 @@ namespace ngf_samples {
 struct mesh {
   ngf::buffer vertex_data;
   ngf::buffer index_data;
-  size_t      num_indices;
+  uint32_t    num_indices;
   bool        have_normals;
   bool        have_uvs;
 };
 
-mesh load_mesh_from_file(const char* file_name, ngf::xfer_encoder xfenc);
+mesh load_mesh_from_file(const char* file_name, ngf_xfer_encoder xfenc);
 
 }
