@@ -63,26 +63,26 @@ float4 PSMain(PixelShaderInput fragmentAttribs) : SV_Target {
     float3 directionalLightIrradiance =
       computeIrradiance(
         shaderUniforms.directionalLightIntensity.rgb,
-        normalize(shaderUniforms.viewSpaceDirectionalLightDirection),
-        viewSpaceNormal,
+        normalize(shaderUniforms.viewSpaceDirectionalLightDirection.xyz),
+        viewSpaceNormal.xyz,
         1.0f);
     float3 specularReflectanceFromPointLight =
-      shaderUniforms.specularCoefficient * 
+      shaderUniforms.specularCoefficient.rgb *
       computeSpecular(
         fragmentAttribs.viewSpacePosition.xyz,
         viewSpaceDirectionToPointLight.xyz,
-        viewSpaceNormal,
+        viewSpaceNormal.xyz,
         shaderUniforms.shininess); 
     float3 specularReflectanceFromDirectionalLight =
-      shaderUniforms.specularCoefficient * 
+      shaderUniforms.specularCoefficient.rgb *
       computeSpecular(
         fragmentAttribs.viewSpacePosition.xyz,
-        normalize(shaderUniforms.viewSpaceDirectionalLightDirection),
-        viewSpaceNormal,
+        normalize(shaderUniforms.viewSpaceDirectionalLightDirection.xyz),
+        viewSpaceNormal.xyz,
         shaderUniforms.shininess); 
         
-    float3 pointLightContribution = (shaderUniforms.diffuseReflectance + specularReflectanceFromPointLight) * pointLightIrradiance;
-    float3 directionalLightContribution = (shaderUniforms.diffuseReflectance + specularReflectanceFromDirectionalLight) * directionalLightIrradiance;
+    float3 pointLightContribution = (shaderUniforms.diffuseReflectance.rgb + specularReflectanceFromPointLight) * pointLightIrradiance;
+    float3 directionalLightContribution = (shaderUniforms.diffuseReflectance.rgb + specularReflectanceFromDirectionalLight) * directionalLightIrradiance;
     
-    return float4(pointLightContribution + directionalLightContribution + shaderUniforms.ambientLightIntensity, 1.0);
+    return float4(pointLightContribution + directionalLightContribution + shaderUniforms.ambientLightIntensity.rgb, 1.0);
 }
