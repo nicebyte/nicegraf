@@ -22,13 +22,15 @@
 
 #include "nicemath.h"
 
+#include <utility>
+
 namespace ngf_samples {
 
 struct camera_state {
   nm::float3 look_at {0.0f, 0.0f, 0.0f};
   float      radius      = 3.0f;
   float      azimuth     = 0.0f;
-  float      inclination = 3.14f/2.0f;
+  float      inclination = 3.14f / 2.0f;
   float      vfov        = 60.0f;
 };
 
@@ -38,6 +40,11 @@ struct camera_matrices {
 };
 
 camera_matrices compute_camera_matrices(const camera_state& state, float aspect_ratio);
-void            camera_ui(camera_state& state);
+void            camera_ui(
+               camera_state&           state,
+               std::pair<float, float> look_at_range,
+               float                   look_at_speed,
+               std::pair<float, float> radius_range,
+               float                   radius_speed);
 
 }  // namespace ngf_samples
