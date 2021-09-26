@@ -19,7 +19,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
-
+#define _CRT_SECURE_NO_WARNINGS
 #include "mesh-loader.h"
 
 #include "check.h"
@@ -29,7 +29,7 @@
 
 namespace ngf_samples {
 
-mesh load_mesh_from_file(const char* mesh_file_name, ngf::xfer_encoder xfenc) {
+mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   mesh  result;
   FILE* mesh_file = fopen(mesh_file_name, "rb");
   NGF_SAMPLES_ASSERT(mesh_file != NULL);
@@ -98,6 +98,8 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf::xfer_encoder xfenc) {
     read_elements =
         fread(mapped_index_data_staging_buffer, sizeof(uint32_t), result.num_indices, mesh_file);
     NGF_SAMPLES_ASSERT(read_elements == result.num_indices);
+    ngf_buffer_flush_range(index_data_staging_buffer.get(), 0, index_data_staging_buffer_info.size);
+    ngf_buffer_unmap(index_data_staging_buffer.get());
   }
 
   /**
@@ -119,7 +121,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf::xfer_encoder xfenc) {
       0u);
   if (result.num_indices > 0) {
     const ngf_buffer_info index_data_buffer_info = {
-        .size         = index_data_buffer_info.size,
+        .size         = sizeof(uint32_t) * result.num_indices,
         .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
         .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
     };
