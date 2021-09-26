@@ -39,11 +39,11 @@ namespace ngf_samples {
 namespace blinn_phong {
 
 struct light_data {
-  nm::float4 ambient_light_intensity { 0.1f, 0.1f, 0.1f, 0.0f };
+  nm::float4 ambient_light_intensity { 0.01f, 0.02f, 0.03f, 0.0f };
   nm::float4 obj_space_point_light_position { 0.0f, 0.0f, 2.0f, 1.0f };
-  nm::float4 point_light_intensity { 0.5f, 0.5f, 0.5f, 0.0f };
-  nm::float4 obj_space_directional_light_direction { 0.0f, -1.0f, 0.0f, 0.0f };
-  nm::float4 directional_light_intensity;
+  nm::float4 point_light_intensity { 0.6f, 0.5f, 0.3f, 1.0f };
+  nm::float4 obj_space_directional_light_direction { 0.0f, -1.0f, 0.5f, 0.0f };
+  nm::float4 directional_light_intensity { 0.2f, 0.3f, 0.5f, 1.0f };
 };
 
 struct material_data {
@@ -174,6 +174,10 @@ void* sample_initialize(
    */
   NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms.initialize(3));
 
+  /**
+   * Set up some initial viewing parameters.
+   */
+   state->camera.look_at[1] = 1.0f;
   return static_cast<void*>(state);
 }
 
@@ -219,7 +223,7 @@ void sample_draw_frame(
 void sample_draw_ui(void* userdata) {
   auto data = reinterpret_cast<blinn_phong::state*>(userdata);
   ImGui::Begin("Controls");
-  camera_ui(data->camera);
+  camera_ui(data->camera, std::make_pair(-5.f, 5.f), .1f, std::make_pair(1.0f, 10.0f), .1f);
   ImGui::Text("point light");
   ImGui::DragFloat3("position", data->lights.obj_space_point_light_position.data, 0.1f, -2.0f, 2.0f, "%.1f", 0);
   ImGui::ColorEdit3("intensity##0", data->lights.point_light_intensity.data);
@@ -231,7 +235,7 @@ void sample_draw_ui(void* userdata) {
   ImGui::Text("material");
   ImGui::ColorEdit3("diffuse reflectance", data->material.diffuse_reflectance.data);
   ImGui::ColorEdit3("specular coefficient", data->material.specular_coefficient.data);
-  ImGui::SliderFloat("shininess", &data->material.shininess, 0.001f, 500.0f, "%.1f", 0);
+  ImGui::SliderFloat("shininess", &data->material.shininess, 0.1f, 1000.0f, "%.1f", 0);
   ImGui::End();
 }
 
