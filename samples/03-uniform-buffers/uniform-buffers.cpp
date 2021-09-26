@@ -28,6 +28,7 @@
 
 #include <imgui.h>
 #include <stdio.h>
+#include <math.h>
 
 namespace ngf_samples {
 
@@ -184,7 +185,7 @@ void sample_draw_frame(
   ngf::cmd_bind_resources(
       main_render_pass,
       ngf::descriptor_set<0>::binding<0>::uniform_buffer(state->uniform_buffer, state->uniform_buffer_offset, state->aligned_uniform_data_size));
-  ngf_cmd_draw(main_render_pass, false, 0u, (state->n) + 2u, 1u);
+  ngf_cmd_draw(main_render_pass, false, 0u, (uint32_t)(state->n) + 2u, 1u);
 
   /**
    * Update the uniform buffer offset so we write there on the next frame.
