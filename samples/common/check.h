@@ -22,20 +22,31 @@
 
 #pragma once
 
+#include "logging.h"
 #include "nicegraf-util.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
 namespace ngf_samples {
 
-#define NGF_SAMPLES_CHECK(expr)                    \
-  {                                                \
-    const ngf_error err = (expr);                  \
-    if (err != NGF_ERROR_OK) {                     \
-      fprintf(stderr, "nicegraf error %d\n", err); \
-      fflush(stderr);                              \
-      abort();                                     \
-    }                                              \
+#define NGF_SAMPLES_CHECK_NGF_ERROR(expr)                         \
+  {                                                               \
+    const ngf_error err = (expr);                                 \
+    if (err != NGF_ERROR_OK) {                                    \
+      ::ngf_samples::loge("nicegraf error %d, aborting.\n", err); \
+      fflush(stderr);                                             \
+      abort();                                                    \
+    }                                                             \
+  }
+
+#define NGF_SAMPLES_ASSERT(expr)                                                                 \
+  {                                                                                              \
+    if (!(expr)) {                                                                               \
+      ::ngf_samples::loge("assertion %s failed (file %s line %d)\n", #expr, __FILE__, __LINE__); \
+      fflush(stderr);                                                                            \
+      abort();                                                                                   \
+    }                                                                                            \
   }
 
 }  // namespace ngf_samples

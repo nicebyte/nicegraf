@@ -248,6 +248,10 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.cpp
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
                      ${NGF_PLATFORM_SOURCE}
                 DEPS ngf-imgui glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
@@ -276,4 +280,5 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     ngf_sample(NAME 04-texture-sampling)
     ngf_sample(NAME 05-cubemap)
     ngf_sample(NAME 06-vertex-attribs)
+    ngf_sample(NAME 07-blinn-phong)    
 endif()
