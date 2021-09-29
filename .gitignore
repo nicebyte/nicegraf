@@ -6,3 +6,5 @@ samples/binaries/*
 !samples/binaries/assets/*
 /out/build/x64-Debug
 /.vs
+samples-build-files/*
+.gitmodules
