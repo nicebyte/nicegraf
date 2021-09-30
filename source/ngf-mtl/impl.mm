@@ -1697,11 +1697,11 @@ void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
         texel_buf_descriptor.sampleCount = 1;
         texel_buf_descriptor.usage = MTLTextureUsageShaderRead;
         texel_buf_descriptor.storageMode = buf->mtl_buffer.storageMode;
-        texel_buf_descriptor.width = buf->mtl_buffer.allocatedSize / ngfmtl_get_bytesperpel(buf_bind_op.format);
+        texel_buf_descriptor.width = buf_bind_op.range / ngfmtl_get_bytesperpel(buf_bind_op.format);
         texel_buf_descriptor.height = 1;
         auto t = [buf->mtl_buffer newTextureWithDescriptor:texel_buf_descriptor
                                                     offset:offset
-                                               bytesPerRow:buf->mtl_buffer.allocatedSize];
+                                               bytesPerRow:buf_bind_op.range];
         [cmd_buf->active_rce setVertexTexture:t atIndex:native_binding];
         [cmd_buf->active_rce setFragmentTexture:t atIndex:native_binding];
         break;
