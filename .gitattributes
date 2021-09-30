@@ -1,7 +1,7 @@
 *.mesh filter=lfs diff=lfs merge=lfs -text
 *.tga filter=lfs diff=lfs merge=lfs -text
-.tga filter=lfs diff=lfs merge=lfs -text
-*.mesh !text !filter !merge !diff
+samples/binaries/assets/* filter=lfs diff=lfs merge=lfs -text
 *.tga !text !filter !merge !diff
+*.mesh !text !filter !merge !diff
 *.tga;*.mesh filter=lfs diff=lfs merge=lfs -text
 *.exe;*.dll filter=lfs diff=lfs merge=lfs -text
