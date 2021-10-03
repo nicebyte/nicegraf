@@ -152,19 +152,36 @@ endif()
 
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
-    # Set the folder to hold all samples binaries.
-    set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples/binaries)
-
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
 
     # Ensure we have the required dependencies are available.
-    if (TARGET nicegraf_shaderc AND TARGET glfw)
-        set_target_properties(nicegraf_shaderc PROPERTIES FOLDER "samples")
+    if (TARGET glfw)
         set_target_properties(glfw PROPERTIES FOLDER "samples")
     else()
         message(FATAL_ERROR "Dependencies required for building samples not found. Make sure to run `git submodule update` from the repo root.")
     endif()
+    
+    # Determine the backend to build the samples with based on the platform, and
+    # any platform-specific source files.
+    set(NGF_PLATFORM_SOURCE "")
+    if (WIN32)
+        set(NICEGRAF_SHADERC_PLATFORM win)
+        set(NGF_SAMPLES_BACKEND nicegraf-vk)
+    elseif(APPLE)
+        set(NICEGRAF_SHADERC_PLATFORM macos)
+        set(NGF_SAMPLES_BACKEND nicegraf-mtl)
+        set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
+                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
+    else()
+        message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
+    endif()
+    
+    # Set the folder to hold all samples binaries.
+    set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples/binaries)
+
+
 
     # Custom target for generated shaders.
     file(GLOB shader_files ${CMAKE_CURRENT_LIST_DIR}/samples/shaders/*.hlsl)
@@ -192,8 +209,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${header_file_name}_binding_consts.h")
         add_custom_command(OUTPUT ${output_files_list}
                            MAIN_DEPENDENCY ${source_path}
-                           DEPENDS nicegraf_shaderc
-                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc/nicegraf_shaderc ARGS ${source_path} "-t" "msl21" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
+                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc/${NICEGRAF_SHADERC_PLATFORM}/nicegraf_shaderc ARGS ${source_path} "-t" "msl21" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
                            WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/samples/shaders)
         set(generated_shaders_list "${output_files_list};${generated_shaders_list}")
       endif()
@@ -210,21 +226,6 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.cpp)
-
-    # Determine the backend to build the samples with based on the platform, and
-    # any platform-specific source files.
-    set(NGF_PLATFORM_SOURCE "")
-    if (WIN32)
-        set(NGF_SAMPLES_BACKEND nicegraf-vk)
-    elseif(APPLE)
-        set(NGF_SAMPLES_BACKEND nicegraf-mtl)
-        set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
-    else()
-        message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
-    endif()
     string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
     string(REPLACE "-" "_" NGF_SAMPLES_BACKEND_DEFINE ${NGF_SAMPLES_BACKEND_DEFINE})
 
