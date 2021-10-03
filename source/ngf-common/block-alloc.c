@@ -47,6 +47,8 @@ struct ngfi_block_allocator {
   uint32_t        tag;
 };
 
+#if !defined(NDEBUG)
+
 static const uint32_t IN_USE_BLOCK_MARKER_MASK = (1u << 31);
 
 static bool ngfi_blkalloc_is_block_free(const ngfi_blkalloc_block* b) {
@@ -64,6 +66,7 @@ static void ngfi_blkalloc_mark_block_free(ngfi_blkalloc_block* b) {
 static uint32_t ngfi_blkalloc_block_tag(const ngfi_blkalloc_block* b) {
   return (~IN_USE_BLOCK_MARKER_MASK) & b->marker_and_tag;
 }
+#endif
 
 static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
   const size_t pool_size = allocator->block_size * allocator->nblocks;
@@ -78,15 +81,17 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
         allocator->freelist = &blk->free_list_node;
       }
       blk->marker_and_tag = allocator->tag;
+#if !defined(NDEBUG)
       ngfi_blkalloc_mark_block_free(blk);
+#endif
     }
     NGFI_DARRAY_APPEND(allocator->pools, pool);
   }
 }
 
 ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32_t nblocks) {
-  static NGFI_THREADLOCAL uint32_t next_tag = 0u;
 #if !defined(NDEBUG)
+  static NGFI_THREADLOCAL uint32_t next_tag = 0u;
   if (next_tag == 0u) {
     srand((unsigned int)time(NULL));
     uint32_t threadid = (uint32_t)rand();
@@ -132,7 +137,9 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
     ngfi_list_remove(alloc->freelist);
     alloc->freelist = new_head == alloc->freelist ? NULL : new_head;
     result          = blk->data;
+#if !defined(NDEBUG)
     ngfi_blkalloc_mark_block_inuse(blk);
+#endif
   }
   return result;
 }
