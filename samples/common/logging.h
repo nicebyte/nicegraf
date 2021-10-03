@@ -60,13 +60,11 @@ inline void logi(const char* fmt, ...) {
 }
 
 inline void logd(const char* fmt, ...) {
-#ifndef NDEBUG
+#if !defined(NDEBUG)
   va_list args;
   va_start(args, fmt);
   vlogd(fmt, args);
   va_end(args);
-#else
-  (fmt,nullptr);
 #endif
 }
 
