@@ -24,8 +24,8 @@
 
 #include "nicegraf-util.h"
 #include "shader-loader.h"
+#include "check.h"
 
-#include <assert.h>
 #include <vector>
 
 namespace ngf_samples {
@@ -89,7 +89,7 @@ ngf_imgui::ngf_imgui(
   pipeline_data.pipeline_info.compatible_rt_attachment_descs =
       ngf_default_render_target_attachment_descs();
   err = pipeline_.initialize(pipeline_data.pipeline_info);
-  assert(err == NGF_ERROR_OK);
+  NGF_SAMPLES_ASSERT(err == NGF_ERROR_OK);
 
   // Create and populate font texture.
   const ngf_image_info font_texture_info = {
@@ -101,14 +101,14 @@ ngf_imgui::ngf_imgui(
       NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST          // usage_hint
   };
   err = font_texture_.initialize(font_texture_info);
-  assert(err == NGF_ERROR_OK);
+  NGF_SAMPLES_ASSERT(err == NGF_ERROR_OK);
   ImGui::GetIO().Fonts->TexID = (ImTextureID)(uintptr_t)font_texture_.get();
   const ngf_buffer_info pbuffer_info {
       4u * (size_t)font_atlas_width * (size_t)font_atlas_height,
       NGF_BUFFER_STORAGE_HOST_WRITEABLE,
       NGF_BUFFER_USAGE_XFER_SRC};
   err = texture_data_.initialize(pbuffer_info);
-  assert(err == NGF_ERROR_OK);
+  NGF_SAMPLES_ASSERT(err == NGF_ERROR_OK);
   void* mapped_texture_data = ngf_buffer_map_range(
       texture_data_.get(),
       0,
@@ -267,7 +267,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
       attrib_buffer,
       0,
       attrib_buffer_info.size);
-  assert(mapped_attrib_buffer != nullptr);
+  NGF_SAMPLES_ASSERT(mapped_attrib_buffer != nullptr);
   memcpy(mapped_attrib_buffer, vertex_data.data(), attrib_buffer_info.size);
   ngf_buffer_flush_range(attrib_buffer, 0, attrib_buffer_info.size);
   ngf_buffer_unmap(attrib_buffer);
@@ -281,7 +281,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   index_buffer_.reset(index_buffer);
   void* mapped_index_buffer =
       ngf_buffer_map_range(index_buffer, 0, index_buffer_info.size);
-  assert(mapped_index_buffer != nullptr);
+  NGF_SAMPLES_ASSERT(mapped_index_buffer != nullptr);
   memcpy(mapped_index_buffer, index_data.data(), index_buffer_info.size);
   ngf_buffer_flush_range(index_buffer, 0, index_buffer_info.size);
   ngf_buffer_unmap(index_buffer);
