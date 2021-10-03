@@ -1,10 +1,10 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 set -e
 
 echo "Downloading binary dependencies for samples"
 git lfs install
-git lfs pull
+git lfs pull --exclude=""
 echo "Downloading library dependencies for samples"
 git submodule init
 git submodule update
