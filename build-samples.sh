@@ -2,7 +2,10 @@
 
 set -e
 
-cp ./samples/install-submodules ./.gitmodules
+echo "Downloading binary dependencies for samples"
+git lfs install
+git lfs pull
+echo "Downloading library dependencies for samples"
 git submodule init
 git submodule update
 mkdir -p samples-build-files
