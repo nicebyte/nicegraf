@@ -60,7 +60,7 @@ struct header {
   uint8_t  id_length;
   uint8_t  has_cmap;
   img_type type;
-  cmap     cmap;
+  cmap     cmap_entry;
   image    img;
 };
 
