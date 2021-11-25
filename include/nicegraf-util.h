@@ -26,11 +26,20 @@
 
 #include <stdint.h>
 
+/**
+ * @file
+ * \defgroup ngf_util Utility Library
+ * This module contains routines that provide auxiliary
+ * functionality or help reduce boilerplate.
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
+ * @struct ngf_util_graphics_pipeline_data
+ * \ingroup ngf_util
  * Contains all the data describing a graphics pipeline, with the exception
  * of shader stages.
  * Use the `pipeline_info` member of this struct to initialize a new pipeline
@@ -47,15 +56,22 @@ typedef struct ngf_util_graphics_pipeline_data {
 } ngf_util_graphics_pipeline_data;
 
 /**
+ * \ingroup ngf_util
  * Creates configuration data for a graphics pipeline.
  * The state is set to match OpenGL defaults and can be adjusted later.
  * @param result Pipeline configuration data will be stored here.
  */
 void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result);
 
+/**
+ * \ingroup ngf_util
+ * Converts an error enum to a human-readable error string.
+ * @param err The error enum to get the string for.
+ */
 const char* ngf_util_get_error_name(const ngf_error err);
 
 /**
+ * \ingroup ngf_util
  * Rounds `value` up to the nearest multiple of `alignment`.
  */
 static inline size_t ngf_util_align_size(size_t value, size_t alignment) {

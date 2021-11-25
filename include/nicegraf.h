@@ -21,9 +21,26 @@
  */
 
 /**
- * @file nicegraf.h
+ * @file 
  * @brief nicegraf declarations.
  */
+
+/**
+ * \defgroup ngf Core C API
+ * Core nicegraf structs, functions and enums.
+ */
+ 
+/**
+ * \mainpage Reference Documentation
+ * These pages contain documentation automatically generated from nicegraf's
+ * code comments. Click one of the links below to proceed to the documentation
+ * for the corresponding module.
+ *
+ *  - \ref ngf
+ *  - \ref ngf_util
+ * 
+ */
+
 #pragma once
 
 #include <stdbool.h>
@@ -45,6 +62,8 @@ extern "C" {
 #endif
 
 /**
+ * @struct ngf_device_capabilities
+ * \ingroup ngf
  * Contains information about various device features, limits, etc.
  */
 typedef struct ngf_device_capabilities {
@@ -63,8 +82,11 @@ typedef struct ngf_device_capabilities {
 } ngf_device_capabilities;
 
 /**
+ * @enum ngf_device_preference
+ * \ingroup ngf
  * Device hints.
  * TODO: API for choosing device explicitly.
+ * \ingroup enums
  */
 typedef enum ngf_device_preference {
   NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete GPU. */
@@ -73,6 +95,8 @@ typedef enum ngf_device_preference {
 } ngf_device_preference;
 
 /**
+ * @enum ngf_diagnostic_log_verbosity
+ * \ingroup ngf
  * Verbosity levels for the diagnostic message log.
  */
 typedef enum ngf_diagnostic_log_verbosity {
@@ -83,6 +107,8 @@ typedef enum ngf_diagnostic_log_verbosity {
 } ngf_diagnostic_log_verbosity;
 
 /**
+ * @enum ngf_diagnostic_message_type
+ * \ingroup ngf
  * Type of a diagnostic log entry.
  */
 typedef enum ngf_diagnostic_message_type {
@@ -105,6 +131,8 @@ typedef enum ngf_diagnostic_message_type {
 typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, const char*, ...);
 
 /**
+ * @struct ngf_diagnostic_info
+ * \ingroup ngf
  * Diagnostic configuration.
  */
 typedef struct ngf_diagnostic_info {
@@ -117,6 +145,7 @@ typedef struct ngf_diagnostic_info {
 } ngf_diagnostic_info;
 
 /**
+ * @struct ngf_init_info
  * nicegraf initialization parameters.
  */
 typedef struct ngf_init_info {
@@ -127,6 +156,8 @@ typedef struct ngf_init_info {
 } ngf_init_info;
 
 /**
+ * @enum ngf_error
+ * \ingroup ngf
  * Error codes.
  *
  * nicegraf functions report errors via return values. Results are stored in
@@ -135,17 +166,24 @@ typedef struct ngf_init_info {
 typedef enum ngf_error {
   NGF_ERROR_OK = 0,     /**< No error, operation finished successfully. */
   NGF_ERROR_OUT_OF_MEM, /**< Host memory allocation failed. */
-  NGF_ERROR_OBJECT_CREATION_FAILED,
+  NGF_ERROR_OBJECT_CREATION_FAILED, /**< A call to the backend API that was
+                                       supposed to create an object failed. */
   NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
                               bounds access. */
-  NGF_ERROR_INVALID_FORMAT,
-  NGF_ERROR_INVALID_SIZE,
-  NGF_ERROR_INVALID_ENUM,
+  NGF_ERROR_INVALID_FORMAT, /**< A format enumerator provided as part of an
+                               argument to the call is not valid in that
+                               context.*/
+  NGF_ERROR_INVALID_SIZE, /**< A size passed as part of an argument to the
+                            call is either too large or too small.*/
+  NGF_ERROR_INVALID_ENUM, /**< An enumerator passed as part of an argument to
+                             the call is not valid in that context.*/
   NGF_ERROR_INVALID_OPERATION
   /*..add new errors above this line */
 } ngf_error;
 
 /**
+ * @enum ngf_present_mode
+ * \ingroup ngf
  * Possible present modes.
  */
 typedef enum ngf_present_mode {
@@ -154,25 +192,31 @@ typedef enum ngf_present_mode {
 } ngf_present_mode;
 
 /**
+ * @struct ngf_irect2d
+ * \ingroup ngf
  * Represents a rectangular, axis-aligned 2D region with integer coordinates.
  */
 typedef struct ngf_irect2d {
   int32_t  x; /**< X coord of lower-left corner. */
   int32_t  y; /**< Y coord of lower-left corner. */
-  uint32_t width;
-  uint32_t height;
+  uint32_t width; /**< The size of the rectangle along the x-axis. */
+  uint32_t height; /**< The size of the rectangle along the y-axis. */
 } ngf_irect2d;
 
 /**
+ * @struct ngf_extent3d
+ * \ingroup ngf
  * Represents a rectangular, axis-aligned 3D volume.
  */
 typedef struct ngf_extent3d {
-  uint32_t width;
-  uint32_t height;
-  uint32_t depth;
+  uint32_t width;  /**< The size of the volume along the x-axis. */
+  uint32_t height; /**< The size of the volume along the y-axis. */
+  uint32_t depth;  /**< The size of the volume along he z-axis. */ 
 } ngf_extent3d;
 
 /**
+ * @struct ngf_offset3d
+ * \ingroup ngf
  * Three-dimensional offset.
  */
 typedef struct ngf_offset3d {
@@ -182,6 +226,8 @@ typedef struct ngf_offset3d {
 } ngf_offset3d;
 
 /**
+ * @enum ngf_stage_type
+ * \ingroup ngf
  * Shader stage types.
  * Note that some back-ends might not support all of these.
  */
@@ -193,6 +239,8 @@ typedef enum ngf_stage_type {
 } ngf_stage_type;
 
 /**
+ * @struct ngf_shader_stage_info
+ * \ingroup ngf
  * Describes a programmable shader stage.
  */
 typedef struct ngf_shader_stage_info {
@@ -209,13 +257,15 @@ typedef struct ngf_shader_stage_info {
 } ngf_shader_stage_info;
 
 /**
+ * @struct ngf_shader_stage
+ * \ingroup ngf
  * A programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
  * data.
  *
- * On platforms that require a compilation step, details about compile errors
- * are reported via the debug callback mechanism.
+ * On platforms that require a compilation step at runtime, details about
+ * compile errors are reported via the debug callback mechanism.
  *
  * On some back-ends, the full compile/link step may be repeated during
  * pipeline creation (if using constant specialization). This does not apply
@@ -225,6 +275,8 @@ typedef struct ngf_shader_stage_info {
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
 /**
+ * @enum ngf_polygon_mode
+ * \ingroup ngf
  * Ways to draw polygons.
  * Some back-ends might not support all of these.
  */
@@ -236,6 +288,8 @@ typedef enum ngf_polygon_mode {
 } ngf_polygon_mode;
 
 /**
+ * @enum ngf_cull_mode
+ * \ingroup ngf
  * Which polygons to cull.
  */
 typedef enum ngf_cull_mode {
@@ -247,6 +301,8 @@ typedef enum ngf_cull_mode {
 } ngf_cull_mode;
 
 /**
+ * @enum ngf_front_face_mode
+ * \ingroup ngf
  * Ways to determine front-facing polygons.
  */
 typedef enum ngf_front_face_mode {
@@ -256,6 +312,8 @@ typedef enum ngf_front_face_mode {
 } ngf_front_face_mode;
 
 /**
+ * @struct ngf_rasterization_info
+ * \ingroup ngf
  * Rasterization stage parameters.
  */
 typedef struct ngf_rasterization_info {
@@ -267,6 +325,8 @@ typedef struct ngf_rasterization_info {
 } ngf_rasterization_info;
 
 /**
+ * @enum ngf_compare_op
+ * \ingroup ngf
  * Compare operations used in depth and stencil tests.
  */
 typedef enum ngf_compare_op {
@@ -282,6 +342,8 @@ typedef enum ngf_compare_op {
 } ngf_compare_op;
 
 /**
+ * @enum ngf_stencil_op
+ * \ingroup ngf
  * Operations that can be performed on stencil buffer.
  */
 typedef enum ngf_stencil_op {
@@ -297,6 +359,8 @@ typedef enum ngf_stencil_op {
 } ngf_stencil_op;
 
 /**
+ * @struct ngf_stencil_info
+ * \ingroup ngf
  * Stencil operation description.
  */
 typedef struct ngf_stencil_info {
@@ -310,6 +374,8 @@ typedef struct ngf_stencil_info {
 } ngf_stencil_info;
 
 /**
+ * @struct ngf_depth_stencil_info
+ * \ingroup ngf
  * Pipeline's depth/stencil state description.
  */
 typedef struct ngf_depth_stencil_info {
@@ -324,6 +390,8 @@ typedef struct ngf_depth_stencil_info {
 } ngf_depth_stencil_info;
 
 /**
+ * @enum ngf_blend_factor
+ * \ingroup ngf
  * Blend factors.
  */
 typedef enum ngf_blend_factor {
@@ -345,6 +413,8 @@ typedef enum ngf_blend_factor {
 } ngf_blend_factor;
 
 /**
+ * @enum ngf_blend_op
+ * \ingroup ngf
  * Blend operations.
  */
 typedef enum ngf_blend_op {
@@ -357,6 +427,8 @@ typedef enum ngf_blend_op {
 } ngf_blend_op;
 
 /**
+ * @struct ngf_blend_info
+ * \ingroup ngf
  * Pipeline's blend state description.
  * The result of blend is computed for color and alpha separately,
  * according to the following equation:
@@ -379,6 +451,8 @@ typedef struct ngf_blend_info {
 } ngf_blend_info;
 
 /**
+ * @enum ngf_input_rate
+ * \ingroup ngf
  * Vertex attribute's input rate.
  */
 typedef enum ngf_input_rate {
@@ -388,6 +462,8 @@ typedef enum ngf_input_rate {
 } ngf_input_rate;
 
 /**
+ * @enum ngf_type
+ * \ingroup ngf
  * Vertex attribute component type.
  */
 typedef enum ngf_type {
@@ -404,6 +480,8 @@ typedef enum ngf_type {
 } ngf_type;
 
 /**
+ * @struct ngf_vertex_buf_binding_desc
+ * \ingroup ngf
  * Specifies an attribute binding.
  */
 typedef struct ngf_vertex_buf_binding_desc {
@@ -414,6 +492,8 @@ typedef struct ngf_vertex_buf_binding_desc {
 } ngf_vertex_buf_binding_desc;
 
 /**
+ * @struct ngf_vertex_attrib_desc
+ * \ingroup ngf
  * Specifies information about a vertex attribute.
  */
 typedef struct ngf_vertex_attrib_desc {
@@ -426,6 +506,8 @@ typedef struct ngf_vertex_attrib_desc {
 } ngf_vertex_attrib_desc;
 
 /**
+ * @struct ngf_vertex_input_info
+ * \ingroup ngf
  * Specifies information about the pipeline's vertex input.
  */
 typedef struct ngf_vertex_input_info {
@@ -439,6 +521,11 @@ typedef struct ngf_vertex_input_info {
   uint32_t                      nattribs;           /**< Number of attribute descriptions.*/
 } ngf_vertex_input_info;
 
+/**
+ * @enum ngf_sample_count
+ * \ingroup ngf
+ * Specifies the number of MSAA samples.
+ */
 typedef enum ngf_sample_count {
   NGF_SAMPLE_COUNT_1  = 1,
   NGF_SAMPLE_COUNT_2  = 2,
@@ -450,6 +537,8 @@ typedef enum ngf_sample_count {
 } ngf_sample_count;
 
 /**
+ * @struct ngf_multisample_info
+ * \ingroup ngf
  * Specifies state of multisampling.
  */
 typedef struct ngf_multisample_info {
@@ -458,6 +547,8 @@ typedef struct ngf_multisample_info {
 } ngf_multisample_info;
 
 /**
+ * @enum ngf_buffer_storage_type
+ * \ingroup ngf
  * Types of memory backing a buffer object.
  */
 typedef enum ngf_buffer_storage_type {
@@ -486,39 +577,49 @@ typedef enum ngf_buffer_storage_type {
 } ngf_buffer_storage_type;
 
 /**
+ * @enum ngf_buffer_usage
+ * \ingroup ngf
  * Flags for specifying how the buffer is intended to be used.
  */
 typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /** < Buffer may be used as a source for
-                                                transfer operations.
-                                            */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /** < Buffer may be used as a destination
-                                                for transfer operations.
-                                            */
-  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /** < Buffer may be bound as a uniform buffer. */
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01, /**< Buffer may be used as a source for
+                                       transfer operations. */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,  /**< Buffer may be used as a
+                                        destination for transfer operations.  */
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< Buffer may be bound as a uniform
+                                             buffer. */
   NGF_BUFFER_USAGE_INDEX_BUFFER =
-      0x08, /** < Buffer may be used as the source of index data for indexed drawcalls. */
+      0x08, /**< Buffer may be used as the source of index data for indexed
+               drawcalls. */
   NGF_BUFFER_USAGE_VERTEX_BUFFER =
-      0x10, /** < Buffer may be used as the source of vertex attribute data. */
+      0x10, /**< Buffer may be used as the source of vertex attribute data. */
 
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /** Buffer may be bound as a uniform texel buffer. */
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /**< Buffer may be bound as a uniform
+                                          texel buffer. */
 } ngf_buffer_usage;
 
 /**
+ * @struct ngf_buffer_info
+ * \ingroup ngf
  * Information required for buffer creation.
  */
-typedef struct ngf_buffer_info {
-  size_t                  size;
-  ngf_buffer_storage_type storage_type;
-  uint32_t                buffer_usage;
+typedef truct ngf_buffer_info {
+  size_t                  size; /**< Size of the buffer in bytes. */
+  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage
+                                           type.*/
+  uint32_t                buffer_usage; /**< Flags specifying intended usage.*/
 } ngf_buffer_info;
 
-/*
+/**
+ * @struct ngf_buffer
+ * \ingroup ngf
  * A memory buffer.
  */
 typedef struct ngf_buffer_t* ngf_buffer;
 
 /**
+ * @enum ngf_image_type
+ * \ingroup ngf
  * Possible image types.
  */
 typedef enum ngf_image_type {
@@ -529,7 +630,10 @@ typedef enum ngf_image_type {
 } ngf_image_type;
 
 /**
+ * @enum ngf_image_format
+ * \ingroup ngf
  * Image formats.
+ *
  * Some backends may not support all of those.
  * Using an sRGB format in a color attachment or swapchain image means that all
  * color values output by the fragment stage are interpreted as being in linear
@@ -580,6 +684,8 @@ typedef enum ngf_image_format {
 } ngf_image_format;
 
 /**
+ * @enum ngf_image_usage
+ * \ingroup ngf
  * Image usage flags.
  */
 typedef enum ngf_image_usage {
@@ -591,6 +697,8 @@ typedef enum ngf_image_usage {
 } ngf_image_usage;
 
 /**
+ * @struct ngf_image_info
+ * \ingroup ngf
  * Describes an image.
  */
 typedef struct ngf_image_info {
@@ -604,9 +712,16 @@ typedef struct ngf_image_info {
                                       combination of image usage flags.*/
 } ngf_image_info;
 
+/**
+ * @struct ngf_image
+ * \ingroup ngf
+ * An image object.
+ */
 typedef struct ngf_image_t* ngf_image;
 
 /**
+ * @enum ngf_cubemap_face
+ * \ingroup ngf
  * Indicates the face of a cubemap.
  */
 typedef enum ngf_cubemap_face {
@@ -620,9 +735,11 @@ typedef enum ngf_cubemap_face {
 } ngf_cubemap_face;
 
 /**
+ * @struct ngf_image_ref
+ * \ingroup ngf
  * Reference to a part of an image.
  */
-typedef struct {
+typedef struct ngf_image_ref {
   ngf_image        image;        /**< Image being referred to.*/
   uint32_t         mip_level;    /**< Mip level within the image.*/
   uint32_t         layer;        /**< Layer within the image.*/
@@ -631,6 +748,8 @@ typedef struct {
 } ngf_image_ref;
 
 /**
+ * @enum ngf_attachment_type
+ * \ingroup ngf
  * Rendertarget attachment types.
  */
 typedef enum ngf_attachment_type {
@@ -640,6 +759,8 @@ typedef enum ngf_attachment_type {
 } ngf_attachment_type;
 
 /**
+ * @enum ngf_attachment_load_op
+ * \ingroup ngf
  * What to do on attachment load.
  */
 typedef enum ngf_attachment_load_op {
@@ -650,6 +771,8 @@ typedef enum ngf_attachment_load_op {
 } ngf_attachment_load_op;
 
 /**
+ * @enum ngf_attachment_store_op
+ * \ingroup ngf
  * What to do on attachment store.
  */
 typedef enum ngf_attachment_store_op {
@@ -670,6 +793,8 @@ typedef enum ngf_attachment_store_op {
 } ngf_attachment_store_op;
 
 /**
+ * @struct ngf_clear_info
+ * \ingroup ngf
  * Specifies a rendertarget clear operation.
  */
 typedef union ngf_clear_info {
@@ -681,6 +806,8 @@ typedef union ngf_clear_info {
 } ngf_clear;
 
 /**
+ * @struct ngf_attachment_description
+ * \ingroup ngf
  * Describes the type and format of a render target attachment.
  */
 typedef struct ngf_attachment_description {
@@ -692,6 +819,8 @@ typedef struct ngf_attachment_description {
 } ngf_attachment_description;
 
 /**
+ * @struct ngf_attachment_descriptions
+ * \ingroup ngf
  * A list of attachment descriptions.
  */
 typedef struct ngf_attachment_descriptions {
@@ -700,6 +829,8 @@ typedef struct ngf_attachment_descriptions {
 } ngf_attachment_descriptions;
 
 /**
+ * @struct ngf_render_target_info
+ * \ingroup ngf
  * Specifies information about a rendertarget.
  */
 typedef struct ngf_render_target_info {
@@ -710,11 +841,15 @@ typedef struct ngf_render_target_info {
 } ngf_render_target_info;
 
 /**
- * Framebuffer
+ * @struct ngf_render_target
+ * \ingroup ngf
+ * Render target. 
  */
 typedef struct ngf_render_target_t* ngf_render_target;
 
 /**
+ * @struct ngf_pass_info
+ * \ingroup ngf
  * Information about a render pass.
  */
 typedef struct ngf_pass_info {
@@ -725,6 +860,8 @@ typedef struct ngf_pass_info {
 } ngf_pass_info;
 
 /**
+ * @struct ngf_swapchain_info
+ * \ingroup ngf
  * Swapchain configuration.
  */
 typedef struct ngf_swapchain_info {
@@ -740,14 +877,22 @@ typedef struct ngf_swapchain_info {
 } ngf_swapchain_info;
 
 /**
+ * @enum ngf_sampler_filter
+ * \ingroup ngf
  *  Min/mag filters.
  */
-typedef enum { NGF_FILTER_NEAREST = 0, NGF_FILTER_LINEAR, NGF_FILTER_COUNT } ngf_sampler_filter;
+typedef enum ngf_sampler_filter {
+  NGF_FILTER_NEAREST = 0,
+  NGF_FILTER_LINEAR,
+  NGF_FILTER_COUNT
+} ngf_sampler_filter;
 
 /**
+ * @enum ngf_sampler_wrap_mode
+ * \ingroup ngf
  * What to do when sampling out-of-bounds.
  */
-typedef enum {
+typedef enum ngf_sampler_wrap_mode {
   NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
   NGF_WRAP_MODE_CLAMP_TO_BORDER,
   NGF_WRAP_MODE_REPEAT,
@@ -756,9 +901,11 @@ typedef enum {
 } ngf_sampler_wrap_mode;
 
 /**
+ * @struct ngf_sampler_info
+ * \ingroup ngf
  * Describes a sampler object.
  */
-typedef struct {
+typedef struct ngf_sampler_info {
   ngf_sampler_filter    min_filter; /**< Minification filter.*/
   ngf_sampler_filter    mag_filter; /**< Magnification filter.*/
   ngf_sampler_filter    mip_filter; /**< Mipmap filter. */
@@ -775,14 +922,19 @@ typedef struct {
 } ngf_sampler_info;
 
 /**
+ * @struct ngf_sampler
+ * \ingroup ngf
  * Sampler object.
  */
 typedef struct ngf_sampler_t* ngf_sampler;
 
-/** Available descriptor types.
+/**
+ * @enum ngf_descriptor_type
+ * \ingroup ngf
+ * Available descriptor types.
  * Not that some back-ends may not support all of the listed descriptor types.
  */
-typedef enum {
+typedef enum ngf_descriptor_type {
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
   NGF_DESCRIPTOR_IMAGE,
   NGF_DESCRIPTOR_SAMPLER,
@@ -792,9 +944,11 @@ typedef enum {
 } ngf_descriptor_type;
 
 /**
+ * @struct ngf_buffer_bind_info
+ * \ingroup ngf
  * Specifies a buffer bind operation.
  */
-typedef struct {
+typedef struct ngf_buffer_bind_info {
   ngf_buffer       buffer; /**< Which buffer to bind.*/
   size_t           offset; /**< Offset at which to bind the buffer.*/
   size_t           range;  /**< Bound range.*/
@@ -802,29 +956,41 @@ typedef struct {
 } ngf_buffer_bind_info;
 
 /**
+ * @struct ngf_image_sampler_bind_info 
+ * \ingroup ngf
  * Specifies an image bind operation.
  */
-typedef struct {
+typedef struct ngf_image_sampler_bind_info {
   ngf_image_ref image_subresource; /**< Image portion to bind.*/
   ngf_sampler   sampler;           /**< Sampler to use.*/
 } ngf_image_sampler_bind_info;
 
-typedef struct {
-  uint32_t            target_set;
-  uint32_t            target_binding;
-  ngf_descriptor_type type;
+/**
+ * @struct ngf_resource_bind_op
+ * \ingroup ngf
+ * Specifies a resource (image, buffer, etc.) bind operation, together with
+ * the target set and binding IDs.
+ */
+typedef struct ngf_resource_bind_op {
+  uint32_t            target_set; /**< Target set ID. */
+  uint32_t            target_binding; /**< Target binding ID. */
+  ngf_descriptor_type type; /**< Type of the resource being bound. */
   union {
     ngf_buffer_bind_info        buffer;
     ngf_image_sampler_bind_info image_sampler;
-  } info;
+  } info; /**< Details of the resource being bound, depending on type. */
 } ngf_resource_bind_op;
 
 /**
+ * @struct ngf_graphics_pipeline
+ * \ingroup ngf
  * Graphics pipeline object.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
 /**
+ * @enum ngf_primitive_type
+ * \ingroup ngf
  * Primitive types to use for draw operations.
  * Some back-ends may not support all of the primitive types.
  */
@@ -838,6 +1004,8 @@ typedef enum ngf_primitive_type {
 } ngf_primitive_type;
 
 /**
+ * @struct ngf_constant_specialization
+ * \ingroup ngf
  * A constant specialization entry, sets the value for a single
  * specialization constant.
  */
@@ -850,6 +1018,8 @@ typedef struct ngf_constant_specialization {
 } ngf_constant_specialization;
 
 /**
+ * @struct ngf_specialization_info
+ * \ingroup ngf
  * Sets specialization constant values for a pipeline.
  */
 typedef struct ngf_specialization_info {
@@ -861,6 +1031,8 @@ typedef struct ngf_specialization_info {
 } ngf_specialization_info;
 
 /**
+ * @struct ngf_graphics_pipeline_info
+ * \ingroup ngf
  * Specifies information for creation of a graphics pipeline.
  */
 typedef struct ngf_graphics_pipeline_info {
@@ -878,6 +1050,8 @@ typedef struct ngf_graphics_pipeline_info {
 } ngf_graphics_pipeline_info;
 
 /**
+ * @struct ngf_allocation_callbacks
+ * \ingroup ngf
  * Specifies host memory allocation callbacks for the library's internal needs.
  */
 typedef struct ngf_allocation_callbacks {
@@ -887,6 +1061,8 @@ typedef struct ngf_allocation_callbacks {
 } ngf_allocation_callbacks;
 
 /**
+ * @struct ngf_context
+ * \ingroup ngf
  * Nicegraf rendering context.
  *
  * A context represents the internal state of the library that is required for
@@ -896,7 +1072,8 @@ typedef struct ngf_allocation_callbacks {
  * submitting command buffers.
  *
  * Most operations, with the exception of `ngf_init` and context management
- * functions, require a context to be "current" on the calling thread.
+ * functions themelves, require a context to be "current" on the calling
+ * thread.
  *
  * Invoking `ngf_set_context` will make a context current on the calling
  * thread. Once a context is made current on a thread, it cannot be migrated to
@@ -915,6 +1092,8 @@ typedef struct ngf_allocation_callbacks {
 typedef struct ngf_context_t* ngf_context;
 
 /**
+ * @struct ngf_context_info
+ * \ingroup ngf
  * Configures a Nicegraf context.
  */
 typedef struct ngf_context_info {
@@ -932,11 +1111,18 @@ typedef struct ngf_context_info {
   const ngf_context shared_context;
 } ngf_context_info;
 
+/**
+ * @struct ngf_cmd_buffer_info
+ * \ingroup ngf
+ * Information about a command buffer.
+ */
 typedef struct ngf_cmd_buffer_info {
   uint32_t flags; /**< Reserved for future use. */
 } ngf_cmd_buffer_info;
 
 /**
+ * @struct ngf_cmd_buffer
+ * \ingroup ngf
  * Encodes a series of rendering commands.
  *
  * Internally, a command buffer may be in any of the following five states:
@@ -946,8 +1132,8 @@ typedef struct ngf_cmd_buffer_info {
  *   - awaiting submission;
  *   - submitted.
  *
- * Every newly created command buffer is in the "new" state. It can be transitioned
- * to the "ready" state by calling `ngf_start_cmd_buffer` on it.
+ * Every newly created command buffer is in the "new" state. It can be
+ * transitioned to the "ready" state by calling `ngf_start_cmd_buffer` on it.
  *
  * When a command buffer is in the "ready" state, you may begin recording a new
  * series of rendering commands into it.
@@ -968,11 +1154,11 @@ typedef struct ngf_cmd_buffer_info {
  * The three rules above mean that a command buffer may not have more than
  * one encoder active at a given time.
  *
- * Once all of the desired commands have been recorded, and the command buffer is
- * in the "awaiting submission" state, the command buffer may be
- * submitted for execution via a call to \ref ngf_cmd_buffer_submit, which
- * transitions it into the "submitted" state.
-
+ * Once all of the desired commands have been recorded, and the command buffer
+ * is in the "awaiting submission" state, the command buffer may be submitted
+ * for execution via a call to \ref ngf_cmd_buffer_submit, which transitions it
+ * into the "submitted" state.
+ *
  * Submission may only be performed on command buffers that are in the
  * "awaiting submission" state.
  *
@@ -1004,6 +1190,8 @@ typedef struct ngf_cmd_buffer_info {
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
 /**
+ * @struct ngf_render_encoder
+ * \ingroup ngf
  * A render encoder records rendering commands (such as draw calls) into its
  * corresponding command buffer.
  */
@@ -1012,6 +1200,8 @@ typedef struct {
 } ngf_render_encoder;
 
 /**
+ * @struct ngf_xfer_encoder
+ * \ingroup ngf
  * A transfer encoder records transfer commands (i.e. copying buffer contents)
  * into its corresponding command buffer.
  */
@@ -1020,6 +1210,8 @@ typedef struct {
 } ngf_xfer_encoder;
 
 /**
+ * @typedef ngf_frame_token
+ * \ingroup ngf
  * A token identifying a frame of rendering.
  */
 typedef uint32_t ngf_frame_token;
@@ -1031,6 +1223,7 @@ typedef uint32_t ngf_frame_token;
 #endif
 
 /**
+ * \ingroup ngf
  * Initialize nicegraf.
  * @param init_info Initialization parameters.
  * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
