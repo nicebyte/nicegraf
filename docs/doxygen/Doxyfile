@@ -1,0 +1,6 @@
+PROJECT_NAME=nicegraf
+IGNORE_PREFIX=ngf_,NGF_,ngf_util,NGF_UTIL
+INPUT=../../include/nicegraf.h,../../include/nicegraf-util.h
+ALPHABETICAL_INDEX=NO
+DISABLE_INDEX=YES
+OPTIMIZE_OUTPUT_FOR_C=YES
