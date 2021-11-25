@@ -131,6 +131,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16F, unsupported on Metal
     {MTLPixelFormatRGBA16Float, 16, 16, 16, 16, 0, 0, false},
     {MTLPixelFormatRG11B10Float, 11, 11, 10, 0, 0, 0, false},
+    {MTLPixelFormatRGB9E5Float, 9, 9, 9, 5, 0, 0, false},
     {MTLPixelFormatR16Unorm, 16, 0, 0, 0, 0, 0, false},
     {MTLPixelFormatR16Snorm, 16, 0, 0, 0, 0, 0, false},
     {MTLPixelFormatR16Uint, 16, 0, 0, 0, 0, 0, false},

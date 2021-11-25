@@ -513,7 +513,6 @@ typedef struct ngf_buffer_info {
   uint32_t                buffer_usage;
 } ngf_buffer_info;
 
-
 /*
  * A memory buffer.
  */
@@ -561,6 +560,7 @@ typedef enum ngf_image_format {
   NGF_IMAGE_FORMAT_RGB16F,
   NGF_IMAGE_FORMAT_RGBA16F,
   NGF_IMAGE_FORMAT_RG11B10F,
+  NGF_IMAGE_FORMAT_RGB9E5,
   NGF_IMAGE_FORMAT_R16_UNORM,
   NGF_IMAGE_FORMAT_R16_SNORM,
   NGF_IMAGE_FORMAT_R16U,
@@ -814,8 +814,8 @@ typedef struct {
   uint32_t            target_binding;
   ngf_descriptor_type type;
   union {
-    ngf_buffer_bind_info buffer;
-    ngf_image_sampler_bind_info  image_sampler;
+    ngf_buffer_bind_info        buffer;
+    ngf_image_sampler_bind_info image_sampler;
   } info;
 } ngf_resource_bind_op;
 
