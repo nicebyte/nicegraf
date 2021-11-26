@@ -701,7 +701,13 @@ name(NGFI_ALLOC(ngf_##type##_t), ##__VA_ARGS__);
 #pragma mark ngf_function_implementations
 
 ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
-  ngfi_diag_info = init_info->diag_info;
+  if (init_info->diag_info != NULL) {
+    ngfi_diag_info = *init_info->diag_info;
+  } else {
+    ngfi_diag_info.callback = NULL;
+    ngfi_diag_info.userdata = NULL;
+    ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
+  }
 #if TARGET_OS_OSX
   // Try setting environment variable to enable Metal API validation if
   // necessary.

@@ -1932,7 +1932,13 @@ ngf_device_capabilities DEVICE_CAPS;
 ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
-  ngfi_diag_info = init_info->diag_info;
+  if (init_info->diag_info != NULL) {
+    ngfi_diag_info = *init_info->diag_info;
+  } else {
+    ngfi_diag_info.callback = NULL;
+    ngfi_diag_info.userdata = NULL;
+    ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
+  }
 
   if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
     vkl_init_loader();                   // Initialize the vulkan loader.

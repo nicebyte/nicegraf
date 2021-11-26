@@ -88,8 +88,6 @@
  * management.
  *  
  */
- 
-
 
 #pragma once
 
@@ -191,6 +189,17 @@ typedef struct ngf_diagnostic_info {
 } ngf_diagnostic_info;
 
 /**
+ * @struct ngf_allocation_callbacks
+ * \ingroup ngf
+ * Specifies host memory allocation callbacks for the library's internal needs.
+ */
+typedef struct ngf_allocation_callbacks {
+  // TODO: specify alignments?
+  void* (*allocate)(size_t obj_size, size_t nobjs);
+  void (*free)(void* ptr, size_t obj_size, size_t nobjs);
+} ngf_allocation_callbacks;
+
+/**
  * @struct ngf_init_info
  * nicegraf initialization parameters.
  */
@@ -198,7 +207,11 @@ typedef struct ngf_init_info {
   ngf_device_preference device_pref; /**< Which type of device to prefer.
                                           May be ignored, depending on the backend.
                                       */
-  ngf_diagnostic_info diag_info;     /**< Diagnostic log configuration. */
+  /** 
+   * Pointer to a structure containing a diagnostic log configuration.
+   * If this pointer is set to NULL, no diagnostic callback shall be invoked.
+   */
+  const ngf_diagnostic_info* diag_info;
 } ngf_init_info;
 
 /**
@@ -1094,17 +1107,6 @@ typedef struct ngf_graphics_pipeline_info {
   const ngf_specialization_info*     spec_info;
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
 } ngf_graphics_pipeline_info;
-
-/**
- * @struct ngf_allocation_callbacks
- * \ingroup ngf
- * Specifies host memory allocation callbacks for the library's internal needs.
- */
-typedef struct ngf_allocation_callbacks {
-  // TODO: specify alignments?
-  void* (*allocate)(size_t obj_size, size_t nobjs);
-  void (*free)(void* ptr, size_t obj_size, size_t nobjs);
-} ngf_allocation_callbacks;
 
 /**
  * @struct ngf_context

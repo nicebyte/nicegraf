@@ -71,12 +71,14 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
    * and install a diagnostic callback.
    */
+  const ngf_diagnostic_info diagnostic_info {
+    .verbosity = diagnostics_verbosity,
+    .userdata  = nullptr,
+    .callback  = ngf_samples::sample_diagnostic_callback
+  };
   const ngf_init_info init_info {
       .device_pref = NGF_DEVICE_PREFERENCE_DISCRETE,
-      .diag_info   = {
-          .verbosity = diagnostics_verbosity,
-          .userdata  = nullptr,
-          .callback  = ngf_samples::sample_diagnostic_callback}};
+      .diag_info   = &diagnostic_info};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
