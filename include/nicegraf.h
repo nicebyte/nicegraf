@@ -26,20 +26,70 @@
  */
 
 /**
- * \defgroup ngf Core C API
- * Core nicegraf structs, functions and enums.
- */
- 
-/**
  * \mainpage Reference Documentation
+ * 
  * These pages contain documentation automatically generated from nicegraf's
- * code comments. Click one of the links below to proceed to the documentation
- * for the corresponding module.
+ * code comments. The text's purpose is to concisely describe the intended
+ * behavior and failure modes of the API.
+ * 
+ * If viewing this document in a web browser or a PDF viewer, click one of the
+ * following links to proceed to the documentation for the corresponding module.
  *
  *  - \ref ngf
  *  - \ref ngf_util
- * 
  */
+
+/**
+ * \defgroup ngf Core C API
+ * This section contains the documentation for the core nicegraf routines, 
+ * structures and enumerations.
+ * 
+ * \subsection core-remarks General Remarks
+ * 
+ * - nicegraf does not guarantee the order of structure fields to be preserved
+ *   from version to version, even across minor versions. Clients should
+ *   therefore never assume a specific memory layout for any of nicegraf
+ *   structures.
+ * 
+ * - When nicegraf's C headers are included from C++, all global functions
+ *   within them are automatically declared to have C linkage. Additionally,
+ *   they are declared to be noexcept.
+ * 
+ * \subsection object-model Object Model
+ * 
+ * nicegraf objects, such as images, buffers, render targets, etc., are
+ * represented using opaque handles. The objects are created and destroyed
+ * explicitly by the application, and it is the responsibility of the
+ * application to ensure a correct order of destruction.
+ * 
+ * \subsection error-reporting Error Reporting
+ * 
+ * Most nicegraf routines report their completion status by returning an
+ * \ref ngf_error, and write their results to out-parameters. The returned value
+ * is a generic error code. Detailed, human-readable information about errors
+ * may vary from platform to platform and is reported by invoking a
+ * user-provided callback function (see \ref ngf_diagnostic_info). The callback
+ * function must accept the diagnostic message type (see
+ * \ref ngf_diagnostic_message_type), an arbitrary void pointer (the value of
+ * which the user may specify when providing the callback), a printf-style
+ * format string, and an arbitrary number of arguments specifying the data for
+ * the format-string.
+ *  
+ * \subsection host-memory-management Host Memory Management
+ * 
+ * By default, nicegraf uses the standard malloc/free to manage host memory for
+ * internal purposes. The client may override this behavior by supplying custom
+ * memory allocation callbacks (see \ref ngf_set_allocation_callbacks).
+ * 
+ * \subsection gpu-memory-management GPU Memory Management
+ * 
+ * nicegraf internally manages GPU memory for all backends. It is currently not
+ * possible for clients to override this behavior and do their own GPU memory
+ * management.
+ *  
+ */
+ 
+
 
 #pragma once
 
@@ -64,7 +114,8 @@ extern "C" {
 /**
  * @struct ngf_device_capabilities
  * \ingroup ngf
- * Contains information about various device features, limits, etc.
+ * Contains information about various device features, limits, etc. Clients
+ * shouldn't instantiate this structure. See \ref ngf_get_device_capabilities.
  */
 typedef struct ngf_device_capabilities {
   /**
@@ -84,15 +135,16 @@ typedef struct ngf_device_capabilities {
 /**
  * @enum ngf_device_preference
  * \ingroup ngf
- * Device hints.
- * TODO: API for choosing device explicitly.
+ * Enumerates the possible device hints for \ref ngf_initialize.
  * \ingroup enums
  */
 typedef enum ngf_device_preference {
-  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete GPU. */
+  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete (high-power) GPU. */
   NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
-  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No GPU preference. */
+  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No preference. */
 } ngf_device_preference;
+/* TODO: API for choosing device explicitly.*/
+
 
 /**
  * @enum ngf_diagnostic_log_verbosity
@@ -103,7 +155,7 @@ typedef enum ngf_diagnostic_log_verbosity {
   NGF_DIAGNOSTICS_VERBOSITY_DEFAULT, /**< Normal level, reports only severe
                                         errors. */
   NGF_DIAGNOSTICS_VERBOSITY_DETAILED /**< Recommended for debug builds, may
-                                        induce perf overhead. */
+                                        induce performance overhead. */
 } ngf_diagnostic_log_verbosity;
 
 /**
@@ -120,13 +172,7 @@ typedef enum ngf_diagnostic_message_type {
 } ngf_diagnostic_message_type;
 
 /**
- * Detailed information about errors may vary from platform to platform.
- * nicegraf reports errors through a combination of generic return codes and
- * detailed human-readable information passed to a user-provided callback
- * function. The callback function must accept the diagnostic message type, an
- * arbitrary void pointer (which the user may specify), a printf-style format
- * string, and an arbitrary number of arguments specifying the data for the
- * format-string.
+ * The diagnostic callback function type.
  */
 typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, const char*, ...);
 
@@ -177,7 +223,7 @@ typedef enum ngf_error {
                             call is either too large or too small.*/
   NGF_ERROR_INVALID_ENUM, /**< An enumerator passed as part of an argument to
                              the call is not valid in that context.*/
-  NGF_ERROR_INVALID_OPERATION
+  NGF_ERROR_INVALID_OPERATION /**< The routine did not complete successfully. */
   /*..add new errors above this line */
 } ngf_error;
 
@@ -1288,7 +1334,8 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT;
 
 /**
  * Get a pointer to the device capabilities structure.
- * @return NULL if no context is present on the calling thread.
+ * @return A pointer to an \ref ngf_device_capabilities instance, or NULL,
+ *         if no context is present on the calling thread.
  */
 const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
 
