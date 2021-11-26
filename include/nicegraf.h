@@ -79,7 +79,7 @@
  * 
  * By default, nicegraf uses the standard malloc/free to manage host memory for
  * internal purposes. The client may override this behavior by supplying custom
- * memory allocation callbacks.
+ * memory allocation callbacks (see \ref ngf_allocation_callbacks).
  * 
  * \subsection gpu-memory-management GPU Memory Management
  * 
@@ -194,8 +194,18 @@ typedef struct ngf_diagnostic_info {
  * Specifies host memory allocation callbacks for the library's internal needs.
  */
 typedef struct ngf_allocation_callbacks {
-  // TODO: specify alignments?
+  /**
+   * This callback shall allocate a region of memory that is able to fit `nobjs` objects
+   * of size `obj_size`, and return a pointer to the allocated region.
+   * The starting address of the allocated region shall have the largest alignment for the
+   * target platform.
+   */
   void* (*allocate)(size_t obj_size, size_t nobjs);
+
+  /**
+   * This callback shall free a region allocated by the custom allocator. The count
+   * and size of objects in the region are supplied as additional parameters.
+   */
   void (*free)(void* ptr, size_t obj_size, size_t nobjs);
 } ngf_allocation_callbacks;
 
