@@ -256,16 +256,6 @@ typedef enum ngf_error {
 } ngf_error;
 
 /**
- * @enum ngf_present_mode
- * \ingroup ngf
- * Possible present modes.
- */
-typedef enum ngf_present_mode {
-  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
-  NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
-} ngf_present_mode;
-
-/**
  * @struct ngf_irect2d
  * \ingroup ngf
  * Represents a rectangular, axis-aligned 2D region with integer coordinates.
@@ -294,9 +284,9 @@ typedef struct ngf_extent3d {
  * Three-dimensional offset.
  */
 typedef struct ngf_offset3d {
-  int32_t x;
-  int32_t y;
-  int32_t z;
+  int32_t x; /**< Offset along the x-axis. */
+  int32_t y; /**< Offset along the y-axis. */
+  int32_t z; /**< Offset along the z-axis. */
 } ngf_offset3d;
 
 /**
@@ -932,6 +922,18 @@ typedef struct ngf_pass_info {
   const ngf_attachment_store_op* store_ops;
   const ngf_clear*               clears;
 } ngf_pass_info;
+
+/**
+ * @enum ngf_present_mode
+ * \ingroup ngf
+ * Enumerates possible presentation modes.
+ * "Presentation mode" refers to the particular way the CPU,
+ * GPU and the presentation engine interact.
+ */
+typedef enum ngf_present_mode {
+  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
+  NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
+} ngf_present_mode;
 
 /**
  * @struct ngf_swapchain_info
