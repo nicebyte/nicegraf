@@ -603,7 +603,7 @@ typedef enum ngf_buffer_usage {
  * \ingroup ngf
  * Information required for buffer creation.
  */
-typedef truct ngf_buffer_info {
+typedef struct ngf_buffer_info {
   size_t                  size; /**< Size of the buffer in bytes. */
   ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage
                                            type.*/
