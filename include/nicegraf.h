@@ -67,7 +67,7 @@
  * Most nicegraf routines report their completion status by returning an
  * \ref ngf_error, and write their results to out-parameters. The returned value
  * is a generic error code. Detailed, human-readable information about errors
- * may vary from platform to platform and is reported by invoking a
+ * may vary from platform to platform; nicegraf reports it by invoking a
  * user-provided callback function (see \ref ngf_diagnostic_info). The callback
  * function must accept the diagnostic message type (see
  * \ref ngf_diagnostic_message_type), an arbitrary void pointer (the value of
@@ -234,10 +234,8 @@ typedef struct ngf_init_info {
 /**
  * @enum ngf_error
  * \ingroup ngf
- * Error codes.
- *
- * nicegraf functions report errors via return values. Results are stored in
- * output arguments.
+ * Enumerates the error codes that nicegraf routines may return.
+ * See also \ref error-reporting.
  */
 typedef enum ngf_error {
   NGF_ERROR_OK = 0,     /**< No error, operation finished successfully. */
