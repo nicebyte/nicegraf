@@ -665,6 +665,8 @@ static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
 
 #pragma region internal_funcs
 
+void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+
 // Handler for messages from validation layers, etc.
 // All messages are forwarded to the user-provided debug callback.
 static VKAPI_ATTR VkBool32 VKAPI_CALL ngfvk_debug_message_callback(
@@ -1939,6 +1941,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     ngfi_diag_info.userdata = NULL;
     ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
   }
+  ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
 
   if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
     vkl_init_loader();                   // Initialize the vulkan loader.

@@ -79,7 +79,7 @@
  * 
  * By default, nicegraf uses the standard malloc/free to manage host memory for
  * internal purposes. The client may override this behavior by supplying custom
- * memory allocation callbacks (see \ref ngf_set_allocation_callbacks).
+ * memory allocation callbacks.
  * 
  * \subsection gpu-memory-management GPU Memory Management
  * 
@@ -212,6 +212,13 @@ typedef struct ngf_init_info {
    * If this pointer is set to NULL, no diagnostic callback shall be invoked.
    */
   const ngf_diagnostic_info* diag_info;
+
+  /**
+   * Pointer to a structure specifying custom allocation callbacks, which the library
+   * shall use to manage CPU memory for internal use.
+   * If this pointer is set to NULL, standard malloc and free are used.
+   */
+  const ngf_allocation_callbacks* allocation_callbacks;
 } ngf_init_info;
 
 /**
@@ -1340,13 +1347,6 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT;
  *         if no context is present on the calling thread.
  */
 const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
-
-/**
- * Set the memory allocation callbacks that the library will use for its
- * internal needs.
- * By default, stdlib's malloc and free are used.
- */
-void ngf_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks) NGF_NOEXCEPT;
 
 /**
  * Create a shader stage from its description.

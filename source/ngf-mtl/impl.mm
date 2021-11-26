@@ -691,6 +691,10 @@ struct ngf_context_t {
   ngf_render_target default_rt;
 };
 
+extern "C" {
+void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+}
+
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
 
@@ -708,6 +712,8 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
     ngfi_diag_info.userdata = NULL;
     ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
   }
+  ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
+
 #if TARGET_OS_OSX
   // Try setting environment variable to enable Metal API validation if
   // necessary.
