@@ -219,14 +219,14 @@ typedef struct ngf_init_info {
                                       */
   /** 
    * Pointer to a structure containing a diagnostic log configuration.
-   * If this pointer is set to NULL, no diagnostic callback shall be invoked.
+   * If this pointer is set to `NULL`, no diagnostic callback shall be invoked.
    */
   const ngf_diagnostic_info* diag_info;
 
   /**
    * Pointer to a structure specifying custom allocation callbacks, which the library
    * shall use to manage CPU memory for internal use.
-   * If this pointer is set to NULL, standard malloc and free are used.
+   * If this pointer is set to `NULL`, standard malloc and free are used.
    */
   const ngf_allocation_callbacks* allocation_callbacks;
 } ngf_init_info;
