@@ -2,7 +2,7 @@
 
 echo "Downloading binary dependencies for samples"
 git lfs install || (exit /b)
-git lfs pull || (exit /b)
+git lfs pull --exclude="" || (exit /b)
 echo "Downloading library dependencies for samples"
 git submodule init || (exit /b)
 git submodule update || (exit /b)
