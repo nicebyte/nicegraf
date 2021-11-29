@@ -287,6 +287,7 @@ typedef struct ngf_render_target_t {
   VkRenderPass                compat_render_pass;
   uint32_t                    nattachments;
   ngf_attachment_description* attachment_descs;
+  VkImageView*                attachment_image_views; /* unused in default RT, set to NULL. */
   ngfvk_attachment_pass_desc* attachment_compat_pass_descs;
   bool                        is_default;
   uint32_t                    width;
@@ -2287,6 +2288,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
         NGFI_ALLOCN(ngf_attachment_description, nattachment_descs);
     ctx->default_render_target->attachment_compat_pass_descs =
         NGFI_ALLOCN(ngfvk_attachment_pass_desc, nattachment_descs);
+    ctx->default_render_target->attachment_image_views = NULL;
 
     uint32_t                    attachment_desc_idx = 0u;
     ngf_attachment_description* color_attachment_desc =
@@ -3377,12 +3379,12 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   memset(rt, 0, sizeof(ngf_render_target_t));
   *result       = rt;
   ngf_error err = NGF_ERROR_OK;
+  VkResult vk_err = VK_SUCCESS;
 
   ngfvk_attachment_pass_desc* vk_attachment_pass_descs =
       NGFI_ALLOCN(ngfvk_attachment_pass_desc, info->attachment_descriptions->ndescs);
 
-  VkImageView* attachment_views =
-      ngfi_sa_alloc(ngfi_tmp_store(), info->attachment_descriptions->ndescs * sizeof(VkImageView));
+  VkImageView* attachment_views = NGFI_ALLOCN(VkImageView, info->attachment_descriptions->ndescs);
   if (vk_attachment_pass_descs == NULL || attachment_views == NULL) {
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_render_target_cleanup;
@@ -3392,7 +3394,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     const ngf_attachment_description* ngf_attachment_desc =
         &info->attachment_descriptions->descs[a];
     ngfvk_attachment_pass_desc* attachment_pass_desc = &vk_attachment_pass_descs[a];
-    switch (ngf_attachment_desc->type) {
+    const ngf_attachment_type attachment_type =  ngf_attachment_desc->type;
+    switch (attachment_type) {
     case NGF_ATTACHMENT_COLOR:
       ++ncolor_attachments;
       attachment_pass_desc->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -3405,7 +3408,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       assert(false);
     }
 
-    const ngf_image attachment_img   = info->attachment_image_refs[a].image;
+    const ngf_image_ref* attachment_img_ref = &info->attachment_image_refs[a];
+    const ngf_image attachment_img   = attachment_img_ref->image;
     const bool is_attachment_sampled = attachment_img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM;
     attachment_pass_desc->is_resolve = false;
     attachment_pass_desc->initial_layout = is_attachment_sampled
@@ -3414,8 +3418,37 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     attachment_pass_desc->final_layout   = is_attachment_sampled
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                : attachment_pass_desc->layout;
-    attachment_views[a] = attachment_img->vkview;  // TODO: use the specified subresource.
+    const VkImageAspectFlags subresource_aspect_flags =
+      (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0) |
+      (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+      (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+    const VkImageViewCreateInfo image_view_create_info = {
+      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+      .pNext = NULL,
+      .flags = 0u,
+      .image = (VkImage)attachment_img->alloc.obj_handle,
+      .components = {
+        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+      },
+      .format = attachment_img->vkformat,
+      .subresourceRange = {
+        .baseArrayLayer = attachment_img_ref->layer,
+        .baseMipLevel = attachment_img_ref->mip_level,
+        .layerCount = 1u,
+        .levelCount = 1u,
+        .aspectMask = subresource_aspect_flags
+      }
+    };
+    vk_err = vkCreateImageView(_vk.device, &image_view_create_info, NULL, &attachment_views[a]);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_render_target_cleanup;
+    }
   }
+  rt->attachment_image_views = attachment_views;
 
   const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_CLEAR;
   const ngf_attachment_store_op store_op = NGF_STORE_OP_STORE;
@@ -3457,7 +3490,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
       .width           = rt->width,
       .height          = rt->height,
       .layers          = 1u};
-  const VkResult vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL, &rt->frame_buffer);
+  vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL, &rt->frame_buffer);
   if (vk_err != VK_SUCCESS) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_render_target_cleanup;
@@ -3478,6 +3511,12 @@ void ngf_destroy_render_target(ngf_render_target target) {
     }
     if (target->compat_render_pass != VK_NULL_HANDLE) {
       NGFI_DARRAY_APPEND(res->retire_render_passes, target->compat_render_pass);
+    }
+    if (target->attachment_image_views) {
+      for (size_t i = 0; i < target->nattachments; ++i) {
+        NGFI_DARRAY_APPEND(res->retire_image_views, target->attachment_image_views[i]);
+      }
+      NGFI_FREEN(target->attachment_image_views, target->nattachments);
     }
     NGFI_FREEN(target->attachment_descs, target->nattachments);
     NGFI_FREEN(target->attachment_compat_pass_descs, target->nattachments);
