@@ -210,6 +210,54 @@ typedef struct ngf_allocation_callbacks {
 } ngf_allocation_callbacks;
 
 /**
+ * @typedef ngf_device_handle
+ * A handle that uniquely identifies a rendering device.
+ * \ingroup ngf
+ */
+typedef uint32_t ngf_device_handle;
+
+/**
+ * @enum ngf_device_type 
+ * Enumerates different types of rendering devices.
+ * \ingroup ngf
+ */
+typedef enum ngf_device_type {
+  /** Discrete GPU, such as GeForce or Radeon. */
+  NGF_DEVICE_TYPE_DISCRETE_GPU = 0,
+
+  /** Integrated GPU, such as Intel HD graphics. */
+  NGF_DEVICE_TYPE_INTEGRATED_GPU,
+
+  /** The device is a GPU, but its specific power profile is unknown. */
+  NGF_DEVICE_TYPE_GENERIC_GPU,
+
+  NGF_DEVICE_TYPE_COUNT
+} ngf_device_type;
+
+/**
+ * Maximum length of the device name. 
+ * \ingroup ngf 
+ */
+#define NGF_DEVICE_NAME_MAX_LENGTH (256u)
+
+/**
+ * @struct ngf_device 
+ * Information about a rendering device.
+ * \ingroup ngf
+ */
+typedef struct ngf_device {
+  ngf_device_type         type; /**< Device class. */
+  ngf_device_handle       handle; /**< A handle to be passed to \ref ngf_initialize. */
+
+  /**
+   * A string associated with the device. This is _not_ guaranteed to be unique.
+   */
+  const char              name[NGF_DEVICE_NAME_MAX_LENGTH]; 
+
+  ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
+} ngf_device;
+
+/**
  * @struct ngf_init_info
  * nicegraf initialization parameters.
  */
@@ -1289,9 +1337,19 @@ typedef uint32_t ngf_frame_token;
 
 /**
  * \ingroup ngf
+ * Enumerates rendering devices available to nicegraf.
+ * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be populated with
+ *                a pointer to an array of \ref ngf_device instances, each containing data about a rendering device
+ *                available to the system.
+ * @param ndevices pointer to a `const uint32_t`. If not NULL, the number of available rendering devices shall be
+ *                 written to the memory pointed to by this parameter.
+ */
+ngf_error ngf_enumerate_devices(const ngf_device** devices, const uint32_t* ndevices);
+
+/**
+ * \ingroup ngf
  * Initialize nicegraf.
  * @param init_info Initialization parameters.
- * @return Error codes: NGF_ERROR_INITIALIZATION_FAILED
  */
 ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
 
@@ -1300,9 +1358,6 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
  * can optionally present to a window surface and mutually share objects
  * (such as images and buffers) with another context.
  * @param info context configuration
- * @return Error codes: NGF_ERROR_CANT_SHARE_CONTEXT,
- *  NGF_ERROR_OUTOFMEM, NGF_ERROR_CONTEXT_CREATION_FAILED,
- *  NGF_ERROR_SWAPCHAIN_CREATION_FAILED
  */
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT;
 
