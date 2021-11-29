@@ -1925,8 +1925,64 @@ static ngf_descriptor_type ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorTyp
   default: return NGF_DESCRIPTOR_TYPE_COUNT;
   }
 }
-#pragma endregion
 
+static VkResult ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* validation_enabled) {
+  vkl_init_loader();  // Initialize the vulkan loader.
+
+  const char* const ext_names[] = {// Names of instance-level extensions.
+                                   "VK_KHR_surface",
+                                   VK_SURFACE_EXT,
+                                   VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+                                   VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+
+  const VkApplicationInfo app_info = {// Application information.
+                                      .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+                                      .pNext            = NULL,
+                                      .pApplicationName = NULL,  // TODO: allow specifying app name.
+                                      .pEngineName      = "nicegraf",
+                                      .engineVersion = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
+                                      .apiVersion    = VK_MAKE_VERSION(1, 0, 9)};
+
+  // Names of instance layers to enable.
+  const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
+  const char* enabled_layers[]      = {validation_layer_name};
+
+  // Check if validation layers are supported.
+  uint32_t nlayers = 0u;
+  vkEnumerateInstanceLayerProperties(&nlayers, NULL);
+  VkLayerProperties* layer_props =
+      ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
+  vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
+  bool validation_supported = false;
+  for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
+    validation_supported = (strcmp(validation_layer_name, layer_props[l].layerName) == 0u);
+  }
+
+  // Enable validation only if detailed verbosity is requested.
+  const bool enable_validation =
+      validation_supported && request_validation;
+  *validation_enabled = enable_validation;
+
+  // Create a Vulkan instance.
+  const VkInstanceCreateInfo inst_info = {
+      .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+      .pNext                   = NULL,
+      .flags                   = 0u,
+      .pApplicationInfo        = &app_info,
+      .enabledLayerCount       = enable_validation ? 1u : 0u,
+      .ppEnabledLayerNames     = enabled_layers,
+      .enabledExtensionCount   = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
+      .ppEnabledExtensionNames = ext_names};
+  VkResult vk_err = vkCreateInstance(&inst_info, NULL, instance_ptr);
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
+    return vk_err;
+  }
+
+  return VK_SUCCESS;
+}
+
+#pragma endregion
 
 #pragma region external_funcs
 
@@ -1945,61 +2001,12 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
 
   if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
-    vkl_init_loader();                   // Initialize the vulkan loader.
+    bool validation_enabled = false;
+    const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
+    ngfvk_create_instance(request_validation, &_vk.instance, &validation_enabled);
+    vkl_init_instance(_vk.instance);  // load instance-level Vulkan functions into the global namespace.
 
-    const char* const ext_names[] = {// Names of instance-level extensions.
-                                     "VK_KHR_surface",
-                                     VK_SURFACE_EXT,
-                                     VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-                                     VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
-
-    const VkApplicationInfo app_info = {
-        // Application information.
-        .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext            = NULL,
-        .pApplicationName = NULL,  // TODO: allow specifying app name.
-        .pEngineName      = "nicegraf",
-        .engineVersion    = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
-        .apiVersion       = VK_MAKE_VERSION(1, 0, 9)};
-
-    // Names of instance layers to enable.
-    const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
-    const char* enabled_layers[]      = {validation_layer_name};
-
-    // Check if validation layers are supported.
-    uint32_t nlayers = 0u;
-    vkEnumerateInstanceLayerProperties(&nlayers, NULL);
-    VkLayerProperties* layer_props =
-        ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
-    vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
-    bool validation_supported = false;
-    for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
-      validation_supported = (strcmp(validation_layer_name, layer_props[l].layerName) == 0u);
-    }
-
-    // Enable validation only if detailed verbosity is requested.
-    const bool enable_validation =
-        validation_supported && (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED);
-
-    // Create a Vulkan instance.
-    const VkInstanceCreateInfo inst_info = {
-        .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-        .pNext                   = NULL,
-        .flags                   = 0u,
-        .pApplicationInfo        = &app_info,
-        .enabledLayerCount       = enable_validation ? 1u : 0u,
-        .ppEnabledLayerNames     = enabled_layers,
-        .enabledExtensionCount   = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
-        .ppEnabledExtensionNames = ext_names};
-    VkResult vk_err = vkCreateInstance(&inst_info, NULL, &_vk.instance);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);
-      return NGF_ERROR_OBJECT_CREATION_FAILED;
-    }
-
-    vkl_init_instance(_vk.instance);  // load instance-level Vulkan functions.
-
-    if (enable_validation) {
+    if (validation_enabled) {
       // Install a debug callback to forward vulkan debug messages to the user.
       const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
           .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -2022,7 +2029,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     // Obtain a list of available physical devices.
     uint32_t         nphysdev = NGFVK_MAX_PHYS_DEV;
     VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
-    vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+    VkResult vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
     if (vk_err != VK_SUCCESS) {
       NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
       return NGF_ERROR_INVALID_OPERATION;
