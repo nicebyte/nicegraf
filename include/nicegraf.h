@@ -221,18 +221,18 @@ typedef uint32_t ngf_device_handle;
  * Enumerates different types of rendering devices.
  * \ingroup ngf
  */
-typedef enum ngf_device_type {
-  /** Discrete GPU, such as GeForce or Radeon. */
-  NGF_DEVICE_TYPE_DISCRETE_GPU = 0,
+typedef enum ngf_device_performance_tier {
+  /** For high-performance devices, such as discrete GPU. */
+  NGF_DEVICE_PERFORMANCE_TIER_HIGH = 0,
 
-  /** Integrated GPU, such as Intel HD graphics. */
-  NGF_DEVICE_TYPE_INTEGRATED_GPU,
+  /** For low-power integrated GPUs, software rendering, etc.  */
+  NGF_DEVICE_PERFORMANCE_TIER_LOW,
 
-  /** The device is a GPU, but its specific power profile is unknown. */
-  NGF_DEVICE_TYPE_GENERIC_GPU,
+  /** The specific performance profile is unknown. */
+  NGF_DEVICE_PERFORMANCE_TIER_UNKNOWN,
 
-  NGF_DEVICE_TYPE_COUNT
-} ngf_device_type;
+  NGF_DEVICE_PERFORMANCE_TIER_COUNT
+} ngf_device_performance_tier;
 
 /**
  * Maximum length of the device name. 
@@ -246,13 +246,13 @@ typedef enum ngf_device_type {
  * \ingroup ngf
  */
 typedef struct ngf_device {
-  ngf_device_type         type; /**< Device class. */
-  ngf_device_handle       handle; /**< A handle to be passed to \ref ngf_initialize. */
+  ngf_device_performance_tier performance_tier; /**< Device's performance tier. */
+  ngf_device_handle           handle; /**< A handle to be passed to \ref ngf_initialize. */
 
   /**
    * A string associated with the device. This is _not_ guaranteed to be unique.
    */
-  const char              name[NGF_DEVICE_NAME_MAX_LENGTH]; 
+  const char name[NGF_DEVICE_NAME_MAX_LENGTH];
 
   ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
 } ngf_device;
@@ -1341,10 +1341,10 @@ typedef uint32_t ngf_frame_token;
  * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be populated with
  *                a pointer to an array of \ref ngf_device instances, each containing data about a rendering device
  *                available to the system.
- * @param ndevices pointer to a `const uint32_t`. If not NULL, the number of available rendering devices shall be
+ * @param ndevices pointer to a `uint32_t`. If not NULL, the number of available rendering devices shall be
  *                 written to the memory pointed to by this parameter.
  */
-ngf_error ngf_enumerate_devices(const ngf_device** devices, const uint32_t* ndevices);
+ngf_error ngf_enumerate_devices(const ngf_device** devices, uint32_t* ndevices);
 
 /**
  * \ingroup ngf
