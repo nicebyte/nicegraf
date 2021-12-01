@@ -1340,14 +1340,14 @@ typedef uint32_t ngf_frame_token;
 
 /**
  * \ingroup ngf
- * Enumerates rendering devices available to nicegraf. This function is not thread-safe.
+ * Obtain a list of rendering devices available to nicegraf. This function is not thread-safe.
  * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be populated with
  *                a pointer to an array of \ref ngf_device instances, each containing data about a rendering device
- *                available to the system.
+ *                available to the system. Callers should not attempt to free the returned pointer.
  * @param ndevices pointer to a `uint32_t`. If not NULL, the number of available rendering devices shall be
  *                 written to the memory pointed to by this parameter.
  */
-ngf_error ngf_enumerate_devices(const ngf_device** devices, uint32_t* ndevices);
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
 
 /**
  * \ingroup ngf

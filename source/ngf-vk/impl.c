@@ -2014,7 +2014,7 @@ ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* v
 
 ngf_device_capabilities DEVICE_CAPS;
 
-ngf_error ngf_enumerate_devices(const ngf_device** devices, uint32_t* ndevices) {
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
   ngfvk_init_loader_if_necessary();
   if (NGFVK_DEVICE_LIST == NULL) {
     ngf_error  err          = NGF_ERROR_OK;
