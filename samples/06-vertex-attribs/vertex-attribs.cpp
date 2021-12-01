@@ -287,11 +287,11 @@ void* sample_initialize(
       float*          p            = &mapped_per_instance_staging_buffer[4 * idx];
       constexpr float grid_offset  = -static_cast<float>(vertex_attribs::INSTANCES_GRID_SIZE >> 1);
       constexpr float grid_spacing = 4.0f;
-      p[0]                         = grid_offset * grid_spacing + grid_spacing * c +
-             0.75f * (2.0f * rand() / static_cast<float>(RAND_MAX) - 1.0f);
-      p[2] = grid_offset * grid_spacing + grid_spacing * r +
-             0.75f * (2.0f * rand() / static_cast<float>(RAND_MAX) - 1.0f);
-      p[1] = (2.0f * rand() / static_cast<float>(RAND_MAX) - 1.0f);
+      p[0]                         = grid_offset * grid_spacing + grid_spacing * (float)c +
+             0.75f * (2.0f * (float)rand() / static_cast<float>(RAND_MAX) - 1.0f);
+      p[2] = grid_offset * (float)grid_spacing + grid_spacing * (float)r +
+             0.75f * (2.0f * (float)rand() / static_cast<float>(RAND_MAX) - 1.0f);
+      p[1] = (2.0f * (float)rand() / static_cast<float>(RAND_MAX) - 1.0f);
     }
   }
   ngf_buffer_flush_range(
