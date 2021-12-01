@@ -131,20 +131,6 @@ typedef struct ngf_device_capabilities {
 } ngf_device_capabilities;
 
 /**
- * @enum ngf_device_preference
- * \ingroup ngf
- * Enumerates the possible device hints for \ref ngf_initialize.
- * \ingroup enums
- */
-typedef enum ngf_device_preference {
-  NGF_DEVICE_PREFERENCE_DISCRETE,   /**< Prefer discrete (high-power) GPU. */
-  NGF_DEVICE_PREFERENCE_INTEGRATED, /**< Prefer integrated GPU. */
-  NGF_DEVICE_PREFERENCE_DONTCARE    /**< No preference. */
-} ngf_device_preference;
-/* TODO: API for choosing device explicitly.*/
-
-
-/**
  * @enum ngf_diagnostic_log_verbosity
  * \ingroup ngf
  * Verbosity levels for the diagnostic message log.
