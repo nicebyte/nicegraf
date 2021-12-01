@@ -31,9 +31,9 @@
 #include "vk_10.h"
 
 #include <assert.h>
+#include <spirv_reflect.h>
 #include <string.h>
 #include <vk_mem_alloc.h>
-#include <spirv_reflect.h>
 
 #pragma region constants
 
@@ -220,6 +220,11 @@ typedef struct ngfvk_renderpass_cache_entry {
 
 #define NGFVK_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.__handle))
 
+typedef struct ngfvk_device_id {
+  uint32_t vendor_id;
+  uint32_t device_id;
+} ngfvk_device_id;
+
 #pragma endregion
 
 #pragma region external_struct_definitions
@@ -296,13 +301,17 @@ typedef struct ngf_render_target_t {
 
 #pragma endregion
 
-#pragma region global_vars
+#pragma region               global_vars
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = NULL;
 
 static struct {
   pthread_mutex_t lock;
   NGFI_DARRAY_OF(VkImageMemoryBarrier) barriers;
 } NGFVK_PENDING_IMG_BARRIER_QUEUE;
+
+uint32_t         NGFVK_DEVICE_COUNT   = 0u;
+ngf_device*      NGFVK_DEVICE_LIST    = NULL;
+ngfvk_device_id* NGFVK_DEVICE_ID_LIST = NULL;
 
 #pragma endregion
 
@@ -636,7 +645,8 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 
 static VkAccessFlags get_vk_buffer_access_flags(ngf_buffer buf) {
   VkAccessFlags result = 0x00;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER) result |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER)
+    result |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER) result |= VK_ACCESS_INDEX_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER) result |= VK_ACCESS_UNIFORM_READ_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER) result |= VK_ACCESS_SHADER_READ_BIT;
@@ -644,15 +654,16 @@ static VkAccessFlags get_vk_buffer_access_flags(ngf_buffer buf) {
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_SRC) result |= VK_ACCESS_TRANSFER_READ_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE) result |= VK_ACCESS_HOST_READ_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_WRITEABLE) result |= VK_ACCESS_HOST_WRITE_BIT;
-  if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE) result |= VK_ACCESS_HOST_READ_BIT |
-                                                                                 VK_ACCESS_HOST_WRITE_BIT;
+  if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE)
+    result |= VK_ACCESS_HOST_READ_BIT | VK_ACCESS_HOST_WRITE_BIT;
   return result;
 }
 
 static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
   VkPipelineStageFlags result = 0x00;
   if ((buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER) ||
-      (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER)) result |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+      (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER))
+    result |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
   if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER ||
       buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER)
     result |= (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
@@ -1620,17 +1631,17 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       }
       case NGF_DESCRIPTOR_TEXEL_BUFFER: {
         const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
-        const VkFormat vk_format = get_vk_image_format(bind_info->format);
-        ngf_buffer buffer = bind_info->buffer;
+        const VkFormat              vk_format = get_vk_image_format(bind_info->format);
+        ngf_buffer                  buffer    = bind_info->buffer;
         if (!buffer->have_associated_buffer_views) {
           NGFI_DARRAY_RESET(buffer->associated_buffer_views, 1);
           buffer->have_associated_buffer_views = true;
         }
         VkBufferView* view_ptr = NULL;
         NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
-          const VkBufferViewCreateInfo* vk_info = &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_info;
-          if (vk_info->offset == bind_info->offset &&
-              vk_info->range == bind_info->range &&
+          const VkBufferViewCreateInfo* vk_info =
+              &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_info;
+          if (vk_info->offset == bind_info->offset && vk_info->range == bind_info->range &&
               vk_info->format == vk_format) {
             view_ptr = &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle;
             break;
@@ -1638,18 +1649,20 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         }
         if (view_ptr == NULL) {
           ngfvk_buffer_view_info new_buffer_view_info = {
-            .vk_handle = VK_NULL_HANDLE,
-            .vk_info = {
-              .sType = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
-              .flags = 0u,
-              .pNext = NULL,
-              .format = vk_format,
-              .offset = bind_info->offset,
-              .range = bind_info->range,
-              .buffer = (VkBuffer)buffer->alloc.obj_handle
-            }
-          };
-          vkCreateBufferView(_vk.device, &new_buffer_view_info.vk_info, NULL, &new_buffer_view_info.vk_handle);
+              .vk_handle = VK_NULL_HANDLE,
+              .vk_info   = {
+                  .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+                  .flags  = 0u,
+                  .pNext  = NULL,
+                  .format = vk_format,
+                  .offset = bind_info->offset,
+                  .range  = bind_info->range,
+                  .buffer = (VkBuffer)buffer->alloc.obj_handle}};
+          vkCreateBufferView(
+              _vk.device,
+              &new_buffer_view_info.vk_info,
+              NULL,
+              &new_buffer_view_info.vk_handle);
           NGFI_DARRAY_APPEND(buffer->associated_buffer_views, new_buffer_view_info);
           view_ptr = &NGFI_DARRAY_BACKPTR(buffer->associated_buffer_views)->vk_handle;
         }
@@ -1844,8 +1857,7 @@ static uint64_t ngfvk_renderpass_ops_key(
   // For default RT, the load/store ops of the resolve attachments are not
   // specified by the client code explicitly. We always treat them as
   // DONT_CARE / STORE.
-  if (rt->is_default &&
-      nattachments < num_rt_attachments &&
+  if (rt->is_default && nattachments < num_rt_attachments &&
       rt->attachment_compat_pass_descs[nattachments].is_resolve) {
     result = result | ((uint64_t)0x1u << (3u * nattachments));
   }
@@ -1879,7 +1891,10 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
         ngfi_sa_alloc(ngfi_tmp_store(), attachment_pass_descs_size);
     const uint32_t rt_attachment_pass_descs_size =
         rt->nattachments * sizeof(ngfvk_attachment_pass_desc);
-    memcpy(attachment_compat_pass_descs, rt->attachment_compat_pass_descs, rt_attachment_pass_descs_size);
+    memcpy(
+        attachment_compat_pass_descs,
+        rt->attachment_compat_pass_descs,
+        rt_attachment_pass_descs_size);
 
     for (uint32_t i = 0; i < rt->nattachments; ++i) {
       attachment_compat_pass_descs[i].load_op  = NGFVK_ATTACHMENT_LOAD_OP_FROM_KEY(i, ops_key);
@@ -1915,20 +1930,32 @@ static int ngfvk_binding_comparator(const void* a, const void* b) {
   return 1;
 }
 
-static ngf_descriptor_type ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
-  switch(spv_reflect_type) {
-  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER: return NGF_DESCRIPTOR_UNIFORM_BUFFER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE: return NGF_DESCRIPTOR_IMAGE;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER: return NGF_DESCRIPTOR_SAMPLER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER: return NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER: return NGF_DESCRIPTOR_TEXEL_BUFFER;
-  default: return NGF_DESCRIPTOR_TYPE_COUNT;
+static ngf_descriptor_type
+ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
+  switch (spv_reflect_type) {
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+    return NGF_DESCRIPTOR_UNIFORM_BUFFER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+    return NGF_DESCRIPTOR_IMAGE;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+    return NGF_DESCRIPTOR_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+    return NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+    return NGF_DESCRIPTOR_TEXEL_BUFFER;
+  default:
+    return NGF_DESCRIPTOR_TYPE_COUNT;
   }
 }
 
-static VkResult ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* validation_enabled) {
-  vkl_init_loader();  // Initialize the vulkan loader.
+static void ngfvk_init_loader_if_necessary() {
+  if (!vkGetInstanceProcAddr) {
+    vkl_init_loader();  // Initialize the vulkan loader if it wasn't initialized before.
+  }
+}
 
+static VkResult
+ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* validation_enabled) {
   const char* const ext_names[] = {// Names of instance-level extensions.
                                    "VK_KHR_surface",
                                    VK_SURFACE_EXT,
@@ -1959,9 +1986,8 @@ static VkResult ngfvk_create_instance(bool request_validation, VkInstance* insta
   }
 
   // Enable validation only if detailed verbosity is requested.
-  const bool enable_validation =
-      validation_supported && request_validation;
-  *validation_enabled = enable_validation;
+  const bool enable_validation = validation_supported && request_validation;
+  if (validation_enabled) { *validation_enabled = enable_validation; }
 
   // Create a Vulkan instance.
   const VkInstanceCreateInfo inst_info = {
@@ -1988,194 +2014,252 @@ static VkResult ngfvk_create_instance(bool request_validation, VkInstance* insta
 
 ngf_device_capabilities DEVICE_CAPS;
 
+ngf_error ngf_enumerate_devices(const ngf_device** devices, uint32_t* ndevices) {
+  ngfvk_init_loader_if_necessary();
+  if (NGFVK_DEVICE_LIST == NULL) {
+    ngf_error  err          = NGF_ERROR_OK;
+    VkInstance tmp_instance = VK_NULL_HANDLE;
+    VkResult   vk_err       = ngfvk_create_instance(false, &tmp_instance, NULL);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    PFN_vkEnumeratePhysicalDevices enumerate_vk_phys_devs = (PFN_vkEnumeratePhysicalDevices)
+        vkGetInstanceProcAddr(tmp_instance, "vkEnumeratePhysicalDevices");
+    PFN_vkGetPhysicalDeviceProperties get_vk_phys_dev_properties =
+        (PFN_vkGetPhysicalDeviceProperties)
+            vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceProperties");
+    PFN_vkDestroyInstance destroy_vk_instance =
+        (PFN_vkDestroyInstance)vkGetInstanceProcAddr(tmp_instance, "vkDestroyInstance");
+    vk_err = enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, NULL);
+    if (vk_err != VK_SUCCESS || NGFVK_DEVICE_COUNT == 0) {
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_enumerate_devices_cleanup;
+    }
+    NGFVK_DEVICE_LIST    = malloc(sizeof(ngf_device) * NGFVK_DEVICE_COUNT);
+    NGFVK_DEVICE_ID_LIST = malloc(sizeof(ngfvk_device_id) * NGFVK_DEVICE_COUNT);
+    VkPhysicalDevice* phys_devs =
+        ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkPhysicalDevice) * NGFVK_DEVICE_COUNT);
+    if (NGFVK_DEVICE_LIST == NULL || NGFVK_DEVICE_ID_LIST == NULL || phys_devs == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngf_enumerate_devices_cleanup;
+    }
+
+    enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, phys_devs);
+    for (size_t i = 0; i < NGFVK_DEVICE_COUNT; ++i) {
+      VkPhysicalDeviceProperties dev_props;
+      get_vk_phys_dev_properties(phys_devs[i], &dev_props);
+      ngfvk_device_id* ngfdevid = &NGFVK_DEVICE_ID_LIST[i];
+      ngfdevid->device_id       = dev_props.deviceID;
+      ngfdevid->vendor_id       = dev_props.vendorID;
+      ngf_device* ngfdev        = &NGFVK_DEVICE_LIST[i];
+      ngfdev->handle            = (ngf_device_handle)i;
+      switch (dev_props.deviceType) {
+      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+        ngfdev->performance_tier = NGF_DEVICE_PERFORMANCE_TIER_HIGH;
+        break;
+      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+      case VK_PHYSICAL_DEVICE_TYPE_CPU:
+        ngfdev->performance_tier = NGF_DEVICE_PERFORMANCE_TIER_LOW;
+        break;
+      default:
+        ngfdev->performance_tier = NGF_DEVICE_PERFORMANCE_TIER_UNKNOWN;
+      }
+      strncpy(
+          ngfdev->name,
+          dev_props.deviceName,
+          NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, VK_MAX_PHYSICAL_DEVICE_NAME_SIZE));
+      ngf_device_capabilities*      devcaps     = &ngfdev->capabilities;
+      const VkPhysicalDeviceLimits* vkdevlimits = &dev_props.limits;
+      devcaps->clipspace_z_zero_to_one          = true;
+      devcaps->uniform_buffer_offset_alignment  = vkdevlimits->minUniformBufferOffsetAlignment;
+    }
+ngf_enumerate_devices_cleanup:
+    if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
+    if (err != NGF_ERROR_OK) return err;
+  }
+  if (devices) { *devices = NGFVK_DEVICE_LIST; }
+  if (ndevices) { *ndevices = NGFVK_DEVICE_COUNT; }
+  return NGF_ERROR_OK;
+}
+
 ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
+  if (_vk.instance != VK_NULL_HANDLE) {
+    // Disallow double initialization.
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  ngfvk_init_loader_if_necessary();
+
   if (init_info->diag_info != NULL) {
     ngfi_diag_info = *init_info->diag_info;
   } else {
-    ngfi_diag_info.callback = NULL;
-    ngfi_diag_info.userdata = NULL;
+    ngfi_diag_info.callback  = NULL;
+    ngfi_diag_info.userdata  = NULL;
     ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
   }
   ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
 
-  if (_vk.instance == VK_NULL_HANDLE) {  // Vulkan not initialized yet.
-    bool validation_enabled = false;
-    const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
-    ngfvk_create_instance(request_validation, &_vk.instance, &validation_enabled);
-    vkl_init_instance(_vk.instance);  // load instance-level Vulkan functions into the global namespace.
+  bool       validation_enabled = false;
+  const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
+  ngfvk_create_instance(request_validation, &_vk.instance, &validation_enabled);
+  vkl_init_instance(
+      _vk.instance);  // load instance-level Vulkan functions into the global namespace.
 
-    if (validation_enabled) {
-      // Install a debug callback to forward vulkan debug messages to the user.
-      const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
-          .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-          .pNext           = NULL,
-          .flags           = 0u,
-          .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
+  if (validation_enabled) {
+    // Install a debug callback to forward vulkan debug messages to the user.
+    const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
+        .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext           = NULL,
+        .flags           = 0u,
+        .messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT,
 
-          .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-          .pfnUserCallback = ngfvk_debug_message_callback,
-          .pUserData       = NULL};
-      VkDebugUtilsMessengerEXT vk_debug_messenger;
-      vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
-    }
-
-    // Obtain a list of available physical devices.
-    uint32_t         nphysdev = NGFVK_MAX_PHYS_DEV;
-    VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
-    VkResult vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-
-    // Pick a suitable physical device based on user's preference.
-    uint32_t                    best_device_score = 0U;
-    uint32_t                    best_device_index = NGFVK_INVALID_IDX;
-    const ngf_device_preference pref              = init_info->device_pref;
-    for (uint32_t i = 0; i < nphysdev; ++i) {
-      VkPhysicalDeviceProperties dev_props;
-      vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
-      uint32_t score = 0U;
-      switch (dev_props.deviceType) {
-      case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-        score += 100U;
-        if (pref == NGF_DEVICE_PREFERENCE_DISCRETE) { score += 1000U; }
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-        score += 90U;
-        if (pref == NGF_DEVICE_PREFERENCE_INTEGRATED) { score += 1000U; }
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-        score += 80U;
-        break;
-      case VK_PHYSICAL_DEVICE_TYPE_CPU:
-        score += 70U;
-        break;
-      default:
-        score += 10U;
-      }
-      if (score > best_device_score) {
-        best_device_index = i;
-        best_device_score = score;
-      }
-    }
-    if (best_device_index == NGFVK_INVALID_IDX) {
-      NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-    _vk.phys_dev = physdevs[best_device_index];
-    VkPhysicalDeviceProperties phys_dev_properties;
-    vkGetPhysicalDeviceProperties(_vk.phys_dev, &phys_dev_properties);
-
-    // Obtain a list of queue family properties from the device.
-    uint32_t num_queue_families = 0U;
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, NULL);
-    VkQueueFamilyProperties* queue_families =
-        NGFI_ALLOCN(VkQueueFamilyProperties, num_queue_families);
-    assert(queue_families);
-    vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, queue_families);
-
-    // Pick suitable queue families for graphics and present.
-    uint32_t gfx_family_idx     = NGFVK_INVALID_IDX;
-    uint32_t present_family_idx = NGFVK_INVALID_IDX;
-    for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
-      const VkQueueFlags flags      = queue_families[q].queueFlags;
-      const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
-      const VkBool32     is_present = ngfvk_query_presentation_support(_vk.phys_dev, q);
-      if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) { gfx_family_idx = q; }
-      if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
-        present_family_idx = q;
-      }
-    }
-    NGFI_FREEN(queue_families, num_queue_families);
-    queue_families = NULL;
-    if (gfx_family_idx == NGFVK_INVALID_IDX || present_family_idx == NGFVK_INVALID_IDX) {
-      NGFI_DIAG_ERROR("Could not find a suitable queue family.");
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-    _vk.gfx_family_idx     = gfx_family_idx;
-    _vk.present_family_idx = present_family_idx;
-
-    // Create logical device.
-    const float                   queue_prio     = 1.0f;
-    const VkDeviceQueueCreateInfo gfx_queue_info = {
-        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .pNext            = NULL,
-        .flags            = 0,
-        .queueFamilyIndex = _vk.gfx_family_idx,
-        .queueCount       = 1,
-        .pQueuePriorities = &queue_prio};
-    const VkDeviceQueueCreateInfo present_queue_info = {
-        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .pNext            = NULL,
-        .flags            = 0,
-        .queueFamilyIndex = _vk.present_family_idx,
-        .queueCount       = 1,
-        .pQueuePriorities = &queue_prio};
-    const bool same_gfx_and_present               = _vk.gfx_family_idx == _vk.present_family_idx;
-    const VkDeviceQueueCreateInfo queue_infos[]   = {gfx_queue_info, present_queue_info};
-    const uint32_t                num_queue_infos = 1u + (same_gfx_and_present ? 0u : 1u);
-    const char*                   device_exts[]   = {
-        "VK_KHR_maintenance1",
-        "VK_KHR_swapchain",
-        "VK_KHR_shader_float16_int8"};
-    const VkPhysicalDeviceFeatures required_features = {.samplerAnisotropy = VK_TRUE};
-
-    VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
-        .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
-        .pNext         = NULL,
-        .shaderFloat16 = false,
-        .shaderInt8    = false};
-
-    if (vkGetPhysicalDeviceFeatures2KHR) {
-      VkPhysicalDeviceFeatures2KHR phys_features = {
-          .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-          .pNext = &sf16_features};
-      vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
-    }
-
-    const VkDeviceCreateInfo dev_info = {
-        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   = &sf16_features,
-        .flags                   = 0,
-        .queueCreateInfoCount    = num_queue_infos,
-        .pQueueCreateInfos       = queue_infos,
-        .enabledLayerCount       = 0,
-        .ppEnabledLayerNames     = NULL,
-        .pEnabledFeatures        = &required_features,
-        .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
-        .ppEnabledExtensionNames = device_exts};
-    vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
-    if (vk_err != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-
-    // Load device-level entry points.
-    vkl_init_device(_vk.device);
-
-    // Obtain queue handles.
-    vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
-    vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
-
-    // Initialize pending image barrier queue.
-    NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
-    pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
-
-    // Populate device capabilities.
-    DEVICE_CAPS.clipspace_z_zero_to_one = true;
-    DEVICE_CAPS.uniform_buffer_offset_alignment =
-        phys_dev_properties.limits.minUniformBufferOffsetAlignment;
-
-    // Done!
+        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .pfnUserCallback = ngfvk_debug_message_callback,
+        .pUserData       = NULL};
+    VkDebugUtilsMessengerEXT vk_debug_messenger;
+    vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
   }
+
+  // Obtain a list of available physical devices.
+  uint32_t         nphysdev = NGFVK_MAX_PHYS_DEV;
+  VkPhysicalDevice physdevs[NGFVK_MAX_PHYS_DEV];
+  VkResult         vk_err = vkEnumeratePhysicalDevices(_vk.instance, &nphysdev, physdevs);
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR("Failed to enumerate Vulkan physical devices, VK error %d.", vk_err);
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  const uint32_t device_idx = (uint32_t)init_info->device;
+  if (device_idx >= NGFVK_DEVICE_COUNT) {
+    // sanity-check the device handle.
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  // Pick a suitable physical device based on user's preference.
+  uint32_t               vk_device_index = NGFVK_INVALID_IDX;
+  const ngfvk_device_id* ngfdevid        = &NGFVK_DEVICE_ID_LIST[device_idx];
+
+  for (uint32_t i = 0; i < nphysdev; ++i) {
+    VkPhysicalDeviceProperties dev_props;
+    vkGetPhysicalDeviceProperties(physdevs[i], &dev_props);
+    if (dev_props.deviceID == ngfdevid->device_id && dev_props.vendorID == ngfdevid->vendor_id) {
+      vk_device_index = i;
+    }
+  }
+  if (vk_device_index == NGFVK_INVALID_IDX) {
+    NGFI_DIAG_ERROR("Failed to find a suitable physical device.");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  _vk.phys_dev = physdevs[vk_device_index];
+  VkPhysicalDeviceProperties phys_dev_properties;
+  vkGetPhysicalDeviceProperties(_vk.phys_dev, &phys_dev_properties);
+
+  // Obtain a list of queue family properties from the device.
+  uint32_t num_queue_families = 0U;
+  vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, NULL);
+  VkQueueFamilyProperties* queue_families =
+      NGFI_ALLOCN(VkQueueFamilyProperties, num_queue_families);
+  assert(queue_families);
+  vkGetPhysicalDeviceQueueFamilyProperties(_vk.phys_dev, &num_queue_families, queue_families);
+
+  // Pick suitable queue families for graphics and present.
+  uint32_t gfx_family_idx     = NGFVK_INVALID_IDX;
+  uint32_t present_family_idx = NGFVK_INVALID_IDX;
+  for (uint32_t q = 0; queue_families && q < num_queue_families; ++q) {
+    const VkQueueFlags flags      = queue_families[q].queueFlags;
+    const VkBool32     is_gfx     = (flags & VK_QUEUE_GRAPHICS_BIT) != 0;
+    const VkBool32     is_present = ngfvk_query_presentation_support(_vk.phys_dev, q);
+    if (gfx_family_idx == NGFVK_INVALID_IDX && is_gfx) { gfx_family_idx = q; }
+    if (present_family_idx == NGFVK_INVALID_IDX && is_present == VK_TRUE) {
+      present_family_idx = q;
+    }
+  }
+  NGFI_FREEN(queue_families, num_queue_families);
+  queue_families = NULL;
+  if (gfx_family_idx == NGFVK_INVALID_IDX || present_family_idx == NGFVK_INVALID_IDX) {
+    NGFI_DIAG_ERROR("Could not find a suitable queue family.");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  _vk.gfx_family_idx     = gfx_family_idx;
+  _vk.present_family_idx = present_family_idx;
+
+  // Create logical device.
+  const float                   queue_prio     = 1.0f;
+  const VkDeviceQueueCreateInfo gfx_queue_info = {
+      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
+      .queueFamilyIndex = _vk.gfx_family_idx,
+      .queueCount       = 1,
+      .pQueuePriorities = &queue_prio};
+  const VkDeviceQueueCreateInfo present_queue_info = {
+      .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+      .pNext            = NULL,
+      .flags            = 0,
+      .queueFamilyIndex = _vk.present_family_idx,
+      .queueCount       = 1,
+      .pQueuePriorities = &queue_prio};
+  const bool                    same_gfx_and_present = _vk.gfx_family_idx == _vk.present_family_idx;
+  const VkDeviceQueueCreateInfo queue_infos[]        = {gfx_queue_info, present_queue_info};
+  const uint32_t                num_queue_infos      = 1u + (same_gfx_and_present ? 0u : 1u);
+  const char*                   device_exts[]        = {
+      "VK_KHR_maintenance1",
+      "VK_KHR_swapchain",
+      "VK_KHR_shader_float16_int8"};
+  const VkPhysicalDeviceFeatures required_features = {.samplerAnisotropy = VK_TRUE};
+
+  VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
+      .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
+      .pNext         = NULL,
+      .shaderFloat16 = false,
+      .shaderInt8    = false};
+
+  if (vkGetPhysicalDeviceFeatures2KHR) {
+    VkPhysicalDeviceFeatures2KHR phys_features = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+        .pNext = &sf16_features};
+    vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
+  }
+
+  const VkDeviceCreateInfo dev_info = {
+      .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext                   = &sf16_features,
+      .flags                   = 0,
+      .queueCreateInfoCount    = num_queue_infos,
+      .pQueueCreateInfos       = queue_infos,
+      .enabledLayerCount       = 0,
+      .ppEnabledLayerNames     = NULL,
+      .pEnabledFeatures        = &required_features,
+      .enabledExtensionCount   = sizeof(device_exts) / sizeof(const char*),
+      .ppEnabledExtensionNames = device_exts};
+  vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  // Load device-level entry points.
+  vkl_init_device(_vk.device);
+
+  // Obtain queue handles.
+  vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
+  vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
+
+  // Initialize pending image barrier queue.
+  NGFI_DARRAY_RESET(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, 10u);
+  pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
+
+  // Populate device capabilities.
+  DEVICE_CAPS.clipspace_z_zero_to_one = true;
+  DEVICE_CAPS.uniform_buffer_offset_alignment =
+      phys_dev_properties.limits.minUniformBufferOffsetAlignment;
+
+  // Done!
 
   return NGF_ERROR_OK;
 }
@@ -2433,9 +2517,7 @@ ngf_create_context_cleanup:
 
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
   assert(ctx);
-  if (ctx == NULL || ctx->default_render_target == NULL) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  if (ctx == NULL || ctx->default_render_target == NULL) { return NGF_ERROR_INVALID_OPERATION; }
 
   ngf_error err = NGF_ERROR_OK;
   ngfvk_destroy_swapchain(&ctx->swapchain);
@@ -2532,12 +2614,12 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
 ngf_error ngf_cmd_begin_render_pass_simple(
     ngf_cmd_buffer      cmd_buf,
     ngf_render_target   rt,
-    float             clear_color_r,
-    float             clear_color_g,
-    float             clear_color_b,
-    float             clear_color_a,
-    float             clear_depth,
-    uint32_t          clear_stencil,
+    float               clear_color_r,
+    float               clear_color_g,
+    float               clear_color_b,
+    float               clear_color_a,
+    float               clear_depth,
+    uint32_t            clear_stencil,
     ngf_render_encoder* enc) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_attachment_load_op* load_ops =
@@ -2545,7 +2627,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
   ngf_attachment_store_op* store_ops =
       ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_store_op) * rt->nattachments);
   ngf_clear* clears = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_clear) * rt->nattachments);
-  
+
   for (size_t i = 0u; i < rt->nattachments; ++i) {
     load_ops[i] = NGF_LOAD_OP_CLEAR;
     if (rt->attachment_descs[i].type == NGF_ATTACHMENT_COLOR) {
@@ -2554,20 +2636,16 @@ ngf_error ngf_cmd_begin_render_pass_simple(
       clears[i].clear_color[2] = clear_color_b;
       clears[i].clear_color[3] = clear_color_a;
     } else if (rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH) {
-      clears[i].clear_depth_stencil.clear_depth = clear_depth;
+      clears[i].clear_depth_stencil.clear_depth   = clear_depth;
       clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
     } else {
       assert(false);
     }
     const bool is_multisampled = (rt->attachment_descs[i].sample_count > 1u);
-    store_ops[i] = is_multisampled ? NGF_STORE_OP_DONTCARE : NGF_STORE_OP_STORE;
+    store_ops[i]               = is_multisampled ? NGF_STORE_OP_DONTCARE : NGF_STORE_OP_STORE;
   }
-  const ngf_pass_info pass_info = {
-    .render_target = rt,
-    .load_ops = load_ops,
-    .store_ops = store_ops,
-    .clears = clears
-  };
+  const ngf_pass_info pass_info =
+      {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
   return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
 }
 
@@ -3172,12 +3250,17 @@ ngf_error ngf_create_graphics_pipeline(
         sizeof(SpvReflectDescriptorBinding) * binding_count);
     bindings_offset += binding_count;
   }
-  qsort(bindings.data, ntotal_bindings, sizeof(SpvReflectDescriptorBinding), ngfvk_binding_comparator);
+  qsort(
+      bindings.data,
+      ntotal_bindings,
+      sizeof(SpvReflectDescriptorBinding),
+      ngfvk_binding_comparator);
   uint32_t nunique_bindings = 0u;
   for (uint32_t cur = 0u; cur < NGFI_DARRAY_SIZE(bindings); ++cur) {
     if (nunique_bindings == 0 ||
         (NGFI_DARRAY_AT(bindings, nunique_bindings - 1).set != NGFI_DARRAY_AT(bindings, cur).set ||
-         NGFI_DARRAY_AT(bindings, nunique_bindings - 1).binding != NGFI_DARRAY_AT(bindings, cur).binding)) {
+         NGFI_DARRAY_AT(bindings, nunique_bindings - 1).binding !=
+             NGFI_DARRAY_AT(bindings, cur).binding)) {
       NGFI_DARRAY_AT(bindings, nunique_bindings++) = NGFI_DARRAY_AT(bindings, cur);
     }
   }
@@ -3204,26 +3287,25 @@ ngf_error ngf_create_graphics_pipeline(
     }
     memset(&set_layout, 0, sizeof(set_layout));
     const uint32_t first_binding_in_set = cur;
-    while (cur < nunique_bindings &&
-           current_set_id == NGFI_DARRAY_AT(bindings, cur).set) cur++;
-    const uint32_t nbindings_in_set = cur - first_binding_in_set;
+    while (cur < nunique_bindings && current_set_id == NGFI_DARRAY_AT(bindings, cur).set) cur++;
+    const uint32_t                nbindings_in_set = cur - first_binding_in_set;
     VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
         NGFI_ALLOCN(  // TODO: use temp storage here
             VkDescriptorSetLayoutBinding,
             nbindings_in_set);
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
-      VkDescriptorSetLayoutBinding* vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
-      const SpvReflectDescriptorBinding* d = &NGFI_DARRAY_AT(bindings, i);
+      VkDescriptorSetLayoutBinding*      vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
+      const SpvReflectDescriptorBinding* d    = &NGFI_DARRAY_AT(bindings, i);
       const ngf_descriptor_type ngf_desc_type = ngfvk_get_ngf_descriptor_type(d->descriptor_type);
       if (ngf_desc_type == NGF_DESCRIPTOR_TYPE_COUNT) {
         err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngf_create_graphics_pipeline_cleanup;
       }
-      vk_d->binding                      = d->binding;
-      vk_d->descriptorCount              = d->count;
-      vk_d->descriptorType               = get_vk_descriptor_type(ngf_desc_type);
-      vk_d->stageFlags                   = VK_SHADER_STAGE_ALL;
-      vk_d->pImmutableSamplers           = NULL;
+      vk_d->binding            = d->binding;
+      vk_d->descriptorCount    = d->count;
+      vk_d->descriptorType     = get_vk_descriptor_type(ngf_desc_type);
+      vk_d->stageFlags         = VK_SHADER_STAGE_ALL;
+      vk_d->pImmutableSamplers = NULL;
       set_layout.counts[ngf_desc_type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
@@ -3384,9 +3466,9 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
   ngf_render_target rt = NGFI_ALLOC(ngf_render_target_t);
   if (rt == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   memset(rt, 0, sizeof(ngf_render_target_t));
-  *result       = rt;
-  ngf_error err = NGF_ERROR_OK;
-  VkResult vk_err = VK_SUCCESS;
+  *result          = rt;
+  ngf_error err    = NGF_ERROR_OK;
+  VkResult  vk_err = VK_SUCCESS;
 
   ngfvk_attachment_pass_desc* vk_attachment_pass_descs =
       NGFI_ALLOCN(ngfvk_attachment_pass_desc, info->attachment_descriptions->ndescs);
@@ -3401,7 +3483,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     const ngf_attachment_description* ngf_attachment_desc =
         &info->attachment_descriptions->descs[a];
     ngfvk_attachment_pass_desc* attachment_pass_desc = &vk_attachment_pass_descs[a];
-    const ngf_attachment_type attachment_type =  ngf_attachment_desc->type;
+    const ngf_attachment_type   attachment_type      = ngf_attachment_desc->type;
     switch (attachment_type) {
     case NGF_ATTACHMENT_COLOR:
       ++ncolor_attachments;
@@ -3416,7 +3498,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     }
 
     const ngf_image_ref* attachment_img_ref = &info->attachment_image_refs[a];
-    const ngf_image attachment_img   = attachment_img_ref->image;
+    const ngf_image      attachment_img     = attachment_img_ref->image;
     const bool is_attachment_sampled = attachment_img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM;
     attachment_pass_desc->is_resolve = false;
     attachment_pass_desc->initial_layout = is_attachment_sampled
@@ -3426,29 +3508,30 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                : attachment_pass_desc->layout;
     const VkImageAspectFlags subresource_aspect_flags =
-      (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0) |
-      (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
-      (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : 0);
+        (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0) |
+        (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+        (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL
+             ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+             : 0);
     const VkImageViewCreateInfo image_view_create_info = {
-      .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-      .pNext = NULL,
-      .flags = 0u,
-      .image = (VkImage)attachment_img->alloc.obj_handle,
-      .components = {
-        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-      },
-      .format = attachment_img->vkformat,
-      .subresourceRange = {
-        .baseArrayLayer = attachment_img_ref->layer,
-        .baseMipLevel = attachment_img_ref->mip_level,
-        .layerCount = 1u,
-        .levelCount = 1u,
-        .aspectMask = subresource_aspect_flags
-      }
-    };
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+        .image = (VkImage)attachment_img->alloc.obj_handle,
+        .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+        .format           = attachment_img->vkformat,
+        .subresourceRange = {
+            .baseArrayLayer = attachment_img_ref->layer,
+            .baseMipLevel   = attachment_img_ref->mip_level,
+            .layerCount     = 1u,
+            .levelCount     = 1u,
+            .aspectMask     = subresource_aspect_flags}};
     vk_err = vkCreateImageView(_vk.device, &image_view_create_info, NULL, &attachment_views[a]);
     if (vk_err != VK_SUCCESS) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -3475,10 +3558,10 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     goto ngf_create_render_target_cleanup;
   }
 
-  rt->width                 = info->attachment_image_refs[0].image->extent.width;
-  rt->height                = info->attachment_image_refs[0].image->extent.height;
-  rt->nattachments          = info->attachment_descriptions->ndescs;
-  rt->attachment_descs      = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
+  rt->width                        = info->attachment_image_refs[0].image->extent.width;
+  rt->height                       = info->attachment_image_refs[0].image->extent.height;
+  rt->nattachments                 = info->attachment_descriptions->ndescs;
+  rt->attachment_descs             = NGFI_ALLOCN(ngf_attachment_description, rt->nattachments);
   rt->attachment_compat_pass_descs = vk_attachment_pass_descs;
 
   memcpy(
@@ -3623,10 +3706,10 @@ void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) {
 }
 
 void ngf_cmd_bind_attrib_buffer(
-    ngf_render_encoder      enc,
-    const ngf_buffer abuf,
-    uint32_t                binding,
-    uint32_t                offset) {
+    ngf_render_encoder enc,
+    const ngf_buffer   abuf,
+    uint32_t           binding,
+    uint32_t           offset) {
   ngf_cmd_buffer buf      = NGFVK_ENC2CMDBUF(enc);
   VkDeviceSize   vkoffset = offset;
   vkCmdBindVertexBuffers(
@@ -3637,18 +3720,11 @@ void ngf_cmd_bind_attrib_buffer(
       &vkoffset);
 }
 
-void ngf_cmd_bind_index_buffer(
-    ngf_render_encoder     enc,
-    const ngf_buffer ibuf,
-    ngf_type               index_type) {
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer ibuf, ngf_type index_type) {
   ngf_cmd_buffer    buf      = NGFVK_ENC2CMDBUF(enc);
   const VkIndexType idx_type = get_vk_index_type(index_type);
   assert(idx_type == VK_INDEX_TYPE_UINT16 || idx_type == VK_INDEX_TYPE_UINT32);
-  vkCmdBindIndexBuffer(
-      buf->active_bundle.vkcmdbuf,
-      (VkBuffer)ibuf->alloc.obj_handle,
-      0u,
-      idx_type);
+  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->alloc.obj_handle, 0u, idx_type);
 }
 
 void ngf_cmd_copy_buffer(
@@ -3769,13 +3845,14 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   // TODO: ensure the pixel format is valid for mip generation.
   // TODO: handle layers as well
 
-  uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth, dst_w = 0, dst_h = 0, dst_d = 0;
+  uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth,
+           dst_w = 0, dst_h = 0, dst_d = 0;
 
   for (uint32_t src_level = 0u; src_level < img->nlevels - 1; ++src_level) {
-    const uint32_t             dst_level           = src_level + 1u;
-    dst_w = src_w > 1u ? (src_w >> 1u) : 1u;
-    dst_h = src_h > 1u ? (src_h >> 1u) : 1u;
-    dst_d = src_d > 1u ? (src_d >> 1u) : 1u;
+    const uint32_t dst_level                       = src_level + 1u;
+    dst_w                                          = src_w > 1u ? (src_w >> 1u) : 1u;
+    dst_h                                          = src_h > 1u ? (src_h >> 1u) : 1u;
+    dst_d                                          = src_d > 1u ? (src_d >> 1u) : 1u;
     const VkImageMemoryBarrier pre_blit_barriers[] = {
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
@@ -3945,8 +4022,8 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
     buf->size = info->size;
   }
 
-  buf->storage_type   = info->storage_type;
-  buf->ngf_usage_mask = info->buffer_usage;
+  buf->storage_type                 = info->storage_type;
+  buf->ngf_usage_mask               = info->buffer_usage;
   buf->have_associated_buffer_views = false;
 
   return err;
@@ -3958,8 +4035,9 @@ void ngf_destroy_buffer(ngf_buffer buffer) {
     NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buffer->alloc);
     if (buffer->have_associated_buffer_views) {
       NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
-        NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffer_views,
-                           NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle);
+        NGFI_DARRAY_APPEND(
+            CURRENT_CONTEXT->frame_res[fi].retire_buffer_views,
+            NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle);
       }
     }
     NGFI_FREE(buffer);

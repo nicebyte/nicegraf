@@ -252,7 +252,7 @@ typedef struct ngf_device {
   /**
    * A string associated with the device. This is _not_ guaranteed to be unique.
    */
-  const char name[NGF_DEVICE_NAME_MAX_LENGTH];
+  char name[NGF_DEVICE_NAME_MAX_LENGTH];
 
   ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
 } ngf_device;
@@ -262,9 +262,6 @@ typedef struct ngf_device {
  * nicegraf initialization parameters.
  */
 typedef struct ngf_init_info {
-  ngf_device_preference device_pref; /**< Which type of device to prefer.
-                                          May be ignored, depending on the backend.
-                                      */
   /** 
    * Pointer to a structure containing a diagnostic log configuration.
    * If this pointer is set to `NULL`, no diagnostic callback shall be invoked.
@@ -277,6 +274,12 @@ typedef struct ngf_init_info {
    * If this pointer is set to `NULL`, standard malloc and free are used.
    */
   const ngf_allocation_callbacks* allocation_callbacks;
+
+  /**
+   * Handle for the rendering device that nicegraf shall execute rendering commands on.
+   * A list of available device and their handles can be obtained with \ref ngf_enumerate_devices.
+   */
+  ngf_device_handle device;
 } ngf_init_info;
 
 /**
