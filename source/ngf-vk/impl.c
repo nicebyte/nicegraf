@@ -3508,8 +3508,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
                                                ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                                : attachment_pass_desc->layout;
     const VkImageAspectFlags subresource_aspect_flags =
-        (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0) |
-        (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0) |
+        (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0u) |
+        (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
         (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL
              ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
              : 0);
