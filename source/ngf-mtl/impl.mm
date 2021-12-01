@@ -31,6 +31,7 @@
 #include <new>
 #include <optional>
 #include <string>
+#include <vector>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 #if TARGET_OS_OSX
@@ -691,12 +692,24 @@ struct ngf_context_t {
   ngf_render_target default_rt;
 };
 
+void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevice> mtldev) {
+    ngfdev.handle = handle;
+    ngfdev.performance_tier = mtldev.lowPower ? NGF_DEVICE_PERFORMANCE_TIER_LOW : NGF_DEVICE_PERFORMANCE_TIER_HIGH;
+    const size_t device_name_length = [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
+    strncpy(ngfdev.name, [mtldev.name UTF8String], NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, device_name_length));
+    ngf_device_capabilities& caps = ngfdev.capabilities;
+    caps.clipspace_z_zero_to_one = true;
+    caps.uniform_buffer_offset_alignment = 256; // TODO: set proper limits for metal using device feature tables as reference.
+}
+
 extern "C" {
 void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 }
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
+std::vector<ngf_device> NGFMTL_DEVICES_LIST;
+const NSArray<id<MTLDevice>>* NGFMTL_MTL_DEVICES;
 
 #define NGFMTL_NURSERY(type, name, ...) \
 ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> \
@@ -704,7 +717,33 @@ name(NGFI_ALLOC(ngf_##type##_t), ##__VA_ARGS__);
 
 #pragma mark ngf_function_implementations
 
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
+  if (NGFMTL_DEVICES_LIST.empty()) {
+#if TARGET_OS_OSX
+    NGFMTL_MTL_DEVICES = MTLCopyAllDevices();
+    NGFMTL_DEVICES_LIST.resize(NGFMTL_MTL_DEVICES.count);
+    for (uint32_t d = 0u; d < NGFMTL_MTL_DEVICES.count; ++d) {
+      ngfmtl_populate_ngf_device(d, NGFMTL_DEVICES_LIST[d], NGFMTL_MTL_DEVICES[d]);
+    }
+#else
+    NGFMTL_MTL_DEVICES = [[NSArray alloc] initWithObjects:MTLCreateSystemDefaultDevice(),nil];
+    NGFMTL_DEVICES_LIST.resize(1);
+    ngfmtl_populate_ngf_device(0, NGFMTL_DEVICES_LIST[0], NGFMTL_MTL_DEVICES[0]);
+#endif
+  }
+  if (devices) {
+    *devices = NGFMTL_DEVICES_LIST.data();
+  }
+  if (ndevices) {
+    *ndevices = (uint32_t)NGFMTL_DEVICES_LIST.size();
+  }
+  return NGF_ERROR_OK;
+}
+
 ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
+  if (MTL_DEVICE != nil || init_info->device >= NGFMTL_DEVICES_LIST.size()) {
+    return NGF_ERROR_INVALID_OPERATION;
+  }
   if (init_info->diag_info != NULL) {
     ngfi_diag_info = *init_info->diag_info;
   } else {
@@ -713,39 +752,11 @@ ngf_error ngf_initialize(const ngf_init_info *init_info) NGF_NOEXCEPT {
     ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
   }
   ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
-
-#if TARGET_OS_OSX
-  // Try setting environment variable to enable Metal API validation if
-  // necessary.
-  if (ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED) {
-    if (setenv("METAL_DEVICE_WRAPPER_TYPE", "1", 1)) {
-      NGFI_DIAG_WARNING("Could not enable detailed diagnostic log");
-    }
-  }
   
-  // On macOS, try picking a device in accordance with user's preferences.
-  id<NSObject> dev_observer = nil;
-  const NSArray<id<MTLDevice>> *devices =
-      MTLCopyAllDevicesWithObserver(&dev_observer,
-                                    ^(id<MTLDevice> d,
-                                      MTLDeviceNotificationName n){});
-  bool found_preferred_device = false;
-  const ngf_device_preference dev_pref = init_info->device_pref;
-  for (uint32_t d = 0u; !found_preferred_device && d < devices.count; ++d) {
-    MTL_DEVICE = devices[d];
-    // If the user prefers discrete GPU, do not pick a low-power device.
-    // Otherwise, anything will do.
-    found_preferred_device = (dev_pref != NGF_DEVICE_PREFERENCE_DISCRETE) ||
-                             !MTL_DEVICE.lowPower;
-  }
-#else
-  // On other targets, simply pick the default device.
-  MTL_DEVICE = MTLCreateSystemDefaultDevice();
-#endif
-
+  MTL_DEVICE = NGFMTL_MTL_DEVICES[init_info->device];
+  
   // Initialize device capabilities.
-  DEVICE_CAPS.clipspace_z_zero_to_one = true;
-  DEVICE_CAPS.uniform_buffer_offset_alignment = 256;
+  DEVICE_CAPS = NGFMTL_DEVICES_LIST[init_info->device].capabilities;
   
   return (MTL_DEVICE != nil) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
