@@ -266,10 +266,10 @@ void sample_draw_frame(
 
   /* Build the final transform matrices for this frame. */
   texture_sampling::matrices uniforms_for_this_frame;
-  for (int i = 0; i < sizeof(uniforms_for_this_frame.m) / sizeof(uniforms_for_this_frame.m[0]);
+  for (size_t i = 0; i < sizeof(uniforms_for_this_frame.m) / sizeof(uniforms_for_this_frame.m[0]);
        ++i) {
     const nm::float4x4 object_to_world =
-        nm::translation(nm::float3 {-3.0f + i * 2.05f, 0.0f, 0.0f});
+        nm::translation(nm::float3 {-3.0f + (float)i * 2.05f, 0.0f, 0.0f});
     uniforms_for_this_frame.m[i].matrix = camera_to_clip * world_to_camera * object_to_world;
   }
   state->uniforms.write(uniforms_for_this_frame);
