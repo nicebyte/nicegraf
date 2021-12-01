@@ -66,6 +66,36 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   constexpr ngf_diagnostic_log_verbosity diagnostics_verbosity = NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
 #endif
 
+  /**
+   * Select a rendering device to be used by nicegraf.
+   */
+  uint32_t ndevices = 0u;
+  const ngf_device* devices = NULL;
+  NGF_SAMPLES_CHECK_NGF_ERROR(ngf_get_device_list(&devices, &ndevices));
+  const char* device_perf_tier_names[NGF_DEVICE_PERFORMANCE_TIER_COUNT] = {"high", "low", "unknown"};
+  /**
+   * For the sample code, we try to select a high-perf tier device. If one isn't available, we just fall back
+   * on the first device in the list.
+   * You may want to choose a different strategy for your specific application, or allow the user to pick.
+   */
+  size_t high_power_device_idx = (~0u);
+  ngf_samples::logi("available rendering devices: ");
+  for (uint32_t i = 0; i < ndevices; ++i) {
+    /** 
+     * If no preferred index has been selected yet, and the current device is high-power, pick it as preferred.
+     * otherwise, just log the device details.
+     */
+    ngf_samples::logi(" device %d : %s (perf tier : `%s`)", i, devices[i].name, device_perf_tier_names[devices[i].performance_tier]);
+    if (high_power_device_idx == (~0u) &&
+        devices[i].performance_tier == NGF_DEVICE_PERFORMANCE_TIER_HIGH) {
+      high_power_device_idx = i;
+    }
+  }
+  /* Fall back to 1st device if no high-power device was found. */
+  const size_t preferred_device_idx = (high_power_device_idx == ~0) ? 0 : high_power_device_idx;
+  const ngf_device_handle device_handle = devices[preferred_device_idx].handle;
+  ngf_samples::logi("selected device %d", preferred_device_idx);
+
   /*
    * Begin by initializing nicegraf.
    * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
@@ -77,8 +107,9 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     .callback  = ngf_samples::sample_diagnostic_callback
   };
   const ngf_init_info init_info {
-      .device_pref = NGF_DEVICE_PREFERENCE_DISCRETE,
-      .diag_info   = &diagnostic_info};
+      .diag_info   = &diagnostic_info,
+      .allocation_callbacks = NULL,
+      .device = device_handle};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
