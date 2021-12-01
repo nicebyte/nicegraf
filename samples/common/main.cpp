@@ -92,7 +92,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     }
   }
   /* Fall back to 1st device if no high-power device was found. */
-  const size_t preferred_device_idx = (high_power_device_idx == ~0) ? 0 : high_power_device_idx;
+  const size_t preferred_device_idx = (high_power_device_idx == ~0u) ? 0 : high_power_device_idx;
   const ngf_device_handle device_handle = devices[preferred_device_idx].handle;
   ngf_samples::logi("selected device %d", preferred_device_idx);
 
