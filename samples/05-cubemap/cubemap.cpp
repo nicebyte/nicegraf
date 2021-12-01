@@ -47,7 +47,7 @@ struct state {
   ngf::graphics_pipeline             pipeline;
   ngf::image                         texture;
   ngf::sampler                       sampler;
-  ngf::uniform_multibuffer<uniforms> uniforms;
+  ngf::uniform_multibuffer<uniforms> uniforms_multibuf;
   float                              yaw   = 0.0f;
   float                              pitch = 0.0f;
 };
@@ -189,7 +189,7 @@ void* sample_initialize(
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms.initialize(3));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   return static_cast<void*>(state);
 }
@@ -208,11 +208,11 @@ void sample_draw_frame(
   ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
-  state->uniforms.write(
+  state->uniforms_multibuf.write(
       {nm::rotation_y(state->yaw) * nm::rotation_x(state->pitch), (float)w / (float)h});
   ngf::cmd_bind_resources(
       main_render_pass,
-      state->uniforms.bind_op_at_current_offset(0, 0),
+      state->uniforms_multibuf.bind_op_at_current_offset(0, 0),
       ngf::descriptor_set<0>::binding<1>::texture(state->texture.get()),
       ngf::descriptor_set<0>::binding<2>::sampler(state->sampler.get()));
   ngf_cmd_draw(main_render_pass, false, 0u, 3u, 1u);
