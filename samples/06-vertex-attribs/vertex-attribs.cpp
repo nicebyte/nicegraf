@@ -47,7 +47,7 @@ struct state {
   ngf::graphics_pipeline             pipeline;
   ngf::image                         object_texture;
   ngf::sampler                       trilinear_sampler;
-  ngf::uniform_multibuffer<uniforms> uniforms;
+  ngf::uniform_multibuffer<uniforms> uniforms_multibuf;
   ngf::buffer                        per_instance_data;
   ngf::buffer                        vertex_attrib_buffer;
   ngf::buffer                        index_buffer;
@@ -310,7 +310,7 @@ void* sample_initialize(
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms.initialize(3));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   /* Load contents of the model's texture into a staging buffer. */
   char              file_name[] = "assets/dodecahedron.tga";
@@ -403,7 +403,7 @@ void sample_draw_frame(
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf_cmd_bind_attrib_buffer(main_render_pass, state->vertex_attrib_buffer, 0, 0);
   ngf_cmd_bind_index_buffer(main_render_pass, state->index_buffer, NGF_TYPE_UINT32);
-  state->uniforms.write(
+  state->uniforms_multibuf.write(
       {nm::perspective(
            nm::deg2rad(state->vfov),
            static_cast<float>(w) / static_cast<float>(h),
@@ -416,7 +416,7 @@ void sample_draw_frame(
        t});
   ngf::cmd_bind_resources(
       main_render_pass,
-      state->uniforms.bind_op_at_current_offset(0, 0),
+      state->uniforms_multibuf.bind_op_at_current_offset(0, 0),
       ngf::descriptor_set<0>::binding<1>::texel_buffer(
           state->per_instance_data,
           0,
