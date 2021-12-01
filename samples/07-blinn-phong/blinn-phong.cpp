@@ -63,7 +63,7 @@ struct state {
   mesh                               bunny_mesh;
   light_data                         lights;
   material_data                      material;
-  ngf::uniform_multibuffer<uniforms> uniforms;
+  ngf::uniform_multibuffer<uniforms> uniforms_multibuf;
   camera_state                       camera;
   float                              dolly = 3.0f;
   float                              vfov  = 60.0f;
@@ -172,7 +172,7 @@ void* sample_initialize(
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms.initialize(3));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   /**
    * Set up some initial viewing parameters.
@@ -208,10 +208,10 @@ void sample_draw_frame(
     uniforms.cam_matrices.world_to_view_transform * uniforms.lights.obj_space_point_light_position;
   uniforms.lights.obj_space_directional_light_direction =
     uniforms.cam_matrices.world_to_view_transform * uniforms.lights.obj_space_directional_light_direction;
-  state->uniforms.write(uniforms);
+  state->uniforms_multibuf.write(uniforms);
   ngf::cmd_bind_resources(
       main_render_pass,
-      state->uniforms.bind_op_at_current_offset(0, 0));
+      state->uniforms_multibuf.bind_op_at_current_offset(0, 0));
   ngf_cmd_draw(
       main_render_pass,
       true,
