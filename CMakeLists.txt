@@ -33,13 +33,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WIN32)
     set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
-    set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror")
+	set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror")
 endif()
 
 # This function adds a new target and sets some configuration
 # common across all targets.
 function (ngf_target)
-  cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES" ${ARGN})
+	cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES;PUB_DEFINES;PVT_DEFINES" ${ARGN})
   if (TGT_TYPE STREQUAL "lib")
     add_library(${TGT_NAME} STATIC ${TGT_SRCS})
   elseif(TGT_TYPE STREQUAL "exe")
@@ -54,6 +54,7 @@ function (ngf_target)
                              PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES}
                              PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${TGT_PVT_INCLUDES})
   target_compile_options(${TGT_NAME} PRIVATE ${NICEGRAF_COMMON_COMPILE_OPTS})
+  target_compile_definitions(${TGT_NAME} PUBLIC ${TCT_PUB_DEFINES} PRIVATE ${TGT_PVT_DEFINES})
   if ( TGT_COPTS )
     target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
   endif()
@@ -174,6 +175,9 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
+    elseif(UNIX AND NOT APPLE)
+        set(NICEGRAF_SHADERC_PLATFORM linux)
+	set(NGF_SAMPLES_BACKEND nicegraf-vk)
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
@@ -217,6 +221,9 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_custom_target(sample-shaders DEPENDS ${generated_shaders_list})
     set_target_properties(sample-shaders PROPERTIES FOLDER "samples")
 
+    string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
+    string(REPLACE "-" "_" NGF_SAMPLES_BACKEND_DEFINE ${NGF_SAMPLES_BACKEND_DEFINE})
+
     set(NGF_IMGUI_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_draw.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_tables.cpp
@@ -226,15 +233,21 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.cpp)
-    string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
-    string(REPLACE "-" "_" NGF_SAMPLES_BACKEND_DEFINE ${NGF_SAMPLES_BACKEND_DEFINE})
+	       
+    if(WIN32)
+        set(NGF_IMGUI_COPTS "")
+    else()
+        # Turn off reporting warnings as errors for ImGui on gcc/clang, because it has a lot of them.
+        set(NGF_IMGUI_COPTS "-Wno-error")
+    endif()
 
     ngf_library(NAME ngf-imgui
                 SRCS ${NGF_IMGUI_SRCS}
                 DEPS glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
-                             ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends)
-
+                             ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends
+	        PVT_DEFINES "GLFW_INCLUDE_NONE"
+		COPTS ${NGF_IMGUI_COPTS})
     ngf_library(NAME ngf-samples-common
                 SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
@@ -266,7 +279,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         ngf_binary(NAME ${SAMPLE_NAME}
                    SRCS ${SAMPLE_SRCS}
                    DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf-util  
-                   PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME})
+                   PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}
+		   PVT_DEFINES "GLFW_INCLUDE_NONE")
         add_dependencies(${SAMPLE_NAME} sample-shaders)
         set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
         set_target_properties(${SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NGF_SAMPLES_OUTPUT_DIR}")
