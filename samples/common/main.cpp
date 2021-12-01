@@ -20,7 +20,7 @@
  * IN THE SOFTWARE.
  */
 
-
+#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -28,6 +28,8 @@
 #elif defined(__APPLE__)
 #define GLFW_EXPOSE_NATIVE_COCOA
 #include "platform/macos/glfw-cocoa-contentview.h"
+#else
+#define GLFW_EXPOSE_NATIVE_X11
 #endif
 #include <GLFW/glfw3native.h>
 
@@ -170,7 +172,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
 #elif defined(__APPLE__)
   native_window_handle = (uintptr_t)ngf_samples::get_glfw_contentview(window);
 #else
-#error "unimplemented"
+  native_window_handle = (uintptr_t)glfwGetX11Window(window);
 #endif
 
   /**
