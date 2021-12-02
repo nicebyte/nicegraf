@@ -1050,6 +1050,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   }
   
   mtl_pipe_desc.rasterSampleCount = info->multisample->sample_count;
+  mtl_pipe_desc.alphaToCoverageEnabled = info->multisample->alpha_to_coverage;
 
   mtl_pipe_desc.stencilAttachmentPixelFormat = MTLPixelFormatInvalid;
 
