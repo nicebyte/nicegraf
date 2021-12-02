@@ -2804,13 +2804,17 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   const bool needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
 
   if (needs_present) {
-    vkAcquireNextImageKHR(
-        _vk.device,
-        CURRENT_CONTEXT->swapchain.vk_swapchain,
-        UINT64_MAX,
-        CURRENT_CONTEXT->swapchain.image_semaphores[fi],
-        VK_NULL_HANDLE,
-        &CURRENT_CONTEXT->swapchain.image_idx);
+    const VkResult acquire_result = 
+      vkAcquireNextImageKHR(
+          _vk.device,
+          CURRENT_CONTEXT->swapchain.vk_swapchain,
+          UINT64_MAX,
+          CURRENT_CONTEXT->swapchain.image_semaphores[fi],
+          VK_NULL_HANDLE,
+          &CURRENT_CONTEXT->swapchain.image_idx);
+    if (acquire_result != VK_SUCCESS) {
+      return NGF_ERROR_INVALID_OPERATION;
+    }
   }
 
   CURRENT_CONTEXT->current_frame_token = ngfi_encode_frame_token(
