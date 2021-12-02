@@ -3137,7 +3137,6 @@ ngf_error ngf_create_graphics_pipeline(
       .lineWidth               = 0.0f};
 
   // Prepare multisampling.
-  // TODO: use specified alpha-to-coverage
   VkPipelineMultisampleStateCreateInfo multisampling = {
       .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
       .pNext                 = NULL,
@@ -3146,7 +3145,7 @@ ngf_error ngf_create_graphics_pipeline(
       .sampleShadingEnable   = VK_FALSE,
       .minSampleShading      = 0.0f,
       .pSampleMask           = NULL,
-      .alphaToCoverageEnable = VK_FALSE,
+      .alphaToCoverageEnable = info->multisample->alpha_to_coverage ? VK_TRUE : VK_FALSE,
       .alphaToOneEnable      = VK_FALSE};
 
   // Prepare depth/stencil.
