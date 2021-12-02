@@ -2258,9 +2258,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   pthread_mutex_init(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock, 0);
 
   // Populate device capabilities.
-  DEVICE_CAPS.clipspace_z_zero_to_one = true;
-  DEVICE_CAPS.uniform_buffer_offset_alignment =
-      phys_dev_properties.limits.minUniformBufferOffsetAlignment;
+  DEVICE_CAPS = NGFVK_DEVICE_LIST[init_info->device].capabilities;
 
   // Done!
 
