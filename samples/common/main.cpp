@@ -240,7 +240,11 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     bool resize_successful = true;
-    if (fb_width != old_fb_width || fb_height != old_fb_height) {
+    const bool need_resize = (fb_width != old_fb_width || fb_height != old_fb_height);
+    if (need_resize) {
+      ngf_samples::logd("window resizing detected, calling ngf_resize context. "
+                        "old size: %d x %d; new size: %d x %d",
+			old_fb_width, old_fb_height, fb_width, fb_height);
       resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, (uint32_t)fb_width, (uint32_t)fb_height));
     }
 
@@ -249,7 +253,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
        * Begin the frame and start the main command buffer.
        */
       ngf_frame_token frame_token;
-      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_begin_frame(&frame_token));
+      if (ngf_begin_frame(&frame_token) != NGF_ERROR_OK) continue;
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_start_cmd_buffer(main_cmd_buffer, frame_token));
 
       /**
