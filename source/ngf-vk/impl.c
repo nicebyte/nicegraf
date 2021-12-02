@@ -2070,6 +2070,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       const VkPhysicalDeviceLimits* vkdevlimits = &dev_props.limits;
       devcaps->clipspace_z_zero_to_one          = true;
       devcaps->uniform_buffer_offset_alignment  = vkdevlimits->minUniformBufferOffsetAlignment;
+      devcaps->texel_buffer_offset_alignment = vkdevlimits->minTexelBufferOffsetAlignment;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
