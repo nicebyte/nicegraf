@@ -2106,6 +2106,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       _vk.instance);  // load instance-level Vulkan functions into the global namespace.
 
   if (validation_enabled) {
+    NGFI_DIAG_INFO("vulkan validation layers enabled");
     // Install a debug callback to forward vulkan debug messages to the user.
     const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
         .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -2123,6 +2124,8 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
         .pUserData       = NULL};
     VkDebugUtilsMessengerEXT vk_debug_messenger;
     vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
+  } else {
+    NGFI_DIAG_INFO("vulkan validation is disabled");
   }
 
   // Obtain a list of available physical devices.
