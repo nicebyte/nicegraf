@@ -34,7 +34,7 @@ namespace ngf_samples {
   {                                                               \
     const ngf_error err = (expr);                                 \
     if (err != NGF_ERROR_OK) {                                    \
-      ::ngf_samples::loge("nicegraf error %d, aborting.\n", err); \
+      ::ngf_samples::loge("nicegraf error %d (file %s line %d), aborting.\n", err, __FILE__, __LINE__); \
       fflush(stderr);                                             \
       abort();                                                    \
     }                                                             \
