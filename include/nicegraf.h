@@ -134,6 +134,19 @@ typedef struct ngf_device_capabilities {
    * a multiple of this number.
    */
   size_t texel_buffer_offset_alignment;
+
+  size_t max_vertex_input_attributes;
+  size_t max_sampled_images_per_pipeline;
+  size_t max_samplers_per_pipeline;
+  size_t max_fragment_input_components;
+  size_t max_fragment_inputs;
+  size_t max_1d_texture_width;
+  size_t max_2d_texture_width;
+  size_t max_2d_texture_height;
+  size_t max_texture_layers;
+  size_t max_render_targets_per_pass;
+
+
 } ngf_device_capabilities;
 
 /**
