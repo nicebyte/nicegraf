@@ -110,6 +110,13 @@ extern "C" {
 #endif
 
 /**
+ * This is a special value used within the \ref ngf_device_capabilities structure
+ * to indicate that a limit value (i.e. max texture size) is not known or not
+ * relevant for the current backend.
+ */
+#define NGF_DEVICE_LIMIT_UNKNOWN (~0u)
+
+/**
  * @struct ngf_device_capabilities
  * \ingroup ngf
  * Contains information about various device features, limits, etc. Clients
@@ -135,15 +142,21 @@ typedef struct ngf_device_capabilities {
    */
   size_t texel_buffer_offset_alignment;
 
-  size_t max_vertex_input_attributes;
+  /**
+   * The maximum allowed number of vertex attributes per pipeline.
+   */
+  size_t max_vertex_input_attributes_per_pipeline;
+
+
   size_t max_sampled_images_per_pipeline;
   size_t max_samplers_per_pipeline;
   size_t max_fragment_input_components;
   size_t max_fragment_inputs;
-  size_t max_1d_texture_width;
-  size_t max_2d_texture_width;
-  size_t max_2d_texture_height;
-  size_t max_texture_layers;
+  size_t max_1d_image_dimension;
+  size_t max_2d_image_dimension;
+  size_t max_3d_image_dimension;
+  size_t max_cube_image_dimension;
+  size_t max_image_layers;
   size_t max_render_targets_per_pass;
 
 
