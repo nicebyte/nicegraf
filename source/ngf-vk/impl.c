@@ -2073,6 +2073,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->texel_buffer_offset_alignment = vkdevlimits->minTexelBufferOffsetAlignment;
       devcaps->max_vertex_input_attributes_per_pipeline = vkdevlimits->maxVertexInputAttributes;
       devcaps->max_sampled_images_per_stage = vkdevlimits->maxPerStageDescriptorSampledImages;
+      devcaps->max_samplers_per_stage = vkdevlimits->maxPerStageDescriptorSamplers;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
