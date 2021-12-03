@@ -163,8 +163,19 @@ typedef struct ngf_device_capabilities {
    */
   size_t max_samplers_per_stage;
 
+  /**
+   * This is the maximum number of _components_, across all inputs, for the fragment
+   * stage. "Input component" refers to the individual components of an input vector.
+   * For example, if the fragment stage has a single float4 input (vector of 4 floats),
+   * then it has 4 input components.
+   */
   size_t max_fragment_input_components;
+
+  /**
+   * This is the maximum number of inputs for the fragment stage.
+   */
   size_t max_fragment_inputs;
+
   size_t max_1d_image_dimension;
   size_t max_2d_image_dimension;
   size_t max_3d_image_dimension;
