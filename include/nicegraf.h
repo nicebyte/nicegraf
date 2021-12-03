@@ -176,11 +176,32 @@ typedef struct ngf_device_capabilities {
    */
   size_t max_fragment_inputs;
 
+  /**
+   * Maximum allowed width of a 1D image.
+   */
   size_t max_1d_image_dimension;
+
+  /**
+   * Maximum allowed width, or height of a 2D image.
+   */
   size_t max_2d_image_dimension;
+
+  /**
+   * Maximum allowed width, height, or depth of a 3D image.
+   */
+
   size_t max_3d_image_dimension;
+
+  /**
+   * Maximum allowed width, or height of a cubemap.
+   */
   size_t max_cube_image_dimension;
+
+  /**
+   * Maximum allowed number of layers in an image.
+   */
   size_t max_image_layers;
+
   size_t max_render_targets_per_pass;
 
 

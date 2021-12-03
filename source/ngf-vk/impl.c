@@ -2076,6 +2076,13 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_samplers_per_stage = vkdevlimits->maxPerStageDescriptorSamplers;
       devcaps->max_fragment_input_components = vkdevlimits->maxFragmentInputComponents;
       devcaps->max_fragment_inputs = (devcaps->max_fragment_input_components) / 4; /* as per vk spec. */
+      devcaps->max_1d_image_dimension = vkdevlimits->maxImageDimension1D;
+      devcaps->max_2d_image_dimension = vkdevlimits->maxImageDimension2D;
+      devcaps->max_3d_image_dimension = vkdevlimits->maxImageDimension3D;
+      devcaps->max_cube_image_dimension = vkdevlimits->maxImageDimensionCube;
+      devcaps->max_image_layers = vkdevlimits->maxImageArrayLayers;
+
+
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
