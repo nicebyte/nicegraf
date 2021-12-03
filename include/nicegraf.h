@@ -148,8 +148,14 @@ typedef struct ngf_device_capabilities {
   size_t max_vertex_input_attributes_per_pipeline;
 
 
-  size_t max_sampled_images_per_pipeline;
-  size_t max_samplers_per_pipeline;
+  /**
+   * The maximum allowed number of sampled images (textures) per single
+   * pipeline stage. On the Vulkan backend, texel buffers also count against
+   * this limit.
+   */
+  size_t max_sampled_images_per_stage;
+
+  size_t max_samplers_per_stage;
   size_t max_fragment_input_components;
   size_t max_fragment_inputs;
   size_t max_1d_image_dimension;
