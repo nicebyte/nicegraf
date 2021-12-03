@@ -202,7 +202,11 @@ typedef struct ngf_device_capabilities {
    */
   size_t max_image_layers;
 
-  size_t max_render_targets_per_pass;
+  /**
+   * Maximum number of color attachments that can be written to
+   * during a render pass.
+   */
+  size_t max_color_attachments_per_pass;
 
 
 } ngf_device_capabilities;

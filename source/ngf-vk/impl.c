@@ -2081,8 +2081,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_3d_image_dimension = vkdevlimits->maxImageDimension3D;
       devcaps->max_cube_image_dimension = vkdevlimits->maxImageDimensionCube;
       devcaps->max_image_layers = vkdevlimits->maxImageArrayLayers;
-
-
+      devcaps->max_color_attachments_per_pass = vkdevlimits->maxColorAttachments;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
