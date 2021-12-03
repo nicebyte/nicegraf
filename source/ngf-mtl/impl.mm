@@ -692,14 +692,40 @@ struct ngf_context_t {
   ngf_render_target default_rt;
 };
 
+MTLGPUFamily ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
+  constexpr MTLGPUFamily families[] = {
+    MTLGPUFamilyMacCatalyst2,
+    MTLGPUFamilyMacCatalyst1,
+    MTLGPUFamilyMac2,
+    MTLGPUFamilyMac1,
+    MTLGPUFamilyApple7,
+    MTLGPUFamilyApple6,
+    MTLGPUFamilyApple5,
+    MTLGPUFamilyApple4,
+    MTLGPUFamilyApple3,
+    MTLGPUFamilyApple2,
+    MTLGPUFamilyApple1
+  };
+  for (auto family : families)
+    if ([mtldev supportsFamily:family]) return family;
+  return MTLGPUFamilyApple1;
+}
+
 void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevice> mtldev) {
-    ngfdev.handle = handle;
-    ngfdev.performance_tier = mtldev.lowPower ? NGF_DEVICE_PERFORMANCE_TIER_LOW : NGF_DEVICE_PERFORMANCE_TIER_HIGH;
-    const size_t device_name_length = [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
-    strncpy(ngfdev.name, [mtldev.name UTF8String], NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, device_name_length));
-    ngf_device_capabilities& caps = ngfdev.capabilities;
-    caps.clipspace_z_zero_to_one = true;
-    caps.uniform_buffer_offset_alignment = 256; // TODO: set proper limits for metal using device feature tables as reference.
+  ngfdev.handle = handle;
+  ngfdev.performance_tier = mtldev.lowPower ? NGF_DEVICE_PERFORMANCE_TIER_LOW : NGF_DEVICE_PERFORMANCE_TIER_HIGH;
+  const size_t device_name_length = [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
+  strncpy(ngfdev.name, [mtldev.name UTF8String], NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, device_name_length));
+  ngf_device_capabilities& caps = ngfdev.capabilities;
+  const MTLGPUFamily gpu_family = ngfmtl_max_supported_gpu_family(mtldev);
+  caps.clipspace_z_zero_to_one = true;
+  if (gpu_family >= MTLGPUFamilyMac1) {
+    caps.uniform_buffer_offset_alignment = 256;
+    caps.texel_buffer_offset_alignment = 256;
+  } else {
+    caps.uniform_buffer_offset_alignment = 4;
+    caps.texel_buffer_offset_alignment = 4;
+  }
 }
 
 extern "C" {
