@@ -152,7 +152,7 @@ typedef struct ngf_device_capabilities {
    * The maximum allowed number of sampled images (textures) per single
    * shader stage. Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER
    * do count against this limit. 
-   * On the Vulkan backend, texel buffers also count against this limit.
+   * Texel buffers also count against this limit.
    */
   size_t max_sampled_images_per_stage;
 
