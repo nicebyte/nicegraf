@@ -147,12 +147,10 @@ typedef struct ngf_device_capabilities {
    */
   size_t max_vertex_input_attributes_per_pipeline;
 
-
   /**
    * The maximum allowed number of sampled images (textures) per single
    * shader stage. Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER
-   * do count against this limit. 
-   * Texel buffers also count against this limit.
+   * and \ref NGF_DESCRIPTOR_TEXEL_BUFFER do count against this limit. 
    */
   size_t max_sampled_images_per_stage;
 
@@ -162,6 +160,11 @@ typedef struct ngf_device_capabilities {
    * this limit.
    */
   size_t max_samplers_per_stage;
+
+  /**
+   * The maximum allowed number of uniform buffers per single shader stage.
+   */
+  size_t max_uniform_buffers_per_stage;
 
   /**
    * This is the maximum number of _components_, across all inputs, for the fragment
