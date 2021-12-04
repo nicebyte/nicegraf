@@ -692,23 +692,34 @@ struct ngf_context_t {
   ngf_render_target default_rt;
 };
 
-MTLGPUFamily ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
-  constexpr MTLGPUFamily families[] = {
-    MTLGPUFamilyMacCatalyst2,
-    MTLGPUFamilyMacCatalyst1,
-    MTLGPUFamilyMac2,
-    MTLGPUFamilyMac1,
-    MTLGPUFamilyApple7,
-    MTLGPUFamilyApple6,
-    MTLGPUFamilyApple5,
-    MTLGPUFamilyApple4,
-    MTLGPUFamilyApple3,
-    MTLGPUFamilyApple2,
-    MTLGPUFamilyApple1
-  };
-  for (auto family : families)
-    if ([mtldev supportsFamily:family]) return family;
-  return MTLGPUFamilyApple1;
+constexpr MTLGPUFamily NGFMTL_GPU_FAMILIES[] = {
+  MTLGPUFamilyCommon1,
+  MTLGPUFamilyCommon2,
+  MTLGPUFamilyApple1,
+  MTLGPUFamilyApple2,
+  MTLGPUFamilyApple3,
+  MTLGPUFamilyApple4,
+  MTLGPUFamilyApple5,
+  MTLGPUFamilyApple6,
+  MTLGPUFamilyApple7,
+  MTLGPUFamilyMac1,
+  MTLGPUFamilyMac2,
+  MTLGPUFamilyMacCatalyst1,
+  MTLGPUFamilyMacCatalyst2,
+};
+
+constexpr size_t NGFMTL_NUM_GPU_FAMILIES = sizeof(NGFMTL_GPU_FAMILIES) / sizeof(MTLGPUFamily);
+
+constexpr size_t ngfmtl_gpufam_idx(MTLGPUFamily  fam) {
+  for (size_t i = 0; i < NGFMTL_NUM_GPU_FAMILIES; ++i)
+    if (NGFMTL_GPU_FAMILIES[i] == fam) return i;
+  return 0;
+}
+
+size_t ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
+  for (size_t fam_idx = NGFMTL_NUM_GPU_FAMILIES - 1; fam_idx >= 0; ++fam_idx)
+    if ([mtldev supportsFamily:NGFMTL_GPU_FAMILIES[fam_idx]]) return fam_idx;
+  return 0;
 }
 
 void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevice> mtldev) {
@@ -717,14 +728,56 @@ void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevic
   const size_t device_name_length = [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
   strncpy(ngfdev.name, [mtldev.name UTF8String], NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, device_name_length));
   ngf_device_capabilities& caps = ngfdev.capabilities;
-  const MTLGPUFamily gpu_family = ngfmtl_max_supported_gpu_family(mtldev);
+  const size_t gpu_family_idx = ngfmtl_max_supported_gpu_family(mtldev);
   caps.clipspace_z_zero_to_one = true;
-  if (gpu_family >= MTLGPUFamilyMac1) {
+  caps.max_vertex_input_attributes_per_pipeline = 31;
+  caps.max_uniform_buffers_per_stage = 31;
+  caps.max_sampler_anisotropy = 16.0f;
+  caps.max_samplers_per_stage = 16;
+  caps.max_3d_image_dimension = 2048;
+  caps.max_image_layers = 2048;
+
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple6)) {
+    caps.max_sampled_images_per_stage = 128;
+  } else if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple4)) {
+    caps.max_sampled_images_per_stage = 96;
+  } else {
+    caps.max_sampled_images_per_stage = 31;
+  }
+ 
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple4)) {
+    caps.max_fragment_input_components = 124;
+  } else {
+    caps.max_fragment_input_components = 60;
+  }
+   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple4)) {
+    caps.max_fragment_inputs = 124;
+  } else {
+    caps.max_fragment_inputs = 60;
+  }
+  
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyMac1)) {
     caps.uniform_buffer_offset_alignment = 256;
     caps.texel_buffer_offset_alignment = 256;
   } else {
     caps.uniform_buffer_offset_alignment = 4;
     caps.texel_buffer_offset_alignment = 4;
+  }
+  
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple3)) {
+    caps.max_1d_image_dimension = 16384;
+    caps.max_2d_image_dimension = 16384;
+    caps.max_cube_image_dimension = 16384;
+  } else {
+    caps.max_1d_image_dimension = 8192;
+    caps.max_2d_image_dimension = 8192;
+    caps.max_cube_image_dimension = 8192;
+  }
+  
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple2)) {
+    caps.max_color_attachments_per_pass = 8;
+  } else {
+    caps.max_color_attachments_per_pass = 4;
   }
 }
 
