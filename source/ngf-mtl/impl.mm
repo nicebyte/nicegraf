@@ -736,6 +736,7 @@ void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevic
   caps.max_samplers_per_stage = 16;
   caps.max_3d_image_dimension = 2048;
   caps.max_image_layers = 2048;
+  caps.max_uniform_buffer_range = NGF_DEVICE_LIMIT_UNKNOWN;
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple6)) {
     caps.max_sampled_images_per_stage = 128;
