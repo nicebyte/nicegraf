@@ -1680,7 +1680,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         vk_bind_info->sampler     = VK_NULL_HANDLE;
         if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
             bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
-          vk_bind_info->imageView   = bind_info->image_subresource.image->vkview;
+          vk_bind_info->imageView   = bind_info->image->vkview;
           vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
         if (bind_op->type == NGF_DESCRIPTOR_SAMPLER ||

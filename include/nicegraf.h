@@ -1155,8 +1155,8 @@ typedef struct ngf_buffer_bind_info {
  * Specifies an image bind operation.
  */
 typedef struct ngf_image_sampler_bind_info {
-  ngf_image_ref image_subresource; /**< Image portion to bind.*/
-  ngf_sampler   sampler;           /**< Sampler to use.*/
+  ngf_image   image;   /**< The image to bind.*/
+  ngf_sampler sampler; /**< Sampler to use.*/
 } ngf_image_sampler_bind_info;
 
 /**

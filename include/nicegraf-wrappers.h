@@ -215,10 +215,10 @@ template<uint32_t S> struct descriptor_set {
   template<uint32_t B> struct binding {
     static ngf_resource_bind_op texture(const ngf_image image) {
       ngf_resource_bind_op op;
-      op.type                                       = NGF_DESCRIPTOR_IMAGE;
-      op.target_binding                             = B;
-      op.target_set                                 = S;
-      op.info.image_sampler.image_subresource.image = image;
+      op.type                     = NGF_DESCRIPTOR_IMAGE;
+      op.target_binding           = B;
+      op.target_set               = S;
+      op.info.image_sampler.image = image;
       return op;
     }
 
@@ -257,11 +257,11 @@ template<uint32_t S> struct descriptor_set {
     static ngf_resource_bind_op
     texture_and_sampler(const ngf_image image, const ngf_sampler sampler) {
       ngf_resource_bind_op op;
-      op.type                                       = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
-      op.target_binding                             = B;
-      op.target_set                                 = S;
-      op.info.image_sampler.image_subresource.image = image;
-      op.info.image_sampler.sampler                 = sampler;
+      op.type                       = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
+      op.target_binding             = B;
+      op.target_set                 = S;
+      op.info.image_sampler.image   = image;
+      op.info.image_sampler.sampler = sampler;
       return op;
     }
   };
