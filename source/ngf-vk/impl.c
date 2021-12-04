@@ -2084,6 +2084,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_image_layers               = vkdevlimits->maxImageArrayLayers;
       devcaps->max_color_attachments_per_pass = vkdevlimits->maxColorAttachments;
       devcaps->max_uniform_buffers_per_stage  = vkdevlimits->maxPerStageDescriptorUniformBuffers;
+      devcaps->max_sampler_anisotropy         = vkdevlimits->maxSamplerAnisotropy;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }

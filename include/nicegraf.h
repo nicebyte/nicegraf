@@ -212,6 +212,10 @@ typedef struct ngf_device_capabilities {
   size_t max_color_attachments_per_pass;
 
 
+  /**
+   * The maximum degree of sampler anisotropy.
+   */
+  float max_sampler_anisotropy;
 } ngf_device_capabilities;
 
 /**
