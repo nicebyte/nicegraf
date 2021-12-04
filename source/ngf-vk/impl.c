@@ -3528,10 +3528,11 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
              ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
              : 0);
     const VkImageViewCreateInfo image_view_create_info = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0u,
-        .image = (VkImage)attachment_img->alloc.obj_handle,
+        .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext    = NULL,
+        .flags    = 0u,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .image    = (VkImage)attachment_img->alloc.obj_handle,
         .components =
             {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
