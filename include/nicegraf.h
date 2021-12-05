@@ -427,8 +427,8 @@ typedef struct ngf_offset3d {
  * Note that some back-ends might not support all of these.
  */
 typedef enum ngf_stage_type {
-  NGF_STAGE_VERTEX = 0,
-  NGF_STAGE_FRAGMENT,
+  NGF_STAGE_VERTEX = 0, /**< Indicates the vertex processing stage. */
+  NGF_STAGE_FRAGMENT, /**< Indicates the fragment processing stage. */
   // TODO: compute pipelines
   NGF_STAGE_COUNT
 } ngf_stage_type;
