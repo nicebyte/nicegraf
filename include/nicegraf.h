@@ -1204,7 +1204,6 @@ typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 typedef enum ngf_primitive_type {
   NGF_PRIMITIVE_TYPE_TRIANGLE_LIST = 0,
   NGF_PRIMITIVE_TYPE_TRIANGLE_STRIP,
-  NGF_PRIMITIVE_TYPE_TRIANGLE_FAN,
   NGF_PRIMITIVE_TYPE_LINE_LIST,
   NGF_PRIMITIVE_TYPE_LINE_STRIP,
   NGF_PRIMITIVE_TYPE_COUNT

@@ -535,7 +535,6 @@ static VkPrimitiveTopology get_vk_primitive_type(ngf_primitive_type p) {
   static const VkPrimitiveTopology topos[NGF_PRIMITIVE_TYPE_COUNT] = {
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
-      VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN,
       VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
       VK_PRIMITIVE_TOPOLOGY_LINE_STRIP};
   return topos[p];

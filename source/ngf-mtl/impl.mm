@@ -250,8 +250,6 @@ get_mtl_primitive_topology_class(ngf_primitive_type type) {
   topo_class[NGF_PRIMITIVE_TYPE_COUNT] = {
     MTLPrimitiveTopologyClassTriangle,
     MTLPrimitiveTopologyClassTriangle,
-    MTLPrimitiveTopologyClassUnspecified, // Triangle Fan, Metal does not
-    // support.
     MTLPrimitiveTopologyClassLine,
     MTLPrimitiveTopologyClassLine,
   };
@@ -263,7 +261,6 @@ static std::optional<MTLPrimitiveType> get_mtl_primitive_type(ngf_primitive_type
   types[NGF_PRIMITIVE_TYPE_COUNT] = {
     MTLPrimitiveTypeTriangle,
     MTLPrimitiveTypeTriangleStrip,
-    std::nullopt, // Triangle Fan not supported.
     MTLPrimitiveTypeLine,
     MTLPrimitiveTypeLineStrip
   };
