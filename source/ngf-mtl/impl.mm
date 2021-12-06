@@ -714,7 +714,7 @@ constexpr size_t ngfmtl_gpufam_idx(MTLGPUFamily  fam) {
 }
 
 size_t ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
-  for (size_t fam_idx = NGFMTL_NUM_GPU_FAMILIES - 1; fam_idx >= 0; ++fam_idx)
+  for (size_t fam_idx = NGFMTL_NUM_GPU_FAMILIES - 1; fam_idx >= 0; --fam_idx)
     if ([mtldev supportsFamily:NGFMTL_GPU_FAMILIES[fam_idx]]) return fam_idx;
   return 0;
 }
