@@ -256,8 +256,8 @@ get_mtl_primitive_topology_class(ngf_primitive_type type) {
   return topo_class[type];
 }
 
-static std::optional<MTLPrimitiveType> get_mtl_primitive_type(ngf_primitive_type type) {
-  static const std::optional<MTLPrimitiveType>
+static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_type type) {
+  static const MTLPrimitiveType
   types[NGF_PRIMITIVE_TYPE_COUNT] = {
     MTLPrimitiveTypeTriangle,
     MTLPrimitiveTypeTriangleStrip,
@@ -1229,14 +1229,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
-  std::optional<MTLPrimitiveType> prim_type =
-      get_mtl_primitive_type(info->primitive_type);
-  if (!prim_type.has_value()) {
-    NGFI_DIAG_ERROR("Primitive type %d not supported by Metal backend.",
-                     info->primitive_type);
-    return NGF_ERROR_INVALID_ENUM;
-  }
-  pipeline->primitive_type = *prim_type;
+  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
   
   // Set winding order and culling mode.
   pipeline->winding = get_mtl_winding(info->rasterization->front_face);
