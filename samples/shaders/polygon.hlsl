@@ -19,7 +19,7 @@ float4 PSMain(PSInput inp) : SV_TARGET {
 
 PSInput VSMain(uint vid : SV_VertexID) {
   PSInput res;
-  if (vid == 0) {
+  if (vid % 3 == 0) {
     res.pos = float4(0.0, 0.0, 0.0, 1.0);
     res.color = float4(0.8, 0.7, 0.8, 1.0);
   } else {
@@ -29,7 +29,7 @@ PSInput VSMain(uint vid : SV_VertexID) {
       sin(rotation_angle), cos(rotation_angle)
     };
     float effective_scale = (vid % 2  ? u_ScaleB : u_ScaleA);
-    int outer_vertex_id = vid - 1;
+    int outer_vertex_id = int(round(float(vid)/3.0));
     float2 vtx_pos = mul(rotation_matrix,
                          float2(sin(outer_vertex_id * u_Theta),
                                 cos(outer_vertex_id * u_Theta))) * float2(1.0, u_AspectRatio)

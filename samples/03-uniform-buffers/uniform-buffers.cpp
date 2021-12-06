@@ -27,8 +27,8 @@
 #include "shader-loader.h"
 
 #include <imgui.h>
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
 
 namespace ngf_samples {
 
@@ -43,7 +43,7 @@ struct shader_uniform_values {
 
 struct state {
   ngf::graphics_pipeline polygon_pipeline;
-  ngf::buffer    uniform_buffer;
+  ngf::buffer            uniform_buffer;
   size_t                 uniform_buffer_offset     = 0u;
   size_t                 aligned_uniform_data_size = 0u;
   shader_uniform_values  uniform_values;
@@ -94,7 +94,7 @@ void* sample_initialize(
   polygon_pipe_info.shader_stages[0]                  = polygon_vertex_stage.get();
   polygon_pipe_info.shader_stages[1]                  = polygon_fragment_stage.get();
   polygon_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  polygon_pipe_info.primitive_type                 = NGF_PRIMITIVE_TYPE_TRIANGLE_FAN;
+  polygon_pipe_info.primitive_type                 = NGF_PRIMITIVE_TYPE_TRIANGLE_LIST;
   NGF_SAMPLES_CHECK_NGF_ERROR(state->polygon_pipeline.initialize(polygon_pipe_info));
 
   /**
@@ -184,8 +184,11 @@ void sample_draw_frame(
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf::cmd_bind_resources(
       main_render_pass,
-      ngf::descriptor_set<0>::binding<0>::uniform_buffer(state->uniform_buffer, state->uniform_buffer_offset, state->aligned_uniform_data_size));
-  ngf_cmd_draw(main_render_pass, false, 0u, (uint32_t)(state->n) + 2u, 1u);
+      ngf::descriptor_set<0>::binding<0>::uniform_buffer(
+          state->uniform_buffer,
+          state->uniform_buffer_offset,
+          state->aligned_uniform_data_size));
+  ngf_cmd_draw(main_render_pass, false, 0u, (uint32_t)(state->n) * 3, 1u);
 
   /**
    * Update the uniform buffer offset so we write there on the next frame.
