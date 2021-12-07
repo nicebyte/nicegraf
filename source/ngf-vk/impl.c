@@ -3672,7 +3672,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
           : pipeline->vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE]);
 }
 
-void ngf_cmd_bind_gfx_resources(
+void ngf_cmd_bind_resources(
     ngf_render_encoder          enc,
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) {

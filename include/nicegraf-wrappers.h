@@ -269,7 +269,7 @@ template<uint32_t S> struct descriptor_set {
 
 template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
   const ngf_resource_bind_op ops[] = {args...};
-  ngf_cmd_bind_gfx_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
+  ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
 
 inline ngf_image_ref image_ref(const ngf_image img) {

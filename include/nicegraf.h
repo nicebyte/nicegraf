@@ -1781,7 +1781,7 @@ void ngf_cmd_line_width(ngf_render_encoder buf, float line_width) NGF_NOEXCEPT;
 /**
  * Bind resources for the shader to read. See ngf_resource_bind_op for more information.
  */
-void ngf_cmd_bind_gfx_resources(
+void ngf_cmd_bind_resources(
     ngf_render_encoder          buf,
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) NGF_NOEXCEPT;

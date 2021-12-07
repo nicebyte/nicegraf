@@ -1760,7 +1760,7 @@ void ngf_cmd_bind_index_buffer(ngf_render_encoder enc,
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
 }
 
-void ngf_cmd_bind_gfx_resources(ngf_render_encoder enc,
+void ngf_cmd_bind_resources(ngf_render_encoder enc,
                                 const ngf_resource_bind_op *bind_ops,
                                 uint32_t nbind_ops) NGF_NOEXCEPT {
   auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
