@@ -46,10 +46,7 @@
  * 
  * \subsection core-remarks General Remarks
  * 
- * - nicegraf does not guarantee the order of structure fields to be preserved
- *   from version to version, even across minor versions. Clients should
- *   therefore never assume a specific memory layout for any of nicegraf
- *   structures.
+ * - The library is currently not intended to be linked dynamically.
  * 
  * - When nicegraf's C headers are included from C++, all global functions
  *   within them are automatically declared to have C linkage. Additionally,
@@ -219,7 +216,9 @@ typedef struct ngf_device_capabilities {
   /**
    * This flag is set to `true` if the platform supports [0; 1]
    * range for the clip-space z coordinate. nicegraf enforces clip-space
-   * z to be in this range on all backends that support it.
+   * z to be in this range on all backends that support it. This ensures
+   * better precision for near-field objects.
+   * See the following for an in-depth explanation: http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
    */
   bool clipspace_z_zero_to_one;
 } ngf_device_capabilities;
@@ -292,6 +291,12 @@ typedef struct ngf_allocation_callbacks {
 /**
  * @typedef ngf_device_handle
  * A handle that uniquely identifies a rendering device.
+ * 
+ * Note that the value of the handle
+ * corresponding to the same exact physical device may be different across for different
+ * instances of the same client. In other words, if the client application shuts down, then
+ * starts up again, it may get different values for device handles than it did before.
+ * Therefore, device handles should not be persisted.
  * \ingroup ngf
  */
 typedef uint32_t ngf_device_handle;
@@ -315,7 +320,7 @@ typedef enum ngf_device_performance_tier {
 } ngf_device_performance_tier;
 
 /**
- * Maximum length of the device name. 
+ * Maximum length of a device's name. 
  * \ingroup ngf 
  */
 #define NGF_DEVICE_NAME_MAX_LENGTH (256u)
@@ -323,6 +328,7 @@ typedef enum ngf_device_performance_tier {
 /**
  * @struct ngf_device 
  * Information about a rendering device.
+ * See also: \ref ngf_get_device_list
  * \ingroup ngf
  */
 typedef struct ngf_device {
@@ -330,7 +336,7 @@ typedef struct ngf_device {
   ngf_device_handle           handle; /**< A handle to be passed to \ref ngf_initialize. */
 
   /**
-   * A string associated with the device. This is _not_ guaranteed to be unique.
+   * A string associated with the device. This is _not_ guaranteed to be unique per device.
    */
   char name[NGF_DEVICE_NAME_MAX_LENGTH];
 
@@ -340,6 +346,7 @@ typedef struct ngf_device {
 /**
  * @struct ngf_init_info
  * nicegraf initialization parameters.
+ * See also: \ref ngf_initialize.
  */
 typedef struct ngf_init_info {
   /** 
@@ -439,16 +446,28 @@ typedef enum ngf_stage_type {
  * Describes a programmable shader stage.
  */
 typedef struct ngf_shader_stage_info {
-  ngf_stage_type type;           /**< Stage type (vert/frag/etc.) */
-  const void*    content;        /**< May be text or binary, depending on the backend.*/
-  uint32_t       content_length; /**< Number of bytes in the content buffer. */
-  const char*    debug_name;     /**< Optional name, will appear in debug logs,
-                                      may be NULL.*/
+  ngf_stage_type type; /**< Stage type (vert/frag/etc.) */
+
   /**
-   * Entry point name for this shader stage. On platforms that have fixed
-   * entry point names (GL), this field gets ignored.
+   * This shall be a pointer to a memory buffer containing the code for
+   * the shader stage.
+   *
+   * The specific contents of the buffer depend on which backend nicegraf
+   * is being used with:
+   *  - for the Vulkan backend, nicegraf expects the SPIR-V bytecode for the shader stage.
+   *  - for the Metal backend, nicegraf expects the source code for the shader stage in the Metal
+   * Shading Language.
+   *
+   * Additionally, the Metal backend expects the code to contain a special comment, mapping all
+   * descriptor set+binding pairs to native Metal slots. See \ref ngf_cmd_bind_resources for
+   * details.
    */
-  const char* entry_point_name;
+  const void* content;
+
+  /** The number of bytes in the \ref ngf_shader_stage_info::content buffer. */
+  uint32_t    content_length;
+  const char* debug_name;       /**< Optional name, will appear in debug logs, may be NULL.*/
+  const char* entry_point_name; /**< Entry point name for this shader stage. */
 } ngf_shader_stage_info;
 
 /**
@@ -457,23 +476,18 @@ typedef struct ngf_shader_stage_info {
  * A programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
- * data.
+ * data, as described in the documentation for \ref ngf_shader_stage_info::content.
  *
  * On platforms that require a compilation step at runtime, details about
  * compile errors are reported via the debug callback mechanism.
- *
- * On some back-ends, the full compile/link step may be repeated during
- * pipeline creation (if using constant specialization). This does not apply
- * to back-ends that support specialization natively with no extensions (i.e.
- * Vulkan and Metal).
  */
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
 /**
  * @enum ngf_polygon_mode
  * \ingroup ngf
- * Ways to draw polygons.
- * Some back-ends might not support all of these.
+ * Enumerates ways to draw polygons.
+ * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_polygon_mode {
   NGF_POLYGON_MODE_FILL = 0, /**< Fill entire polyoon.*/
@@ -485,24 +499,31 @@ typedef enum ngf_polygon_mode {
 /**
  * @enum ngf_cull_mode
  * \ingroup ngf
- * Which polygons to cull.
+ * Enumerates polygon culling strategies.
+ * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_cull_mode {
   NGF_CULL_MODE_BACK = 0,       /**< Cull back-facing polygons.*/
   NGF_CULL_MODE_FRONT,          /**< Cull front-facing polygons. */
-  NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all.*/
-  NGF_CULL_MODE_NONE,           /**< Never cull triangles. */
+  NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all polygons.*/
+  NGF_CULL_MODE_NONE,           /**< Do not cull anything. */
   NGF_CULL_MODE_COUNT
 } ngf_cull_mode;
 
 /**
  * @enum ngf_front_face_mode
  * \ingroup ngf
- * Ways to determine front-facing polygons.
+ * Enumerates possible vertex winding orders, which are used to decide which
+ * polygons are front- or back-facing.
+ * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_front_face_mode {
-  NGF_FRONT_FACE_COUNTER_CLOCKWISE = 0, /**< CCW winding is front-facing.*/
-  NGF_FRONT_FACE_CLOCKWISE,             /**< CW winding is front-facing. */
+  /** Polygons with vertices in counter-clockwise order are considered front-facing. */
+  NGF_FRONT_FACE_COUNTER_CLOCKWISE = 0,
+
+  /** Polygons with vertices in clockwise order are considered front-facing. */
+  NGF_FRONT_FACE_CLOCKWISE,
+
   NGF_FRONT_FACE_COUNT
 } ngf_front_face_mode;
 
@@ -512,8 +533,8 @@ typedef enum ngf_front_face_mode {
  * Rasterization stage parameters.
  */
 typedef struct ngf_rasterization_info {
-  bool discard;                     /**< Enable/disable rasterizer discard. Use in pipelines that
-                                         don't write fragment data.*/
+  bool discard;                     /**< Enable/disable rasterizer discard. Use this in pipelines that
+                                         don't write any fragment data.*/
   ngf_polygon_mode    polygon_mode; /**< How to draw polygons.*/
   ngf_cull_mode       cull_mode;    /**< Which polygons to cull.*/
   ngf_front_face_mode front_face;   /**< Which winding counts as front-facing.*/
@@ -561,11 +582,11 @@ typedef enum ngf_stencil_op {
 typedef struct ngf_stencil_info {
   ngf_stencil_op fail_op;       /**< What to do on stencil test fail.*/
   ngf_stencil_op pass_op;       /**< What to do on pass.*/
-  ngf_stencil_op depth_fail_op; /**< When depth fails but stencil pass.*/
+  ngf_stencil_op depth_fail_op; /**< What to do when depth test fails but stencil test passes.*/
   ngf_compare_op compare_op;    /**< Stencil comparison function.*/
   uint32_t       compare_mask;  /**< Compare mask.*/
   uint32_t       write_mask;    /**< Write mask.*/
-  uint32_t       reference;     /**< Reference value (used for REPLACE).*/
+  uint32_t       reference;     /**< Reference value (used for \ref NGF_STENCIL_OP_REPLACE).*/
 } ngf_stencil_info;
 
 /**
@@ -1142,7 +1163,13 @@ typedef struct ngf_sampler_t* ngf_sampler;
  * Not that some back-ends may not support all of the listed descriptor types.
  */
 typedef enum ngf_descriptor_type {
+  /**
+   * A uniform buffer, also known as a constant buffer, can be used pass
+   * small to medium sized chunk of data to the shader in a structured way.
+   * The data is exactly the same for all shader invocations.
+   */
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
+
   NGF_DESCRIPTOR_IMAGE,
   NGF_DESCRIPTOR_SAMPLER,
   NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
