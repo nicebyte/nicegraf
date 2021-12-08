@@ -721,7 +721,11 @@ size_t ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
 
 void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevice> mtldev) {
   ngfdev.handle = handle;
+#if TARGET_OS_OSX
   ngfdev.performance_tier = mtldev.lowPower ? NGF_DEVICE_PERFORMANCE_TIER_LOW : NGF_DEVICE_PERFORMANCE_TIER_HIGH;
+#else
+  ngfdev.performance_tier = NGF_DEVICE_PERFORMANCE_TIER_UNKNOWN;
+#endif
   const size_t device_name_length = [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
   strncpy(ngfdev.name, [mtldev.name UTF8String], NGFI_MIN(NGF_DEVICE_NAME_MAX_LENGTH, device_name_length));
   ngf_device_capabilities& caps = ngfdev.capabilities;
