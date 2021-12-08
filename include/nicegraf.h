@@ -21,17 +21,17 @@
  */
 
 /**
- * @file 
+ * @file
  * @brief nicegraf declarations.
  */
 
 /**
  * \mainpage Reference Documentation
- * 
+ *
  * These pages contain documentation automatically generated from nicegraf's
  * code comments. The text's purpose is to concisely describe the intended
  * behavior and failure modes of the API.
- * 
+ *
  * If viewing this document in a web browser or a PDF viewer, click one of the
  * following links to proceed to the documentation for the corresponding module.
  *
@@ -41,26 +41,26 @@
 
 /**
  * \defgroup ngf Core C API
- * This section contains the documentation for the core nicegraf routines, 
+ * This section contains the documentation for the core nicegraf routines,
  * structures and enumerations.
- * 
+ *
  * \subsection core-remarks General Remarks
- * 
+ *
  * - The library is currently not intended to be linked dynamically.
- * 
+ *
  * - When nicegraf's C headers are included from C++, all global functions
  *   within them are automatically declared to have C linkage. Additionally,
  *   they are declared to be noexcept.
- * 
+ *
  * \subsection object-model Object Model
- * 
+ *
  * nicegraf objects, such as images, buffers, render targets, etc., are
  * represented using opaque handles. The objects are created and destroyed
  * explicitly by the application, and it is the responsibility of the
  * application to ensure a correct order of destruction.
- * 
+ *
  * \subsection error-reporting Error Reporting
- * 
+ *
  * Most nicegraf routines report their completion status by returning an
  * \ref ngf_error, and write their results to out-parameters. The returned value
  * is a generic error code. Detailed, human-readable information about errors
@@ -71,19 +71,19 @@
  * which the user may specify when providing the callback), a printf-style
  * format string, and an arbitrary number of arguments specifying the data for
  * the format-string.
- *  
+ *
  * \subsection host-memory-management Host Memory Management
- * 
+ *
  * By default, nicegraf uses the standard malloc/free to manage host memory for
  * internal purposes. The client may override this behavior by supplying custom
  * memory allocation callbacks (see \ref ngf_allocation_callbacks).
- * 
+ *
  * \subsection gpu-memory-management GPU Memory Management
- * 
+ *
  * nicegraf internally manages GPU memory for all backends. It is currently not
  * possible for clients to override this behavior and do their own GPU memory
  * management.
- *  
+ *
  */
 
 #pragma once
@@ -133,7 +133,7 @@ typedef struct ngf_device_capabilities {
   size_t max_uniform_buffer_range;
 
   /**
-   * When binding texel buffers, the specified offset must be 
+   * When binding texel buffers, the specified offset must be
    * a multiple of this number.
    */
   size_t texel_buffer_offset_alignment;
@@ -146,7 +146,7 @@ typedef struct ngf_device_capabilities {
   /**
    * The maximum allowed number of sampled images (textures) per single
    * shader stage. Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER
-   * and \ref NGF_DESCRIPTOR_TEXEL_BUFFER do count against this limit. 
+   * and \ref NGF_DESCRIPTOR_TEXEL_BUFFER do count against this limit.
    */
   size_t max_sampled_images_per_stage;
 
@@ -207,7 +207,6 @@ typedef struct ngf_device_capabilities {
    */
   size_t max_color_attachments_per_pass;
 
-
   /**
    * The maximum degree of sampler anisotropy.
    */
@@ -218,7 +217,8 @@ typedef struct ngf_device_capabilities {
    * range for the clip-space z coordinate. nicegraf enforces clip-space
    * z to be in this range on all backends that support it. This ensures
    * better precision for near-field objects.
-   * See the following for an in-depth explanation: http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
+   * See the following for an in-depth explanation:
+   * http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
    */
   bool clipspace_z_zero_to_one;
 } ngf_device_capabilities;
@@ -291,7 +291,7 @@ typedef struct ngf_allocation_callbacks {
 /**
  * @typedef ngf_device_handle
  * A handle that uniquely identifies a rendering device.
- * 
+ *
  * Note that the value of the handle
  * corresponding to the same exact physical device may be different across for different
  * instances of the same client. In other words, if the client application shuts down, then
@@ -302,7 +302,7 @@ typedef struct ngf_allocation_callbacks {
 typedef uint32_t ngf_device_handle;
 
 /**
- * @enum ngf_device_type 
+ * @enum ngf_device_type
  * Enumerates different types of rendering devices.
  * \ingroup ngf
  */
@@ -320,13 +320,13 @@ typedef enum ngf_device_performance_tier {
 } ngf_device_performance_tier;
 
 /**
- * Maximum length of a device's name. 
- * \ingroup ngf 
+ * Maximum length of a device's name.
+ * \ingroup ngf
  */
 #define NGF_DEVICE_NAME_MAX_LENGTH (256u)
 
 /**
- * @struct ngf_device 
+ * @struct ngf_device
  * Information about a rendering device.
  * See also: \ref ngf_get_device_list
  * \ingroup ngf
@@ -349,7 +349,7 @@ typedef struct ngf_device {
  * See also: \ref ngf_initialize.
  */
 typedef struct ngf_init_info {
-  /** 
+  /**
    * Pointer to a structure containing a diagnostic log configuration.
    * If this pointer is set to `NULL`, no diagnostic callback shall be invoked.
    */
@@ -376,20 +376,20 @@ typedef struct ngf_init_info {
  * See also \ref error-reporting.
  */
 typedef enum ngf_error {
-  NGF_ERROR_OK = 0,     /**< No error, operation finished successfully. */
-  NGF_ERROR_OUT_OF_MEM, /**< Host memory allocation failed. */
+  NGF_ERROR_OK = 0,                 /**< No error, operation finished successfully. */
+  NGF_ERROR_OUT_OF_MEM,             /**< Host memory allocation failed. */
   NGF_ERROR_OBJECT_CREATION_FAILED, /**< A call to the backend API that was
                                        supposed to create an object failed. */
-  NGF_ERROR_OUT_OF_BOUNDS, /**< The operation would have resulted in an out of
-                              bounds access. */
-  NGF_ERROR_INVALID_FORMAT, /**< A format enumerator provided as part of an
-                               argument to the call is not valid in that
-                               context.*/
-  NGF_ERROR_INVALID_SIZE, /**< A size passed as part of an argument to the
-                            call is either too large or too small.*/
-  NGF_ERROR_INVALID_ENUM, /**< An enumerator passed as part of an argument to
-                             the call is not valid in that context.*/
-  NGF_ERROR_INVALID_OPERATION /**< The routine did not complete successfully. */
+  NGF_ERROR_OUT_OF_BOUNDS,          /**< The operation would have resulted in an out of
+                                       bounds access. */
+  NGF_ERROR_INVALID_FORMAT,         /**< A format enumerator provided as part of an
+                                       argument to the call is not valid in that
+                                       context.*/
+  NGF_ERROR_INVALID_SIZE,           /**< A size passed as part of an argument to the
+                                      call is either too large or too small.*/
+  NGF_ERROR_INVALID_ENUM,           /**< An enumerator passed as part of an argument to
+                                       the call is not valid in that context.*/
+  NGF_ERROR_INVALID_OPERATION       /**< The routine did not complete successfully. */
   /*..add new errors above this line */
 } ngf_error;
 
@@ -399,9 +399,9 @@ typedef enum ngf_error {
  * Represents a rectangular, axis-aligned 2D region with integer coordinates.
  */
 typedef struct ngf_irect2d {
-  int32_t  x; /**< X coord of lower-left corner. */
-  int32_t  y; /**< Y coord of lower-left corner. */
-  uint32_t width; /**< The size of the rectangle along the x-axis. */
+  int32_t  x;      /**< X coord of lower-left corner. */
+  int32_t  y;      /**< Y coord of lower-left corner. */
+  uint32_t width;  /**< The size of the rectangle along the x-axis. */
   uint32_t height; /**< The size of the rectangle along the y-axis. */
 } ngf_irect2d;
 
@@ -413,7 +413,7 @@ typedef struct ngf_irect2d {
 typedef struct ngf_extent3d {
   uint32_t width;  /**< The size of the volume along the x-axis. */
   uint32_t height; /**< The size of the volume along the y-axis. */
-  uint32_t depth;  /**< The size of the volume along he z-axis. */ 
+  uint32_t depth;  /**< The size of the volume along he z-axis. */
 } ngf_extent3d;
 
 /**
@@ -435,7 +435,7 @@ typedef struct ngf_offset3d {
  */
 typedef enum ngf_stage_type {
   NGF_STAGE_VERTEX = 0, /**< Indicates the vertex processing stage. */
-  NGF_STAGE_FRAGMENT, /**< Indicates the fragment processing stage. */
+  NGF_STAGE_FRAGMENT,   /**< Indicates the fragment processing stage. */
   // TODO: compute pipelines
   NGF_STAGE_COUNT
 } ngf_stage_type;
@@ -533,8 +533,8 @@ typedef enum ngf_front_face_mode {
  * Rasterization stage parameters.
  */
 typedef struct ngf_rasterization_info {
-  bool discard;                     /**< Enable/disable rasterizer discard. Use this in pipelines that
-                                         don't write any fragment data.*/
+  bool discard; /**< Enable/disable rasterizer discard. Use this in pipelines that
+                     don't write any fragment data.*/
   ngf_polygon_mode    polygon_mode; /**< How to draw polygons.*/
   ngf_cull_mode       cull_mode;    /**< Which polygons to cull.*/
   ngf_front_face_mode front_face;   /**< Which winding counts as front-facing.*/
@@ -798,15 +798,14 @@ typedef enum ngf_buffer_storage_type {
  * Flags for specifying how the buffer is intended to be used.
  */
 typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01, /**< Buffer may be used as a source for
-                                       transfer operations. */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,  /**< Buffer may be used as a
-                                        destination for transfer operations.  */
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< Buffer may be used as a source for
+                                             transfer operations. */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< Buffer may be used as a
+                                             destination for transfer operations.  */
   NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< Buffer may be bound as a uniform
                                              buffer. */
-  NGF_BUFFER_USAGE_INDEX_BUFFER =
-      0x08, /**< Buffer may be used as the source of index data for indexed
-               drawcalls. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER = 0x08,   /**< Buffer may be used as the source of index data for
+                                             indexed   drawcalls. */
   NGF_BUFFER_USAGE_VERTEX_BUFFER =
       0x10, /**< Buffer may be used as the source of vertex attribute data. */
 
@@ -820,9 +819,8 @@ typedef enum ngf_buffer_usage {
  * Information required for buffer creation.
  */
 typedef struct ngf_buffer_info {
-  size_t                  size; /**< Size of the buffer in bytes. */
-  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage
-                                           type.*/
+  size_t                  size;         /**< Size of the buffer in bytes. */
+  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage type.*/
   uint32_t                buffer_usage; /**< Flags specifying intended usage.*/
 } ngf_buffer_info;
 
@@ -1059,7 +1057,7 @@ typedef struct ngf_render_target_info {
 /**
  * @struct ngf_render_target
  * \ingroup ngf
- * Render target. 
+ * Render target.
  */
 typedef struct ngf_render_target_t* ngf_render_target;
 
@@ -1190,7 +1188,7 @@ typedef struct ngf_buffer_bind_info {
 } ngf_buffer_bind_info;
 
 /**
- * @struct ngf_image_sampler_bind_info 
+ * @struct ngf_image_sampler_bind_info
  * \ingroup ngf
  * Specifies an image bind operation.
  */
@@ -1206,9 +1204,9 @@ typedef struct ngf_image_sampler_bind_info {
  * the target set and binding IDs.
  */
 typedef struct ngf_resource_bind_op {
-  uint32_t            target_set; /**< Target set ID. */
+  uint32_t            target_set;     /**< Target set ID. */
   uint32_t            target_binding; /**< Target binding ID. */
-  ngf_descriptor_type type; /**< Type of the resource being bound. */
+  ngf_descriptor_type type;           /**< Type of the resource being bound. */
   union {
     ngf_buffer_bind_info        buffer;
     ngf_image_sampler_bind_info image_sampler;
@@ -1449,18 +1447,19 @@ typedef uint32_t ngf_frame_token;
  * Obtain a list of rendering devices available to nicegraf. This function is not thread-safe.
  * The devices are not returned in any particular order, and the order is not guaranteed to be the
  * same every time the function is called.
- * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be populated with
- *                a pointer to an array of \ref ngf_device instances, each containing data about a rendering device
- *                available to the system. Callers should not attempt to free the returned pointer.
- * @param ndevices pointer to a `uint32_t`. If not NULL, the number of available rendering devices shall be
- *                 written to the memory pointed to by this parameter.
+ * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be
+ * populated with a pointer to an array of \ref ngf_device instances, each containing data about a
+ * rendering device available to the system. Callers should not attempt to free the returned
+ * pointer.
+ * @param ndevices pointer to a `uint32_t`. If not NULL, the number of available rendering devices
+ * shall be written to the memory pointed to by this parameter.
  */
 ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
 
 /**
  * \ingroup ngf
  * Initializes nicegraf.
- * 
+ *
  * The client should call this function only once during the
  * entire lifetime of the application. This function is not thread safe.
  * @param init_info Initialization parameters.
