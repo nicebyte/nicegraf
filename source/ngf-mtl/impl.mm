@@ -69,17 +69,6 @@ ngf_device_capabilities DEVICE_CAPS;
 
 #pragma mark ngf_enum_maps
 
-struct mtl_format {
-  const MTLPixelFormat format;
-  const uint8_t rbits;
-  const uint8_t gbits;
-  const uint8_t bbits;
-  const uint8_t abits;
-  const uint8_t dbits;
-  const uint8_t sbits;
-  const bool    srgb;
-};
-
 static MTLBlendFactor get_mtl_blend_factor(ngf_blend_factor f) {
   static constexpr MTLBlendFactor factors[NGF_BLEND_FACTOR_COUNT] = {
     MTLBlendFactorZero,
@@ -111,50 +100,98 @@ static MTLBlendOperation get_mtl_blend_operation(ngf_blend_op op) {
   return ops[op];
 }
 
+struct mtl_format {
+  const MTLPixelFormat format = MTLPixelFormatInvalid;
+  const uint8_t bits_per_block = 0;
+  const bool    srgb = false;
+  const uint8_t block_width = 1;
+  const uint8_t block_height = 1;
+};
+
 static mtl_format get_mtl_pixel_format(ngf_image_format f) {
   static const mtl_format formats[NGF_IMAGE_FORMAT_COUNT] = {
-    {MTLPixelFormatR8Unorm, 8, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatRG8Unorm, 8, 8, 0, 0, 0, 0, false},
-    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, false}, // RGB8, unsupported on Metal
-    {MTLPixelFormatRGBA8Unorm, 8, 8, 8, 8, 0, 0, false},
-    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, true}, // SRGB8, unsupported on Metal
-    {MTLPixelFormatRGBA8Unorm_sRGB, 8, 8, 8, 8, 0, 0, true},
-    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, false}, // BGR8, unsupported on Metal
-    {MTLPixelFormatBGRA8Unorm, 8, 8, 8, 8, 0, 0, false},
-    {MTLPixelFormatInvalid, 8, 8, 8, 0, 0, 0, true}, // BGR8_SRGB, unsupported on Metal
-    {MTLPixelFormatBGRA8Unorm_sRGB, 8, 8, 8, 8, 0, 0, true},
-    {MTLPixelFormatR32Float, 32, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatRG32Float, 32, 32, 0, 0, 0, 0, false},
-    {MTLPixelFormatInvalid, 32, 32, 32, 0, 0, 0,  false}, // RGB32F, unsupported on Metal
-    {MTLPixelFormatRGBA32Float, 32, 32, 32, 32, 0, 0,  false},
-    {MTLPixelFormatR16Float, 16, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatRG16Float, 16, 16, 0, 0, 0, 0, false},
-    {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16F, unsupported on Metal
-    {MTLPixelFormatRGBA16Float, 16, 16, 16, 16, 0, 0, false},
-    {MTLPixelFormatRG11B10Float, 11, 11, 10, 0, 0, 0, false},
-    {MTLPixelFormatRGB9E5Float, 9, 9, 9, 5, 0, 0, false},
-    {MTLPixelFormatR16Unorm, 16, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatR16Snorm, 16, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatR16Uint, 16, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatR16Sint, 16, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatRG16Uint, 16, 16, 0, 0, 0, 0, false},
-    {MTLPixelFormatInvalid, 16, 16, 16, 0, 0, 0, false}, // RGB16U, unsupported on Metal
-    {MTLPixelFormatRGBA16Uint, 16, 16, 16, 16, 0, 0, false},
-    {MTLPixelFormatR32Uint, 32, 0, 0, 0, 0, 0, false},
-    {MTLPixelFormatRG32Uint, 32, 32, 0, 0, 0, 0, false},
-    {MTLPixelFormatInvalid, 32, 32, 32, 0, 0, 0, false}, // RGB32U, unsupported on Metal
-    {MTLPixelFormatRGBA32Uint, 32, 32, 32, 32, 0, 0, false},
-    {MTLPixelFormatDepth32Float, 0, 0, 0, 0, 32, 0, false},
+    {MTLPixelFormatR8Unorm, 8},
+    {MTLPixelFormatRG8Unorm, 16},
+    {}, // RGB8, unsupported
+    {MTLPixelFormatRGBA8Unorm, 32},
+    {}, // SRGB8, unsupported
+    {MTLPixelFormatRGBA8Unorm_sRGB, 32, true},
+    {}, // BGR8, unsupported
+    {MTLPixelFormatBGRA8Unorm, 32},
+    {}, // BGR8_SRGB, unsupported
+    {MTLPixelFormatBGRA8Unorm_sRGB, 32, true},
+    {MTLPixelFormatR32Float, 32},
+    {MTLPixelFormatRG32Float, 64},
+    {}, // RGB32F, unsupported
+    {MTLPixelFormatRGBA32Float, 128},
+    {MTLPixelFormatR16Float, 16},
+    {MTLPixelFormatRG16Float, 32},
+    {}, // RGB16F, unsupported
+    {MTLPixelFormatRGBA16Float, 64},
+    {MTLPixelFormatRG11B10Float, 32},
+    {MTLPixelFormatRGB9E5Float, 32},
+    {MTLPixelFormatR16Unorm, 16},
+    {MTLPixelFormatR16Snorm, 16},
+    {MTLPixelFormatR16Uint, 16},
+    {MTLPixelFormatR16Sint, 16},
+    {MTLPixelFormatRG16Uint, 32},
+    {}, // RGB16U, unsupported
+    {MTLPixelFormatRGBA16Uint, 64},
+    {MTLPixelFormatR32Uint, 32},
+    {MTLPixelFormatRG32Uint, 64},
+    {}, // RGB32U, unsupported
+    {MTLPixelFormatRGBA32Uint, 128},
 #if TARGET_OS_OSX
-    {MTLPixelFormatDepth16Unorm, 0, 0, 0, 0, 16, 0, false},
-    {MTLPixelFormatDepth32Float_Stencil8, 0, 0, 0, 0, 24, 8, false}, // instead of 24Unorm_Stencil8,
+    {MTLPixelFormatBC7_RGBAUnorm, 128, false, 4, 4},
+    {MTLPixelFormatBC7_RGBAUnorm_sRGB, 128, true, 4, 4},
+#else
+    {}, {}, // BC7, unsupported on iOS
+#endif
+#if TARGET_OS_OSX && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 110000
+    // ASTC is not supported till macOS 11.0
+    {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+    {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {},
+#else
+    {MTLPixelFormatASTC_4x4_LDR, 128, false, 4, 4},
+    {MTLPixelFormatASTC_4x4_sRGB, 128, true, 4, 4},
+    {MTLPixelFormatASTC_5x4_LDR, 128, false, 5, 4},
+    {MTLPixelFormatASTC_5x4_sRGB, 128, true, 5, 4},
+    {MTLPixelFormatASTC_5x5_LDR, 128, false, 5, 5},
+    {MTLPixelFormatASTC_5x5_sRGB, 128, true, 5, 5},
+    {MTLPixelFormatASTC_6x5_LDR, 128, false, 6, 5},
+    {MTLPixelFormatASTC_6x5_sRGB, 128, true, 6, 5},
+    {MTLPixelFormatASTC_6x6_LDR, 128, false, 6, 6},
+    {MTLPixelFormatASTC_6x6_sRGB, 128, true, 6, 6},
+    {MTLPixelFormatASTC_8x5_LDR, 128, false, 8, 5},
+    {MTLPixelFormatASTC_8x5_sRGB, 128, true, 8, 5},
+    {MTLPixelFormatASTC_8x6_LDR, 128, false, 8, 6},
+    {MTLPixelFormatASTC_8x6_sRGB, 128, true, 8, 6},
+    {MTLPixelFormatASTC_8x8_LDR, 128, false, 8, 8},
+    {MTLPixelFormatASTC_8x8_sRGB, 128, true, 8, 8},
+    {MTLPixelFormatASTC_10x5_LDR, 128, false, 10, 5},
+    {MTLPixelFormatASTC_10x5_sRGB, 128, true, 10, 5},
+    {MTLPixelFormatASTC_10x6_LDR, 128, false, 10, 6},
+    {MTLPixelFormatASTC_10x6_sRGB, 128, true, 10, 6},
+    {MTLPixelFormatASTC_10x8_LDR, 128, false, 10, 8},
+    {MTLPixelFormatASTC_10x8_sRGB, 128, true, 10, 8},
+    {MTLPixelFormatASTC_10x10_LDR, 128, false, 10, 10},
+    {MTLPixelFormatASTC_10x10_sRGB, 128, true, 10, 10},
+    {MTLPixelFormatASTC_12x10_LDR, 128, false, 12, 10},
+    {MTLPixelFormatASTC_12x10_sRGB, 128, true, 12, 10},
+    {MTLPixelFormatASTC_12x12_LDR, 128, false, 12, 12},
+    {MTLPixelFormatASTC_12x12_sRGB, 128, true, 12, 12},
+#endif
+    {MTLPixelFormatDepth32Float, 32},
+#if TARGET_OS_OSX
+    {MTLPixelFormatDepth16Unorm, 16},
+    {MTLPixelFormatDepth32Float_Stencil8, 32}, // instead of 24Unorm_Stencil8,
     // because metal validator doesn't
     // like it for some reason...
 #else
-    {MTLPixelFormatInvalid, 0, 0, 0, 0, 16, 0, false}, // DEPTH16, iOS does not support.
-    {MTLPixelFormatDepth32Float_Stencil8, 0, 0, 0, 0, 24, 8, false}, // Emulate DEPTH24_STENCIL8 on iOS
+    {}, // DEPTH16, iOS does not support.
+    {MTLPixelFormatDepth32Float_Stencil8, 32}, // Emulate DEPTH24_STENCIL8 on iOS
 #endif
-    {MTLPixelFormatInvalid, 0, 0, 0, 0, 0, 0, false}
+    {}
   };
   return formats[f];
 }
@@ -374,12 +411,16 @@ static MTLSamplerMipFilter get_mtl_mip_filter(ngf_sampler_filter f) {
 
 static uint32_t ngfmtl_get_bytesperpel(const ngf_image_format format) {
   const mtl_format f = get_mtl_pixel_format(format);
-  const uint32_t bits = f.rbits + f.gbits + f.bbits + f.abits + f.dbits + f.sbits;
-  return bits / 8;
+  assert((f.block_width | f.block_height) == 1); //invalid op for compressed formats
+  return f.bits_per_block / 8;
 }
 
 static uint32_t ngfmtl_get_pitch(const uint32_t width, const ngf_image_format format) {
-  return width * ngfmtl_get_bytesperpel(format);
+  const mtl_format f = get_mtl_pixel_format(format);
+  const bool is_compressed_format = (f.block_width | f.block_height) > 1;
+  return is_compressed_format
+  ? (width + f.block_width - 1) / f.block_width * f.bits_per_block / 8
+  : width * f.bits_per_block / 8;
 }
 
 
