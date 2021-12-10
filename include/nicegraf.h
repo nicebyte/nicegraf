@@ -592,15 +592,50 @@ typedef struct ngf_stencil_info {
 /**
  * @struct ngf_depth_stencil_info
  * \ingroup ngf
- * Pipeline's depth/stencil state description.
+ * A graphics pipeline's depth/stencil state description.
  */
 typedef struct ngf_depth_stencil_info {
-  bool             depth_test;    /**< Enable depth test.*/
-  bool             depth_write;   /**< Enable writes to depth buffer.*/
-  ngf_compare_op   depth_compare; /**< Depth comparison function.*/
-  bool             stencil_test;  /**< Enable stencil test.*/
-  ngf_stencil_info front_stencil; /**< Stencil op for front-facing polys*/
-  ngf_stencil_info back_stencil;  /**< Stencil op for back-facing polys*/
+  /**
+   * Stencil test and actions for front-facing polys.
+   * This is ignored when stencil testing is disabled.
+   */
+  ngf_stencil_info front_stencil;
+
+  /**
+   * Stencil test and actions for back-facing polys.
+   * This is ignored when stencil testing is disabled.
+   */
+  ngf_stencil_info back_stencil;
+
+  /**
+   * The comparison function to use when performing the depth test.
+   * This is ignored when depth testing is disabled.
+   */
+  ngf_compare_op depth_compare;
+
+  /**
+   * Whether to enable stencil testing.
+   * The exact procedure for the stencil test, and the actions to
+   * perform on success or failure can be specified separately
+   * for front- and back-facing polygons (see \ref ngf_depth_stencil_info::front_stencil and
+   * \ref ngf_depth_stencil_info::back_stencil).
+   */
+  bool stencil_test;
+
+  /**
+   * Whether to enable depth test.
+   * When this is enabled, fragments that fail the test specified in
+   * \ref ngf_depth_stencil_info::depth_compare, get discarded.
+   */
+  bool depth_test;
+
+  /**
+   * Whether to enable writing to the depth buffer.
+   * When this is enabled, fragments that pass the depth test have their
+   * depth written into the depth buffer.
+   */
+  bool depth_write;
+
 } ngf_depth_stencil_info;
 
 /**
