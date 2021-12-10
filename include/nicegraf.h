@@ -595,8 +595,6 @@ typedef struct ngf_stencil_info {
  * Pipeline's depth/stencil state description.
  */
 typedef struct ngf_depth_stencil_info {
-  float            min_depth;     /** Near end of the depth range. */
-  float            max_depth;     /** Far end of the depth range. */
   bool             depth_test;    /**< Enable depth test.*/
   bool             depth_write;   /**< Enable writes to depth buffer.*/
   ngf_compare_op   depth_compare; /**< Depth comparison function.*/

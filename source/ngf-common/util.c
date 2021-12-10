@@ -47,8 +47,6 @@ void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_d
       .write_mask    = 0,
       .reference     = 0};
   ngf_depth_stencil_info dsi = {
-      .min_depth     = 0.0f,
-      .max_depth     = 1.0f,
       .stencil_test  = false,
       .depth_test    = false,
       .depth_write   = false,
