@@ -850,13 +850,61 @@ typedef enum ngf_vertex_input_rate {
 /**
  * @struct ngf_vertex_buf_binding_desc
  * \ingroup ngf
- * Specifies an attribute binding.
+ * Specifies a vertex buffer binding.
+ * A _vertex buffer binding_ can be thought of as a slot to which a vertex attribute buffer can be bound.
+ * An \ref ngf_graphics_pipeline may have several such slots, which are addressed by their indices.
+ * Vertex attribute buffers can be bound to these slots with \ref ngf_cmd_bind_attrib_buffer.
+ * The binding also partly defines how the contents of the bound buffer is interpreted - via
+ * \ref ngf_vertex_buf_binding_desc::stride and \ref ngf_vertex_buf_binding_desc::input_rate
  */
 typedef struct ngf_vertex_buf_binding_desc {
-  uint32_t              binding;    /**< Index of the binding that this structure describes.*/
-  uint32_t              stride;     /**< Number of bytes between consecutive attribute values.*/
-  ngf_vertex_input_rate input_rate; /**< Whether attributes read from this binding
-                                  change per-vetex or per-instance.*/
+  uint32_t binding; /**< Index of the binding that this structure describes.*/
+
+  /**
+   * Specifies the distance (in bytes) between the starting bytes of two consecutive attribute
+   * values. When set to 0, the attribute values are assumed to be tightly packed (i.e. the next
+   * value of the attribute immediately follows the previous with no gaps).
+   *
+   * As an example, assume the buffer contains data for a single attribute, such as the position of
+   * a vertex in three-dimensional space. Each component of the position is a 32-bit floating point
+   * number. The values are laid out in memory one after another:
+   *
+   * ```
+   *  ________ ________ ________ ________ ________ ________ ____
+   * |        |        |        |        |        |        |
+   * | pos0.x | pos0.y | pos0.z | pos1.x | pos1.y | pos1.z | ...
+   * |________|________|________|________|________|________|____
+   *
+   * ```
+   * In this case, the stride is 3*4 = 12 bytes - the distance from the beginning of the first
+   * attribute to the beginning of the next attribute is equal to the size of one attribute value.
+   * However, it can be set to 0, because in this case the attribute values are tightly packed - the
+   * next immediately follows the previous.
+   *
+   * Now consider a different case, where we have two attributes: a three-dimensional position and
+   * an RGB color, and the buffer first lists all the attribute values for the first vertex,
+   * then all attribute values for the second vertex and so on:
+   *
+   * ```
+   *  ________ ________ ________ ________ ________ ________ ________ _____
+   * |        |        |        |        |        |        |        |
+   * | pos0.x | pos0.y | pos0.z | col0.x | col0.y | col0.z | pos1.x | ...
+   * |________|________|________|________|________|________|________|_____
+   *
+   * ```
+   *
+   * In this case, the stride has to be nonzero because the position of the next vertex does
+   * not immediately follow the position previous one - there is the value of the color attribute in
+   * between. In this case, assuming the attribute components use a 32-bit floating point, the
+   * stride would have to be `3 * 4 + 3 * 4 = 24` bytes.
+   */
+  uint32_t stride;
+
+  /**
+   * Specifies whether attributes are read from the bound buffer
+   * per-vetex or per-instance.
+   */
+  ngf_vertex_input_rate input_rate;
 } ngf_vertex_buf_binding_desc;
 
 /**
@@ -865,12 +913,20 @@ typedef struct ngf_vertex_buf_binding_desc {
  * Specifies information about a vertex attribute.
  */
 typedef struct ngf_vertex_attrib_desc {
-  uint32_t location;   /**< Attribute index. */
-  uint32_t binding;    /**< Which vertex buffer binding to use.*/
-  uint32_t offset;     /**< Offset in the buffer at which attribute data starts.*/
-  ngf_type type;       /**< Type of attribute component.*/
-  uint32_t size;       /**< Number of attribute components.*/
-  bool     normalized; /**< Whether attribute values should be normalized.*/
+  uint32_t location; /**< Attribute index. */
+  uint32_t binding;  /**< The index of the vertex attribute buffer binding to use.*/
+  uint32_t offset;   /**< Offset in the buffer at which attribute data starts.*/
+  ngf_type type;     /**< Type of attribute component.*/
+  uint32_t size;     /**< Number of attribute components. This value has to be between 1 and 4
+                        (inclusive). */
+
+  /**
+   * Whether the vertex stage sees the raw or normalized values for the attribute components.
+   * Only attributes with component types \ref NGF_TYPE_INT8, \ref NGF_TYPE_UINT8, \ref
+   * NGF_TYPE_INT16 and \ref NGF_TYPE_UINT16 can be normalized. For signed types, the values are
+   * scaled to the [-1; 1] floating point range, for unsigned types they are scaled to [0; 1].
+   */
+  bool normalized; /**< Whether attribute values are normalized.*/
 } ngf_vertex_attrib_desc;
 
 /**
@@ -879,14 +935,19 @@ typedef struct ngf_vertex_attrib_desc {
  * Specifies information about the pipeline's vertex input.
  */
 typedef struct ngf_vertex_input_info {
+  uint32_t nattribs;           /**< Number of attribute descriptions.*/
+  uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings used.*/
+
   /**
-   * Pointer to array of structures describing the vertex buffer binding
-   * used.
+   * Pointer to an array of structures describing vertex attribute buffer
+   * bindings.
    */
   const ngf_vertex_buf_binding_desc* vert_buf_bindings;
-  uint32_t                      nvert_buf_bindings; /**< Number of vertex buffer bindings used.*/
-  const ngf_vertex_attrib_desc* attribs;            /**< Ptr to attrib descriptions.*/
-  uint32_t                      nattribs;           /**< Number of attribute descriptions.*/
+
+  /**
+   * Pointer to an array of structures describing the vertex attributes.
+   */
+  const ngf_vertex_attrib_desc* attribs;
 } ngf_vertex_input_info;
 
 /**
