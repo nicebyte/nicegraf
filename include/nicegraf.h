@@ -810,7 +810,7 @@ typedef struct ngf_blend_info {
 /**
  * @enum ngf_type
  * \ingroup ngf
- * Vertex attribute component type.
+ * Enumerates the available vertex attribute component types.
  */
 typedef enum ngf_type {
   NGF_TYPE_INT8 = 0,   /**< Signed 8-bit integer. */
