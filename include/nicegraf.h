@@ -641,7 +641,8 @@ typedef struct ngf_depth_stencil_info {
 /**
  * @enum ngf_blend_factor
  * \ingroup ngf
- * Blend factors.
+ * Factors that can be used for source and destination values during the blend operation.
+ * See \ref ngf_blend_info for details.
  */
 typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ZERO = 0,
@@ -664,38 +665,48 @@ typedef enum ngf_blend_factor {
 /**
  * @enum ngf_blend_op
  * \ingroup ngf
- * Blend operations.
+ * Operations that can be performed to blend the values computed by the fragment stage
+ * (source values, denoted `S` in the member documentation) with values already present
+ * in the target color attachment of the framebuffer (destination values, denoted `D` in
+ * the member documentation).
+ * 
+ * The factors (\ref ngf_blend_factor) for the source and destination values are denoted
+ * as `Fs` and `Fd` respectively in the member documentation below.
+ * 
  */
 typedef enum ngf_blend_op {
-  NGF_BLEND_OP_ADD,
-  NGF_BLEND_OP_SUB,
-  NGF_BLEND_OP_REV_SUB,
-  NGF_BLEND_OP_MIN,
-  NGF_BLEND_OP_MAX,
+  NGF_BLEND_OP_ADD,     /**< The result of the blend operation shall be `S*Fs + D*Fd` */
+  NGF_BLEND_OP_SUB,     /**< The result of the blend operation shall be `S*Fs - D*Fd` */
+  NGF_BLEND_OP_REV_SUB, /**< The result of the blend operation shall be `D*Fd - S*Fs` */
+  NGF_BLEND_OP_MIN,     /**< The result of the blend operation shall be `min(S, D)`   */
+  NGF_BLEND_OP_MAX,     /**< The result of the blend operation shall be `max(S, D)`   */
   NGF_BLEND_OP_COUNT
 } ngf_blend_op;
 
 /**
  * @struct ngf_blend_info
  * \ingroup ngf
- * Pipeline's blend state description.
- * The result of blend is computed for color and alpha separately,
- * according to the following equation:
- *  source*sfactor OP dest*dfactor
- * Where:
- *  - `source` is the incoming value, `dest` is the value already in the frame
- *     buffer.
- *  - `OP` is one of the supported blend operations.
- *  - `sfactor` and `dfactor` are one of the supported blend factors.
+ * Describes how blending should be handled by the pipeline.
+ * If blending is disabled, the resulting color and alpha values are directly assigned
+ * the color and alpha values computed at the fragment stage.
+ * 
+ * When blending is enabled, the resulting color and alpha values are computed using the
+ * corresponding blend operations and factors (specified separately for color and alpha).
+ * Note that if the render target attachment from which the destination values are read
+ * uses an sRGB format, the destination color values are linearized prior to being used
+ * in a blend operation.
+ * 
+ * If the render target attachment uses an sRGB format, the resulting color value
+ * is converted to an sRGB representation prior to being finally written to the attachment.
  */
 typedef struct ngf_blend_info {
-  bool             enable;                 /**< Enable blending.*/
-  ngf_blend_op     blend_op_color;         /**< Blend operation to perform for color. */
-  ngf_blend_op     blend_op_alpha;         /**< Blend operation to perform for alpha. */
-  ngf_blend_factor src_color_blend_factor; /**< Source blend factor for color. */
-  ngf_blend_factor dst_color_blend_factor; /**< Destination blend factor for color. */
-  ngf_blend_factor src_alpha_blend_factor; /**< Source blend factor for alpha. */
-  ngf_blend_factor dst_alpha_blend_factor; /**< Destination blend factor for alpha. */
+  bool             enable;                 /**< Specifies whethe blending is enabled.*/
+  ngf_blend_op     blend_op_color;         /**< The blend operation to perform for color. */
+  ngf_blend_op     blend_op_alpha;         /**< The blend operation to perform for alpha. */
+  ngf_blend_factor src_color_blend_factor; /**< The source blend factor for color. */
+  ngf_blend_factor dst_color_blend_factor; /**< The destination blend factor for color. */
+  ngf_blend_factor src_alpha_blend_factor; /**< The source blend factor for alpha. */
+  ngf_blend_factor dst_alpha_blend_factor; /**< The destination blend factor for alpha. */
   float            blend_color[4];         /**< Blend color. */
 } ngf_blend_info;
 
