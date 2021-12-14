@@ -642,7 +642,7 @@ typedef struct ngf_depth_stencil_info {
  * @enum ngf_blend_factor
  * \ingroup ngf
  * Factors that can be used for source and destination values during the blend operation.
- * The factor can be thought 
+ * The factor can be thought
  * See \ref ngf_blend_info for details.
  */
 typedef enum ngf_blend_factor {
@@ -762,10 +762,10 @@ typedef enum ngf_blend_factor {
  * (source values, denoted `S` in the member documentation) with values already present
  * in the target color attachment of the framebuffer (destination values, denoted `D` in
  * the member documentation).
- * 
+ *
  * The factors (\ref ngf_blend_factor) for the source and destination values are denoted
  * as `Fs` and `Fd` respectively in the member documentation below.
- * 
+ *
  */
 typedef enum ngf_blend_op {
   NGF_BLEND_OP_ADD,     /**< The result of the blend operation shall be `S*Fs + D*Fd` */
@@ -782,13 +782,13 @@ typedef enum ngf_blend_op {
  * Describes how blending should be handled by the pipeline.
  * If blending is disabled, the resulting color and alpha values are directly assigned
  * the color and alpha values computed at the fragment stage.
- * 
+ *
  * When blending is enabled, the resulting color and alpha values are computed using the
  * corresponding blend operations and factors (specified separately for color and alpha).
  * Note that if the render target attachment from which the destination values are read
  * uses an sRGB format, the destination color values are linearized prior to being used
  * in a blend operation.
- * 
+ *
  * If the render target attachment uses an sRGB format, the resulting color value
  * is converted to an sRGB representation prior to being finally written to the attachment.
  */
@@ -804,7 +804,7 @@ typedef struct ngf_blend_info {
                                               NGF_BLEND_FACTOR_CONSTANT_ALPHA, \ref
                                               NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR and \ref
                                               NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA . */
-  bool             enable;                 /**< Specifies whether blending is enabled.*/
+  bool enable;                             /**< Specifies whether blending is enabled.*/
 } ngf_blend_info;
 
 /**
@@ -904,87 +904,6 @@ typedef struct ngf_multisample_info {
 } ngf_multisample_info;
 
 /**
- * @enum ngf_buffer_storage_type
- * \ingroup ngf
- * Types of memory backing a buffer object.
- */
-typedef enum ngf_buffer_storage_type {
-  /**
-   * Memory that can be read by the host.
-   */
-  NGF_BUFFER_STORAGE_HOST_READABLE,
-
-  /**
-   * Memory that can be written to by the host.
-   */
-  NGF_BUFFER_STORAGE_HOST_WRITEABLE,
-
-  /**
-   * Memory that can be both read from and written to by the
-   * host.
-   */
-  NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
-
-  /**
-   * Private memory cannot be accessed by the host directly. The contents of a
-   * buffer backed by this type of memory can only be modified by executing a
-   * `ngf_cmd_copy_xxxxx_buffer`.
-   */
-  NGF_BUFFER_STORAGE_PRIVATE
-} ngf_buffer_storage_type;
-
-/**
- * @enum ngf_buffer_usage
- * \ingroup ngf
- * Flags for specifying how the buffer is intended to be used.
- */
-typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< Buffer may be used as a source for
-                                             transfer operations. */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< Buffer may be used as a
-                                             destination for transfer operations.  */
-  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< Buffer may be bound as a uniform
-                                             buffer. */
-  NGF_BUFFER_USAGE_INDEX_BUFFER = 0x08,   /**< Buffer may be used as the source of index data for
-                                             indexed   drawcalls. */
-  NGF_BUFFER_USAGE_VERTEX_BUFFER =
-      0x10, /**< Buffer may be used as the source of vertex attribute data. */
-
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /**< Buffer may be bound as a uniform
-                                          texel buffer. */
-} ngf_buffer_usage;
-
-/**
- * @struct ngf_buffer_info
- * \ingroup ngf
- * Information required for buffer creation.
- */
-typedef struct ngf_buffer_info {
-  size_t                  size;         /**< Size of the buffer in bytes. */
-  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage type.*/
-  uint32_t                buffer_usage; /**< Flags specifying intended usage.*/
-} ngf_buffer_info;
-
-/**
- * @struct ngf_buffer
- * \ingroup ngf
- * A memory buffer.
- */
-typedef struct ngf_buffer_t* ngf_buffer;
-
-/**
- * @enum ngf_image_type
- * \ingroup ngf
- * Possible image types.
- */
-typedef enum ngf_image_type {
-  NGF_IMAGE_TYPE_IMAGE_2D = 0,
-  NGF_IMAGE_TYPE_IMAGE_3D,
-  NGF_IMAGE_TYPE_CUBE,
-  NGF_IMAGE_TYPE_COUNT
-} ngf_image_type;
-
-/**
  * @enum ngf_image_format
  * \ingroup ngf
  * Image formats.
@@ -1069,70 +988,6 @@ typedef enum ngf_image_format {
 } ngf_image_format;
 
 /**
- * @enum ngf_image_usage
- * \ingroup ngf
- * Image usage flags.
- */
-typedef enum ngf_image_usage {
-  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
-  NGF_IMAGE_USAGE_ATTACHMENT  = 0x02, /**< Can be used as an attachment for a
-                                           render target.*/
-  NGF_IMAGE_USAGE_XFER_DST = 0x04, /**< Can be used as a destination for a transfer operation. **/
-  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 /**< Use this flag to enable auto mipmap generation. */
-} ngf_image_usage;
-
-/**
- * @struct ngf_image_info
- * \ingroup ngf
- * Describes an image.
- */
-typedef struct ngf_image_info {
-  ngf_image_type type;
-  ngf_extent3d   extent;         /**< Width, height and depth (for 3d images) or no. of
-                                      layers (for layered images).*/
-  uint32_t         nmips;        /**< Number of mip levels.*/
-  ngf_image_format format;       /**< Internal format.*/
-  ngf_sample_count sample_count; /**< Number of samples. **/
-  uint32_t         usage_hint;   /**< How the client intends to use the image. Must be a
-                                      combination of image usage flags.*/
-} ngf_image_info;
-
-/**
- * @struct ngf_image
- * \ingroup ngf
- * An image object.
- */
-typedef struct ngf_image_t* ngf_image;
-
-/**
- * @enum ngf_cubemap_face
- * \ingroup ngf
- * Indicates the face of a cubemap.
- */
-typedef enum ngf_cubemap_face {
-  NGF_CUBEMAP_FACE_POSITIVE_X,
-  NGF_CUBEMAP_FACE_NEGATIVE_X,
-  NGF_CUBEMAP_FACE_POSITIVE_Y,
-  NGF_CUBEMAP_FACE_NEGATIVE_Y,
-  NGF_CUBEMAP_FACE_POSITIVE_Z,
-  NGF_CUBEMAP_FACE_NEGATIVE_Z,
-  NGF_CUBEMAP_FACE_COUNT
-} ngf_cubemap_face;
-
-/**
- * @struct ngf_image_ref
- * \ingroup ngf
- * Reference to a part of an image.
- */
-typedef struct ngf_image_ref {
-  ngf_image        image;        /**< Image being referred to.*/
-  uint32_t         mip_level;    /**< Mip level within the image.*/
-  uint32_t         layer;        /**< Layer within the image.*/
-  ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
-                                      non-cubemap images.*/
-} ngf_image_ref;
-
-/**
  * @enum ngf_attachment_type
  * \ingroup ngf
  * Rendertarget attachment types.
@@ -1142,53 +997,6 @@ typedef enum ngf_attachment_type {
   NGF_ATTACHMENT_DEPTH,
   NGF_ATTACHMENT_DEPTH_STENCIL
 } ngf_attachment_type;
-
-/**
- * @enum ngf_attachment_load_op
- * \ingroup ngf
- * What to do on attachment load.
- */
-typedef enum ngf_attachment_load_op {
-  NGF_LOAD_OP_DONTCARE = 0, /**< Don't care what happens. */
-  NGF_LOAD_OP_KEEP,         /**< Preserve the prior contents of the attachment. */
-  NGF_LOAD_OP_CLEAR,        /**< Clear attachment. */
-  NGF_LOAD_OP_COUNT
-} ngf_attachment_load_op;
-
-/**
- * @enum ngf_attachment_store_op
- * \ingroup ngf
- * What to do on attachment store.
- */
-typedef enum ngf_attachment_store_op {
-  /**
-   * Don't care what happens. Use this if you don't plan on reading back the
-   * contents of the attachment in any shaders or presenting it to screen.
-   */
-  NGF_STORE_OP_DONTCARE = 0,
-
-  /**
-   * Make sure the contents is written out to system memory. Use this if you
-   * plan on reading the contents of the attachment in any shaders or
-   * presenting it to screen.
-   */
-  NGF_STORE_OP_STORE,
-
-  NGF_STORE_OP_COUNT
-} ngf_attachment_store_op;
-
-/**
- * @struct ngf_clear_info
- * \ingroup ngf
- * Specifies a rendertarget clear operation.
- */
-typedef union ngf_clear_info {
-  float clear_color[4];
-  struct {
-    float    clear_depth;
-    uint32_t clear_stencil;
-  } clear_depth_stencil;
-} ngf_clear;
 
 /**
  * @struct ngf_attachment_description
@@ -1212,184 +1020,6 @@ typedef struct ngf_attachment_descriptions {
   uint32_t                          ndescs;
   const ngf_attachment_description* descs;
 } ngf_attachment_descriptions;
-
-/**
- * @struct ngf_render_target_info
- * \ingroup ngf
- * Specifies information about a rendertarget.
- */
-typedef struct ngf_render_target_info {
-  const ngf_attachment_descriptions* attachment_descriptions; /**< List of attachment descriptions
-                                                                   for this render target. */
-  const ngf_image_ref* attachment_image_refs;                 /**< Image references corresponding
-                                                                   to each attachment in the list. */
-} ngf_render_target_info;
-
-/**
- * @struct ngf_render_target
- * \ingroup ngf
- * Render target.
- */
-typedef struct ngf_render_target_t* ngf_render_target;
-
-/**
- * @struct ngf_pass_info
- * \ingroup ngf
- * Information about a render pass.
- */
-typedef struct ngf_pass_info {
-  ngf_render_target              render_target;
-  const ngf_attachment_load_op*  load_ops;
-  const ngf_attachment_store_op* store_ops;
-  const ngf_clear*               clears;
-} ngf_pass_info;
-
-/**
- * @enum ngf_present_mode
- * \ingroup ngf
- * Enumerates possible presentation modes.
- * "Presentation mode" refers to the particular way the CPU,
- * GPU and the presentation engine interact.
- */
-typedef enum ngf_present_mode {
-  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
-  NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
-} ngf_present_mode;
-
-/**
- * @struct ngf_swapchain_info
- * \ingroup ngf
- * Swapchain configuration.
- */
-typedef struct ngf_swapchain_info {
-  ngf_image_format color_format;  /**< Swapchain image format. */
-  ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to
-                                     NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
-  ngf_sample_count sample_count;  /**< Number of samples per pixel (0 for non-multisampled) */
-  uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
-  uint32_t         width;         /**< Width of swapchain images in pixels. */
-  uint32_t         height;        /**< Height of swapchain images in pixels. */
-  uintptr_t        native_handle; /**< HWND, ANativeWindow, NSWindow, etc. */
-  ngf_present_mode present_mode;  /**< Desired present mode. */
-} ngf_swapchain_info;
-
-/**
- * @enum ngf_sampler_filter
- * \ingroup ngf
- *  Min/mag filters.
- */
-typedef enum ngf_sampler_filter {
-  NGF_FILTER_NEAREST = 0,
-  NGF_FILTER_LINEAR,
-  NGF_FILTER_COUNT
-} ngf_sampler_filter;
-
-/**
- * @enum ngf_sampler_wrap_mode
- * \ingroup ngf
- * What to do when sampling out-of-bounds.
- */
-typedef enum ngf_sampler_wrap_mode {
-  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
-  NGF_WRAP_MODE_CLAMP_TO_BORDER,
-  NGF_WRAP_MODE_REPEAT,
-  NGF_WRAP_MODE_MIRRORED_REPEAT,
-  NGF_WRAP_MODE_COUNT
-} ngf_sampler_wrap_mode;
-
-/**
- * @struct ngf_sampler_info
- * \ingroup ngf
- * Describes a sampler object.
- */
-typedef struct ngf_sampler_info {
-  ngf_sampler_filter    min_filter; /**< Minification filter.*/
-  ngf_sampler_filter    mag_filter; /**< Magnification filter.*/
-  ngf_sampler_filter    mip_filter; /**< Mipmap filter. */
-  ngf_sampler_wrap_mode wrap_s;     /**< Horizontal wrap mode. */
-  ngf_sampler_wrap_mode wrap_t;
-  ngf_sampler_wrap_mode wrap_r;
-  float                 lod_max;         /**< Max mip level.*/
-  float                 lod_min;         /**< Min mip level.*/
-  float                 lod_bias;        /**< Level bias.*/
-  float                 border_color[4]; /**< Border color.*/
-  /** Max number of samples allowed for anisotropic filtering.*/
-  float max_anisotropy;
-  bool  enable_anisotropy; /**< Whether to allow anisotropic filtering. */
-} ngf_sampler_info;
-
-/**
- * @struct ngf_sampler
- * \ingroup ngf
- * Sampler object.
- */
-typedef struct ngf_sampler_t* ngf_sampler;
-
-/**
- * @enum ngf_descriptor_type
- * \ingroup ngf
- * Available descriptor types.
- * Not that some back-ends may not support all of the listed descriptor types.
- */
-typedef enum ngf_descriptor_type {
-  /**
-   * A uniform buffer, also known as a constant buffer, can be used pass
-   * small to medium sized chunk of data to the shader in a structured way.
-   * The data is exactly the same for all shader invocations.
-   */
-  NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
-
-  NGF_DESCRIPTOR_IMAGE,
-  NGF_DESCRIPTOR_SAMPLER,
-  NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
-  NGF_DESCRIPTOR_TEXEL_BUFFER,
-  NGF_DESCRIPTOR_TYPE_COUNT
-} ngf_descriptor_type;
-
-/**
- * @struct ngf_buffer_bind_info
- * \ingroup ngf
- * Specifies a buffer bind operation.
- */
-typedef struct ngf_buffer_bind_info {
-  ngf_buffer       buffer; /**< Which buffer to bind.*/
-  size_t           offset; /**< Offset at which to bind the buffer.*/
-  size_t           range;  /**< Bound range.*/
-  ngf_image_format format; /**< Texel format (texel buffers only). */
-} ngf_buffer_bind_info;
-
-/**
- * @struct ngf_image_sampler_bind_info
- * \ingroup ngf
- * Specifies an image bind operation.
- */
-typedef struct ngf_image_sampler_bind_info {
-  ngf_image   image;   /**< The image to bind.*/
-  ngf_sampler sampler; /**< Sampler to use.*/
-} ngf_image_sampler_bind_info;
-
-/**
- * @struct ngf_resource_bind_op
- * \ingroup ngf
- * Specifies a resource (image, buffer, etc.) bind operation, together with
- * the target set and binding IDs.
- */
-typedef struct ngf_resource_bind_op {
-  uint32_t            target_set;     /**< Target set ID. */
-  uint32_t            target_binding; /**< Target binding ID. */
-  ngf_descriptor_type type;           /**< Type of the resource being bound. */
-  union {
-    ngf_buffer_bind_info        buffer;
-    ngf_image_sampler_bind_info image_sampler;
-  } info; /**< Details of the resource being bound, depending on type. */
-} ngf_resource_bind_op;
-
-/**
- * @struct ngf_graphics_pipeline
- * \ingroup ngf
- * Graphics pipeline object.
- */
-typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
 /**
  * @enum ngf_primitive_type
@@ -1450,6 +1080,376 @@ typedef struct ngf_graphics_pipeline_info {
   const ngf_specialization_info*     spec_info;
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
 } ngf_graphics_pipeline_info;
+
+/**
+ * @struct ngf_graphics_pipeline
+ * \ingroup ngf
+ * Graphics pipeline object.
+ */
+typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
+
+/**
+ * @enum ngf_descriptor_type
+ * \ingroup ngf
+ * Available descriptor types.
+ * Not that some back-ends may not support all of the listed descriptor types.
+ */
+typedef enum ngf_descriptor_type {
+  /**
+   * A uniform buffer, also known as a constant buffer, can be used pass
+   * small to medium sized chunk of data to the shader in a structured way.
+   * The data is exactly the same for all shader invocations.
+   */
+  NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
+
+  NGF_DESCRIPTOR_IMAGE,
+  NGF_DESCRIPTOR_SAMPLER,
+  NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
+  NGF_DESCRIPTOR_TEXEL_BUFFER,
+  NGF_DESCRIPTOR_TYPE_COUNT
+} ngf_descriptor_type;
+
+/**
+ * @enum ngf_sampler_filter
+ * \ingroup ngf
+ *  Min/mag filters.
+ */
+typedef enum ngf_sampler_filter {
+  NGF_FILTER_NEAREST = 0,
+  NGF_FILTER_LINEAR,
+  NGF_FILTER_COUNT
+} ngf_sampler_filter;
+
+/**
+ * @enum ngf_sampler_wrap_mode
+ * \ingroup ngf
+ * What to do when sampling out-of-bounds.
+ */
+typedef enum ngf_sampler_wrap_mode {
+  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
+  NGF_WRAP_MODE_CLAMP_TO_BORDER,
+  NGF_WRAP_MODE_REPEAT,
+  NGF_WRAP_MODE_MIRRORED_REPEAT,
+  NGF_WRAP_MODE_COUNT
+} ngf_sampler_wrap_mode;
+
+/**
+ * @struct ngf_sampler_info
+ * \ingroup ngf
+ * Describes a sampler object.
+ */
+typedef struct ngf_sampler_info {
+  ngf_sampler_filter    min_filter; /**< Minification filter.*/
+  ngf_sampler_filter    mag_filter; /**< Magnification filter.*/
+  ngf_sampler_filter    mip_filter; /**< Mipmap filter. */
+  ngf_sampler_wrap_mode wrap_s;     /**< Horizontal wrap mode. */
+  ngf_sampler_wrap_mode wrap_t;
+  ngf_sampler_wrap_mode wrap_r;
+  float                 lod_max;         /**< Max mip level.*/
+  float                 lod_min;         /**< Min mip level.*/
+  float                 lod_bias;        /**< Level bias.*/
+  float                 border_color[4]; /**< Border color.*/
+  /** Max number of samples allowed for anisotropic filtering.*/
+  float max_anisotropy;
+  bool  enable_anisotropy; /**< Whether to allow anisotropic filtering. */
+} ngf_sampler_info;
+
+/**
+ * @struct ngf_sampler
+ * \ingroup ngf
+ * Sampler object.
+ */
+typedef struct ngf_sampler_t* ngf_sampler;
+
+/**
+ * @enum ngf_image_usage
+ * \ingroup ngf
+ * Image usage flags.
+ */
+typedef enum ngf_image_usage {
+  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
+  NGF_IMAGE_USAGE_ATTACHMENT  = 0x02, /**< Can be used as an attachment for a
+                                           render target.*/
+  NGF_IMAGE_USAGE_XFER_DST = 0x04, /**< Can be used as a destination for a transfer operation. **/
+  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 /**< Use this flag to enable auto mipmap generation. */
+} ngf_image_usage;
+
+/**
+ * @enum ngf_image_type
+ * \ingroup ngf
+ * Possible image types.
+ */
+typedef enum ngf_image_type {
+  NGF_IMAGE_TYPE_IMAGE_2D = 0,
+  NGF_IMAGE_TYPE_IMAGE_3D,
+  NGF_IMAGE_TYPE_CUBE,
+  NGF_IMAGE_TYPE_COUNT
+} ngf_image_type;
+
+/**
+ * @struct ngf_image_info
+ * \ingroup ngf
+ * Describes an image.
+ */
+typedef struct ngf_image_info {
+  ngf_image_type type;
+  ngf_extent3d   extent;         /**< Width, height and depth (for 3d images) or no. of
+                                      layers (for layered images).*/
+  uint32_t         nmips;        /**< Number of mip levels.*/
+  ngf_image_format format;       /**< Internal format.*/
+  ngf_sample_count sample_count; /**< Number of samples. **/
+  uint32_t         usage_hint;   /**< How the client intends to use the image. Must be a
+                                      combination of image usage flags.*/
+} ngf_image_info;
+
+/**
+ * @struct ngf_image
+ * \ingroup ngf
+ * An image object.
+ */
+typedef struct ngf_image_t* ngf_image;
+
+/**
+ * @enum ngf_cubemap_face
+ * \ingroup ngf
+ * Indicates the face of a cubemap.
+ */
+typedef enum ngf_cubemap_face {
+  NGF_CUBEMAP_FACE_POSITIVE_X,
+  NGF_CUBEMAP_FACE_NEGATIVE_X,
+  NGF_CUBEMAP_FACE_POSITIVE_Y,
+  NGF_CUBEMAP_FACE_NEGATIVE_Y,
+  NGF_CUBEMAP_FACE_POSITIVE_Z,
+  NGF_CUBEMAP_FACE_NEGATIVE_Z,
+  NGF_CUBEMAP_FACE_COUNT
+} ngf_cubemap_face;
+
+/**
+ * @struct ngf_image_ref
+ * \ingroup ngf
+ * Reference to a part of an image.
+ */
+typedef struct ngf_image_ref {
+  ngf_image        image;        /**< Image being referred to.*/
+  uint32_t         mip_level;    /**< Mip level within the image.*/
+  uint32_t         layer;        /**< Layer within the image.*/
+  ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
+                                      non-cubemap images.*/
+} ngf_image_ref;
+
+/**
+ * @struct ngf_render_target_info
+ * \ingroup ngf
+ * Specifies information about a rendertarget.
+ */
+typedef struct ngf_render_target_info {
+  const ngf_attachment_descriptions* attachment_descriptions; /**< List of attachment descriptions
+                                                                   for this render target. */
+  const ngf_image_ref* attachment_image_refs;                 /**< Image references corresponding
+                                                                   to each attachment in the list. */
+} ngf_render_target_info;
+
+/**
+ * @struct ngf_render_target
+ * \ingroup ngf
+ * Render target.
+ */
+typedef struct ngf_render_target_t* ngf_render_target;
+
+/**
+ * @struct ngf_clear_info
+ * \ingroup ngf
+ * Specifies a rendertarget clear operation.
+ */
+typedef union ngf_clear_info {
+  float clear_color[4];
+  struct {
+    float    clear_depth;
+    uint32_t clear_stencil;
+  } clear_depth_stencil;
+} ngf_clear;
+
+/**
+ * @enum ngf_attachment_load_op
+ * \ingroup ngf
+ * What to do on attachment load.
+ */
+typedef enum ngf_attachment_load_op {
+  NGF_LOAD_OP_DONTCARE = 0, /**< Don't care what happens. */
+  NGF_LOAD_OP_KEEP,         /**< Preserve the prior contents of the attachment. */
+  NGF_LOAD_OP_CLEAR,        /**< Clear attachment. */
+  NGF_LOAD_OP_COUNT
+} ngf_attachment_load_op;
+
+/**
+ * @enum ngf_attachment_store_op
+ * \ingroup ngf
+ * What to do on attachment store.
+ */
+typedef enum ngf_attachment_store_op {
+  /**
+   * Don't care what happens. Use this if you don't plan on reading back the
+   * contents of the attachment in any shaders or presenting it to screen.
+   */
+  NGF_STORE_OP_DONTCARE = 0,
+
+  /**
+   * Make sure the contents is written out to system memory. Use this if you
+   * plan on reading the contents of the attachment in any shaders or
+   * presenting it to screen.
+   */
+  NGF_STORE_OP_STORE,
+
+  NGF_STORE_OP_COUNT
+} ngf_attachment_store_op;
+
+/**
+ * @struct ngf_pass_info
+ * \ingroup ngf
+ * Information about a render pass.
+ */
+typedef struct ngf_pass_info {
+  ngf_render_target              render_target;
+  const ngf_attachment_load_op*  load_ops;
+  const ngf_attachment_store_op* store_ops;
+  const ngf_clear*               clears;
+} ngf_pass_info;
+
+/**
+ * @enum ngf_buffer_storage_type
+ * \ingroup ngf
+ * Types of memory backing a buffer object.
+ */
+typedef enum ngf_buffer_storage_type {
+  /**
+   * Memory that can be read by the host.
+   */
+  NGF_BUFFER_STORAGE_HOST_READABLE,
+
+  /**
+   * Memory that can be written to by the host.
+   */
+  NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+
+  /**
+   * Memory that can be both read from and written to by the
+   * host.
+   */
+  NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
+
+  /**
+   * Private memory cannot be accessed by the host directly. The contents of a
+   * buffer backed by this type of memory can only be modified by executing a
+   * `ngf_cmd_copy_xxxxx_buffer`.
+   */
+  NGF_BUFFER_STORAGE_PRIVATE
+} ngf_buffer_storage_type;
+
+/**
+ * @enum ngf_buffer_usage
+ * \ingroup ngf
+ * Flags for specifying how the buffer is intended to be used.
+ */
+typedef enum ngf_buffer_usage {
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< Buffer may be used as a source for
+                                             transfer operations. */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< Buffer may be used as a
+                                             destination for transfer operations.  */
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< Buffer may be bound as a uniform
+                                             buffer. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER = 0x08,   /**< Buffer may be used as the source of index data for
+                                             indexed   drawcalls. */
+  NGF_BUFFER_USAGE_VERTEX_BUFFER =
+      0x10, /**< Buffer may be used as the source of vertex attribute data. */
+
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /**< Buffer may be bound as a uniform
+                                          texel buffer. */
+} ngf_buffer_usage;
+
+/**
+ * @struct ngf_buffer_info
+ * \ingroup ngf
+ * Information required for buffer creation.
+ */
+typedef struct ngf_buffer_info {
+  size_t                  size;         /**< Size of the buffer in bytes. */
+  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage type.*/
+  uint32_t                buffer_usage; /**< Flags specifying intended usage.*/
+} ngf_buffer_info;
+
+/**
+ * @struct ngf_buffer
+ * \ingroup ngf
+ * A memory buffer.
+ */
+typedef struct ngf_buffer_t* ngf_buffer;
+
+/**
+ * @struct ngf_buffer_bind_info
+ * \ingroup ngf
+ * Specifies a buffer bind operation.
+ */
+typedef struct ngf_buffer_bind_info {
+  ngf_buffer       buffer; /**< Which buffer to bind.*/
+  size_t           offset; /**< Offset at which to bind the buffer.*/
+  size_t           range;  /**< Bound range.*/
+  ngf_image_format format; /**< Texel format (texel buffers only). */
+} ngf_buffer_bind_info;
+
+/**
+ * @struct ngf_image_sampler_bind_info
+ * \ingroup ngf
+ * Specifies an image bind operation.
+ */
+typedef struct ngf_image_sampler_bind_info {
+  ngf_image   image;   /**< The image to bind.*/
+  ngf_sampler sampler; /**< Sampler to use.*/
+} ngf_image_sampler_bind_info;
+
+/**
+ * @struct ngf_resource_bind_op
+ * \ingroup ngf
+ * Specifies a resource (image, buffer, etc.) bind operation, together with
+ * the target set and binding IDs.
+ */
+typedef struct ngf_resource_bind_op {
+  uint32_t            target_set;     /**< Target set ID. */
+  uint32_t            target_binding; /**< Target binding ID. */
+  ngf_descriptor_type type;           /**< Type of the resource being bound. */
+  union {
+    ngf_buffer_bind_info        buffer;
+    ngf_image_sampler_bind_info image_sampler;
+  } info; /**< Details of the resource being bound, depending on type. */
+} ngf_resource_bind_op;
+
+/**
+ * @enum ngf_present_mode
+ * \ingroup ngf
+ * Enumerates possible presentation modes.
+ * "Presentation mode" refers to the particular way the CPU,
+ * GPU and the presentation engine interact.
+ */
+typedef enum ngf_present_mode {
+  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
+  NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
+} ngf_present_mode;
+
+/**
+ * @struct ngf_swapchain_info
+ * \ingroup ngf
+ * Swapchain configuration.
+ */
+typedef struct ngf_swapchain_info {
+  ngf_image_format color_format;  /**< Swapchain image format. */
+  ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to
+                                     NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
+  ngf_sample_count sample_count;  /**< Number of samples per pixel (0 for non-multisampled) */
+  uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
+  uint32_t         width;         /**< Width of swapchain images in pixels. */
+  uint32_t         height;        /**< Height of swapchain images in pixels. */
+  uintptr_t        native_handle; /**< HWND, ANativeWindow, NSWindow, etc. */
+  ngf_present_mode present_mode;  /**< Desired present mode. */
+} ngf_swapchain_info;
 
 /**
  * @struct ngf_context
