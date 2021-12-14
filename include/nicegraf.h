@@ -642,22 +642,115 @@ typedef struct ngf_depth_stencil_info {
  * @enum ngf_blend_factor
  * \ingroup ngf
  * Factors that can be used for source and destination values during the blend operation.
+ * The factor can be thought 
  * See \ref ngf_blend_info for details.
  */
 typedef enum ngf_blend_factor {
+  /**
+   * - If used as a blend factor for color: sets each color component to 0;
+   * - if used as a blend factor for alpha: sets alpha to 0.
+   */
   NGF_BLEND_FACTOR_ZERO = 0,
+
+  /**
+   * - If used as a blend factor for color: leaves the color unchanged;
+   * - if used as a blend factor for alpha: leaves the alpha value unchanged.
+   */
   NGF_BLEND_FACTOR_ONE,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by the corresponding
+   * component of the "source" color value;
+   * - if used as a blend factor for alpha: multiples the alpha value by the "source" alpha value.
+   */
   NGF_BLEND_FACTOR_SRC_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by one minus the
+   * corresponding component of the "source" color value;
+   * - if used as a blend factor for alpha: multiples the alpha value by one minus the "source"
+   * alpha value.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by the corresponding
+   * component of the "destination" color value;
+   * - if used as a blend factor for alpha: multiples the alpha value by the "destination" alpha
+   * value.
+   */
   NGF_BLEND_FACTOR_DST_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by one minus the
+   * corresponding component of the "destination" color value;
+   * - if used as a blend factor for alpha: multiples the alpha value by one minus the "destination"
+   * alpha value.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by the "source" alpha
+   * value;
+   * - if used as a blend factor for alpha: multiples the alpha value by the "source" alpha value.
+   */
   NGF_BLEND_FACTOR_SRC_ALPHA,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by one minus the
+   * "source" alpha value;
+   * - if used as a blend factor for alpha: multiples the alpha value by one minus the "source"
+   * alpha value.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by the "destination"
+   * alpha value;
+   * - if used as a blend factor for alpha: multiples the alpha value by the "destination" alpha
+   * value.
+   */
   NGF_BLEND_FACTOR_DST_ALPHA,
+
+  /**
+   * - If used as a blend factor for color: multiplies each color component by one minus the
+   * "destination" alpha value;
+   * - if used as a blend factor for alpha: multiples the alpha value by one minus the "destination"
+   * alpha value.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+
+  /**
+   * - If used as a blend factor for color: multiplies the red, green and blue components of the
+   * color by the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts respectively;
+   * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
+   * ngf_blend_info::blend_consts.
+   */
   NGF_BLEND_FACTOR_CONSTANT_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies the red, green and blue components of the
+   * color by one minus the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts
+   * respectively;
+   * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
+   * component of \ref ngf_blend_info::blend_consts.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
+
+  /**
+   * - If used as a blend factor for color: multiplies the components of the color by the 4th
+   * element of \ref ngf_blend_info::blend_consts;
+   * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
+   * ngf_blend_info::blend_consts.
+   */
   NGF_BLEND_FACTOR_CONSTANT_ALPHA,
+
+  /**
+   * - If used as a blend factor for color: multiplies the components of the color by one minus the
+   * 4th element of \ref ngf_blend_info::blend_consts;
+   * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
+   * component of \ref ngf_blend_info::blend_consts.
+   */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
   NGF_BLEND_FACTOR_COUNT
 } ngf_blend_factor;
