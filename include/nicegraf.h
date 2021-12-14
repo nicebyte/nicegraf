@@ -824,15 +824,15 @@ typedef enum ngf_input_rate {
  * Vertex attribute component type.
  */
 typedef enum ngf_type {
-  NGF_TYPE_INT8 = 0,
-  NGF_TYPE_UINT8,
-  NGF_TYPE_INT16,
-  NGF_TYPE_UINT16,
-  NGF_TYPE_INT32,
-  NGF_TYPE_UINT32,
-  NGF_TYPE_FLOAT,
-  NGF_TYPE_HALF_FLOAT,
-  NGF_TYPE_DOUBLE,
+  NGF_TYPE_INT8 = 0,   /**< Signed 8-bit integer. */
+  NGF_TYPE_UINT8,      /**< Unsigned 8-bit integer. */
+  NGF_TYPE_INT16,      /**< Signed 16-bit integer. */
+  NGF_TYPE_UINT16,     /**< Unsigned 16-bit integer. */
+  NGF_TYPE_INT32,      /**< Signed 32-bit integer. */
+  NGF_TYPE_UINT32,     /**< Unsigned 32-bit integer. */
+  NGF_TYPE_FLOAT,      /**< 32-bit floating point number. */
+  NGF_TYPE_HALF_FLOAT, /**< 16-bit floating point number. */
+  NGF_TYPE_DOUBLE,     /**< Double-precision floating point number. */
   NGF_TYPE_COUNT
 } ngf_type;
 
