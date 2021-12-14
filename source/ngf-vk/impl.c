@@ -623,8 +623,8 @@ static VkFormat get_vk_vertex_format(ngf_type type, uint32_t size, bool norm) {
   }
 }
 
-static VkVertexInputRate get_vk_input_rate(ngf_input_rate r) {
-  static const VkVertexInputRate rates[NGF_INPUT_RATE_COUNT] = {
+static VkVertexInputRate get_vk_input_rate(ngf_vertex_input_rate r) {
+  static const VkVertexInputRate rates[NGF_VERTEX_INPUT_RATE_COUNT] = {
       VK_VERTEX_INPUT_RATE_VERTEX,
       VK_VERTEX_INPUT_RATE_INSTANCE};
   return rates[r];
@@ -3264,10 +3264,11 @@ ngf_error ngf_create_graphics_pipeline(
       .logicOp         = VK_LOGIC_OP_SET,
       .attachmentCount = ncolor_attachments,
       .pAttachments    = blend_states,
-      .blendConstants  = {info->blend->blend_consts[0],
-                          info->blend->blend_consts[1],
-                          info->blend->blend_consts[2],
-                          info->blend->blend_consts[3]}};
+      .blendConstants  = {
+          info->blend->blend_consts[0],
+          info->blend->blend_consts[1],
+          info->blend->blend_consts[2],
+          info->blend->blend_consts[3]}};
 
   // Dynamic state.
   const VkDynamicState dynamic_states[] = {

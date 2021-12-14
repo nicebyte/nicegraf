@@ -808,17 +808,6 @@ typedef struct ngf_blend_info {
 } ngf_blend_info;
 
 /**
- * @enum ngf_input_rate
- * \ingroup ngf
- * Vertex attribute's input rate.
- */
-typedef enum ngf_input_rate {
-  NGF_INPUT_RATE_VERTEX = 0, /**< attribute changes per-vertex*/
-  NGF_INPUT_RATE_INSTANCE,   /**< attribute changes per-instance*/
-  NGF_INPUT_RATE_COUNT
-} ngf_input_rate;
-
-/**
  * @enum ngf_type
  * \ingroup ngf
  * Vertex attribute component type.
@@ -837,14 +826,25 @@ typedef enum ngf_type {
 } ngf_type;
 
 /**
+ * @enum ngf_input_rate
+ * \ingroup ngf
+ * The input rate
+ */
+typedef enum ngf_vertex_input_rate {
+  NGF_INPUT_RATE_VERTEX = 0, /**< attribute changes per-vertex*/
+  NGF_INPUT_RATE_INSTANCE,   /**< attribute changes per-instance*/
+  NGF_VERTEX_INPUT_RATE_COUNT
+} ngf_vertex_input_rate;
+
+/**
  * @struct ngf_vertex_buf_binding_desc
  * \ingroup ngf
  * Specifies an attribute binding.
  */
 typedef struct ngf_vertex_buf_binding_desc {
-  uint32_t       binding;    /**< Index of the binding that this structure describes.*/
-  uint32_t       stride;     /**< Number of bytes between consecutive attribute values.*/
-  ngf_input_rate input_rate; /**< Whether attributes read from this binding
+  uint32_t              binding;    /**< Index of the binding that this structure describes.*/
+  uint32_t              stride;     /**< Number of bytes between consecutive attribute values.*/
+  ngf_vertex_input_rate input_rate; /**< Whether attributes read from this binding
                                   change per-vetex or per-instance.*/
 } ngf_vertex_buf_binding_desc;
 

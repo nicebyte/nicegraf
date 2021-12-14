@@ -273,8 +273,8 @@ static MTLVertexFormat get_mtl_attrib_format(ngf_type type,
   return formats[type][normalized? 1 : 0][size - 1u];
 }
 
-static MTLVertexStepFunction get_mtl_step_function(ngf_input_rate rate) {
-  static const MTLVertexStepFunction funcs[NGF_INPUT_RATE_COUNT] = {
+static MTLVertexStepFunction get_mtl_step_function(ngf_vertex_input_rate rate) {
+  static const MTLVertexStepFunction funcs[NGF_VERTEX_INPUT_RATE_COUNT] = {
     MTLVertexStepFunctionPerVertex,
     MTLVertexStepFunctionPerInstance
   };
