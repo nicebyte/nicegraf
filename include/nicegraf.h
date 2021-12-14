@@ -828,11 +828,22 @@ typedef enum ngf_type {
 /**
  * @enum ngf_input_rate
  * \ingroup ngf
- * The input rate
+ * The vertex input rate specifies whether a new set of attributes is read from a buffer per each
+ * vertex or per each instance.
  */
 typedef enum ngf_vertex_input_rate {
-  NGF_INPUT_RATE_VERTEX = 0, /**< attribute changes per-vertex*/
-  NGF_INPUT_RATE_INSTANCE,   /**< attribute changes per-instance*/
+  /**
+   * Attributes are read per-vertex.
+   * With this vertex input rate, each vertex receives its own set of attributes.
+   */
+  NGF_INPUT_RATE_VERTEX = 0,
+
+  /**
+   * Attributes are read per-instance.
+   * With this vertex input rate, all vertices within the same instance share the same
+   * attribute values.
+   */
+  NGF_INPUT_RATE_INSTANCE,
   NGF_VERTEX_INPUT_RATE_COUNT
 } ngf_vertex_input_rate;
 
