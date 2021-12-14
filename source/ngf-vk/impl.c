@@ -3264,7 +3264,10 @@ ngf_error ngf_create_graphics_pipeline(
       .logicOp         = VK_LOGIC_OP_SET,
       .attachmentCount = ncolor_attachments,
       .pAttachments    = blend_states,
-      .blendConstants  = {0.0f, .0f, .0f, .0f}};
+      .blendConstants  = {info->blend->blend_consts[0],
+                          info->blend->blend_consts[1],
+                          info->blend->blend_consts[2],
+                          info->blend->blend_consts[3]}};
 
   // Dynamic state.
   const VkDynamicState dynamic_states[] = {

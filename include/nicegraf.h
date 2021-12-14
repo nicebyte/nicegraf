@@ -700,14 +700,18 @@ typedef enum ngf_blend_op {
  * is converted to an sRGB representation prior to being finally written to the attachment.
  */
 typedef struct ngf_blend_info {
-  bool             enable;                 /**< Specifies whethe blending is enabled.*/
   ngf_blend_op     blend_op_color;         /**< The blend operation to perform for color. */
   ngf_blend_op     blend_op_alpha;         /**< The blend operation to perform for alpha. */
   ngf_blend_factor src_color_blend_factor; /**< The source blend factor for color. */
   ngf_blend_factor dst_color_blend_factor; /**< The destination blend factor for color. */
   ngf_blend_factor src_alpha_blend_factor; /**< The source blend factor for alpha. */
   ngf_blend_factor dst_alpha_blend_factor; /**< The destination blend factor for alpha. */
-  float            blend_color[4];         /**< Blend color. */
+  float            blend_consts[4];        /**< Blend constants used by
+                                                \ref NGF_BLEND_FACTOR_CONSTANT_COLOR, \ref
+                                              NGF_BLEND_FACTOR_CONSTANT_ALPHA, \ref
+                                              NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR and \ref
+                                              NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA . */
+  bool             enable;                 /**< Specifies whether blending is enabled.*/
 } ngf_blend_info;
 
 /**

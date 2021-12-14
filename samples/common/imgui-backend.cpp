@@ -56,7 +56,7 @@ ngf_imgui::ngf_imgui(
   pipeline_data.blend_info.dst_alpha_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
   pipeline_data.blend_info.blend_op_color         = NGF_BLEND_OP_ADD;
   pipeline_data.blend_info.blend_op_alpha         = NGF_BLEND_OP_ADD;
-  memset(pipeline_data.blend_info.blend_color, 0, sizeof(pipeline_data.blend_info.blend_color));
+  memset(pipeline_data.blend_info.blend_consts, 0, sizeof(pipeline_data.blend_info.blend_consts));
 
   // Set up depth & stencil state.
   pipeline_data.depth_stencil_info.depth_test   = false;
