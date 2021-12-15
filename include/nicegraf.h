@@ -849,7 +849,7 @@ typedef enum ngf_vertex_input_rate {
  * @struct ngf_vertex_buf_binding_desc
  * \ingroup ngf
  * Specifies a vertex buffer binding.
- * A _vertex buffer binding_ can be thought of as a slot to which a vertex attribute buffer can be bound.
+ * A _vertex buffer binding_ may be thought of as a slot to which a vertex attribute buffer can be bound.
  * An \ref ngf_graphics_pipeline may have several such slots, which are addressed by their indices.
  * Vertex attribute buffers can be bound to these slots with \ref ngf_cmd_bind_attrib_buffer.
  * The binding also partly defines how the contents of the bound buffer is interpreted - via
@@ -920,11 +920,11 @@ typedef struct ngf_vertex_attrib_desc {
 
   /**
    * Whether the vertex stage sees the raw or normalized values for the attribute components.
-   * Only attributes with component types \ref NGF_TYPE_INT8, \ref NGF_TYPE_UINT8, \ref
+   * Only attribute components of types \ref NGF_TYPE_INT8, \ref NGF_TYPE_UINT8, \ref
    * NGF_TYPE_INT16 and \ref NGF_TYPE_UINT16 can be normalized. For signed types, the values are
    * scaled to the [-1; 1] floating point range, for unsigned types they are scaled to [0; 1].
    */
-  bool normalized; /**< Whether attribute values are normalized.*/
+  bool normalized;
 } ngf_vertex_attrib_desc;
 
 /**
@@ -934,7 +934,7 @@ typedef struct ngf_vertex_attrib_desc {
  */
 typedef struct ngf_vertex_input_info {
   uint32_t nattribs;           /**< Number of attribute descriptions.*/
-  uint32_t nvert_buf_bindings; /**< Number of vertex buffer bindings used.*/
+  uint32_t nvert_buf_bindings; /**< Number of vertex buffer binding descriptions.*/
 
   /**
    * Pointer to an array of structures describing vertex attribute buffer
