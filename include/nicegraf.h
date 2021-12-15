@@ -292,11 +292,9 @@ typedef struct ngf_allocation_callbacks {
  * @typedef ngf_device_handle
  * A handle that uniquely identifies a rendering device.
  *
- * Note that the value of the handle
- * corresponding to the same exact physical device may be different across for different
- * instances of the same client. In other words, if the client application shuts down, then
- * starts up again, it may get different values for device handles than it did before.
- * Therefore, device handles should not be persisted.
+ * Note that the value of the handle corresponding to the same exact physical device may be different across different
+ * instances of the same client. In other words, if the client application shuts down, then starts up again, it may
+ * get different values for device handles than it did before. Therefore, device handles should not be persisted.
  * \ingroup ngf
  */
 typedef uint32_t ngf_device_handle;
