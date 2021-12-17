@@ -1161,26 +1161,46 @@ typedef struct ngf_specialization_info {
 /**
  * @struct ngf_graphics_pipeline_info
  * \ingroup ngf
- * Specifies information for creation of a graphics pipeline.
+ * Contains all information necessary for creating a graphics pipeline object.
  */
 typedef struct ngf_graphics_pipeline_info {
-  ngf_shader_stage                   shader_stages[5];
-  uint32_t                           nshader_stages;
-  const ngf_rasterization_info*      rasterization;
-  const ngf_multisample_info*        multisample;
-  const ngf_depth_stencil_info*      depth_stencil;
-  const ngf_blend_info*              blend;
-  uint32_t                           dynamic_state_mask;
-  const ngf_vertex_input_info*       input_info;
-  ngf_primitive_topology             primitive_topology;
-  const ngf_specialization_info*     spec_info;
+  ngf_shader_stage              shader_stages[5]; /**< The programmable stages for this pipeline. */
+  uint32_t                      nshader_stages; /**< The number of programmable stages involved. */
+  const ngf_rasterization_info* rasterization;  /**< Specifies the parameters for the rasterizer. */
+  const ngf_multisample_info*   multisample;    /**< Specifies the parameters for multisampling. */
+
+  /**
+   * Specifies the parameters for depth and stencil testing.
+   */
+  const ngf_depth_stencil_info* depth_stencil;
+
+  /**
+   * Specifies the parameters for blending.
+   */
+  const ngf_blend_info* blend;
+
+  /**
+   * Specifies vertex attributes and vertex attribute buffer bindings.
+   */
+  const ngf_vertex_input_info* input_info;
+
+  ngf_primitive_topology primitive_topology; /**< The primitive topology used by this pipeline. */
+  const ngf_specialization_info* spec_info;  /**< Specifies the values for specialization constants
+                                                (if any) used by the programmable stages. */
+
+  /**
+   * Describes which render targets compatible with this pipeline.
+   * A compatible render target must have the same number of attachments as specified in the list,
+   * with matching type, format and sample count.
+   */
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
 } ngf_graphics_pipeline_info;
 
 /**
  * @struct ngf_graphics_pipeline
  * \ingroup ngf
- * Graphics pipeline object.
+ * An opaque handle to a graphics pipeline object. See \ref ngf_graphics_pipeline_info and \ref
+ * ngf_create_graphics_pipeline.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
