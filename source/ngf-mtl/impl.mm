@@ -1267,7 +1267,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
   pipeline->binding_map = native_binding_map;
   memcpy(pipeline->blend_color,
-         info->blend->blend_color,
+         info->blend->blend_consts,
          sizeof(pipeline->blend_color));
   
   NSError *err = nil;
