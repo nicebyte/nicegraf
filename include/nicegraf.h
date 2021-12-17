@@ -1099,13 +1099,34 @@ typedef struct ngf_attachment_descriptions {
 /**
  * @enum ngf_primitive_topology
  * \ingroup ngf
- * Primitive types to use for draw operations.
- * Some back-ends may not support all of the primitive types.
+ * Enumerates the available primitive topologies (ways to group vertices into primitives).
  */
 typedef enum ngf_primitive_topology {
+  /**
+   * A list of separate triangles - each three vertices define a separate triangle.
+   */
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 0,
+
+  /**
+   * A list of connected triangles, with consecutive triangles sharing an edge like so:
+   * ```
+   *  o---------o-----------o
+   *   \       /  \       /
+   *     \   /      \   / ...
+   *       o----------o
+   *       o
+   * ```
+   */
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+
+  /**
+   * A list of separate lines. Each two vertices define a separate line.
+   */
   NGF_PRIMITIVE_TOPOLOGY_LINE_LIST,
+
+  /**
+   * A list of connected lines. The end of a line is the beginning of the next line in the list.
+   */
   NGF_PRIMITIVE_TOPOLOGY_LINE_STRIP,
   NGF_PRIMITIVE_TOPOLOGY_COUNT
 } ngf_primitive_topology;
