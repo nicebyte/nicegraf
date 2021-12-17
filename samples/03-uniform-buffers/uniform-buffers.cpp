@@ -94,7 +94,7 @@ void* sample_initialize(
   polygon_pipe_info.shader_stages[0]                  = polygon_vertex_stage.get();
   polygon_pipe_info.shader_stages[1]                  = polygon_fragment_stage.get();
   polygon_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  polygon_pipe_info.primitive_type                 = NGF_PRIMITIVE_TYPE_TRIANGLE_LIST;
+  polygon_pipe_info.primitive_topology                 = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   NGF_SAMPLES_CHECK_NGF_ERROR(state->polygon_pipeline.initialize(polygon_pipe_info));
 
   /**

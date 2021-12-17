@@ -561,8 +561,8 @@ static VkFrontFace get_vk_front_face(ngf_front_face_mode f) {
   return modes[f];
 }
 
-static VkPrimitiveTopology get_vk_primitive_type(ngf_primitive_type p) {
-  static const VkPrimitiveTopology topos[NGF_PRIMITIVE_TYPE_COUNT] = {
+static VkPrimitiveTopology get_vk_primitive_type(ngf_primitive_topology p) {
+  static const VkPrimitiveTopology topos[NGF_PRIMITIVE_TOPOLOGY_COUNT] = {
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
       VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
       VK_PRIMITIVE_TOPOLOGY_LINE_LIST,
@@ -3139,7 +3139,7 @@ ngf_error ngf_create_graphics_pipeline(
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
-      .topology               = get_vk_primitive_type(info->primitive_type),
+      .topology               = get_vk_primitive_type(info->primitive_topology),
       .primitiveRestartEnable = VK_FALSE};
 
   // Prepare tessellation state.

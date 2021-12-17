@@ -1097,18 +1097,18 @@ typedef struct ngf_attachment_descriptions {
 } ngf_attachment_descriptions;
 
 /**
- * @enum ngf_primitive_type
+ * @enum ngf_primitive_topology
  * \ingroup ngf
  * Primitive types to use for draw operations.
  * Some back-ends may not support all of the primitive types.
  */
-typedef enum ngf_primitive_type {
-  NGF_PRIMITIVE_TYPE_TRIANGLE_LIST = 0,
-  NGF_PRIMITIVE_TYPE_TRIANGLE_STRIP,
-  NGF_PRIMITIVE_TYPE_LINE_LIST,
-  NGF_PRIMITIVE_TYPE_LINE_STRIP,
-  NGF_PRIMITIVE_TYPE_COUNT
-} ngf_primitive_type;
+typedef enum ngf_primitive_topology {
+  NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 0,
+  NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+  NGF_PRIMITIVE_TOPOLOGY_LINE_LIST,
+  NGF_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+  NGF_PRIMITIVE_TOPOLOGY_COUNT
+} ngf_primitive_topology;
 
 /**
  * @struct ngf_constant_specialization
@@ -1151,7 +1151,7 @@ typedef struct ngf_graphics_pipeline_info {
   const ngf_blend_info*              blend;
   uint32_t                           dynamic_state_mask;
   const ngf_vertex_input_info*       input_info;
-  ngf_primitive_type                 primitive_type;
+  ngf_primitive_topology             primitive_topology;
   const ngf_specialization_info*     spec_info;
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
 } ngf_graphics_pipeline_info;

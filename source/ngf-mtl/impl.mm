@@ -282,20 +282,20 @@ static MTLVertexStepFunction get_mtl_step_function(ngf_vertex_input_rate rate) {
 }
 
 static MTLPrimitiveTopologyClass
-get_mtl_primitive_topology_class(ngf_primitive_type type) {
+get_mtl_primitive_topology_class(ngf_primitive_topology t) {
   static const MTLPrimitiveTopologyClass
-  topo_class[NGF_PRIMITIVE_TYPE_COUNT] = {
+  topo_class[NGF_PRIMITIVE_TOPOLOGY_COUNT] = {
     MTLPrimitiveTopologyClassTriangle,
     MTLPrimitiveTopologyClassTriangle,
     MTLPrimitiveTopologyClassLine,
     MTLPrimitiveTopologyClassLine,
   };
-  return topo_class[type];
+  return topo_class[t];
 }
 
-static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_type type) {
+static MTLPrimitiveType get_mtl_primitive_type(ngf_primitive_topology type) {
   static const MTLPrimitiveType
-  types[NGF_PRIMITIVE_TYPE_COUNT] = {
+  types[NGF_PRIMITIVE_TOPOLOGY_COUNT] = {
     MTLPrimitiveTypeTriangle,
     MTLPrimitiveTypeTriangleStrip,
     MTLPrimitiveTypeLine,
@@ -1258,7 +1258,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   
   // Set primitive topology.
   mtl_pipe_desc.inputPrimitiveTopology =
-      get_mtl_primitive_topology_class(info->primitive_type);
+      get_mtl_primitive_topology_class(info->primitive_topology);
   if (mtl_pipe_desc.inputPrimitiveTopology ==
       MTLPrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -1274,7 +1274,7 @@ ngf_error ngf_create_graphics_pipeline(const ngf_graphics_pipeline_info *info,
   pipeline->pipeline = [CURRENT_CONTEXT->device
       newRenderPipelineStateWithDescriptor:mtl_pipe_desc
       error:&err];
-  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_type);
+  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_topology);
   
   // Set winding order and culling mode.
   pipeline->winding = get_mtl_winding(info->rasterization->front_face);

@@ -78,7 +78,7 @@ void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_d
       .blend          = &result->blend_info,
       .depth_stencil  = &result->depth_stencil_info,
       .input_info     = &result->vertex_input_info,
-      .primitive_type = NGF_PRIMITIVE_TYPE_TRIANGLE_LIST,
+      .primitive_topology = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
       .multisample    = &result->multisample_info,
       .shader_stages  = {NULL},
       .nshader_stages = 0u,
