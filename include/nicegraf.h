@@ -1134,14 +1134,12 @@ typedef enum ngf_primitive_topology {
 /**
  * @struct ngf_constant_specialization
  * \ingroup ngf
- * A constant specialization entry, sets the value for a single
- * specialization constant.
+ * A constant specialization entry, sets the value for a single specialization constant.
  */
 typedef struct ngf_constant_specialization {
-  uint32_t constant_id; /**< ID of the specialization constant used in the
-                             shader stage */
-  uint32_t offset;      /**< Offset at which the user-provided value is stored in
-                             the specialization buffer. */
+  uint32_t constant_id; /**< ID of the specialization constant used in the shader stage */
+  uint32_t offset;      /**< Offset at which the user-provided value is stored in the specialization
+                           buffer. */
   ngf_type type;        /**< Type of the specialization constant. */
 } ngf_constant_specialization;
 
@@ -1149,6 +1147,8 @@ typedef struct ngf_constant_specialization {
  * @struct ngf_specialization_info
  * \ingroup ngf
  * Sets specialization constant values for a pipeline.
+ * Specialization constants are a kind of shader constant whose values can be set at pipeline creation time.
+ * The shaders that run as part of said pipeline will then see the provided values during execution.
  */
 typedef struct ngf_specialization_info {
   ngf_constant_specialization* specializations; /**< List of specialization
