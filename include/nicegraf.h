@@ -1114,7 +1114,7 @@ typedef enum ngf_primitive_topology {
    *   \       /  \       /
    *     \   /      \   / ...
    *       o----------o
-   *       o
+   *  
    * ```
    */
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
