@@ -3738,8 +3738,8 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
       .y        = is_default_rt ? (float)r->y + (float)r->height : (float)r->y,
       .width    = NGFI_MAX(1, (float)r->width),
       .height   = (is_default_rt ? -1.0f : 1.0f) * NGFI_MAX(1, (float)r->height),
-      .minDepth = 0.0f,  // TODO: add depth parameter
-      .maxDepth = 1.0f   // TODO: add max depth parameter
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f
   };
   vkCmdSetViewport(buf->active_bundle.vkcmdbuf, 0u, 1u, &viewport);
 }
