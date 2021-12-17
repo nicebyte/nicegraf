@@ -67,8 +67,8 @@ void* sample_initialize(
     .is_sampled = true
   };
   const ngf_attachment_descriptions attachments_list = {
+    .descs = &offscreen_color_attachment_description,
     .ndescs = 1u,
-    .descs = &offscreen_color_attachment_description
   };
   const ngf_image_ref img_ref = {
     .image = state->rt_texture.get(),
