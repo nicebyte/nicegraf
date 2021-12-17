@@ -1212,40 +1212,57 @@ typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
  */
 typedef enum ngf_descriptor_type {
   /**
-   * A uniform buffer, also known as a constant buffer, can be used pass
-   * small to medium sized chunk of data to the shader in a structured way.
-   * The data is exactly the same for all shader invocations.
+   * A uniform buffer, also known as a constant buffer, can be used to pass
+   * a small to medium sized chunk of data to the shader in a structured way.
+   * See also \ref ngf_buffer.
    */
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
 
+  /**
+   * An \ref ngf_image.
+   */
   NGF_DESCRIPTOR_IMAGE,
+
+  /**
+   * An \ref ngf_sampler.
+   */
   NGF_DESCRIPTOR_SAMPLER,
+
+  /**
+   * A combination of an image and sampler in a single object.
+   */
   NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
+
+  /**
+   * A texel buffer can be used to pass a large amount of unstructured data
+   * (i.e. a big array of `float4`s) to the shader. See also \ref ngf_buffer.
+   */
   NGF_DESCRIPTOR_TEXEL_BUFFER,
+
   NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
 
 /**
  * @enum ngf_sampler_filter
  * \ingroup ngf
- *  Min/mag filters.
+ *  Enumerates minification and magnification filters.
  */
 typedef enum ngf_sampler_filter {
-  NGF_FILTER_NEAREST = 0,
-  NGF_FILTER_LINEAR,
+  NGF_FILTER_NEAREST = 0, /**< Pick the nearest value. */
+  NGF_FILTER_LINEAR,      /**< Linearly interpolate between the nearest values. */
   NGF_FILTER_COUNT
 } ngf_sampler_filter;
 
 /**
  * @enum ngf_sampler_wrap_mode
  * \ingroup ngf
- * What to do when sampling out-of-bounds.
+ * What to do when sampling an image out-of-bounds.
  */
 typedef enum ngf_sampler_wrap_mode {
-  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
+  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, /**< Clamp the pixel value to what's at the edge of the image. */
   NGF_WRAP_MODE_CLAMP_TO_BORDER,
-  NGF_WRAP_MODE_REPEAT,
-  NGF_WRAP_MODE_MIRRORED_REPEAT,
+  NGF_WRAP_MODE_REPEAT,            /**< Repeat the image contents. */
+  NGF_WRAP_MODE_MIRRORED_REPEAT,   /**< Repeat the image contents, mirrored. */
   NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
 
@@ -1273,7 +1290,7 @@ typedef struct ngf_sampler_info {
 /**
  * @struct ngf_sampler
  * \ingroup ngf
- * Sampler object.
+ * An opaque handle for a sampler object. See also \ref ngf_sampler_info and \ref ngf_create_sampler.
  */
 typedef struct ngf_sampler_t* ngf_sampler;
 
