@@ -1512,7 +1512,7 @@ typedef enum ngf_buffer_storage_type {
   /**
    * Private memory that cannot be accessed by the host directly. The contents of a
    * buffer backed by this type of memory can only be modified by executing a
-   * `ngf_cmd_copy_xxxxx_buffer`.
+   * \ref ngf_cmd_copy_buffer.
    */
   NGF_BUFFER_STORAGE_PRIVATE
 } ngf_buffer_storage_type;
@@ -1520,39 +1520,37 @@ typedef enum ngf_buffer_storage_type {
 /**
  * @enum ngf_buffer_usage
  * \ingroup ngf
- * Flags for specifying how the buffer is intended to be used.
+ * Enumerates the buffer usage flags. A valid buffer usage mask may be formed by combining a subset
+ * of these values with a bitwise OR operator.
  */
 typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< Buffer may be used as a source for
-                                             transfer operations. */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< Buffer may be used as a
-                                             destination for transfer operations.  */
-  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< Buffer may be bound as a uniform
-                                             buffer. */
-  NGF_BUFFER_USAGE_INDEX_BUFFER = 0x08,   /**< Buffer may be used as the source of index data for
-                                             indexed   drawcalls. */
-  NGF_BUFFER_USAGE_VERTEX_BUFFER =
-      0x10, /**< Buffer may be used as the source of vertex attribute data. */
-
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20 /**< Buffer may be bound as a uniform
-                                          texel buffer. */
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< The buffer may be used as a source
+                                             for transfer operations. */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< The buffer may be used as a destination
+                                             for transfer operations.  */
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< The buffer may be bound as a uniform buffer. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER   = 0x08, /**< The buffer may be used as the source of
+                                               index data for indexed draws. */
+  NGF_BUFFER_USAGE_VERTEX_BUFFER = 0x10,  /**< The buffer may be used as a source
+                                             of vertex attribute data. */
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20    /**< The buffer may be bound as a uniform texel buffer. */
 } ngf_buffer_usage;
 
 /**
  * @struct ngf_buffer_info
  * \ingroup ngf
- * Information required for buffer creation.
+ * Information required to create a buffer object.
  */
 typedef struct ngf_buffer_info {
-  size_t                  size;         /**< Size of the buffer in bytes. */
-  ngf_buffer_storage_type storage_type; /**< Flags specifying preferred storage type.*/
-  uint32_t                buffer_usage; /**< Flags specifying intended usage.*/
+  size_t                  size;         /**< The size of the buffer in bytes. */
+  ngf_buffer_storage_type storage_type; /**< Flags specifying the preferred storage type.*/
+  uint32_t                buffer_usage; /**< Flags specifying the intended usage.*/
 } ngf_buffer_info;
 
 /**
  * @struct ngf_buffer
  * \ingroup ngf
- * A memory buffer.
+ * An opaque handle to a buffer object.
  */
 typedef struct ngf_buffer_t* ngf_buffer;
 
