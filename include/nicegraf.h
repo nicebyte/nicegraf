@@ -1325,7 +1325,7 @@ typedef enum ngf_image_type {
 /**
  * @struct ngf_image_info
  * \ingroup ngf
- * Describes an image.
+ * Information required to create an image object.
  */
 typedef struct ngf_image_info {
   ngf_image_type type;           /**< The image type. */
@@ -1376,63 +1376,73 @@ typedef struct ngf_image_ref {
 /**
  * @struct ngf_render_target_info
  * \ingroup ngf
- * Specifies information about a rendertarget.
+ * Information required to create a render target object.
  */
 typedef struct ngf_render_target_info {
-  const ngf_attachment_descriptions* attachment_descriptions; /**< List of attachment descriptions
-                                                                   for this render target. */
-  const ngf_image_ref* attachment_image_refs;                 /**< Image references corresponding
-                                                                   to each attachment in the list. */
+  /** List of attachment descriptions. */
+  const ngf_attachment_descriptions* attachment_descriptions; 
+  /** Image references, describing what is bound to each attachment. */
+  const ngf_image_ref* attachment_image_refs; 
 } ngf_render_target_info;
 
 /**
  * @struct ngf_render_target
  * \ingroup ngf
- * Render target.
+ * An opaque handle to a render target object.
  */
 typedef struct ngf_render_target_t* ngf_render_target;
 
 /**
  * @struct ngf_clear_info
  * \ingroup ngf
- * Specifies a rendertarget clear operation.
+ * Specifies a render target clear operation.
  */
 typedef union ngf_clear_info {
+  /**
+   * The color to clear to. Each element corresponds to the red, green, blue and alpha channel
+   * respectively. If the format of the render target image does not have that channel, the value is
+   * ignored.
+   * This field is used for color attachments only.
+   */
   float clear_color[4];
+
+  /**
+   * The depth and stencil values to clear to. This field is used for depth or combined
+   * depth/stencil attachments only.
+   */
   struct {
-    float    clear_depth;
-    uint32_t clear_stencil;
+    float    clear_depth;   /**< The depth value to clear to. */
+    uint32_t clear_stencil; /**< The stencil value to clear to. */
   } clear_depth_stencil;
 } ngf_clear;
 
 /**
  * @enum ngf_attachment_load_op
  * \ingroup ngf
- * What to do on attachment load.
+ * Enumerates actions that can be performed on attachment "load" (at the start of a render pass).
  */
 typedef enum ngf_attachment_load_op {
   NGF_LOAD_OP_DONTCARE = 0, /**< Don't care what happens. */
   NGF_LOAD_OP_KEEP,         /**< Preserve the prior contents of the attachment. */
-  NGF_LOAD_OP_CLEAR,        /**< Clear attachment. */
+  NGF_LOAD_OP_CLEAR,        /**< Clear the attachment. */
   NGF_LOAD_OP_COUNT
 } ngf_attachment_load_op;
 
 /**
  * @enum ngf_attachment_store_op
  * \ingroup ngf
- * What to do on attachment store.
+ * Enumerates actions that can be performed on attachment "store" (at the end of a render pass).
  */
 typedef enum ngf_attachment_store_op {
   /**
    * Don't care what happens. Use this if you don't plan on reading back the
-   * contents of the attachment in any shaders or presenting it to screen.
+   * contents of the attachment in any shaders, or presenting it to screen.
    */
   NGF_STORE_OP_DONTCARE = 0,
 
   /**
-   * Make sure the contents is written out to system memory. Use this if you
-   * plan on reading the contents of the attachment in any shaders or
-   * presenting it to screen.
+   * Use this if you plan on reading the contents of the attachment in any shaders or
+   * presenting it to screen. The contents of the attachment shall be written out to system memory.
    */
   NGF_STORE_OP_STORE,
 
@@ -1442,13 +1452,39 @@ typedef enum ngf_attachment_store_op {
 /**
  * @struct ngf_pass_info
  * \ingroup ngf
- * Information about a render pass.
+ * Information required to begin a render pass.
  */
 typedef struct ngf_pass_info {
-  ngf_render_target              render_target;
-  const ngf_attachment_load_op*  load_ops;
+  /**
+   * A render target that shall be rendered to during this pass.
+   */
+  ngf_render_target render_target;
+
+  /**
+   * A pointer to a buffer of \ref ngf_load_op enumerators specifying the operation to perform at
+   * the start of the render pass for each attachment of \ref ngf_pass_info::render_target. The
+   * buffer must have at least the same number of elements as there are attachments in the render
+   * target. The `i`th element of the buffer corresponds to the `i`th attachment.
+   */
+  const ngf_attachment_load_op* load_ops;
+
+  /**
+   * A pointer to a buffer of \ref ngf_store_op enumerators specifying the operation to perform at
+   * the end of the render pass for each attachment of \ref ngf_pass_info::render_target. The
+   * buffer must have at least the same number of elements as there are attachments in the render
+   * target. The `i`th element of the buffer corresponds to the `i`th attachment.
+   */
   const ngf_attachment_store_op* store_ops;
-  const ngf_clear*               clears;
+
+  /**
+   * If no attachment has a clear as its load op, this field may be NULL.
+   * Otherwise, it shall be a pointer to a buffer of \ref ngf_clear objects. The buffer must contain
+   * at least as many elements as there are attachments in the render target. The `i`th element of
+   * the buffer corresponds to the `i`th attachment. For attachments that are to be cleared at the
+   * beginning of the pass, the clear values from the corresponding element of the buffer are used.
+   * The rest of the buffer's elements are ignored.
+   */
+  const ngf_clear* clears;
 } ngf_pass_info;
 
 /**
