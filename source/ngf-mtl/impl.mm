@@ -381,12 +381,6 @@ get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
   static const std::optional<MTLSamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] =
   {
     MTLSamplerAddressModeClampToEdge,
-#if TARGET_OS_OSX
-    MTLSamplerAddressModeClampToBorderColor,
-#else
-    //ClampToBorderColor is unsupported on iOS, temp solution:
-    std::nullopt,
-#endif
     MTLSamplerAddressModeRepeat,
     MTLSamplerAddressModeMirrorRepeat
   };

@@ -1260,9 +1260,8 @@ typedef enum ngf_sampler_filter {
  */
 typedef enum ngf_sampler_wrap_mode {
   NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, /**< Clamp the pixel value to what's at the edge of the image. */
-  NGF_WRAP_MODE_CLAMP_TO_BORDER,
-  NGF_WRAP_MODE_REPEAT,            /**< Repeat the image contents. */
-  NGF_WRAP_MODE_MIRRORED_REPEAT,   /**< Repeat the image contents, mirrored. */
+  NGF_WRAP_MODE_REPEAT,                     /**< Repeat the image contents. */
+  NGF_WRAP_MODE_MIRRORED_REPEAT,            /**< Repeat the image contents, mirrored. */
   NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
 
@@ -1281,7 +1280,6 @@ typedef struct ngf_sampler_info {
   float                 lod_max;         /**< Max mip level.*/
   float                 lod_min;         /**< Min mip level.*/
   float                 lod_bias;        /**< Level bias.*/
-  float                 border_color[4]; /**< Border color.*/
   /** Max number of samples allowed for anisotropic filtering.*/
   float max_anisotropy;
   bool  enable_anisotropy; /**< Whether to allow anisotropic filtering. */

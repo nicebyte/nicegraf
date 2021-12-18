@@ -325,7 +325,6 @@ static VkFilter get_vk_filter(ngf_sampler_filter filter) {
 static VkSamplerAddressMode get_vk_address_mode(ngf_sampler_wrap_mode mode) {
   static const VkSamplerAddressMode vkmodes[NGF_WRAP_MODE_COUNT] = {
       VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-      VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER,
       VK_SAMPLER_ADDRESS_MODE_REPEAT,
       VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
   return vkmodes[mode];
