@@ -292,10 +292,10 @@ typedef struct ngf_allocation_callbacks {
  * @typedef ngf_device_handle
  * A handle that uniquely identifies a rendering device.
  *
- * Note that the value of the handle corresponding to the same exact physical device may be different across different
- * instances of the same client. In other words, if the client application shuts down, then starts up again, it may
- * get different values for device handles than it did before. Therefore, device handles should not be persisted.
- * \ingroup ngf
+ * Note that the value of the handle corresponding to the same exact physical device may be
+ * different across different instances of the same client. In other words, if the client
+ * application shuts down, then starts up again, it may get different values for device handles than
+ * it did before. Therefore, device handles should not be persisted. \ingroup ngf
  */
 typedef uint32_t ngf_device_handle;
 
@@ -849,11 +849,12 @@ typedef enum ngf_vertex_input_rate {
  * @struct ngf_vertex_buf_binding_desc
  * \ingroup ngf
  * Specifies a vertex buffer binding.
- * A _vertex buffer binding_ may be thought of as a slot to which a vertex attribute buffer can be bound.
- * An \ref ngf_graphics_pipeline may have several such slots, which are addressed by their indices.
- * Vertex attribute buffers can be bound to these slots with \ref ngf_cmd_bind_attrib_buffer.
- * The binding also partly defines how the contents of the bound buffer is interpreted - via
- * \ref ngf_vertex_buf_binding_desc::stride and \ref ngf_vertex_buf_binding_desc::input_rate
+ * A _vertex buffer binding_ may be thought of as a slot to which a vertex attribute buffer can be
+ * bound. An \ref ngf_graphics_pipeline may have several such slots, which are addressed by their
+ * indices. Vertex attribute buffers can be bound to these slots with \ref
+ * ngf_cmd_bind_attrib_buffer. The binding also partly defines how the contents of the bound buffer
+ * is interpreted - via \ref ngf_vertex_buf_binding_desc::stride and \ref
+ * ngf_vertex_buf_binding_desc::input_rate
  */
 typedef struct ngf_vertex_buf_binding_desc {
   uint32_t binding; /**< Index of the binding that this structure describes.*/
@@ -1114,7 +1115,7 @@ typedef enum ngf_primitive_topology {
    *   \       /  \       /
    *     \   /      \   / ...
    *       o----------o
-   *  
+   *
    * ```
    */
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
@@ -1147,8 +1148,9 @@ typedef struct ngf_constant_specialization {
  * @struct ngf_specialization_info
  * \ingroup ngf
  * Sets specialization constant values for a pipeline.
- * Specialization constants are a kind of shader constant whose values can be set at pipeline creation time.
- * The shaders that run as part of said pipeline will then see the provided values during execution.
+ * Specialization constants are a kind of shader constant whose values can be set at pipeline
+ * creation time. The shaders that run as part of said pipeline will then see the provided values
+ * during execution.
  */
 typedef struct ngf_specialization_info {
   ngf_constant_specialization* specializations; /**< List of specialization
@@ -1287,7 +1289,8 @@ typedef struct ngf_sampler_info {
 /**
  * @struct ngf_sampler
  * \ingroup ngf
- * An opaque handle for a sampler object. See also \ref ngf_sampler_info and \ref ngf_create_sampler.
+ * An opaque handle for a sampler object. See also \ref ngf_sampler_info and \ref
+ * ngf_create_sampler.
  */
 typedef struct ngf_sampler_t* ngf_sampler;
 
@@ -1307,7 +1310,7 @@ typedef enum ngf_image_usage {
   NGF_IMAGE_USAGE_XFER_DST = 0x04,
 
   /** Mipmaps may be generated for the image with \ref ngf_cmd_generate_mipmaps. */
-  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 
+  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08
 } ngf_image_usage;
 
 /**
@@ -1380,9 +1383,9 @@ typedef struct ngf_image_ref {
  */
 typedef struct ngf_render_target_info {
   /** List of attachment descriptions. */
-  const ngf_attachment_descriptions* attachment_descriptions; 
+  const ngf_attachment_descriptions* attachment_descriptions;
   /** Image references, describing what is bound to each attachment. */
-  const ngf_image_ref* attachment_image_refs; 
+  const ngf_image_ref* attachment_image_refs;
 } ngf_render_target_info;
 
 /**
