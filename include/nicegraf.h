@@ -1294,14 +1294,20 @@ typedef struct ngf_sampler_t* ngf_sampler;
 /**
  * @enum ngf_image_usage
  * \ingroup ngf
- * Image usage flags.
+ * Image usage flags. A valid image usage mask may be formed by combining one or more of these
+ * values with a bitwise OR operator.
  */
 typedef enum ngf_image_usage {
-  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< Can be read from in a shader.*/
-  NGF_IMAGE_USAGE_ATTACHMENT  = 0x02, /**< Can be used as an attachment for a
-                                           render target.*/
-  NGF_IMAGE_USAGE_XFER_DST = 0x04, /**< Can be used as a destination for a transfer operation. **/
-  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 /**< Use this flag to enable auto mipmap generation. */
+  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< The image may be read from in a shader.*/
+
+  /** The image may be used as an attachment for a render target.*/
+  NGF_IMAGE_USAGE_ATTACHMENT = 0x02,
+
+  /** The image may be used as a destination for a transfer operation. **/
+  NGF_IMAGE_USAGE_XFER_DST = 0x04,
+
+  /** Mipmaps may be generated for the image with \ref ngf_cmd_generate_mipmaps. */
+  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08 
 } ngf_image_usage;
 
 /**
@@ -1310,9 +1316,9 @@ typedef enum ngf_image_usage {
  * Possible image types.
  */
 typedef enum ngf_image_type {
-  NGF_IMAGE_TYPE_IMAGE_2D = 0,
-  NGF_IMAGE_TYPE_IMAGE_3D,
-  NGF_IMAGE_TYPE_CUBE,
+  NGF_IMAGE_TYPE_IMAGE_2D = 0, /**< Two-dimensional image. */
+  NGF_IMAGE_TYPE_IMAGE_3D,     /**< Three-dimensional image. */
+  NGF_IMAGE_TYPE_CUBE,         /**< Cubemap. */
   NGF_IMAGE_TYPE_COUNT
 } ngf_image_type;
 
@@ -1322,27 +1328,27 @@ typedef enum ngf_image_type {
  * Describes an image.
  */
 typedef struct ngf_image_info {
-  ngf_image_type type;
-  ngf_extent3d   extent;         /**< Width, height and depth (for 3d images) or no. of
+  ngf_image_type type;           /**< The image type. */
+  ngf_extent3d   extent;         /**< The width, height and depth (for 3d images) or no. of
                                       layers (for layered images).*/
-  uint32_t         nmips;        /**< Number of mip levels.*/
+  uint32_t         nmips;        /**< The number of mip levels in the image.*/
   ngf_image_format format;       /**< Internal format.*/
-  ngf_sample_count sample_count; /**< Number of samples. **/
-  uint32_t         usage_hint;   /**< How the client intends to use the image. Must be a
+  ngf_sample_count sample_count; /**< The number of samples per pixel in the image. **/
+  uint32_t         usage_hint;   /**< Specifies how the client intends to use the image. Must be a
                                       combination of image usage flags.*/
 } ngf_image_info;
 
 /**
  * @struct ngf_image
  * \ingroup ngf
- * An image object.
+ * An opaque handle to an image object.
  */
 typedef struct ngf_image_t* ngf_image;
 
 /**
  * @enum ngf_cubemap_face
  * \ingroup ngf
- * Indicates the face of a cubemap.
+ * Members of this enumeration are used to refer to the different faces of a cubemap.
  */
 typedef enum ngf_cubemap_face {
   NGF_CUBEMAP_FACE_POSITIVE_X,
@@ -1357,13 +1363,13 @@ typedef enum ngf_cubemap_face {
 /**
  * @struct ngf_image_ref
  * \ingroup ngf
- * Reference to a part of an image.
+ * A reference to a part of an image.
  */
 typedef struct ngf_image_ref {
-  ngf_image        image;        /**< Image being referred to.*/
-  uint32_t         mip_level;    /**< Mip level within the image.*/
-  uint32_t         layer;        /**< Layer within the image.*/
-  ngf_cubemap_face cubemap_face; /**< Face of the cubemap, ignored for
+  ngf_image        image;        /**< The image being referred to.*/
+  uint32_t         mip_level;    /**< The mip level within the image.*/
+  uint32_t         layer;        /**< The layer within the image.*/
+  ngf_cubemap_face cubemap_face; /**< The face of the cubemap for cubemaps, ignored for
                                       non-cubemap images.*/
 } ngf_image_ref;
 
