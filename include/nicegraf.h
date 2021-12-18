@@ -1557,7 +1557,7 @@ typedef struct ngf_buffer_t* ngf_buffer;
 /**
  * @struct ngf_buffer_bind_info
  * \ingroup ngf
- * Specifies a buffer bind operation.
+ * Specifies a buffer resource bind operation.
  */
 typedef struct ngf_buffer_bind_info {
   ngf_buffer       buffer; /**< Which buffer to bind.*/
@@ -1569,27 +1569,28 @@ typedef struct ngf_buffer_bind_info {
 /**
  * @struct ngf_image_sampler_bind_info
  * \ingroup ngf
- * Specifies an image bind operation.
+ * Specifies an image and/or sampler resource bind operation. To bind a combined image sampler, both
+ * fields have to be set.
  */
 typedef struct ngf_image_sampler_bind_info {
-  ngf_image   image;   /**< The image to bind.*/
-  ngf_sampler sampler; /**< Sampler to use.*/
+  ngf_image   image;   /**< The image to bind. Can be NULL if binding just a sampler. */
+  ngf_sampler sampler; /**< The sampler to bind. Can be NULL if binding just an image. */
 } ngf_image_sampler_bind_info;
 
 /**
  * @struct ngf_resource_bind_op
  * \ingroup ngf
  * Specifies a resource (image, buffer, etc.) bind operation, together with
- * the target set and binding IDs.
+ * the target set and binding IDs. See \ref ngf_cmd_bind_resources for details.
  */
 typedef struct ngf_resource_bind_op {
   uint32_t            target_set;     /**< Target set ID. */
   uint32_t            target_binding; /**< Target binding ID. */
-  ngf_descriptor_type type;           /**< Type of the resource being bound. */
+  ngf_descriptor_type type;           /**< The type of the resource being bound. */
   union {
     ngf_buffer_bind_info        buffer;
     ngf_image_sampler_bind_info image_sampler;
-  } info; /**< Details of the resource being bound, depending on type. */
+  } info; /**< The details about the resource being bound, depending on type. */
 } ngf_resource_bind_op;
 
 /**
