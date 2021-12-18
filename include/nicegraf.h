@@ -1490,7 +1490,7 @@ typedef struct ngf_pass_info {
 /**
  * @enum ngf_buffer_storage_type
  * \ingroup ngf
- * Types of memory backing a buffer object.
+ * Enumerates types of memory backing a buffer object.
  */
 typedef enum ngf_buffer_storage_type {
   /**
@@ -1510,7 +1510,7 @@ typedef enum ngf_buffer_storage_type {
   NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
 
   /**
-   * Private memory cannot be accessed by the host directly. The contents of a
+   * Private memory that cannot be accessed by the host directly. The contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * `ngf_cmd_copy_xxxxx_buffer`.
    */
