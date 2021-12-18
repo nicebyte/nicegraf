@@ -1260,29 +1260,28 @@ typedef enum ngf_sampler_filter {
  */
 typedef enum ngf_sampler_wrap_mode {
   NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, /**< Clamp the pixel value to what's at the edge of the image. */
-  NGF_WRAP_MODE_REPEAT,                     /**< Repeat the image contents. */
-  NGF_WRAP_MODE_MIRRORED_REPEAT,            /**< Repeat the image contents, mirrored. */
+  NGF_WRAP_MODE_REPEAT,            /**< Repeat the image contents. */
+  NGF_WRAP_MODE_MIRRORED_REPEAT,   /**< Repeat the image contents, mirrored. */
   NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
 
 /**
  * @struct ngf_sampler_info
  * \ingroup ngf
- * Describes a sampler object.
+ * Information for creating a sampler object.
  */
 typedef struct ngf_sampler_info {
-  ngf_sampler_filter    min_filter; /**< Minification filter.*/
-  ngf_sampler_filter    mag_filter; /**< Magnification filter.*/
-  ngf_sampler_filter    mip_filter; /**< Mipmap filter. */
-  ngf_sampler_wrap_mode wrap_s;     /**< Horizontal wrap mode. */
-  ngf_sampler_wrap_mode wrap_t;
-  ngf_sampler_wrap_mode wrap_r;
-  float                 lod_max;         /**< Max mip level.*/
-  float                 lod_min;         /**< Min mip level.*/
-  float                 lod_bias;        /**< Level bias.*/
-  /** Max number of samples allowed for anisotropic filtering.*/
-  float max_anisotropy;
-  bool  enable_anisotropy; /**< Whether to allow anisotropic filtering. */
+  ngf_sampler_filter    min_filter;        /**< Minification filter.*/
+  ngf_sampler_filter    mag_filter;        /**< Magnification filter.*/
+  ngf_sampler_filter    mip_filter;        /**< Mipmap filter. */
+  ngf_sampler_wrap_mode wrap_u;            /**< Wrap mode for the U coordinate. */
+  ngf_sampler_wrap_mode wrap_v;            /**< Wrap mode for the V coordinate. */
+  ngf_sampler_wrap_mode wrap_w;            /**< Wrap mode for the W coordinate. */
+  float                 lod_max;           /**< Max mip level.*/
+  float                 lod_min;           /**< Min mip level.*/
+  float                 lod_bias;          /**< Level bias.*/
+  float                 max_anisotropy;    /**< Max allowed degree of anisotropy. */
+  bool                  enable_anisotropy; /**< Whether to allow anisotropic filtering. */
 } ngf_sampler_info;
 
 /**

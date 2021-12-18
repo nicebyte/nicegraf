@@ -1377,9 +1377,9 @@ void ngf_buffer_unmap([[maybe_unused]] ngf_buffer buf) NGF_NOEXCEPT {}
 ngf_error ngf_create_sampler(const ngf_sampler_info *info,
                              ngf_sampler *result) NGF_NOEXCEPT {
   auto *sampler_desc = [MTLSamplerDescriptor new];
-  std::optional<MTLSamplerAddressMode> s = get_mtl_address_mode(info->wrap_s),
-                                       t = get_mtl_address_mode(info->wrap_t),
-                                       r = get_mtl_address_mode(info->wrap_r);
+  std::optional<MTLSamplerAddressMode> s = get_mtl_address_mode(info->wrap_u),
+                                       t = get_mtl_address_mode(info->wrap_v),
+                                       r = get_mtl_address_mode(info->wrap_w);
   if (!(s && t && r)) {
     return NGF_ERROR_INVALID_ENUM;
   }
