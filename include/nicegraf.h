@@ -1313,7 +1313,7 @@ typedef enum ngf_image_usage {
 /**
  * @enum ngf_image_type
  * \ingroup ngf
- * Possible image types.
+ * Enumerates the possible image types.
  */
 typedef enum ngf_image_type {
   NGF_IMAGE_TYPE_IMAGE_2D = 0, /**< Two-dimensional image. */
@@ -1739,7 +1739,8 @@ typedef struct {
 /**
  * @typedef ngf_frame_token
  * \ingroup ngf
- * A token identifying a frame of rendering.
+ * A token identifying a frame of rendering. See \ref ngf_begin_frame and \ref ngf_end_frame for
+ * details.
  */
 typedef uint32_t ngf_frame_token;
 
