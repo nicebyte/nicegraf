@@ -1747,7 +1747,7 @@ typedef struct ngf_cmd_buffer_info {
  * Once a command buffer is in the "submitted" state, it is
  * impossible to append any new commands to it.
  * It is, however, possible to begin recording a new, completely separate batch
- * of commands by calling \ref ngf_cmd_buffer_start which implicitly
+ * of commands by calling \ref ngf_start_cmd_buffer which implicitly
  * transitions the buffer to the "ready" state if it is already "submitted".
  * This does not affect any previously submitted commands.
  *
@@ -1758,16 +1758,6 @@ typedef struct ngf_cmd_buffer_info {
  * \ref ngf_cmd_buffer_submit expects command buffers to be in the "awaiting
  * submission" state.
  *
- * Command buffers may be recorded in parrallel on different threads. Recording
- * and destroying a command buffer must always be done by the same thread that
- * created it.
- *
- * Submitting a command buffer for execution may be done by a different thread,
- * as long as the submitting and recording threads have shared contexts.
- *
- * Access to command buffer objects from different threads must be synchronized
- * by the application. In other words, it falls on the application to ensure
- * that no two threads ever access the same command buffer simultaneously.
  */
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
