@@ -1676,19 +1676,19 @@ typedef struct ngf_context_t* ngf_context;
 /**
  * @struct ngf_context_info
  * \ingroup ngf
- * Configures a Nicegraf context.
+ * Configures a nicegraf rendering context.
  */
 typedef struct ngf_context_info {
   /**
    * Configures the swapchain that the context will be presenting to. This
-   * can be NULL if all rendering is done off-screen.
+   * can be NULL if all rendering is done off-screen and the context never
+   * presents to a window.
    */
   const ngf_swapchain_info* swapchain_info;
 
   /**
-   * A reference to another context; the newly created context will have access
-   * to the other one's resources (such as buffers and images) and vice versa
-   * Can be NULL.
+   * A reference to another context; the newly created context shall be able to use the resources
+   * (such as buffers and images) created within the given context, and vice versa Can be NULL.
    */
   const ngf_context shared_context;
 } ngf_context_info;
