@@ -1601,11 +1601,26 @@ typedef struct ngf_resource_bind_op {
  * \ingroup ngf
  * Enumerates possible presentation modes.
  * "Presentation mode" refers to the particular way the CPU,
- * GPU and the presentation engine interact.
+ * GPU and the presentation engine interact. Some of the listed presentation modes
+ * may not be supported on various backend, hardware or OS combinations. If an
+ * unsupported mode is requested, nicegraf silently falls back onto \ref NGF_PRESENTATION_MODE_FIFO.
  */
 typedef enum ngf_present_mode {
-  NGF_PRESENTATION_MODE_FIFO,     /**< Frames get queued ("wait for vsync") */
-  NGF_PRESENTATION_MODE_IMMEDIATE /**< Doesn't wait for vsync */
+  /**
+   * This is the only presentation mode that is guaranteed to be supported.
+   * In this mode, the presentation requests are queued internally, and the
+   * presentation engine waits for the vertical blanking signal to present
+   * the image at the front of the queue. This mode guarantees no
+   * frame tearing.
+   */
+  NGF_PRESENTATION_MODE_FIFO,
+
+  /**
+   * In this mode, the presentation engine does not wait for the vertical blanking signal, instead
+   * presenting an image immediately. This mode results in lower latency but may induce frame
+   * tearing. It is not recommended to use this mode on mobile targets.
+   */
+  NGF_PRESENTATION_MODE_IMMEDIATE
 } ngf_present_mode;
 
 /**
@@ -1628,7 +1643,7 @@ typedef struct ngf_swapchain_info {
 /**
  * @struct ngf_context
  * \ingroup ngf
- * Nicegraf rendering context.
+ * An opaque handle to a nicegraf rendering context.
  *
  * A context represents the internal state of the library that is required for
  * performing most of the library's functionality. This includes, but is not
@@ -1653,6 +1668,8 @@ typedef struct ngf_swapchain_info {
  * A context mainatins exclusive ownership of its swapchain (if it has one),
  * and even shared contexts cannot acquire, present or render to images from
  * that swapchain.
+ * 
+ * See also: \ref ngf_context_info and \ref ngf_create_context.
  */
 typedef struct ngf_context_t* ngf_context;
 
