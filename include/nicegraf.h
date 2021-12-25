@@ -535,6 +535,7 @@ typedef enum ngf_polygon_mode {
 /**
  * @enum ngf_cull_mode
  * \ingroup ngf
+ * 
  * Enumerates polygon culling strategies.
  * See also \ref ngf_rasterization_info.
  */
@@ -1245,8 +1246,8 @@ typedef struct ngf_graphics_pipeline_info {
  * @struct ngf_graphics_pipeline
  * \ingroup ngf
  * 
- * An opaque handle to a graphics pipeline object. See \ref ngf_graphics_pipeline_info and \ref
- * ngf_create_graphics_pipeline.
+ * An opaque handle to a graphics pipeline object.
+ * See also: \ref ngf_graphics_pipeline_info, \ref ngf_create_graphics_pipeline and \ref ngf_destroy_graphics_pipeline.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
