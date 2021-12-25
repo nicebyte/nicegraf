@@ -2012,18 +2012,6 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     NGF_NOEXCEPT;
 
 /**
- * Blit pixels from one render target to another. If the source render target
- * is multisampled, this will trigger an MSAA resolve.
- * @param src source rt
- * @param dst destination rt
- * @param src_rect the region to copy from the source rt
- */
-ngf_error ngf_resolve_render_target(
-    const ngf_render_target src,
-    ngf_render_target       dst,
-    const ngf_irect2d*      src_rect) NGF_NOEXCEPT;
-
-/**
  * Destroy the given render target.
  */
 void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT;
