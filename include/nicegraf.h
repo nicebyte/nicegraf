@@ -1797,7 +1797,10 @@ typedef uint32_t ngf_frame_token;
 
 /**
  * \ingroup ngf
- * Obtain a list of rendering devices available to nicegraf. This function is not thread-safe.
+ * 
+ * Obtains a list of rendering devices available to nicegraf.
+ *
+ * This function is not thread-safe.
  * The devices are not returned in any particular order, and the order is not guaranteed to be the
  * same every time the function is called.
  * @param devices pointer to a pointer to `const` \ref ngf_device. If not `NULL`, this will be
@@ -1811,6 +1814,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
 
 /**
  * \ingroup ngf
+ * 
  * Initializes nicegraf.
  *
  * The client should call this function only once during the
@@ -1820,32 +1824,44 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
 ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
 
 /**
- * Create a new nicegraf context. Creates a new Nicegraf context that
- * can optionally present to a window surface and mutually share objects
- * (such as images and buffers) with another context.
- * @param info context configuration
+ * \ingroup ngf
+ * 
+ * Creates a new \ref ngf_context.
+ * 
+ * @param info The context configuration.
  */
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT;
 
 /**
- * Destroy a nicegraf context.
- * @param ctx The context to deallocate.
+ * \ingroup ngf
+ * 
+ * Destroys the given \ref ngf_context.
+ * 
+ * @param ctx The context to destroy.
  */
 void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT;
 
 /**
- * Adjust the size of a context's associated swapchain. This function must be
- * called every time the swapchain's underlying window is resized.
+ * \ingroup ngf
+ * 
+ * Adjust the images associated with the given context's swapchain.
+ 
+ * This function must be called every time that the window the context's presenting to is resized.
+ * It is up to the client application to detect the resize events and call this function.
+ * Not calling this function on resize results in undefined behavior.
+ * 
  * @param ctx The context to operate on
- * @param new_width New window width in pixels
- * @param new_height New window height in pixels
- * @return Error codes: NGF_ERROR_SWAPCHAIN_CREATION_FAILED, NGF_ERROR_OUTOFMEM
+ * @param new_width New window client area width in pixels
+ * @param new_height New window client area height in pixels
  */
 ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT;
 
 /**
- * Set a given nicegraf context as current for the calling thread. All
- * subsequent rendering operations invoked from the calling thread will affect
+ * \ingroup ngf
+ * 
+ * Set the given nicegraf context as current for the calling thread.
+ * 
+ * All subsequent rendering operations invoked from the calling thread shall affect
  * the given context.
  *
  * Once a context has been set as current on a thread, it cannot be migrated to
