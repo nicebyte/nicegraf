@@ -457,8 +457,34 @@ typedef struct ngf_shader_stage_info {
    * Shading Language.
    *
    * Additionally, the Metal backend expects the code to contain a special comment, mapping all
-   * descriptor set+binding pairs to native Metal slots. See \ref ngf_cmd_bind_resources for
-   * details.
+   * <descriptor set, binding> pairs to the native Metal argument table slots. The comment shall
+   * start with 
+   * 
+   * ```
+   * /**NGF_NATIVE_BINDING_MAP
+   * ```
+   * 
+   * and each of the following lines until the end of the comment shall have the following format:
+   * 
+   * ```
+   * (s b) : m
+   * ```
+   * 
+   * where `s` is the set number, `b` is the binding number within the set, and `m` is the index
+   * of the corresponding resource in Metal's argument table.
+   * 
+   * For example, let's say the Metal shader refers to index 3 in the texture argument table. 
+   * Adding the following line to the binding map comment
+   * 
+   * ```
+   * (0 1) : 3
+   * ```
+   * 
+   * would tell the nicegraf metal backend to use the third slot of the texture argument table when
+   * an image is bound to set 0, binding 1 using \ref ngf_cmd_bind_resources.
+   * 
+   * When compiling HLSL shaders using nicegraf-shaderc, the comment with the binding map is generated
+   * automatically.
    */
   const void* content;
 
