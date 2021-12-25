@@ -33,7 +33,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WIN32)
     set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
-	set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror")
+	set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
 endif()
 
 # This function adds a new target and sets some configuration
