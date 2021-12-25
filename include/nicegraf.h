@@ -500,6 +500,7 @@ typedef struct ngf_shader_stage_info {
 /**
  * @struct ngf_shader_stage
  * \ingroup ngf
+ * 
  * A programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
@@ -507,6 +508,10 @@ typedef struct ngf_shader_stage_info {
  *
  * On platforms that require a compilation step at runtime, details about
  * compile errors are reported via the debug callback mechanism.
+ * 
+ * Shader stage objects are necessary for creating \ref ngf_graphics_pipeline objects, but once
+ * the pipelines have been created, the shader stages that had been used to create
+ * them can safely be disposed of.
  */
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
@@ -1932,12 +1937,10 @@ const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
 /**
  * \ingroup ngf
  * 
- * Creates a shader stage object from its description.
- * Shader stage objects are necessary for creating graphics pipeline objects, but once
- * the pipelines have been created, the shader stage objects that had been used to create
- * them can safely be disposed of.
+ * Creates a new shader stage object.
  *
- * @param stages Information to construct the shader stage object.
+ * @param stages Information required to construct the shader stage object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
  */
 ngf_error
 ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* result) NGF_NOEXCEPT;
@@ -1945,24 +1948,32 @@ ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* res
 /**
  * \ingroup ngf
  * 
- * Destroys a given shader stage.
+ * Destroys the given shader stage.
  * 
- * @param stage the shader stage object to destroy.
+ * @param stage The handle to the shader stage object to be destroyed.
  */
 void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT;
 
 /**
- * Creates a graphics pipeline object.
- * @param info Configuration for the graphics pipeline.
+ * \ingroup ngf
+ * 
+ * Creates a new graphics pipeline object.
+ * 
+ * @param info Information required to construct the graphics pipeline object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
  */
 ngf_error ngf_create_graphics_pipeline(
     const ngf_graphics_pipeline_info* info,
     ngf_graphics_pipeline*            result) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
  * Destroys the given graphics pipeline object.
+ * 
+ * @param pipeline The handle to the pipeline object to be destroyed.
  */
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) NGF_NOEXCEPT;
+void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
  * Creates a new image object.
