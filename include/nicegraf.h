@@ -441,6 +441,7 @@ typedef enum ngf_stage_type {
 /**
  * @struct ngf_shader_stage_info
  * \ingroup ngf
+ *
  * Describes a programmable shader stage.
  */
 typedef struct ngf_shader_stage_info {
@@ -512,12 +513,15 @@ typedef struct ngf_shader_stage_info {
  * Shader stage objects are necessary for creating \ref ngf_graphics_pipeline objects, but once
  * the pipelines have been created, the shader stages that had been used to create
  * them can safely be disposed of.
+ * 
+ * See also: \ref ngf_shader_stage_info, \ref ngf_create_shader_stage, \ref ngf_destroy_shader_stage.
  */
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
 /**
  * @enum ngf_polygon_mode
  * \ingroup ngf
+ * 
  * Enumerates ways to draw polygons.
  * See also \ref ngf_rasterization_info.
  */
@@ -1001,7 +1005,8 @@ typedef enum ngf_sample_count {
 /**
  * @struct ngf_multisample_info
  * \ingroup ngf
- * Specifies state of multisampling.
+ * 
+ * Specifies the state of multisampling.
  */
 typedef struct ngf_multisample_info {
   ngf_sample_count sample_count;      /**< MSAA sample count. */
@@ -1011,6 +1016,7 @@ typedef struct ngf_multisample_info {
 /**
  * @enum ngf_image_format
  * \ingroup ngf
+ * 
  * Image formats.
  *
  * Some backends may not support all of those.
@@ -1134,6 +1140,7 @@ typedef struct ngf_attachment_descriptions {
 /**
  * @enum ngf_primitive_topology
  * \ingroup ngf
+ * 
  * Enumerates the available primitive topologies (ways to group vertices into primitives).
  */
 typedef enum ngf_primitive_topology {
@@ -1169,6 +1176,7 @@ typedef enum ngf_primitive_topology {
 /**
  * @struct ngf_constant_specialization
  * \ingroup ngf
+ * 
  * A constant specialization entry, sets the value for a single specialization constant.
  */
 typedef struct ngf_constant_specialization {
@@ -1197,6 +1205,7 @@ typedef struct ngf_specialization_info {
 /**
  * @struct ngf_graphics_pipeline_info
  * \ingroup ngf
+ * 
  * Contains all information necessary for creating a graphics pipeline object.
  */
 typedef struct ngf_graphics_pipeline_info {
@@ -1235,6 +1244,7 @@ typedef struct ngf_graphics_pipeline_info {
 /**
  * @struct ngf_graphics_pipeline
  * \ingroup ngf
+ * 
  * An opaque handle to a graphics pipeline object. See \ref ngf_graphics_pipeline_info and \ref
  * ngf_create_graphics_pipeline.
  */
