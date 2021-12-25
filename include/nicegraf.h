@@ -1944,7 +1944,7 @@ ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* res
 
 /**
  * \ingroup ngf
- 
+ * 
  * Destroys a given shader stage.
  * 
  * @param stage the shader stage object to destroy.
