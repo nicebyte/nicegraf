@@ -458,13 +458,16 @@ typedef struct ngf_shader_stage_info {
    *
    * Additionally, the Metal backend expects the code to contain a special comment, mapping all
    * <descriptor set, binding> pairs to the native Metal argument table slots. The comment shall
-   * start with 
+   * be a C-style block comment - beginning with a forward slash, followed by an asterisk - 
+   * containing the following word:
    * 
    * ```
-   * /**NGF_NATIVE_BINDING_MAP
+   * NGF_NATIVE_BINDING_MAP
    * ```
    * 
-   * and each of the following lines until the end of the comment shall have the following format:
+   * followed by a newline character. 
+   * 
+   * Each of the following lines until the end of the comment shall have the following format:
    * 
    * ```
    * (s b) : m
@@ -1930,6 +1933,9 @@ const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
  * \ingroup ngf
  * 
  * Creates a shader stage object from its description.
+ * Shader stage objects are necessary for creating graphics pipeline objects, but once
+ * the pipelines have been created, the shader stage objects that had been used to create
+ * them can safely be disposed of.
  *
  * @param stages Information to construct the shader stage object.
  */
@@ -1937,7 +1943,11 @@ ngf_error
 ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* result) NGF_NOEXCEPT;
 
 /**
- * Detsroys a given shader stage.
+ * \ingroup ngf
+ 
+ * Destroys a given shader stage.
+ * 
+ * @param stage the shader stage object to destroy.
  */
 void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT;
 
