@@ -1254,6 +1254,7 @@ typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 /**
  * @enum ngf_descriptor_type
  * \ingroup ngf
+ * 
  * Available descriptor types.
  * Not that some back-ends may not support all of the listed descriptor types.
  */
@@ -1292,6 +1293,7 @@ typedef enum ngf_descriptor_type {
 /**
  * @enum ngf_sampler_filter
  * \ingroup ngf
+ * 
  *  Enumerates minification and magnification filters.
  */
 typedef enum ngf_sampler_filter {
@@ -1303,6 +1305,7 @@ typedef enum ngf_sampler_filter {
 /**
  * @enum ngf_sampler_wrap_mode
  * \ingroup ngf
+ * 
  * What to do when sampling an image out-of-bounds.
  */
 typedef enum ngf_sampler_wrap_mode {
@@ -1922,7 +1925,7 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
  * Begin a frame of rendering.
  * 
  * This function starts a frame of rendering in the calling thread's current context.
- * It generates a special token associate with the frame, which is required for recording
+ * It generates a special token associated with the frame, which is required for recording
  * command buffers (see \ref ngf_start_cmd_buffer).
  * @param token A pointer to a \ref ngf_frame_token. The generated frame token shall be returned here.
  */
