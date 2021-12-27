@@ -1435,6 +1435,8 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   mtl_img_desc.pixelFormat      = fmt;
   mtl_img_desc.width            = info->extent.width;
   mtl_img_desc.height           = info->extent.height;
+  mtl_img_desc.depth            = info->extent.depth;
+  mtl_img_desc.arrayLength      = info->nlayers;
   mtl_img_desc.mipmapLevelCount = info->nmips;
   mtl_img_desc.storageMode      = MTLStorageModePrivate;
   mtl_img_desc.sampleCount      = info->sample_count;
@@ -1443,22 +1445,6 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   }
   if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
     mtl_img_desc.usage |= MTLTextureUsageShaderRead;
-  }
-  switch(mtl_img_desc.textureType) {
-  case MTLTextureType2D:
-  case MTLTextureType2DMultisample:
-  case MTLTextureType3D:
-  case MTLTextureTypeCube:
-      mtl_img_desc.depth = info->extent.depth;
-      break;
-  case MTLTextureType2DArray:
-  case MTLTextureType2DMultisampleArray:
-  case MTLTextureTypeCubeArray:
-      mtl_img_desc.depth       = 1u;
-      mtl_img_desc.arrayLength = info->extent.depth;
-      break;
-  default:
-      assert(false);
   }
   NGFMTL_NURSERY(image, image);
   image->texture =

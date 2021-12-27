@@ -4164,7 +4164,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
           {.width = info->extent.width, .height = info->extent.height, .depth = info->extent.depth},
       .format                = img->vkformat,
       .mipLevels             = info->nmips,
-      .arrayLayers           = !is_cubemap ? 1u : 6u,  // TODO: layered images
+      .arrayLayers           = info->nlayers * (!is_cubemap ? 1u : 6u),
       .samples               = get_vk_sample_count(info->sample_count),
       .usage                 = usage_flags,
       .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
