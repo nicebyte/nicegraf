@@ -502,7 +502,7 @@ typedef struct ngf_shader_stage_info {
  * @struct ngf_shader_stage
  * \ingroup ngf
  * 
- * A programmable stage of the rendering pipeline.
+ * An opaque handle to a programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
  * data, as described in the documentation for \ref ngf_shader_stage_info::content.
@@ -1247,6 +1247,7 @@ typedef struct ngf_graphics_pipeline_info {
  * \ingroup ngf
  * 
  * An opaque handle to a graphics pipeline object.
+ * 
  * See also: \ref ngf_graphics_pipeline_info, \ref ngf_create_graphics_pipeline and \ref ngf_destroy_graphics_pipeline.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
@@ -1306,7 +1307,7 @@ typedef enum ngf_sampler_filter {
  * @enum ngf_sampler_wrap_mode
  * \ingroup ngf
  * 
- * What to do when sampling an image out-of-bounds.
+ * Enumerates strategies for dealing with sampling an image out-of-bounds.
  */
 typedef enum ngf_sampler_wrap_mode {
   NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, /**< Clamp the pixel value to what's at the edge of the image. */
@@ -1318,6 +1319,7 @@ typedef enum ngf_sampler_wrap_mode {
 /**
  * @struct ngf_sampler_info
  * \ingroup ngf
+ * 
  * Information for creating a sampler object.
  */
 typedef struct ngf_sampler_info {
@@ -1337,6 +1339,7 @@ typedef struct ngf_sampler_info {
 /**
  * @struct ngf_sampler
  * \ingroup ngf
+ * 
  * An opaque handle for a sampler object. See also \ref ngf_sampler_info and \ref
  * ngf_create_sampler.
  */
@@ -1345,7 +1348,10 @@ typedef struct ngf_sampler_t* ngf_sampler;
 /**
  * @enum ngf_image_usage
  * \ingroup ngf
- * Image usage flags. A valid image usage mask may be formed by combining one or more of these
+ * 
+ * Image usage flags.
+ *
+ * A valid image usage mask may be formed by combining one or more of these
  * values with a bitwise OR operator.
  */
 typedef enum ngf_image_usage {
@@ -1364,6 +1370,7 @@ typedef enum ngf_image_usage {
 /**
  * @enum ngf_image_type
  * \ingroup ngf
+ * 
  * Enumerates the possible image types.
  */
 typedef enum ngf_image_type {
@@ -1376,29 +1383,34 @@ typedef enum ngf_image_type {
 /**
  * @struct ngf_image_info
  * \ingroup ngf
+ * 
  * Information required to create an image object.
  */
 typedef struct ngf_image_info {
-  ngf_image_type type;           /**< The image type. */
-  ngf_extent3d   extent;         /**< The width, height and depth (for 3d images) or no. of
-                                      layers (for layered images).*/
-  uint32_t         nmips;        /**< The number of mip levels in the image.*/
-  ngf_image_format format;       /**< Internal format.*/
+  ngf_image_type type;     /**< The image type. */
+  ngf_extent3d   extent;   /**< The width, height and depth. Note that dimensions irrelevant for the
+                              specified image type are ignored.*/
+  uint32_t         nmips;  /**< The number of mip levels in the image.*/
+  ngf_image_format format; /**< Internal format.*/
   ngf_sample_count sample_count; /**< The number of samples per pixel in the image. **/
   uint32_t         usage_hint;   /**< Specifies how the client intends to use the image. Must be a
-                                      combination of image usage flags.*/
+                                      combination of \ref ngf_image_usage flags.*/
 } ngf_image_info;
 
 /**
  * @struct ngf_image
  * \ingroup ngf
+ * 
  * An opaque handle to an image object.
+ * 
+ * Images are 2- or 3-dimensional arrays of data that can be sampled from in shaders, or rendered into.
  */
 typedef struct ngf_image_t* ngf_image;
 
 /**
  * @enum ngf_cubemap_face
  * \ingroup ngf
+ * 
  * Members of this enumeration are used to refer to the different faces of a cubemap.
  */
 typedef enum ngf_cubemap_face {
@@ -1414,6 +1426,7 @@ typedef enum ngf_cubemap_face {
 /**
  * @struct ngf_image_ref
  * \ingroup ngf
+ * 
  * A reference to a part of an image.
  */
 typedef struct ngf_image_ref {
@@ -1812,6 +1825,7 @@ typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 /**
  * @struct ngf_render_encoder
  * \ingroup ngf
+ * 
  * A render encoder records rendering commands (such as draw calls) into its
  * corresponding command buffer.
  */
@@ -1822,6 +1836,7 @@ typedef struct {
 /**
  * @struct ngf_xfer_encoder
  * \ingroup ngf
+ * 
  * A transfer encoder records transfer commands (i.e. copying buffer contents)
  * into its corresponding command buffer.
  */
@@ -1990,8 +2005,11 @@ ngf_error ngf_create_graphics_pipeline(
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
  * Creates a new image object.
- * @param info Configuration of the image.
+ * 
+ * @param info Information required to construct the image object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
  */
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT;
 
