@@ -1,14 +1,15 @@
 // T: simple-texture vs:VSMain ps:PSMain
 
+#define GENERIC_FS_INPUT_HAS_UV
 #include "triangle.hlsl"
 
-[[vk::binding(1, 0)]] uniform Texture2D tex;
-[[vk::binding(2, 0)]] uniform sampler samp;
+[[vk::binding(1, 0)]] uniform Texture2D textureImage;
+[[vk::binding(2, 0)]] uniform sampler imageSampler;
 
-float4 PSMain(Triangle_PSInput ps_in) : SV_TARGET {
-  return tex.Sample(samp, ps_in.texcoord);
+float4 PSMain(GenericFragShaderInput vertexAttribs) : SV_Target {
+  return textureImage.Sample(imageSampler, vertexAttribs.textureUv);
 }
 
-Triangle_PSInput VSMain(uint vid : SV_VertexID) {
-  return Triangle(vid, 1.0, 0.0, 0.0);
+GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
+  return TriangleVertex(vertexId, 1.0, 0.0, 0.0);
 }

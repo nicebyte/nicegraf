@@ -2,10 +2,8 @@
 
 #include "quat.hlsl"
 
-struct PixelShaderInput {
-  float4 clipSpacePosition : SV_Position;
-  float2 textureUv : TEXCOORD0;
-};
+#define GENERIC_FS_INPUT_HAS_UV
+#include "generic-frag-shader-input.hlsl"
 
 struct VertexShaderInput {
   float3 objSpacePosition : SV_Position;
@@ -20,7 +18,7 @@ struct ShaderUniforms {
 [[vk::binding(0, 0)]] ConstantBuffer<ShaderUniforms> shaderUniforms;
 [[vk::binding(1, 0)]] Buffer<float3> perInstanceData;
 
-PixelShaderInput VSMain(VertexShaderInput vertexAttrs, int instanceIdx : SV_InstanceID) {
+GenericFragShaderInput VSMain(VertexShaderInput vertexAttrs, int instanceIdx : SV_InstanceID) {
   float4 worldSpaceTranslation = float4(perInstanceData.Load(instanceIdx), 0.0);
   const float oscillationFrequency = 5.0;
   float  oscillationPhase = worldSpaceTranslation.x * worldSpaceTranslation.y;
@@ -29,7 +27,7 @@ PixelShaderInput VSMain(VertexShaderInput vertexAttrs, int instanceIdx : SV_Inst
   float4 worldSpacePosition = rotateByQuat(float4(vertexAttrs.objSpacePosition, 1.0), rotationQuat) +
                               worldSpaceTranslation +
                               oscillationOffset;
-  PixelShaderInput result = {
+  GenericFragShaderInput result = {
     mul(shaderUniforms.worldToClipTransform, worldSpacePosition),
     vertexAttrs.textureUv
   };
@@ -39,6 +37,6 @@ PixelShaderInput VSMain(VertexShaderInput vertexAttrs, int instanceIdx : SV_Inst
 [[vk::binding(2, 0)]] uniform Texture2D modelTexture;
 [[vk::binding(3, 0)]] uniform sampler textureSampler;
 
-float4 PSMain(PixelShaderInput fragmentAttribs) : SV_Target {
+float4 PSMain(GenericFragShaderInput fragmentAttribs) : SV_Target {
     return modelTexture.Sample(textureSampler, fragmentAttribs.textureUv);
 }

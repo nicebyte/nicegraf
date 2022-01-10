@@ -1,19 +1,26 @@
 // T: cubemap vs:VSMain ps:PSMain
 
+#define GENERIC_FS_INPUT_HAS_CLIPSPACE_POS
 #include "triangle.hlsl"
 
-[[vk::binding(0, 0)]] cbuffer UniformData {
-  float4x4 u_Transform;
-  float    u_Aspect;
+struct ShaderUniforms {
+  float4x4 cameraTransform;
+  float    aspectRatio;
 };
-[[vk::binding(1, 0)]] uniform TextureCube tex;
-[[vk::binding(2, 0)]] uniform sampler samp;
 
-float4 PSMain(Triangle_PSInput ps_in) : SV_TARGET {
-  float3 dir = mul(u_Transform, float4(-ps_in.position.x * u_Aspect, ps_in.position.y, -1.0, 0.0)).xyz;
-  return tex.Sample(samp, dir);
+[[vk::binding(0, 0)]] ConstantBuffer<ShaderUniforms> shaderUniforms;
+[[vk::binding(1, 0)]] uniform TextureCube cubemapImage;
+[[vk::binding(2, 0)]] uniform sampler imageSampler;
+
+float4 PSMain(GenericFragShaderInput vertexAttribs) : SV_Target {
+  float3 direction = mul(shaderUniforms.cameraTransform,
+                         float4(-vertexAttribs.clipSpacePosition.x * shaderUniforms.aspectRatio,
+                                 vertexAttribs.clipSpacePosition.y,
+                                -1.0,
+                                 0.0)).xyz;
+  return cubemapImage.Sample(imageSampler, direction);
 }
 
-Triangle_PSInput VSMain(uint vid : SV_VertexID) {
-  return Triangle(vid, 1.0, 0.0, 0.0);
+GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
+  return TriangleVertex(vertexId, 1.0, 0.0, 0.0);
 }
