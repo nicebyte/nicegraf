@@ -985,6 +985,7 @@ static ngf_error ngfvk_create_swapchain(
         .type   = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
+        .nlayers = 1u,
         .format = swapchain_info->color_format,
         .sample_count = swapchain_info->sample_count,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
@@ -1050,6 +1051,7 @@ static ngf_error ngfvk_create_swapchain(
         .type   = NGF_IMAGE_TYPE_IMAGE_2D,
         .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips  = 1u,
+        .nlayers = 1u,
         .sample_count = swapchain_info->sample_count,
         .format       = swapchain_info->depth_format,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |

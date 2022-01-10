@@ -1387,12 +1387,12 @@ typedef enum ngf_image_type {
  * Information required to create an image object.
  */
 typedef struct ngf_image_info {
-  ngf_image_type type;     /**< The image type. */
-  ngf_extent3d   extent;   /**< The width, height and depth. Note that dimensions irrelevant for the
-                              specified image type are ignored.*/
-  uint32_t         nmips;  /**< The number of mip levels in the image.*/
-  uint32_t         nlayers;  /**< Number of layers within the image. */
-  ngf_image_format format;   /**< Internal format.*/
+  ngf_image_type type;    /**< The image type. */
+  ngf_extent3d   extent;  /**< The width, height and depth. Note that dimensions irrelevant for the
+                             specified image type are ignored.*/
+  uint32_t         nmips; /**< The number of mip levels in the image.*/
+  uint32_t         nlayers;      /**< Number of layers within the image. */
+  ngf_image_format format;       /**< Internal format.*/
   ngf_sample_count sample_count; /**< The number of samples per pixel in the image. **/
   uint32_t         usage_hint;   /**< Specifies how the client intends to use the image. Must be a
                                       combination of \ref ngf_image_usage flags.*/
