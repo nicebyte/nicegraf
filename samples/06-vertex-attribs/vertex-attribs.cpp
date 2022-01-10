@@ -353,6 +353,7 @@ void* sample_initialize(
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
       .extent       = ngf_extent3d {.width = texture_width, .height = texture_height, .depth = 1},
       .nmips        = nmips,
+      .nlayers      = 1u,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST |

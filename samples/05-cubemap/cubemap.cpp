@@ -118,6 +118,7 @@ void* sample_initialize(
       .type         = NGF_IMAGE_TYPE_CUBE,
       .extent       = ngf_extent3d {.width = face_width, .height = face_height, .depth = 1},
       .nmips        = 1u,
+      .nlayers      = 1u,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST}));

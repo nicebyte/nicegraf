@@ -116,6 +116,7 @@ void* sample_initialize(
               .depth  = 1u,
           },
       .nmips        = nmips,
+      .nlayers      = 1u,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |

@@ -96,6 +96,7 @@ ngf_imgui::ngf_imgui(
       NGF_IMAGE_TYPE_IMAGE_2D,                                        // type
       {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u},  // extent
       1u,                                                             // nmips
+      1u,                                                             // nlayers
       NGF_IMAGE_FORMAT_RGBA8,                                         // image_format
       NGF_SAMPLE_COUNT_1,                                             // samples
       NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST          // usage_hint

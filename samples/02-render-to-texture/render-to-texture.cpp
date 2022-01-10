@@ -53,6 +53,7 @@ void* sample_initialize(
     NGF_IMAGE_TYPE_IMAGE_2D,
     img_size,
     1u,
+    1u,
     NGF_IMAGE_FORMAT_BGRA8_SRGB,
     NGF_SAMPLE_COUNT_1,
     NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT
