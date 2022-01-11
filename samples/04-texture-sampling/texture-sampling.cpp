@@ -40,7 +40,7 @@ struct matrices {
   struct {
     nm::float4x4 matrix;
     char _padding[256 - sizeof(nm::float4x4)];
-  } m[4];
+  } m[4]{};
 };
 
 struct state {
