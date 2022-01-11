@@ -22,6 +22,7 @@
 
 #pragma once
 
+#pragma warning(disable:26812)
 #include "nicegraf.h"
 
 #include <stdint.h>
