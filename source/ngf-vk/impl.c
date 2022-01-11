@@ -254,6 +254,7 @@ typedef struct ngf_image_t {
   ngf_extent3d   extent;
   uint32_t       usage_flags;
   uint32_t       nlevels;
+  uint32_t       nlayers;
 } ngf_image_t;
 
 typedef struct ngf_context_t {
@@ -3899,7 +3900,6 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   assert(buf);
 
   // TODO: ensure the pixel format is valid for mip generation.
-  // TODO: handle layers as well
 
   uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth,
            dst_w = 0, dst_h = 0, dst_d = 0;
@@ -3924,7 +3924,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
               .baseMipLevel   = src_level,
               .levelCount     = 1u,
               .baseArrayLayer = 0u,
-              .layerCount     = 1u}},
+              .layerCount     = img->nlayers}},
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
          .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT,
@@ -3939,7 +3939,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseMipLevel   = dst_level,
              .levelCount     = 1u,
              .baseArrayLayer = 0u,
-             .layerCount     = 1u}}};
+             .layerCount     = img->nlayers}}};
     vkCmdPipelineBarrier(
         buf->active_bundle.vkcmdbuf,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
@@ -3956,12 +3956,12 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
             {.mipLevel       = src_level,
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-             .layerCount     = 1u},
+             .layerCount     = img->nlayers},
         .dstSubresource =
             {.mipLevel       = dst_level,
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-             .layerCount     = 1u},
+             .layerCount     = img->nlayers},
         .srcOffsets = {{0, 0, 0}, {(int32_t)src_w, (int32_t)src_h, (int32_t)src_d}},
         .dstOffsets = {{0, 0, 0}, {(int32_t)dst_w, (int32_t)dst_h, (int32_t)dst_d}}};
     vkCmdBlitImage(
@@ -3988,7 +3988,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
               .baseMipLevel   = src_level,
               .levelCount     = 1u,
               .baseArrayLayer = 0u,
-              .layerCount     = 1u}},
+              .layerCount     = img->nlayers}},
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
          .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -4003,7 +4003,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseMipLevel   = dst_level,
              .levelCount     = 1u,
              .baseArrayLayer = 0u,
-             .layerCount     = 1u}}};
+             .layerCount     = img->nlayers}}};
     vkCmdPipelineBarrier(
         buf->active_bundle.vkcmdbuf,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -4203,7 +4203,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   }
   err = ngfvk_create_vk_image_view(
       (VkImage)img->alloc.obj_handle,
-      get_vk_image_view_type(info->type, info->extent.depth),
+      get_vk_image_view_type(info->type, info->nlayers),
       vk_image_info.format,
       vk_image_info.mipLevels,
       vk_image_info.arrayLayers,
@@ -4236,6 +4236,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
           .layerCount     = vk_image_info.arrayLayers}};
 
   img->nlevels = info->nmips;
+  img->nlayers = vk_image_info.arrayLayers;
 
   pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
   NGFI_DARRAY_APPEND(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers, barrier);
