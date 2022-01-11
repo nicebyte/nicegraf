@@ -159,11 +159,11 @@ class render_encoder {
     if (enc_.__handle) ngf_cmd_end_render_pass(enc_);
   }
 
-  render_encoder(render_encoder&& other) {
+  render_encoder(render_encoder&& other) noexcept {
     *this = std::move(other);
   }
 
-  render_encoder& operator=(render_encoder&& other) {
+  render_encoder& operator=(render_encoder&& other) noexcept {
     enc_                = other.enc_;
     other.enc_.__handle = 0u;
     return *this;
@@ -177,7 +177,7 @@ class render_encoder {
   }
 
   private:
-  ngf_render_encoder enc_;
+  ngf_render_encoder enc_{};
 };
 
 class xfer_encoder {
@@ -190,11 +190,11 @@ class xfer_encoder {
     if (enc_.__handle) ngf_cmd_end_xfer_pass(enc_);
   }
 
-  xfer_encoder(xfer_encoder&& other) {
+  xfer_encoder(xfer_encoder&& other) noexcept {
     *this = std::move(other);
   }
 
-  xfer_encoder& operator=(xfer_encoder&& other) {
+  xfer_encoder& operator=(xfer_encoder&& other) noexcept {
     enc_                = other.enc_;
     other.enc_.__handle = 0u;
     return *this;
