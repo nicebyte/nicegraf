@@ -264,6 +264,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.cpp
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.h
+                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.cpp
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.h
                      ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
                      ${NGF_PLATFORM_SOURCE}

@@ -28,6 +28,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#pragma warning(disable:26812)
+
 namespace ngf_samples {
 
 #define NGF_SAMPLES_CHECK_NGF_ERROR(expr)                         \

@@ -28,7 +28,7 @@
 #include "nicemath.h"
 #include "sample-interface.h"
 #include "shader-loader.h"
-#include "targa-loader.h"
+#include "staging-image.h"
 
 #include <stdio.h>
 
@@ -62,71 +62,30 @@ void* sample_initialize(
     ngf_xfer_encoder xfer_encoder) {
   auto s = new texture_sampling::state {};
 
-  /* Read in the texture image file.*/
-  std::vector<char> texture_tga_data = load_file("assets/tiles.tga");
-
-  /* this call does nothing but quickly get the width & height. */
-  uint32_t texture_width, texture_height;
-  load_targa(
-      texture_tga_data.data(),
-      texture_tga_data.size(),
-      nullptr,
-      0u,
-      &texture_width,
-      &texture_height);
-
-  /* Create an appropriately sized staging buffer for the texture upload. */
-  const size_t      texture_size_bytes = texture_width * texture_height * 4u;
-  ngf::buffer staging_buf;
-  NGF_SAMPLES_CHECK_NGF_ERROR(staging_buf.initialize(ngf_buffer_info {
-      .size         = texture_size_bytes,
-      .storage_type = NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
-      .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC}));
-  void* mapped_staging_buf = ngf_buffer_map_range(
-      staging_buf.get(),
-      0,
-      texture_size_bytes);
-
-  /* Decode the loaded targa file, writing RGBA values directly into mapped memory. */
-  load_targa(
-      texture_tga_data.data(),
-      texture_tga_data.size(),
-      mapped_staging_buf,
-      texture_size_bytes,
-      &texture_width,
-      &texture_height);
-
-  /* Flush and unmap the staging buffer. */
-  ngf_buffer_flush_range(staging_buf.get(), 0, texture_size_bytes);
-  ngf_buffer_unmap(staging_buf.get());
-
-  /* Count the number of mipmaps we'll have to generate for trilinear filtering.
-     Note that we keep generating mip levels until both dimensions are reduced to 1.
-   */
-  uint32_t nmips =
-      1 + static_cast<uint32_t>(std::floor(std::log2(std::max(texture_width, texture_height))));
-
-  /* Create the texture object. */
+  /* Prepare a staging buffer for the image. */
+  staging_image texture_staging_image = create_staging_image_from_tga("assets/tiles.tga");
+  
+  /* Create the image object. */
   ngf_image_info texture_image_info = {
       .type = NGF_IMAGE_TYPE_IMAGE_2D,
       .extent =
           {
-              .width  = texture_width,
-              .height = texture_height,
+              .width  = texture_staging_image.width_px,
+              .height = texture_staging_image.height_px,
               .depth  = 1u,
           },
-      .nmips        = nmips,
+      .nmips        = texture_staging_image.nmax_mip_levels,
       .nlayers      = 1u,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
-                    NGF_IMAGE_USAGE_XFER_DST};
+                      NGF_IMAGE_USAGE_XFER_DST};
   NGF_SAMPLES_CHECK_NGF_ERROR(s->texture.initialize(texture_image_info));
 
   /* Upload the data from the staging buffer into the 0th mip level of the texture. */
   ngf_cmd_write_image(
       xfer_encoder,
-      staging_buf.get(),
+      texture_staging_image.staging_buffer.get(),
       0u,
       ngf_image_ref {
           .image        = s->texture.get(),
@@ -134,7 +93,7 @@ void* sample_initialize(
           .layer        = 0u,
           .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
       ngf_offset3d {},
-      ngf_extent3d {texture_width, texture_height, 1u});
+      ngf_extent3d {texture_staging_image.width_px, texture_staging_image.height_px, 1u});
 
   /* Populate the rest of the mip levels automatically. */
   ngf_cmd_generate_mipmaps(xfer_encoder, s->texture.get());
@@ -178,7 +137,7 @@ void* sample_initialize(
       .wrap_u            = NGF_WRAP_MODE_REPEAT,
       .wrap_v            = NGF_WRAP_MODE_REPEAT,
       .wrap_w            = NGF_WRAP_MODE_REPEAT,
-      .lod_max           = (float)nmips,
+      .lod_max           = (float)texture_staging_image.nmax_mip_levels,
       .lod_min           = 0.0f,
       .lod_bias          = 0.0f,
       .max_anisotropy    = 0.0f,
@@ -193,7 +152,7 @@ void* sample_initialize(
       .wrap_u            = NGF_WRAP_MODE_REPEAT,
       .wrap_v            = NGF_WRAP_MODE_REPEAT,
       .wrap_w            = NGF_WRAP_MODE_REPEAT,
-      .lod_max           = (float)nmips,
+      .lod_max           = (float)texture_staging_image.nmax_mip_levels,
       .lod_min           = 0.0f,
       .lod_bias          = 0.0f,
       .max_anisotropy    = 16.0f,
