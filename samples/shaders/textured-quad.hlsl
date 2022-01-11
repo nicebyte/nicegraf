@@ -1,11 +1,16 @@
-//T: textured-quad ps:PSMain vs:VSMain
+//T: textured-quad ps:PSMain vs:VSMain define:GENERIC_FS_INPUT_HAS_UV=1
+//T: textured-quad-image-array ps:PSMain vs:VSMain define:GENERIC_FS_INPUT_HAS_UV=1 define:USE_IMAGE_ARRAY=1
 
-#define GENERIC_FS_INPUT_HAS_UV
 #include "generic-frag-shader-input.hlsl"
 
-[[vk::binding(0, 0)]] cbuffer UniformData {
-  float4x4 u_TransformMatrix;
+struct ShaderUniforms {
+  float4x4 transformMatrix;
+#if defined(USE_IMAGE_ARRAY)
+  float imageArrayIdx;
+#endif
 };
+
+[[vk::binding(0, 0)]] ConstantBuffer<ShaderUniforms> shaderUniforms;
 
 GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
   const float2 vertices[] = {
@@ -18,15 +23,27 @@ GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
   };
   vertexId = vertexId % 6;
   GenericFragShaderInput result = {
-    mul(u_TransformMatrix, float4(vertices[vertexId], 0.0, 1.0)),
+    mul(shaderUniforms.transformMatrix,
+        float4(vertices[vertexId], 0.0, 1.0)),
     2 * uvs[vertexId]
   };
   return result;
 }
 
-[[vk::binding(0, 1)]] uniform Texture2D textureImage;
-[[vk::binding(1, 0)]] uniform sampler   imageSampler;
+#if defined(USE_IMAGE_ARRAY)
+#define TEXTURE_IMAGE_TYPE Texture2DArray
+#else
+#define TEXTURE_IMAGE_TYPE Texture2D
+#endif
+
+[[vk::binding(0, 1)]] uniform TEXTURE_IMAGE_TYPE textureImage;
+[[vk::binding(1, 0)]] uniform sampler imageSampler;
 
 float4 PSMain(GenericFragShaderInput vertexAttribs) : SV_Target {
-  return textureImage.Sample(imageSampler, vertexAttribs.textureUv);
+#if defined(USE_IMAGE_ARRAY)
+  float3 sampleCoords = float3(vertexAttribs.textureUv, shaderUniforms.imageArrayIdx);
+#else
+  float2 sampleCoords = vertexAttribs.textureUv;
+#endif
+  return textureImage.Sample(imageSampler, sampleCoords);
 }
