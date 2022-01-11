@@ -3718,6 +3718,10 @@ void ngf_cmd_bind_resources(
     if (!pending_bind_ops->last || pending_bind_ops->last->last_idx >= NGFVK_BIND_OP_CHUNK_SIZE) {
       ngfvk_bind_op_chunk* prev_last = pending_bind_ops->last;
       pending_bind_ops->last       = ngfi_blkalloc_alloc(CURRENT_CONTEXT->bind_op_chunk_allocator);
+      if (pending_bind_ops->last == NULL) {
+        NGFI_DIAG_ERROR("failed memory allocation while binding resources");
+        return;
+      }
       pending_bind_ops->last->next = NULL;
       pending_bind_ops->last->last_idx = 0;
       if (prev_last) {
