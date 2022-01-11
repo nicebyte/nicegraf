@@ -1128,7 +1128,7 @@ ngfvk_create_swapchain_cleanup:
 }
 
 static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
-  if (frame_res->nwait_fences > 0 && frame_res->nwait_fences > 0u) {
+  if (frame_res->nwait_fences > 0u) {
     VkResult wait_status = VK_SUCCESS;
     do {
       wait_status = vkWaitForFences(
