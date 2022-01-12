@@ -21,8 +21,8 @@
  */
 #pragma once
 
-#include "nicegraf.h"
 #include "nicegraf-util.h"
+#include "nicegraf.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +59,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   }
 
   ngf_handle& operator=(const ngf_handle&) = delete;
-  ngf_handle& operator                     =(ngf_handle&& other) {
+  ngf_handle& operator                     =(ngf_handle&& other) noexcept {
     destroy_if_necessary();
     handle_       = other.handle_;
     other.handle_ = nullptr;
@@ -177,7 +177,7 @@ class render_encoder {
   }
 
   private:
-  ngf_render_encoder enc_{};
+  ngf_render_encoder enc_ {};
 };
 
 class xfer_encoder {
@@ -233,7 +233,8 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
-    static ngf_resource_bind_op texel_buffer(const ngf_buffer buf, size_t offset, size_t range, ngf_image_format fmt) {
+    static ngf_resource_bind_op
+    texel_buffer(const ngf_buffer buf, size_t offset, size_t range, ngf_image_format fmt) {
       ngf_resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_TEXEL_BUFFER;
       op.target_binding     = B;
@@ -334,9 +335,9 @@ template<typename T> class uniform_multibuffer {
       size_t   additional_offset = 0,
       size_t   range             = 0) const {
     ngf_resource_bind_op op;
-    op.type                       = NGF_DESCRIPTOR_UNIFORM_BUFFER;
-    op.target_binding             = binding;
-    op.target_set                 = set;
+    op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
+    op.target_binding     = binding;
+    op.target_set         = set;
     op.info.buffer.buffer = buf_.get();
     op.info.buffer.offset = current_offset_ + additional_offset;
     op.info.buffer.range  = (range == 0) ? aligned_per_frame_size_ : range;
