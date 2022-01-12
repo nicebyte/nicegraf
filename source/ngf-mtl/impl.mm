@@ -817,6 +817,10 @@ void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevic
   } else {
     caps.max_color_attachments_per_pass = 4;
   }
+  
+  caps.cubemap_arrays_supported = gpu_family_idx == ngfmtl_gpufam_idx(MTLGPUFamilyCommon2) ||
+                                  gpu_family_idx == ngfmtl_gpufam_idx(MTLGPUFamilyCommon3) ||
+                                  gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple3);
 }
 
 extern "C" {
