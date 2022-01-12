@@ -684,6 +684,7 @@ private:
             .depth = 1u
           },
           .nmips = 1u,
+          .nlayers = 1u,
           .format = swapchain_info.color_format,
           .sample_count = (ngf_sample_count)swapchain_info.sample_count,
           .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT
@@ -1425,7 +1426,7 @@ ngf_error ngf_create_image(const ngf_image_info *info, ngf_image *result) NGF_NO
   }
 
   std::optional<MTLTextureType> maybe_texture_type =
-      get_mtl_texture_type(info->type, info->extent.depth, info->sample_count);
+      get_mtl_texture_type(info->type, info->nlayers, info->sample_count);
   if (!maybe_texture_type.has_value()) {
     NGFI_DIAG_ERROR("Image type %d not supported by Metal backend.",
                     info->type);
