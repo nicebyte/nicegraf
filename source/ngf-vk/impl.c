@@ -983,11 +983,11 @@ static ngf_error ngfvk_create_swapchain(
   // Create multisampled images, if necessary.
   if (is_multisampled) {
     const ngf_image_info ms_image_info = {
-        .type   = NGF_IMAGE_TYPE_IMAGE_2D,
-        .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
-        .nmips  = 1u,
+        .type    = NGF_IMAGE_TYPE_IMAGE_2D,
+        .extent  = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
+        .nmips   = 1u,
         .nlayers = 1u,
-        .format = swapchain_info->color_format,
+        .format  = swapchain_info->color_format,
         .sample_count = swapchain_info->sample_count,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT | NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT,
     };
@@ -1049,9 +1049,9 @@ static ngf_error ngfvk_create_swapchain(
   // Create an image for the depth attachment if necessary.
   if (have_depth_attachment) {
     const ngf_image_info depth_image_info = {
-        .type   = NGF_IMAGE_TYPE_IMAGE_2D,
-        .extent = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
-        .nmips  = 1u,
+        .type    = NGF_IMAGE_TYPE_IMAGE_2D,
+        .extent  = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
+        .nmips   = 1u,
         .nlayers = 1u,
         .sample_count = swapchain_info->sample_count,
         .format       = swapchain_info->depth_format,
@@ -2057,6 +2057,8 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
     PFN_vkGetPhysicalDeviceProperties get_vk_phys_dev_properties =
         (PFN_vkGetPhysicalDeviceProperties)
             vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceProperties");
+    PFN_vkGetPhysicalDeviceFeatures get_vk_phys_dev_features = (PFN_vkGetPhysicalDeviceFeatures)
+        vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceFeatures");
     PFN_vkDestroyInstance destroy_vk_instance =
         (PFN_vkDestroyInstance)vkGetInstanceProcAddr(tmp_instance, "vkDestroyInstance");
     vk_err = enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, NULL);
@@ -2076,7 +2078,9 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
     enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, phys_devs);
     for (size_t i = 0; i < NGFVK_DEVICE_COUNT; ++i) {
       VkPhysicalDeviceProperties dev_props;
+      VkPhysicalDeviceFeatures   dev_features;
       get_vk_phys_dev_properties(phys_devs[i], &dev_props);
+      get_vk_phys_dev_features(phys_devs[i], &dev_features);
       ngfvk_device_id* ngfdevid = &NGFVK_DEVICE_ID_LIST[i];
       ngfdevid->device_id       = dev_props.deviceID;
       ngfdevid->vendor_id       = dev_props.vendorID;
@@ -2117,6 +2121,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_uniform_buffers_per_stage  = vkdevlimits->maxPerStageDescriptorUniformBuffers;
       devcaps->max_sampler_anisotropy         = vkdevlimits->maxSamplerAnisotropy;
       devcaps->max_uniform_buffer_range       = vkdevlimits->maxUniformBufferRange;
+      devcaps->cubemap_arrays_supported       = dev_features.imageCubeArray;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
@@ -2261,7 +2266,11 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       "VK_KHR_maintenance1",
       "VK_KHR_swapchain",
       "VK_KHR_shader_float16_int8"};
-  const VkPhysicalDeviceFeatures required_features = {.samplerAnisotropy = VK_TRUE};
+  const VkBool32 enable_cubemap_arrays =
+      NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
+  const VkPhysicalDeviceFeatures required_features = {
+      .samplerAnisotropy = VK_TRUE,
+      .imageCubeArray    = enable_cubemap_arrays};
 
   VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
       .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
@@ -3718,12 +3727,12 @@ void ngf_cmd_bind_resources(
     ngfvk_bind_op_chunk_list* pending_bind_ops = &buf->pending_bind_ops;
     if (!pending_bind_ops->last || pending_bind_ops->last->last_idx >= NGFVK_BIND_OP_CHUNK_SIZE) {
       ngfvk_bind_op_chunk* prev_last = pending_bind_ops->last;
-      pending_bind_ops->last       = ngfi_blkalloc_alloc(CURRENT_CONTEXT->bind_op_chunk_allocator);
+      pending_bind_ops->last = ngfi_blkalloc_alloc(CURRENT_CONTEXT->bind_op_chunk_allocator);
       if (pending_bind_ops->last == NULL) {
         NGFI_DIAG_ERROR("failed memory allocation while binding resources");
         return;
       }
-      pending_bind_ops->last->next = NULL;
+      pending_bind_ops->last->next     = NULL;
       pending_bind_ops->last->last_idx = 0;
       if (prev_last) {
         prev_last->next = pending_bind_ops->last;
@@ -3745,8 +3754,7 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
       .width    = NGFI_MAX(1, (float)r->width),
       .height   = (is_default_rt ? -1.0f : 1.0f) * NGFI_MAX(1, (float)r->height),
       .minDepth = 0.0f,
-      .maxDepth = 1.0f
-  };
+      .maxDepth = 1.0f};
   vkCmdSetViewport(buf->active_bundle.vkcmdbuf, 0u, 1u, &viewport);
 }
 

@@ -221,6 +221,11 @@ typedef struct ngf_device_capabilities {
    * http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
    */
   bool clipspace_z_zero_to_one;
+
+  /**
+   * This flag is set to true if the device supports cubemap arrays.
+   */
+  bool cubemap_arrays_supported;
 } ngf_device_capabilities;
 
 /**
