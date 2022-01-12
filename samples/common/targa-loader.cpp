@@ -126,8 +126,7 @@ void load_targa(
   if (hdr->type != tga::img_type::true_color_rle) {
     throw std::runtime_error("unsupported tga feature detected");
   }
-
-  const bool has_alpha = (hdr->img.descriptor & 0x07) != 0;
+  const bool has_alpha = (hdr->img.descriptor & 0x08) != 0;
 
   /* obtain extension data offset. */
   const size_t ext_offset = ftr->ext_offset;
