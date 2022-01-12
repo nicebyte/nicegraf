@@ -3911,6 +3911,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
 
   uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth,
            dst_w = 0, dst_h = 0, dst_d = 0;
+  const uint32_t nlayers = img->nlayers;
 
   for (uint32_t src_level = 0u; src_level < img->nlevels - 1; ++src_level) {
     const uint32_t dst_level                       = src_level + 1u;
@@ -3932,7 +3933,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
               .baseMipLevel   = src_level,
               .levelCount     = 1u,
               .baseArrayLayer = 0u,
-              .layerCount     = img->nlayers}},
+              .layerCount     = nlayers}},
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
          .srcAccessMask       = VK_ACCESS_SHADER_READ_BIT,
@@ -3947,7 +3948,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseMipLevel   = dst_level,
              .levelCount     = 1u,
              .baseArrayLayer = 0u,
-             .layerCount     = img->nlayers}}};
+             .layerCount     = nlayers}}};
     vkCmdPipelineBarrier(
         buf->active_bundle.vkcmdbuf,
         VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
@@ -3964,12 +3965,12 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
             {.mipLevel       = src_level,
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-             .layerCount     = img->nlayers},
+             .layerCount     = nlayers},
         .dstSubresource =
             {.mipLevel       = dst_level,
              .baseArrayLayer = 0u,
              .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-             .layerCount     = img->nlayers},
+             .layerCount     = nlayers},
         .srcOffsets = {{0, 0, 0}, {(int32_t)src_w, (int32_t)src_h, (int32_t)src_d}},
         .dstOffsets = {{0, 0, 0}, {(int32_t)dst_w, (int32_t)dst_h, (int32_t)dst_d}}};
     vkCmdBlitImage(
@@ -3996,7 +3997,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
               .baseMipLevel   = src_level,
               .levelCount     = 1u,
               .baseArrayLayer = 0u,
-              .layerCount     = img->nlayers}},
+              .layerCount     = nlayers}},
         {.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
          .pNext               = NULL,
          .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -4011,7 +4012,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
              .baseMipLevel   = dst_level,
              .levelCount     = 1u,
              .baseArrayLayer = 0u,
-             .layerCount     = img->nlayers}}};
+             .layerCount     = nlayers}}};
     vkCmdPipelineBarrier(
         buf->active_bundle.vkcmdbuf,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
