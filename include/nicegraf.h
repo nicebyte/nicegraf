@@ -1379,9 +1379,15 @@ typedef enum ngf_image_usage {
  * Enumerates the possible image types.
  */
 typedef enum ngf_image_type {
-  NGF_IMAGE_TYPE_IMAGE_2D = 0, /**< Two-dimensional image. */
-  NGF_IMAGE_TYPE_IMAGE_3D,     /**< Three-dimensional image. */
-  NGF_IMAGE_TYPE_CUBE,         /**< Cubemap. */
+  /** Two-dimensional image. */
+  NGF_IMAGE_TYPE_IMAGE_2D = 0,
+
+  /** Three-dimensional image. */
+  NGF_IMAGE_TYPE_IMAGE_3D,
+
+  /** Cubemap. */
+  NGF_IMAGE_TYPE_CUBE,
+
   NGF_IMAGE_TYPE_COUNT
 } ngf_image_type;
 
@@ -1409,7 +1415,31 @@ typedef struct ngf_image_info {
  * 
  * An opaque handle to an image object.
  * 
- * Images are 2- or 3-dimensional arrays of data that can be sampled from in shaders, or rendered into.
+ * Images are multidimensional arrays of data that can be sampled from in shaders, or rendered into.
+ * The individual elements of such arrays shall be referred to as "texels". An \ref ngf_image_format
+ * describes the specific type and layout of data elements within a single texel. Note that
+ * compressed image formats typically don't store values of texels directly, rather they store enough
+ * information that the texel values can be reconstructed (perhaps lossily) by the rendering device.
+ * 
+ * Images can be one of the following types (see \ref ngf_image_type):
+ *  - a two-dimensional image, identified by \ref NGF_IMAGE_TYPE_IMAGE_2D and representing a
+ *    two-dimensional array of texels;
+ *  - a three-dimensional image, identified by \ref NGF_IMAGE_TYPE_IMAGE_3D and representing a
+ *    three-dimensional array of texels;
+ *  - a cubemap, identified by \ref NGF_IMAGE_TYPE_CUBE and representing a collection of six
+ *    two-dimensional texel arrays, each corresponding to a face of a cube.
+ * 
+ * An image object may actually contain several images of the same type, format and dimensions.
+ * Those are referred to as "layers" and images containing more than a single layer are called
+ * "layered", or "image arrays". Note that a multi-layered 2D image is different from a
+ * single-layered 3D image, because filtering is not performed across levels when sampling it. Also
+ * note that layered cubemaps are not supported by all hardware - see \ref
+ * ngf_device_capabilities::cubemap_arrays_supported.
+ * 
+ * Each image layer may contain mip levels. Mip level 0 is the layer itself, and each subsequent
+ * level (1, 2 and so on) is 2x smaller in dimensions, and usually contains the downscaled version
+ * of the preceding level for the purposes of filtering, although the application is free to upload
+ * arbitrary data into any mip level, as long as dimension requirements are respected.
  */
 typedef struct ngf_image_t* ngf_image;
 
@@ -2020,7 +2050,11 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT;
 
 /**
- * Destroy the given image object.
+ * \ingroup ngf
+ * 
+ * Destroys the given image object.
+ * 
+ * @param image The handle to the image object to be destroyed.
  */
 void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
 
