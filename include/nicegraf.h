@@ -2728,6 +2728,18 @@ void ngf_cmd_draw(
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ * 
+ * Copies data between buffers.
+ * 
+ * @param enc The handle to the transfer encoder object to record the command into.
+ * @param src The handle to the buffer object to be copied from.
+ * @param dst The handle to the budder object to be copied into.
+ * @param size The size of the copied region, in bytes.
+ * @param src_offset The offset in the source buffer to copy from.
+ * @param dst_offset The offset in the destination buffer to copy into.
+ */
 void ngf_cmd_copy_buffer(
     ngf_xfer_encoder enc,
     const ngf_buffer src,
@@ -2736,8 +2748,14 @@ void ngf_cmd_copy_buffer(
     size_t           src_offset,
     size_t           dst_offset) NGF_NOEXCEPT;
 
+/**
+ * Copies data from a buffer into an image.
+ * 
+ * @param enc The handle to the transfer encoder object to record the command into.
+ * @param src The handle to the buffer object to be copied from.
+ */
 void ngf_cmd_write_image(
-    ngf_xfer_encoder buf,
+    ngf_xfer_encoder enc,
     const ngf_buffer src,
     size_t           src_offset,
     ngf_image_ref    dst,
