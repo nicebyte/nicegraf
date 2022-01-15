@@ -1911,7 +1911,8 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
                          size_t src_offset,
                          ngf_image_ref dst,
                          ngf_offset3d offset,
-                         ngf_extent3d extent) NGF_NOEXCEPT {
+                         ngf_extent3d extent,
+                         uint32_t nlayers) NGF_NOEXCEPT {
   auto buf = (ngf_cmd_buffer)enc.__handle;
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) {
@@ -1923,19 +1924,21 @@ void ngf_cmd_write_image(ngf_xfer_encoder enc,
   const uint32_t       target_slice = (is_cubemap ? 6u : 1u) * dst.layer +
                                       (is_cubemap ? dst.cubemap_face : 0);
   const uint32_t pitch = ngfmtl_get_pitch(extent.width, dst.image->format);
-  [buf->active_bce copyFromBuffer:src->mtl_buffer
-                     sourceOffset:src_offset
-                sourceBytesPerRow:pitch
-              sourceBytesPerImage:pitch * extent.height
-                       sourceSize:MTLSizeMake(extent.width,
-                                              extent.height,
-                                              extent.depth)
-                        toTexture:dst.image->texture
-                 destinationSlice:target_slice
-                 destinationLevel:dst.mip_level
-                destinationOrigin:MTLOriginMake((NSUInteger)offset.x,
-                                                (NSUInteger)offset.y,
-                                                (NSUInteger)offset.z)];
+  for (uint32_t l = 0; l < nlayers; ++ l) {
+    [buf->active_bce copyFromBuffer:src->mtl_buffer
+                       sourceOffset:src_offset + (l * pitch * extent.height)
+                  sourceBytesPerRow:pitch
+                sourceBytesPerImage:pitch * extent.height
+                         sourceSize:MTLSizeMake(extent.width,
+                                                extent.height,
+                                                extent.depth)
+                          toTexture:dst.image->texture
+                   destinationSlice:target_slice + l
+                   destinationLevel:dst.mip_level
+                  destinationOrigin:MTLOriginMake((NSUInteger)offset.x,
+                                                  (NSUInteger)offset.y,
+                                                  (NSUInteger)offset.z)];
+  }
 }
 
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT {
