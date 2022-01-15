@@ -2614,14 +2614,24 @@ ngf_error ngf_cmd_begin_render_pass_simple(
 ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
 
 /**
- * Starts a new encoder for transfer commands associated with the given
- * command buffer.
- * @param buf The buffer to create the encoder for. Must be in the "ready"
+ * \ingroup ngf
+ * 
+ * Begins a transfer pass.
+ * 
+ * A transfer pass is a sequence of commands that copy data.
+ * 
+ * @param buf The handle to the command buffer to operate on. Must be in the "ready"
  *            state, will be transitioned to the "recording" state.
+ * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
+ *            associated with the transfer pass must be recorded using that encoder.
  */
 ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, ngf_xfer_encoder* enc) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
+ * Ends a transfer pass.
+ * 
  * Disposes of the given transfer cmd encoder, transitioning its corresponding
  * command buffer to the "ready" state.
  */
