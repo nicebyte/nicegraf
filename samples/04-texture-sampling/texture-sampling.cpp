@@ -93,7 +93,8 @@ void* sample_initialize(
           .layer        = 0u,
           .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
       ngf_offset3d {},
-      ngf_extent3d {texture_staging_image.width_px, texture_staging_image.height_px, 1u});
+      ngf_extent3d {texture_staging_image.width_px, texture_staging_image.height_px, 1u},
+      1u);
 
   /* Populate the rest of the mip levels automatically. */
   ngf_cmd_generate_mipmaps(xfer_encoder, s->texture.get());

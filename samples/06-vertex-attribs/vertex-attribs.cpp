@@ -366,7 +366,7 @@ void* sample_initialize(
       0,
       ngf_image_ref {state->object_texture, 0, 0, NGF_CUBEMAP_FACE_COUNT},
       ngf_offset3d {},
-      ngf_extent3d {texture_width, texture_height, 1});
+      ngf_extent3d {texture_width, texture_height, 1}, 1u);
   ngf_cmd_generate_mipmaps(xfer_encoder, state->object_texture);
 
   /* Create the image sampler. */

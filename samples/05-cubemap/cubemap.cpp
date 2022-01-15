@@ -124,15 +124,13 @@ void* sample_initialize(
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_XFER_DST}));
 
   /* Populate the cubemap texture. */
-  for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; face++) {
-    ngf_cmd_write_image(
-        xfer_encoder,
-        staging_buffer.get(),
-        face * bytes_per_face,
-        ngf_image_ref {state->texture, 0, 0, (ngf_cubemap_face)face},
-        ngf_offset3d {},
-        ngf_extent3d {face_width, face_height, 1});
-  }
+  ngf_cmd_write_image(
+      xfer_encoder,
+      staging_buffer.get(),
+      0,
+      ngf_image_ref {state->texture, 0, 0, (ngf_cubemap_face)NGF_CUBEMAP_FACE_POSITIVE_X},
+      ngf_offset3d {},
+      ngf_extent3d {face_width, face_height, 1}, NGF_CUBEMAP_FACE_COUNT);
 
   /* Create the image sampler. */
 

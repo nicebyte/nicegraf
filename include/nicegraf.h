@@ -2760,7 +2760,8 @@ void ngf_cmd_write_image(
     size_t           src_offset,
     ngf_image_ref    dst,
     ngf_offset3d     offset,
-    ngf_extent3d     extent) NGF_NOEXCEPT;
+    ngf_extent3d     extent,
+    uint32_t         nlayers) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

@@ -3818,7 +3818,8 @@ void ngf_cmd_write_image(
     size_t           src_offset,
     ngf_image_ref    dst,
     ngf_offset3d     offset,
-    ngf_extent3d     extent) {
+    ngf_extent3d     extent,
+    uint32_t         nlayers) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   const uint32_t dst_layer =
@@ -3838,7 +3839,7 @@ void ngf_cmd_write_image(
           .baseMipLevel   = dst.mip_level,
           .levelCount     = 1u,
           .baseArrayLayer = dst_layer,
-          .layerCount     = 1u}};
+          .layerCount     = nlayers}};
   vkCmdPipelineBarrier(
       buf->active_bundle.vkcmdbuf,
       VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
@@ -3858,7 +3859,7 @@ void ngf_cmd_write_image(
           {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
            .mipLevel       = dst.mip_level,
            .baseArrayLayer = dst_layer,
-           .layerCount     = 1u},
+           .layerCount     = nlayers},
       .imageOffset = {.x = offset.x, .y = offset.y, .z = offset.z},
       .imageExtent = {.width = extent.width, .height = extent.height, .depth = extent.depth}};
   vkCmdCopyBufferToImage(
@@ -3883,7 +3884,7 @@ void ngf_cmd_write_image(
           .baseMipLevel   = dst.mip_level,
           .levelCount     = 1u,
           .baseArrayLayer = dst_layer,
-          .layerCount     = 1u}};
+          .layerCount     = nlayers}};
   vkCmdPipelineBarrier(
       buf->active_bundle.vkcmdbuf,
       VK_PIPELINE_STAGE_TRANSFER_BIT,

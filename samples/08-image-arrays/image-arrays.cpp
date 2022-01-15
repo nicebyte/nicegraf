@@ -128,7 +128,8 @@ void* sample_initialize(
             .layer        = i,
             .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
         ngf_offset3d {},
-        ngf_extent3d {image_array_width, image_array_height, 1u});
+        ngf_extent3d {image_array_width, image_array_height, 1u},
+        1u);
   }
 
   /** Populate the rest of the mip levels automatically. **/
@@ -164,7 +165,8 @@ void* sample_initialize(
               .layer        = i,
               .cubemap_face = (ngf_cubemap_face)face},
           ngf_offset3d {},
-          ngf_extent3d {image_array_width, image_array_height, 1u});
+          ngf_extent3d {image_array_width, image_array_height, 1u},
+          1u);
     }
   }
   /** Generate the rest of the mips automatically. */

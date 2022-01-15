@@ -133,7 +133,7 @@ ngf_imgui::ngf_imgui(
       0,
       font_texture_ref,
       ngf_offset3d{},
-      ngf_extent3d{(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u});
+      ngf_extent3d{(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u}, 1u);
 
   // Create a sampler for the font texture.
   ngf_sampler_info sampler_info {
