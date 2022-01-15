@@ -2667,8 +2667,15 @@ void ngf_cmd_write_image(
     ngf_extent3d     extent) NGF_NOEXCEPT;
 
 /**
- * Generate mipmaps from level 0 of the given image and write the results to the remaining levels of
- * the given image. Requires the image to have been created with NGF_IMAGE_USAGE_MIPMAP_GENERATION.
+ * \ingroup ngf
+ * Generates mipmaps automatically.
+ * 
+ * Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level
+ * specified when creating the image, using the data from the preceding level as the source. Level 0
+ * of each layer is expected to be populated by the application code prior to calling this function.
+ * 
+ * @param xfenc A transfer command encoder.
+ * @param img The handle to the image to operate on.
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
 
