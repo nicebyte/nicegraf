@@ -1459,7 +1459,6 @@ typedef enum ngf_descriptor_type {
    * 
    * A uniform buffer, also known as a constant buffer, can be used to pass
    * a small to medium sized chunk of data to the shader in a structured way.
-   * See also \ref ngf_buffer.
    */
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
 
@@ -1488,7 +1487,7 @@ typedef enum ngf_descriptor_type {
    * \ingroup ngf
    * 
    * A texel buffer can be used to pass a large amount of unstructured data
-   * (i.e. a big array of `float4`s) to the shader. See also \ref ngf_buffer.
+   * (i.e. a big array of `float4`s) to the shader.
    */
   NGF_DESCRIPTOR_TEXEL_BUFFER,
 
@@ -1526,6 +1525,7 @@ typedef enum ngf_sampler_filter {
    * closest to the requested mip level value.
    */
   NGF_FILTER_LINEAR,      
+
   NGF_FILTER_COUNT
 } ngf_sampler_filter;
 
@@ -1946,6 +1946,7 @@ typedef struct ngf_buffer_info {
 /**
  * @struct ngf_buffer
  * \ingroup ngf
+ * 
  * An opaque handle to a buffer object.
  */
 typedef struct ngf_buffer_t* ngf_buffer;
@@ -2421,49 +2422,65 @@ ngf_render_target ngf_default_render_target() NGF_NOEXCEPT;
 const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT;
 
 /**
- * Creates a new buffer.
- * @param info see \ref ngf_buffer_info
- * @param result the new buffer handle will be stored here.
+ * \ingroup ngf
+ * 
+ * Creates a new buffer object.
+ * 
+ * @param info Information required to construct the buffer object.
+ * @param result Pointer to where the handle to the newly created object will be written to.
  */
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT;
 
 /**
- * Discards the given buffer.
+ * \ingroup ngf
+ * 
+ * Destroys the given buffer object.
+ * 
+ * @param buffer The handle to the buffer object to be destroyed.
  */
 void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT;
 
 /**
- * Map a region of a given buffer to host memory.
- * It is an error to bind a mapped buffer using any command. If a buffer that
- * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure
- * any new data in the mapped range becomes visible to the subsequent commands,
- * then call \ref ngf_buffer_unmap. Then it shall be safe to bind the buffer.
- * Writing into any region that could be in use by previously submitted commands
- * results in undefined behavior.
- * @param buf The buffer to be mapped.
- * @param offset Offset at which the mapped region starts, in bytes. It must
- *               satisfy platform-specific alignment requirements.
- * @param size  Size of the mapped region in bytes.
+ * \ingroup ngf
+ * 
+ * Maps a region of a given buffer to host memory.
+ * 
+ * It is an error to bind a buffer that is currently mapped using any command. If a buffer that
+ * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure any new data in the
+ * mapped range becomes visible to the subsequent commands, then call \ref ngf_buffer_unmap. Writing
+ * into any region that could be in use by previously submitted commands results in undefined behavior.
+ * 
+ * @param buf The handle to the buffer to be mapped.
+ * @param offset The offset at which the mapped region starts, in bytes. It must
+ *               satisfy platform-specific alignment requirements. See, for example, \ref
+ *               ngf_device_capabilities::uniform_buffer_offset_alignment and \ref
+ *               ngf_device_capabilities::texel_buffer_offet_alignment.
+ * @param size  The size of the mapped region, in bytes.
  * @param flags A combination of flags from \ref ngf_buffer_map_flags.
- * @return A pointer to the mapped memory, or NULL if the buffer could not be
- *         mapped.
+ * @return A pointer to the mapped memory, or NULL if the buffer could not be mapped.
  */
 void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
 
 /**
- * Ensure that any new data in the mapped range will be visible to subsequently
- * submitted commands.
- * @param ptr A \ref ngf_buffer_ptr object wrapping a handle to the buffer that
- *            needs to be flushed.
- * @param offset Offset, relative to the start of the mapped range, at which
+ * \ingroup ngf
+ * 
+ * Ensures that any writes performed by the CPU into the mapped range are be visible to subsequently
+ * submitted rendering commands executed by the rendering device.
+ * @param ptr The handle to the buffer that needs to be flushed.
+ * @param offset The offset, relative to the start of the mapped range, at which
  *               the flushed region starts, in bytes.
- * @param size  Size of the flushed region in bytes.
+ * @param size  The size of the flushed region, in bytes.
  */
 void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
 
 /**
- * Unmaps a previously mapped buffer. The pointer returned for that buffer
- * by the corresponding call to \ref ngf_buffer_map_range becomes invalid.
+ * \ingroup ngf
+ * 
+ * Unmaps a previously mapped buffer.
+ *
+ * If multiple regions were mapped, all of them are unmapped. Any pointers returned by prior calls
+ * to \ref ngf_buffer_map_range are invalidated.
+ * 
  * @param buf The buffer that needs to be unmapped.
  */
 void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
