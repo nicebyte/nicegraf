@@ -1,5 +1,8 @@
 build/*
 tests/build/*
+docs/doxygen/html
+docs/doxygen/xml
+docs/doxygen/latex
 tests/ngf_tests
 samples/binaries/*
 !samples/binaries/assets/
