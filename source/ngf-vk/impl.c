@@ -4043,14 +4043,15 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   *result        = buf;
   if (buf == NULL) return NGF_ERROR_OUT_OF_MEM;
 
-  const VkBufferUsageFlags    vk_usage_flags  = get_vk_buffer_usage(info->buffer_usage);
-  const VkMemoryPropertyFlags vk_mem_flags    = get_vk_memory_flags(info->storage_type);
-  const uint32_t              vma_usage_flags = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
-                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
-                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
-
+  const VkBufferUsageFlags    vk_usage_flags = get_vk_buffer_usage(info->buffer_usage);
+  const VkMemoryPropertyFlags vk_mem_flags   = get_vk_memory_flags(info->storage_type);
+  const bool     vk_mem_is_host_visible      = vk_mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  const uint32_t vma_usage_flags             = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+                                                   ? VMA_MEMORY_USAGE_GPU_ONLY
+                                                   : VMA_MEMORY_USAGE_CPU_ONLY;
   ngf_error    err   = NGF_ERROR_OK;
   ngfvk_alloc* alloc = &buf->alloc;
+
 
   const VkBufferCreateInfo buf_vk_info = {
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -4063,7 +4064,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
       .pQueueFamilyIndices   = NULL};
 
   const VmaAllocationCreateInfo buf_alloc_info = {
-      .flags          = 0u,
+      .flags          = vk_mem_is_host_visible ? VMA_ALLOCATION_CREATE_MAPPED_BIT : 0u,
       .usage          = vma_usage_flags,
       .requiredFlags  = vk_mem_flags,
       .preferredFlags = 0u,
