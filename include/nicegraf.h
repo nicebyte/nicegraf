@@ -1737,6 +1737,7 @@ typedef struct ngf_image_ref {
 typedef struct ngf_render_target_info {
   /** List of attachment descriptions. */
   const ngf_attachment_descriptions* attachment_descriptions;
+
   /** Image references, describing what is bound to each attachment. */
   const ngf_image_ref* attachment_image_refs;
 } ngf_render_target_info;
@@ -1744,13 +1745,21 @@ typedef struct ngf_render_target_info {
 /**
  * @struct ngf_render_target
  * \ingroup ngf
+ * 
  * An opaque handle to a render target object.
+ * 
+ * Render targets are collections of images that can be rendered into. Each image in the collection is
+ * referred to as an "attachment". Some attachments have special meaning, for example the depth or
+ * the combined depth+stencil attachment, the contents of which are used in depth/stencil tests. A render
+ * target is not allowed to have multiple depth or depth+stencil attachments, however it is allowed to
+ * have multiple color attachments (up to a certain limit).
  */
 typedef struct ngf_render_target_t* ngf_render_target;
 
 /**
  * @struct ngf_clear_info
  * \ingroup ngf
+ * 
  * Specifies a render target clear operation.
  */
 typedef union ngf_clear_info {
@@ -2356,7 +2365,7 @@ void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
  * Creates a new sampler object.
  * 
  * @param info Information required to construct the sampler object.
- * @param result Pointer ti where the handle to the newly created object will be returned.
+ * @param result Pointer to where the handle to the newly created object will be returned.
  */
 ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT;
 
@@ -2370,12 +2379,33 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
 void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 
 /**
- * Obtain a render target associated with the the current context's
- * swapchain. If the current context does not have a swapchain, the result shall
- * be a null pointer. Otherwise, it shall be a render target that has a
- * color attachment associated with the context's swapchain. If the swapchain
- * was created with an accompanying depth buffer, the render target shall
- * have an attachment for that as well.
+ * \ingroup ngf
+ * 
+ * Create a new rendertarget object.
+ * 
+ * @param info Information required to construct the rendertarget object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
+ */
+ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result)
+    NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Destroys the given render target.
+ * 
+ * @param rendertarget The handle to the rendertarget object to be destroyed.
+ */
+void ngf_destroy_render_target(ngf_render_target rendertarget) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns the handle to the \ref ngf_render_target associated with the the current context's
+ * swapchain (aka the default render target). If the current context does not have a swapchain, the
+ * result shall be null. Otherwise, it shall be a render target that has a color attachment
+ * associated with the context's swapchain. If the swapchain was created with an accompanying depth
+ * buffer, the render target shall have an attachment for that as well.
  *
  * The caller should not attempt to destroy the returned render target. It shall
  * be destroyed automatically, together with the parent context.
@@ -2383,22 +2413,12 @@ void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 ngf_render_target ngf_default_render_target() NGF_NOEXCEPT;
 
 /**
- * Obtain the attachment descriptions for the default render target.
- * The caller should not attempt to free the returned pointer or modify the contents of the memory
- * it points to.
+ * \ingroup ngf
+ * 
+ * Returns the attachment descriptions for the default render target. The caller should not attempt
+ * to free the returned pointer or modify the contents of the memory it points to.
  */
 const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT;
-
-/**
- * Create a new rendertarget with the given configuration.
- */
-ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result)
-    NGF_NOEXCEPT;
-
-/**
- * Destroy the given render target.
- */
-void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT;
 
 /**
  * Creates a new buffer.
