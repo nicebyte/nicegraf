@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__rasterization__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_rasterization_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__rasterization__info_1a2512a053ce718b5f3b2feeb09831d6bf" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_rasterization_info::discard</definition>
+        <argsstring></argsstring>
+        <name>discard</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Enable/disable rasterizer discard. Use this in pipelines that don&apos;t write any fragment data. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="573" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="573" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__rasterization__info_1a93a89a1653165034d291978e5c01351d" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gab411421f89d976d54cb0d72b736ff517" kindref="member">ngf_polygon_mode</ref></type>
+        <definition>ngf_polygon_mode ngf_rasterization_info::polygon_mode</definition>
+        <argsstring></argsstring>
+        <name>polygon_mode</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>How to draw polygons. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="575" column="23" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="575" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__rasterization__info_1a7d09cd2c188cb0f28038486ce4d2ff25" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gac58dd9a88f616e4b9822e2645cdbfb2b" kindref="member">ngf_cull_mode</ref></type>
+        <definition>ngf_cull_mode ngf_rasterization_info::cull_mode</definition>
+        <argsstring></argsstring>
+        <name>cull_mode</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Which polygons to cull. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="576" column="23" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="576" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__rasterization__info_1afeb51b6bc22a87bd16d42b434e1d380d" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gac78e26eae8830282edaedc5636120714" kindref="member">ngf_front_face_mode</ref></type>
+        <definition>ngf_front_face_mode ngf_rasterization_info::front_face</definition>
+        <argsstring></argsstring>
+        <name>front_face</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Which winding counts as front-facing. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="577" column="23" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="577" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Rasterization stage parameters. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="572" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="572" bodyend="578"/>
+    <listofallmembers>
+      <member refid="structngf__rasterization__info_1a7d09cd2c188cb0f28038486ce4d2ff25" prot="public" virt="non-virtual"><scope>ngf_rasterization_info</scope><name>cull_mode</name></member>
+      <member refid="structngf__rasterization__info_1a2512a053ce718b5f3b2feeb09831d6bf" prot="public" virt="non-virtual"><scope>ngf_rasterization_info</scope><name>discard</name></member>
+      <member refid="structngf__rasterization__info_1afeb51b6bc22a87bd16d42b434e1d380d" prot="public" virt="non-virtual"><scope>ngf_rasterization_info</scope><name>front_face</name></member>
+      <member refid="structngf__rasterization__info_1a93a89a1653165034d291978e5c01351d" prot="public" virt="non-virtual"><scope>ngf_rasterization_info</scope><name>polygon_mode</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

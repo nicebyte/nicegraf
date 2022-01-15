@@ -1,0 +1,75 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__vertex__buf__binding__desc" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_vertex_buf_binding_desc</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__vertex__buf__binding__desc_1a095d45b0a9f40c3880c774c68f2846c6" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_buf_binding_desc::binding</definition>
+        <argsstring></argsstring>
+        <name>binding</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Index of the binding that this structure describes. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="899" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="899" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__buf__binding__desc_1a014106bf2efcc5a84a1a64181d48cd48" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_buf_binding_desc::stride</definition>
+        <argsstring></argsstring>
+        <name>stride</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the distance (in bytes) between the starting bytes of two consecutive attribute values. When set to 0, the attribute values are assumed to be tightly packed (i.e. the next value of the attribute immediately follows the previous with no gaps).</para>
+<para>As an example, assume the buffer contains data for a single attribute, such as the position of a vertex in three-dimensional space. Each component of the position is a 32-bit floating point number. The values are laid out in memory one after another:</para>
+<para><programlisting><codeline><highlight class="normal"><sp/>________<sp/>________<sp/>________<sp/>________<sp/>________<sp/>________<sp/>____</highlight></codeline>
+<codeline><highlight class="normal">|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|</highlight></codeline>
+<codeline><highlight class="normal">|<sp/>pos0.x<sp/>|<sp/>pos0.y<sp/>|<sp/>pos0.z<sp/>|<sp/>pos1.x<sp/>|<sp/>pos1.y<sp/>|<sp/>pos1.z<sp/>|<sp/>...</highlight></codeline>
+<codeline><highlight class="normal">|________|________|________|________|________|________|____</highlight></codeline>
+</programlisting> In this case, the stride is 3*4 = 12 bytes - the distance from the beginning of the first attribute to the beginning of the next attribute is equal to the size of one attribute value. However, it can be set to 0, because in this case the attribute values are tightly packed - the next immediately follows the previous.</para>
+<para>Now consider a different case, where we have two attributes: a three-dimensional position and an RGB color, and the buffer first lists all the attribute values for the first vertex, then all attribute values for the second vertex and so on:</para>
+<para><programlisting><codeline><highlight class="normal"><sp/>________<sp/>________<sp/>________<sp/>________<sp/>________<sp/>________<sp/>________<sp/>_____</highlight></codeline>
+<codeline><highlight class="normal">|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|<sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>|</highlight></codeline>
+<codeline><highlight class="normal">|<sp/>pos0.x<sp/>|<sp/>pos0.y<sp/>|<sp/>pos0.z<sp/>|<sp/>col0.x<sp/>|<sp/>col0.y<sp/>|<sp/>col0.z<sp/>|<sp/>pos1.x<sp/>|<sp/>...</highlight></codeline>
+<codeline><highlight class="normal">|________|________|________|________|________|________|________|_____</highlight></codeline>
+</programlisting></para>
+<para>In this case, the stride has to be nonzero because the position of the next vertex does not immediately follow the position previous one - there is the value of the color attribute in between. In this case, assuming the attribute components use a 32-bit floating point, the stride would have to be <computeroutput>3 * 4 + 3 * 4 = 24</computeroutput> bytes. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="939" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="939" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__buf__binding__desc_1ab8a0421821b49354fb98cec2a7e050a1" prot="public" static="no" mutable="no">
+        <type><ref refid="nicegraf_8h_1a0cb6495958cc48f224ec5f0d084897c2" kindref="member">ngf_vertex_input_rate</ref></type>
+        <definition>ngf_vertex_input_rate ngf_vertex_buf_binding_desc::input_rate</definition>
+        <argsstring></argsstring>
+        <name>input_rate</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies whether attributes are read from the bound buffer per-vetex or per-instance. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="945" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="945" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Specifies a vertex buffer binding. A <emphasis>vertex buffer binding</emphasis> may be thought of as a slot to which a vertex attribute buffer can be bound. An <ref refid="structngf__graphics__pipeline" kindref="compound">ngf_graphics_pipeline</ref> may have several such slots, which are addressed by their indices. Vertex attribute buffers can be bound to these slots with ngf_cmd_bind_attrib_buffer. The binding also partly defines how the contents of the bound buffer is interpreted - via <ref refid="structngf__vertex__buf__binding__desc_1a014106bf2efcc5a84a1a64181d48cd48" kindref="member">ngf_vertex_buf_binding_desc::stride</ref> and <ref refid="structngf__vertex__buf__binding__desc_1ab8a0421821b49354fb98cec2a7e050a1" kindref="member">ngf_vertex_buf_binding_desc::input_rate</ref> </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="898" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="898" bodyend="946"/>
+    <listofallmembers>
+      <member refid="structngf__vertex__buf__binding__desc_1a095d45b0a9f40c3880c774c68f2846c6" prot="public" virt="non-virtual"><scope>ngf_vertex_buf_binding_desc</scope><name>binding</name></member>
+      <member refid="structngf__vertex__buf__binding__desc_1ab8a0421821b49354fb98cec2a7e050a1" prot="public" virt="non-virtual"><scope>ngf_vertex_buf_binding_desc</scope><name>input_rate</name></member>
+      <member refid="structngf__vertex__buf__binding__desc_1a014106bf2efcc5a84a1a64181d48cd48" prot="public" virt="non-virtual"><scope>ngf_vertex_buf_binding_desc</scope><name>stride</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

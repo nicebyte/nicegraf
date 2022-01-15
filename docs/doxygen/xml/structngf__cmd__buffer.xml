@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__cmd__buffer" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_cmd_buffer</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Encodes a series of rendering commands.</para>
+<para>Internally, a command buffer may be in any of the following five states:<itemizedlist>
+<listitem><para>new;</para>
+</listitem><listitem><para>ready;</para>
+</listitem><listitem><para>recording;</para>
+</listitem><listitem><para>awaiting submission;</para>
+</listitem><listitem><para>submitted.</para>
+</listitem></itemizedlist>
+</para>
+<para>Every newly created command buffer is in the &quot;new&quot; state. It can be transitioned to the &quot;ready&quot; state by calling <computeroutput>ngf_start_cmd_buffer</computeroutput> on it.</para>
+<para>When a command buffer is in the &quot;ready&quot; state, you may begin recording a new series of rendering commands into it.</para>
+<para>Recording commands into a command buffer is performed using command encoders. There are a few different types of encoders, supporting different types of commands.</para>
+<para>A new encoder may be created for a command buffer only if the command buffer is in either the &quot;ready&quot; or the &quot;awaiting submission&quot; state.</para>
+<para>Creating a new encoder for a command buffer transitions that command buffer to the &quot;recording&quot; state.</para>
+<para>Finishing and disposing of an active encoder transitions its corresponding command buffer into the &quot;awaiting submission&quot; state.</para>
+<para>The three rules above mean that a command buffer may not have more than one encoder active at a given time.</para>
+<para>Once all of the desired commands have been recorded, and the command buffer is in the &quot;awaiting submission&quot; state, the command buffer may be submitted for execution via a call to ngf_cmd_buffer_submit, which transitions it into the &quot;submitted&quot; state.</para>
+<para>Submission may only be performed on command buffers that are in the &quot;awaiting submission&quot; state.</para>
+<para>Once a command buffer is in the &quot;submitted&quot; state, it is impossible to append any new commands to it. It is, however, possible to begin recording a new, completely separate batch of commands by calling <ref refid="nicegraf_8h_1a52027dd2cf70d4530d60edabe5a6019c" kindref="member">ngf_start_cmd_buffer</ref> which implicitly transitions the buffer to the &quot;ready&quot; state if it is already &quot;submitted&quot;. This does not affect any previously submitted commands.</para>
+<para>Calling a command buffer function on a buffer that is in a state not expected by that function will result in an error. For example, calling ngf_cmd_buffer_submit would produce an error on a buffer that is in the &quot;ready&quot; state, since, according to the rules outlined above, ngf_cmd_buffer_submit expects command buffers to be in the &quot;awaiting
+submission&quot; state. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1754" column="1"/>
+    <listofallmembers>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

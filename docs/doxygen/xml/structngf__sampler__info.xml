@@ -1,0 +1,182 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__sampler__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_sampler_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__sampler__info_1afe0f979f267c816201c7ade4223ad00e" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gabcde3381b55395f963eca78b2773283f" kindref="member">ngf_sampler_filter</ref></type>
+        <definition>ngf_sampler_filter ngf_sampler_info::min_filter</definition>
+        <argsstring></argsstring>
+        <name>min_filter</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Minification filter. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1324" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1324" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a16e4909ea0faf45bdd470cfc73de4945" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gabcde3381b55395f963eca78b2773283f" kindref="member">ngf_sampler_filter</ref></type>
+        <definition>ngf_sampler_filter ngf_sampler_info::mag_filter</definition>
+        <argsstring></argsstring>
+        <name>mag_filter</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Magnification filter. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1325" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1325" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1ae50b36c07bc64038335b803d0e5ba00d" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gabcde3381b55395f963eca78b2773283f" kindref="member">ngf_sampler_filter</ref></type>
+        <definition>ngf_sampler_filter ngf_sampler_info::mip_filter</definition>
+        <argsstring></argsstring>
+        <name>mip_filter</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Mipmap filter. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1326" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1326" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a01c052235d7554f8732e092e28f5c14e" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga9e66e1eb316415e8793897338bdbd81e" kindref="member">ngf_sampler_wrap_mode</ref></type>
+        <definition>ngf_sampler_wrap_mode ngf_sampler_info::wrap_u</definition>
+        <argsstring></argsstring>
+        <name>wrap_u</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Wrap mode for the U coordinate. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1327" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1327" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a22c54f3f08de0d2c18d0d660a7aa69c3" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga9e66e1eb316415e8793897338bdbd81e" kindref="member">ngf_sampler_wrap_mode</ref></type>
+        <definition>ngf_sampler_wrap_mode ngf_sampler_info::wrap_v</definition>
+        <argsstring></argsstring>
+        <name>wrap_v</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Wrap mode for the V coordinate. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1328" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1328" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a5777f5d43b2d44787ab604aa91857d50" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga9e66e1eb316415e8793897338bdbd81e" kindref="member">ngf_sampler_wrap_mode</ref></type>
+        <definition>ngf_sampler_wrap_mode ngf_sampler_info::wrap_w</definition>
+        <argsstring></argsstring>
+        <name>wrap_w</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Wrap mode for the W coordinate. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1329" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1329" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a7cd7bdce3b5d787774efd06400356f71" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_sampler_info::lod_max</definition>
+        <argsstring></argsstring>
+        <name>lod_max</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Max mip level. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1330" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1330" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1a0af30b2b09598fba479b985913e2e7b7" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_sampler_info::lod_min</definition>
+        <argsstring></argsstring>
+        <name>lod_min</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Min mip level. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1331" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1331" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1afb8eb5889ee4f730536423978d0167c4" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_sampler_info::lod_bias</definition>
+        <argsstring></argsstring>
+        <name>lod_bias</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Level bias. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1332" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1332" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1af242dd161b04ce4e0ae0a7c8cd886406" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_sampler_info::max_anisotropy</definition>
+        <argsstring></argsstring>
+        <name>max_anisotropy</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Max allowed degree of anisotropy. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1333" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1333" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__sampler__info_1afcb20f1df177810de1a2e0cf01d7c0db" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_sampler_info::enable_anisotropy</definition>
+        <argsstring></argsstring>
+        <name>enable_anisotropy</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Whether to allow anisotropic filtering. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1334" column="25" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1334" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Information for creating a sampler object. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1323" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1323" bodyend="1335"/>
+    <listofallmembers>
+      <member refid="structngf__sampler__info_1afcb20f1df177810de1a2e0cf01d7c0db" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>enable_anisotropy</name></member>
+      <member refid="structngf__sampler__info_1afb8eb5889ee4f730536423978d0167c4" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>lod_bias</name></member>
+      <member refid="structngf__sampler__info_1a7cd7bdce3b5d787774efd06400356f71" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>lod_max</name></member>
+      <member refid="structngf__sampler__info_1a0af30b2b09598fba479b985913e2e7b7" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>lod_min</name></member>
+      <member refid="structngf__sampler__info_1a16e4909ea0faf45bdd470cfc73de4945" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>mag_filter</name></member>
+      <member refid="structngf__sampler__info_1af242dd161b04ce4e0ae0a7c8cd886406" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>max_anisotropy</name></member>
+      <member refid="structngf__sampler__info_1afe0f979f267c816201c7ade4223ad00e" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>min_filter</name></member>
+      <member refid="structngf__sampler__info_1ae50b36c07bc64038335b803d0e5ba00d" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>mip_filter</name></member>
+      <member refid="structngf__sampler__info_1a01c052235d7554f8732e092e28f5c14e" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>wrap_u</name></member>
+      <member refid="structngf__sampler__info_1a22c54f3f08de0d2c18d0d660a7aa69c3" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>wrap_v</name></member>
+      <member refid="structngf__sampler__info_1a5777f5d43b2d44787ab604aa91857d50" prot="public" virt="non-virtual"><scope>ngf_sampler_info</scope><name>wrap_w</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

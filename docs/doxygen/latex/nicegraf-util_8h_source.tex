@@ -1,0 +1,39 @@
+\hypertarget{nicegraf-util_8h_source}{}\doxysection{nicegraf-\/util.h}
+\label{nicegraf-util_8h_source}\index{C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-\/util.h@{C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-\/util.h}}
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{1 }
+\DoxyCodeLine{23 \textcolor{preprocessor}{\#pragma once}}
+\DoxyCodeLine{24 }
+\DoxyCodeLine{25 \textcolor{preprocessor}{\#include "{}nicegraf.h"{}}}
+\DoxyCodeLine{26 }
+\DoxyCodeLine{27 \textcolor{preprocessor}{\#include <stdint.h>}}
+\DoxyCodeLine{28 }
+\DoxyCodeLine{36 \textcolor{preprocessor}{\#ifdef \_\_cplusplus}}
+\DoxyCodeLine{37 \textcolor{keyword}{extern} \textcolor{stringliteral}{"{}C"{}} \{}
+\DoxyCodeLine{38 \textcolor{preprocessor}{\#endif}}
+\DoxyCodeLine{39 }
+\DoxyCodeLine{48 \textcolor{keyword}{typedef} \textcolor{keyword}{struct }\mbox{\hyperlink{structngf__util__graphics__pipeline__data}{ngf\_util\_graphics\_pipeline\_data}} \{}
+\DoxyCodeLine{49   \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\_graphics\_pipeline\_info}} pipeline\_info;}
+\DoxyCodeLine{50   \mbox{\hyperlink{structngf__blend__info}{ngf\_blend\_info}}             blend\_info;}
+\DoxyCodeLine{51   \mbox{\hyperlink{structngf__depth__stencil__info}{ngf\_depth\_stencil\_info}}     depth\_stencil\_info;}
+\DoxyCodeLine{52   \mbox{\hyperlink{structngf__vertex__input__info}{ngf\_vertex\_input\_info}}      vertex\_input\_info;}
+\DoxyCodeLine{53   \mbox{\hyperlink{structngf__multisample__info}{ngf\_multisample\_info}}       multisample\_info;}
+\DoxyCodeLine{54   \mbox{\hyperlink{structngf__rasterization__info}{ngf\_rasterization\_info}}     rasterization\_info;}
+\DoxyCodeLine{55   \mbox{\hyperlink{structngf__specialization__info}{ngf\_specialization\_info}}    spec\_info;}
+\DoxyCodeLine{56 \} \mbox{\hyperlink{structngf__util__graphics__pipeline__data}{ngf\_util\_graphics\_pipeline\_data}};}
+\DoxyCodeLine{57 }
+\DoxyCodeLine{64 \textcolor{keywordtype}{void} \mbox{\hyperlink{group__ngf__util_ga590a9f828a3b02e12ae66c25192becbf}{ngf\_util\_create\_default\_graphics\_pipeline\_data}}(\mbox{\hyperlink{structngf__util__graphics__pipeline__data}{ngf\_util\_graphics\_pipeline\_data}}* result);}
+\DoxyCodeLine{65 }
+\DoxyCodeLine{71 \textcolor{keyword}{const} \textcolor{keywordtype}{char}* \mbox{\hyperlink{group__ngf__util_gaa86f3ddc74dd73157e7a7b54f9202cd7}{ngf\_util\_get\_error\_name}}(\textcolor{keyword}{const} \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\_error}} err);}
+\DoxyCodeLine{72 }
+\DoxyCodeLine{77 \textcolor{keyword}{static} \textcolor{keyword}{inline} \textcolor{keywordtype}{size\_t} ngf\_util\_align\_size(\textcolor{keywordtype}{size\_t} value, \textcolor{keywordtype}{size\_t} alignment) \{}
+\DoxyCodeLine{78     \textcolor{keyword}{const} \textcolor{keywordtype}{size\_t} m = value \% alignment;}
+\DoxyCodeLine{79     \textcolor{keywordflow}{return} value + (m > 0 ? (alignment -\/ m) : 0u);}
+\DoxyCodeLine{80 \}}
+\DoxyCodeLine{81 }
+\DoxyCodeLine{82 \textcolor{preprocessor}{\#ifdef \_\_cplusplus}}
+\DoxyCodeLine{83 \}}
+\DoxyCodeLine{84 \textcolor{preprocessor}{\#endif}}
+
+\end{DoxyCode}

@@ -1,0 +1,62 @@
+\hypertarget{structngf__vertex__buf__binding__desc}{}\doxysection{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc Struct Reference}
+\label{structngf__vertex__buf__binding__desc}\index{ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+uint32\+\_\+t \mbox{\hyperlink{structngf__vertex__buf__binding__desc_a095d45b0a9f40c3880c774c68f2846c6}{binding}}
+\item 
+uint32\+\_\+t \mbox{\hyperlink{structngf__vertex__buf__binding__desc_a014106bf2efcc5a84a1a64181d48cd48}{stride}}
+\item 
+ngf\+\_\+vertex\+\_\+input\+\_\+rate \mbox{\hyperlink{structngf__vertex__buf__binding__desc_ab8a0421821b49354fb98cec2a7e050a1}{input\+\_\+rate}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Specifies a vertex buffer binding. A {\itshape vertex buffer binding} may be thought of as a slot to which a vertex attribute buffer can be bound. An \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} may have several such slots, which are addressed by their indices. Vertex attribute buffers can be bound to these slots with \mbox{\hyperlink{group__ngf_ga904b09eb0463b98ca9b30b9e790dc432}{ngf\+\_\+cmd\+\_\+bind\+\_\+attrib\+\_\+buffer}}. The binding also partly defines how the contents of the bound buffer is interpreted -\/ via \mbox{\hyperlink{structngf__vertex__buf__binding__desc_a014106bf2efcc5a84a1a64181d48cd48}{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc\+::stride}} and \mbox{\hyperlink{structngf__vertex__buf__binding__desc_ab8a0421821b49354fb98cec2a7e050a1}{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc\+::input\+\_\+rate}} 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__vertex__buf__binding__desc_a095d45b0a9f40c3880c774c68f2846c6}\label{structngf__vertex__buf__binding__desc_a095d45b0a9f40c3880c774c68f2846c6}} 
+\index{ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}!binding@{binding}}
+\index{binding@{binding}!ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}}
+\doxysubsubsection{\texorpdfstring{binding}{binding}}
+{\footnotesize\ttfamily uint32\+\_\+t ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc\+::binding}
+
+Index of the binding that this structure describes. \mbox{\Hypertarget{structngf__vertex__buf__binding__desc_ab8a0421821b49354fb98cec2a7e050a1}\label{structngf__vertex__buf__binding__desc_ab8a0421821b49354fb98cec2a7e050a1}} 
+\index{ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}!input\_rate@{input\_rate}}
+\index{input\_rate@{input\_rate}!ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}}
+\doxysubsubsection{\texorpdfstring{input\_rate}{input\_rate}}
+{\footnotesize\ttfamily ngf\+\_\+vertex\+\_\+input\+\_\+rate ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc\+::input\+\_\+rate}
+
+Specifies whether attributes are read from the bound buffer per-\/vetex or per-\/instance. \mbox{\Hypertarget{structngf__vertex__buf__binding__desc_a014106bf2efcc5a84a1a64181d48cd48}\label{structngf__vertex__buf__binding__desc_a014106bf2efcc5a84a1a64181d48cd48}} 
+\index{ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}!stride@{stride}}
+\index{stride@{stride}!ngf\_vertex\_buf\_binding\_desc@{ngf\_vertex\_buf\_binding\_desc}}
+\doxysubsubsection{\texorpdfstring{stride}{stride}}
+{\footnotesize\ttfamily uint32\+\_\+t ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc\+::stride}
+
+Specifies the distance (in bytes) between the starting bytes of two consecutive attribute values. When set to 0, the attribute values are assumed to be tightly packed (i.\+e. the next value of the attribute immediately follows the previous with no gaps).
+
+As an example, assume the buffer contains data for a single attribute, such as the position of a vertex in three-\/dimensional space. Each component of the position is a 32-\/bit floating point number. The values are laid out in memory one after another\+:
+
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_}
+\DoxyCodeLine{|        |        |        |        |        |        |}
+\DoxyCodeLine{| pos0.x | pos0.y | pos0.z | pos1.x | pos1.y | pos1.z | ...}
+\DoxyCodeLine{|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_}
+
+\end{DoxyCode}
+ In this case, the stride is 3$\ast$4 = 12 bytes -\/ the distance from the beginning of the first attribute to the beginning of the next attribute is equal to the size of one attribute value. However, it can be set to 0, because in this case the attribute values are tightly packed -\/ the next immediately follows the previous.
+
+Now consider a different case, where we have two attributes\+: a three-\/dimensional position and an RGB color, and the buffer first lists all the attribute values for the first vertex, then all attribute values for the second vertex and so on\+:
+
+
+\begin{DoxyCode}{0}
+\DoxyCodeLine{ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_ \_\_\_\_\_}
+\DoxyCodeLine{|        |        |        |        |        |        |        |}
+\DoxyCodeLine{| pos0.x | pos0.y | pos0.z | col0.x | col0.y | col0.z | pos1.x | ...}
+\DoxyCodeLine{|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_|\_\_\_\_\_}
+
+\end{DoxyCode}
+
+
+In this case, the stride has to be nonzero because the position of the next vertex does not immediately follow the position previous one -\/ there is the value of the color attribute in between. In this case, assuming the attribute components use a 32-\/bit floating point, the stride would have to be {\ttfamily 3 $\ast$ 4 + 3 $\ast$ 4 = 24} bytes. 

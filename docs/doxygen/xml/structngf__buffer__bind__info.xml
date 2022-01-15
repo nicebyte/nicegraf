@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__buffer__bind__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_buffer_bind_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__buffer__bind__info_1aa025a38fea9bdb2fc8cb94c30b25aabd" prot="public" static="no" mutable="no">
+        <type><ref refid="structngf__buffer" kindref="compound">ngf_buffer</ref></type>
+        <definition>ngf_buffer ngf_buffer_bind_info::buffer</definition>
+        <argsstring></argsstring>
+        <name>buffer</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Which buffer to bind. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1614" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1614" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__buffer__bind__info_1a27b003c6be7ef682eb0ca4bcede94b8c" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_buffer_bind_info::offset</definition>
+        <argsstring></argsstring>
+        <name>offset</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset at which to bind the buffer. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1615" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1615" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__buffer__bind__info_1a7737e4f897ad73ed97bb8ed352425f18" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_buffer_bind_info::range</definition>
+        <argsstring></argsstring>
+        <name>range</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Bound range. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1616" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1616" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__buffer__bind__info_1afd691b2a6d6d1b01b0f3cfa17a847e72" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga48bf7488f4d5c9421491c8c0b955132a" kindref="member">ngf_image_format</ref></type>
+        <definition>ngf_image_format ngf_buffer_bind_info::format</definition>
+        <argsstring></argsstring>
+        <name>format</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Texel format (texel buffers only). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1617" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1617" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Specifies a buffer resource bind operation. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1613" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1613" bodyend="1618"/>
+    <listofallmembers>
+      <member refid="structngf__buffer__bind__info_1aa025a38fea9bdb2fc8cb94c30b25aabd" prot="public" virt="non-virtual"><scope>ngf_buffer_bind_info</scope><name>buffer</name></member>
+      <member refid="structngf__buffer__bind__info_1afd691b2a6d6d1b01b0f3cfa17a847e72" prot="public" virt="non-virtual"><scope>ngf_buffer_bind_info</scope><name>format</name></member>
+      <member refid="structngf__buffer__bind__info_1a27b003c6be7ef682eb0ca4bcede94b8c" prot="public" virt="non-virtual"><scope>ngf_buffer_bind_info</scope><name>offset</name></member>
+      <member refid="structngf__buffer__bind__info_1a7737e4f897ad73ed97bb8ed352425f18" prot="public" virt="non-virtual"><scope>ngf_buffer_bind_info</scope><name>range</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

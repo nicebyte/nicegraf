@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__offset3d" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_offset3d</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__offset3d_1a0e98ee082e4cf99b08ed6520ecba4a9e" prot="public" static="no" mutable="no">
+        <type>int32_t</type>
+        <definition>int32_t ngf_offset3d::x</definition>
+        <argsstring></argsstring>
+        <name>x</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset along the x-axis. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="423" column="11" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="423" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__offset3d_1a3d4e959322fa5842623029a74d104bfe" prot="public" static="no" mutable="no">
+        <type>int32_t</type>
+        <definition>int32_t ngf_offset3d::y</definition>
+        <argsstring></argsstring>
+        <name>y</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset along the y-axis. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="424" column="11" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="424" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__offset3d_1ad8609d8a73704a938030ad9fcca2807b" prot="public" static="no" mutable="no">
+        <type>int32_t</type>
+        <definition>int32_t ngf_offset3d::z</definition>
+        <argsstring></argsstring>
+        <name>z</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset along the z-axis. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="425" column="11" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="425" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Three-dimensional offset. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="422" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="422" bodyend="426"/>
+    <listofallmembers>
+      <member refid="structngf__offset3d_1a0e98ee082e4cf99b08ed6520ecba4a9e" prot="public" virt="non-virtual"><scope>ngf_offset3d</scope><name>x</name></member>
+      <member refid="structngf__offset3d_1a3d4e959322fa5842623029a74d104bfe" prot="public" virt="non-virtual"><scope>ngf_offset3d</scope><name>y</name></member>
+      <member refid="structngf__offset3d_1ad8609d8a73704a938030ad9fcca2807b" prot="public" virt="non-virtual"><scope>ngf_offset3d</scope><name>z</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

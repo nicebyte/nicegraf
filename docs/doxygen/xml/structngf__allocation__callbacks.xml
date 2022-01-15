@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__allocation__callbacks" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_allocation_callbacks</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__allocation__callbacks_1a2b12dbf60ee4ffe87e9aa36ba8eab4a3" prot="public" static="no" mutable="no">
+        <type>void *(*</type>
+        <definition>void *(* ngf_allocation_callbacks::allocate) (size_t obj_size, size_t nobjs)</definition>
+        <argsstring>)(size_t obj_size, size_t nobjs)</argsstring>
+        <name>allocate</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>This callback shall allocate a region of memory that is able to fit <computeroutput>nobjs</computeroutput> objects of size <computeroutput>obj_size</computeroutput>, and return a pointer to the allocated region. The starting address of the allocated region shall have the largest alignment for the target platform. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="282" column="3" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="282" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__allocation__callbacks_1aee66d0310bac3009a04363624c50a3d4" prot="public" static="no" mutable="no">
+        <type>void(*</type>
+        <definition>void(* ngf_allocation_callbacks::free) (void *ptr, size_t obj_size, size_t nobjs)</definition>
+        <argsstring>)(void *ptr, size_t obj_size, size_t nobjs)</argsstring>
+        <name>free</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>This callback shall free a region allocated by the custom allocator. The count and size of objects in the region are supplied as additional parameters. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="288" column="3" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="288" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Specifies host memory allocation callbacks for the library&apos;s internal needs. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="275" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="275" bodyend="289"/>
+    <listofallmembers>
+      <member refid="structngf__allocation__callbacks_1a2b12dbf60ee4ffe87e9aa36ba8eab4a3" prot="public" virt="non-virtual"><scope>ngf_allocation_callbacks</scope><name>allocate</name></member>
+      <member refid="structngf__allocation__callbacks_1aee66d0310bac3009a04363624c50a3d4" prot="public" virt="non-virtual"><scope>ngf_allocation_callbacks</scope><name>free</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

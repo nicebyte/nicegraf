@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__buffer" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_buffer</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>An opaque handle to a buffer object. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1602" column="1"/>
+    <listofallmembers>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

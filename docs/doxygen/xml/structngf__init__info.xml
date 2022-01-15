@@ -1,0 +1,82 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__init__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_init_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__init__info_1a197468280e940f9b69e5013ccc232410" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__diagnostic__info" kindref="compound">ngf_diagnostic_info</ref> *</type>
+        <definition>const ngf_diagnostic_info* ngf_init_info::diag_info</definition>
+        <argsstring></argsstring>
+        <name>diag_info</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Pointer to a structure containing a diagnostic log configuration. If this pointer is set to <computeroutput>NULL</computeroutput>, no diagnostic callback shall be invoked. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="354" column="29" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="354" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__init__info_1a2e03925a39985824254e17f8d024192e" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__allocation__callbacks" kindref="compound">ngf_allocation_callbacks</ref> *</type>
+        <definition>const ngf_allocation_callbacks* ngf_init_info::allocation_callbacks</definition>
+        <argsstring></argsstring>
+        <name>allocation_callbacks</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Pointer to a structure specifying custom allocation callbacks, which the library shall use to manage CPU memory for internal use. If this pointer is set to <computeroutput>NULL</computeroutput>, standard malloc and free are used. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="361" column="34" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="361" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__init__info_1a5159cdedd9943cfadea3da7c7dc1bca8" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga93bf6330e6a48e0520aed9893ebc9f5e" kindref="member">ngf_device_handle</ref></type>
+        <definition>ngf_device_handle ngf_init_info::device</definition>
+        <argsstring></argsstring>
+        <name>device</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Handle for the rendering device that nicegraf shall execute rendering commands on. A list of available device and their handles can be obtained with ngf_enumerate_devices. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="367" column="21" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="367" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>nicegraf initialization parameters. See also: <ref refid="group__ngf_1ga067147fcb8d461a23c9099c0fea5b605" kindref="member">ngf_initialize</ref>. </para>
+    </detaileddescription>
+    <collaborationgraph>
+      <node id="3">
+        <label>ngf_allocation_callbacks</label>
+        <link refid="structngf__allocation__callbacks"/>
+      </node>
+      <node id="2">
+        <label>ngf_diagnostic_info</label>
+        <link refid="structngf__diagnostic__info"/>
+      </node>
+      <node id="1">
+        <label>ngf_init_info</label>
+        <link refid="structngf__init__info"/>
+        <childnode refid="2" relation="usage">
+          <edgelabel>diag_info</edgelabel>
+        </childnode>
+        <childnode refid="3" relation="usage">
+          <edgelabel>allocation_callbacks</edgelabel>
+        </childnode>
+      </node>
+    </collaborationgraph>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="349" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="349" bodyend="368"/>
+    <listofallmembers>
+      <member refid="structngf__init__info_1a2e03925a39985824254e17f8d024192e" prot="public" virt="non-virtual"><scope>ngf_init_info</scope><name>allocation_callbacks</name></member>
+      <member refid="structngf__init__info_1a5159cdedd9943cfadea3da7c7dc1bca8" prot="public" virt="non-virtual"><scope>ngf_init_info</scope><name>device</name></member>
+      <member refid="structngf__init__info_1a197468280e940f9b69e5013ccc232410" prot="public" virt="non-virtual"><scope>ngf_init_info</scope><name>diag_info</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,50 @@
+\hypertarget{structngf__resource__bind__op}{}\doxysection{ngf\+\_\+resource\+\_\+bind\+\_\+op Struct Reference}
+\label{structngf__resource__bind__op}\index{ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+uint32\+\_\+t \mbox{\hyperlink{structngf__resource__bind__op_a81eca061d071d5173d92bd39d761a491}{target\+\_\+set}}
+\item 
+uint32\+\_\+t \mbox{\hyperlink{structngf__resource__bind__op_a20de916237e3c2264441a537886158af}{target\+\_\+binding}}
+\item 
+\mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}} \mbox{\hyperlink{structngf__resource__bind__op_ab8038dfe27c568bc0d580eacbc22b2c4}{type}}
+\item 
+\begin{tabbing}
+xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=xx\=\kill
+union \{\\
+\>\mbox{\hyperlink{structngf__buffer__bind__info}{ngf\_buffer\_bind\_info}} {\bfseries buffer}\\
+\>\mbox{\hyperlink{structngf__image__sampler__bind__info}{ngf\_image\_sampler\_bind\_info}} {\bfseries image\_sampler}\\
+\} \mbox{\hyperlink{structngf__resource__bind__op_a75ffaf0281ee394591fb8ec2bc963553}{info}}\\
+
+\end{tabbing}\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Specifies a resource (image, buffer, etc.) bind operation, together with the target set and binding IDs. See ngf\+\_\+cmd\+\_\+bind\+\_\+resources for details. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__resource__bind__op_a75ffaf0281ee394591fb8ec2bc963553}\label{structngf__resource__bind__op_a75ffaf0281ee394591fb8ec2bc963553}} 
+\index{ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}!info@{info}}
+\index{info@{info}!ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}}
+\doxysubsubsection{\texorpdfstring{}{}}
+{\footnotesize\ttfamily union  \{ ... \}  ngf\+\_\+resource\+\_\+bind\+\_\+op\+::info}
+
+The details about the resource being bound, depending on type. \mbox{\Hypertarget{structngf__resource__bind__op_a20de916237e3c2264441a537886158af}\label{structngf__resource__bind__op_a20de916237e3c2264441a537886158af}} 
+\index{ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}!target\_binding@{target\_binding}}
+\index{target\_binding@{target\_binding}!ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}}
+\doxysubsubsection{\texorpdfstring{target\_binding}{target\_binding}}
+{\footnotesize\ttfamily uint32\+\_\+t ngf\+\_\+resource\+\_\+bind\+\_\+op\+::target\+\_\+binding}
+
+Target binding ID. \mbox{\Hypertarget{structngf__resource__bind__op_a81eca061d071d5173d92bd39d761a491}\label{structngf__resource__bind__op_a81eca061d071d5173d92bd39d761a491}} 
+\index{ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}!target\_set@{target\_set}}
+\index{target\_set@{target\_set}!ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}}
+\doxysubsubsection{\texorpdfstring{target\_set}{target\_set}}
+{\footnotesize\ttfamily uint32\+\_\+t ngf\+\_\+resource\+\_\+bind\+\_\+op\+::target\+\_\+set}
+
+Target set ID. \mbox{\Hypertarget{structngf__resource__bind__op_ab8038dfe27c568bc0d580eacbc22b2c4}\label{structngf__resource__bind__op_ab8038dfe27c568bc0d580eacbc22b2c4}} 
+\index{ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}!type@{type}}
+\index{type@{type}!ngf\_resource\_bind\_op@{ngf\_resource\_bind\_op}}
+\doxysubsubsection{\texorpdfstring{type}{type}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}} ngf\+\_\+resource\+\_\+bind\+\_\+op\+::type}
+
+The type of the resource being bound. 

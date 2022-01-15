@@ -1,0 +1,272 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__device__capabilities" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_device_capabilities</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__device__capabilities_1a437794f030cd5837276d3701a5706ad8" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::uniform_buffer_offset_alignment</definition>
+        <argsstring></argsstring>
+        <name>uniform_buffer_offset_alignment</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>When binding uniform buffers, the specified offset must be a multiple of this number. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="127" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="127" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ad353256dbb4fa4faa8ff993d411d8e93" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_uniform_buffer_range</definition>
+        <argsstring></argsstring>
+        <name>max_uniform_buffer_range</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>When binding a uniform buffer, the specified range must not exceed this value. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="133" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="133" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ab1d71ec2c35107fc7a739184916c2a32" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::texel_buffer_offset_alignment</definition>
+        <argsstring></argsstring>
+        <name>texel_buffer_offset_alignment</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>When binding texel buffers, the specified offset must be a multiple of this number. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="139" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="139" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ae220d989f581910d48209c75fa3ac00d" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_vertex_input_attributes_per_pipeline</definition>
+        <argsstring></argsstring>
+        <name>max_vertex_input_attributes_per_pipeline</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The maximum allowed number of vertex attributes per pipeline. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="144" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="144" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a11494fe0b1bfc902b728a6f0e3cb2bd3" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_sampled_images_per_stage</definition>
+        <argsstring></argsstring>
+        <name>max_sampled_images_per_stage</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The maximum allowed number of sampled images (textures) per single shader stage. Descriptors with type <ref refid="nicegraf_8h_1ga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3" kindref="member">NGF_DESCRIPTOR_IMAGE_AND_SAMPLER</ref> and <ref refid="nicegraf_8h_1ga8a0ef5b45413475065aa68cf8508b835ad51efeead738e9553ef2d7b9f9cf718f" kindref="member">NGF_DESCRIPTOR_TEXEL_BUFFER</ref> do count against this limit. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="151" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="151" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a3fa64c62b4ffc22435aa4c6d17a767c8" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_samplers_per_stage</definition>
+        <argsstring></argsstring>
+        <name>max_samplers_per_stage</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The maximum allowed number of sampler objects per single shader stage. Descriptors with type <ref refid="nicegraf_8h_1ga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3" kindref="member">NGF_DESCRIPTOR_IMAGE_AND_SAMPLER</ref> do count against this limit. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="158" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="158" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a95e179c90d630c3d04055da316d47ecc" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_uniform_buffers_per_stage</definition>
+        <argsstring></argsstring>
+        <name>max_uniform_buffers_per_stage</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The maximum allowed number of uniform buffers per single shader stage. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="163" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="163" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1af9eec61237998b919db9bd25d13e4349" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_fragment_input_components</definition>
+        <argsstring></argsstring>
+        <name>max_fragment_input_components</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>This is the maximum number of <emphasis>components</emphasis>, across all inputs, for the fragment stage. &quot;Input component&quot; refers to the individual components of an input vector. For example, if the fragment stage has a single float4 input (vector of 4 floats), then it has 4 input components. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="171" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="171" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1af9f9790741ee6e9aaf73f2c210f2e36f" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_fragment_inputs</definition>
+        <argsstring></argsstring>
+        <name>max_fragment_inputs</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>This is the maximum number of inputs for the fragment stage. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="176" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="176" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ae72788b2f2d139c2890c19c05cc84f48" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_1d_image_dimension</definition>
+        <argsstring></argsstring>
+        <name>max_1d_image_dimension</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum allowed width of a 1D image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="181" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="181" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a7db0d9009ba3c394d2eb12bd0ae60d02" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_2d_image_dimension</definition>
+        <argsstring></argsstring>
+        <name>max_2d_image_dimension</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum allowed width, or height of a 2D image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="186" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="186" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ab7b56e0a16a9c99acea26b9f86156a96" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_3d_image_dimension</definition>
+        <argsstring></argsstring>
+        <name>max_3d_image_dimension</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum allowed width, height, or depth of a 3D image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="192" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="192" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a9c9caebfe35f92c369dc0591556463fd" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_cube_image_dimension</definition>
+        <argsstring></argsstring>
+        <name>max_cube_image_dimension</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum allowed width, or height of a cubemap. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="197" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="197" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1a4831dbde2743c3b926607b01e73ea75a" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_image_layers</definition>
+        <argsstring></argsstring>
+        <name>max_image_layers</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum allowed number of layers in an image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="202" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="202" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1ab398c9d0f61992bed2daa69c17583497" prot="public" static="no" mutable="no">
+        <type>size_t</type>
+        <definition>size_t ngf_device_capabilities::max_color_attachments_per_pass</definition>
+        <argsstring></argsstring>
+        <name>max_color_attachments_per_pass</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Maximum number of color attachments that can be written to during a render pass. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="208" column="10" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="208" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1acd6a2b4e71509ffdb7ee15cd96ff1ecb" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_device_capabilities::max_sampler_anisotropy</definition>
+        <argsstring></argsstring>
+        <name>max_sampler_anisotropy</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The maximum degree of sampler anisotropy. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="213" column="9" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="213" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device__capabilities_1aa4a98c1432ceb5dda1d3ec2030aecfac" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_device_capabilities::clipspace_z_zero_to_one</definition>
+        <argsstring></argsstring>
+        <name>clipspace_z_zero_to_one</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>This flag is set to <computeroutput>true</computeroutput> if the platform supports [0; 1] range for the clip-space z coordinate. nicegraf enforces clip-space z to be in this range on all backends that support it. This ensures better precision for near-field objects. See the following for an in-depth explanation: <ulink url="http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized">http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized</ulink> </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="223" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="223" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Contains information about various device features, limits, etc. Clients shouldn&apos;t instantiate this structure. See <ref refid="group__ngf_1ga64f16281740125152672a7ce38f1a853" kindref="member">ngf_get_device_capabilities</ref>. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="122" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="122" bodyend="224"/>
+    <listofallmembers>
+      <member refid="structngf__device__capabilities_1aa4a98c1432ceb5dda1d3ec2030aecfac" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>clipspace_z_zero_to_one</name></member>
+      <member refid="structngf__device__capabilities_1ae72788b2f2d139c2890c19c05cc84f48" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_1d_image_dimension</name></member>
+      <member refid="structngf__device__capabilities_1a7db0d9009ba3c394d2eb12bd0ae60d02" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_2d_image_dimension</name></member>
+      <member refid="structngf__device__capabilities_1ab7b56e0a16a9c99acea26b9f86156a96" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_3d_image_dimension</name></member>
+      <member refid="structngf__device__capabilities_1ab398c9d0f61992bed2daa69c17583497" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_color_attachments_per_pass</name></member>
+      <member refid="structngf__device__capabilities_1a9c9caebfe35f92c369dc0591556463fd" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_cube_image_dimension</name></member>
+      <member refid="structngf__device__capabilities_1af9eec61237998b919db9bd25d13e4349" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_fragment_input_components</name></member>
+      <member refid="structngf__device__capabilities_1af9f9790741ee6e9aaf73f2c210f2e36f" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_fragment_inputs</name></member>
+      <member refid="structngf__device__capabilities_1a4831dbde2743c3b926607b01e73ea75a" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_image_layers</name></member>
+      <member refid="structngf__device__capabilities_1a11494fe0b1bfc902b728a6f0e3cb2bd3" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_sampled_images_per_stage</name></member>
+      <member refid="structngf__device__capabilities_1acd6a2b4e71509ffdb7ee15cd96ff1ecb" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_sampler_anisotropy</name></member>
+      <member refid="structngf__device__capabilities_1a3fa64c62b4ffc22435aa4c6d17a767c8" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_samplers_per_stage</name></member>
+      <member refid="structngf__device__capabilities_1ad353256dbb4fa4faa8ff993d411d8e93" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_uniform_buffer_range</name></member>
+      <member refid="structngf__device__capabilities_1a95e179c90d630c3d04055da316d47ecc" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_uniform_buffers_per_stage</name></member>
+      <member refid="structngf__device__capabilities_1ae220d989f581910d48209c75fa3ac00d" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>max_vertex_input_attributes_per_pipeline</name></member>
+      <member refid="structngf__device__capabilities_1ab1d71ec2c35107fc7a739184916c2a32" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>texel_buffer_offset_alignment</name></member>
+      <member refid="structngf__device__capabilities_1a437794f030cd5837276d3701a5706ad8" prot="public" virt="non-virtual"><scope>ngf_device_capabilities</scope><name>uniform_buffer_offset_alignment</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

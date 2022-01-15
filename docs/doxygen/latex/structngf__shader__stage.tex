@@ -1,0 +1,14 @@
+\hypertarget{structngf__shader__stage}{}\doxysection{ngf\+\_\+shader\+\_\+stage Struct Reference}
+\label{structngf__shader__stage}\index{ngf\_shader\_stage@{ngf\_shader\_stage}}
+
+
+\doxysubsection{Detailed Description}
+An opaque handle to a programmable stage of the rendering pipeline.
+
+Programmable stages are specified using backend-\/specific blobs of data, as described in the documentation for \mbox{\hyperlink{structngf__shader__stage__info_a456425c00d87d3c485135ce41d8db8b1}{ngf\+\_\+shader\+\_\+stage\+\_\+info\+::content}}.
+
+On platforms that require a compilation step at runtime, details about compile errors are reported via the debug callback mechanism.
+
+Shader stage objects are necessary for creating \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} objects, but once the pipelines have been created, the shader stages that had been used to create them can safely be disposed of.
+
+See also\+: \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}}, \mbox{\hyperlink{group__ngf_ga6b11af603327969158d78a1d7b63a402}{ngf\+\_\+create\+\_\+shader\+\_\+stage}}, \mbox{\hyperlink{group__ngf_ga4cdfd3d01bc3fad21af9eba68e3cb019}{ngf\+\_\+destroy\+\_\+shader\+\_\+stage}}. 

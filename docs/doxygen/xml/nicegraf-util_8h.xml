@@ -1,0 +1,175 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="nicegraf-util_8h" kind="file" language="C++">
+    <compoundname>nicegraf-util.h</compoundname>
+    <includes refid="nicegraf_8h" local="yes">nicegraf.h</includes>
+    <includes local="no">stdint.h</includes>
+    <incdepgraph>
+      <node id="1">
+        <label>C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h</label>
+        <link refid="nicegraf-util_8h"/>
+        <childnode refid="2" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="2">
+        <label>nicegraf.h</label>
+        <link refid="nicegraf_8h"/>
+        <childnode refid="3" relation="include">
+        </childnode>
+        <childnode refid="4" relation="include">
+        </childnode>
+        <childnode refid="5" relation="include">
+        </childnode>
+      </node>
+      <node id="3">
+        <label>stdbool.h</label>
+      </node>
+      <node id="4">
+        <label>stddef.h</label>
+      </node>
+      <node id="5">
+        <label>stdint.h</label>
+      </node>
+    </incdepgraph>
+    <innerclass refid="structngf__util__graphics__pipeline__data" prot="public">ngf_util_graphics_pipeline_data</innerclass>
+      <sectiondef kind="typedef">
+      <memberdef kind="typedef" id="nicegraf-util_8h_1a6528f043fad0c25ae9fa569c30d5f02f" prot="public" static="no">
+        <type>struct <ref refid="structngf__util__graphics__pipeline__data" kindref="compound">ngf_util_graphics_pipeline_data</ref></type>
+        <definition>typedef struct ngf_util_graphics_pipeline_data ngf_util_graphics_pipeline_data</definition>
+        <argsstring></argsstring>
+        <name>ngf_util_graphics_pipeline_data</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" line="56" column="33"/>
+      </memberdef>
+      </sectiondef>
+      <sectiondef kind="func">
+      <memberdef kind="function" id="group__ngf__util_1ga590a9f828a3b02e12ae66c25192becbf" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>void</type>
+        <definition>void ngf_util_create_default_graphics_pipeline_data</definition>
+        <argsstring>(ngf_util_graphics_pipeline_data *result)</argsstring>
+        <name>ngf_util_create_default_graphics_pipeline_data</name>
+        <param>
+          <type><ref refid="structngf__util__graphics__pipeline__data" kindref="compound">ngf_util_graphics_pipeline_data</ref> *</type>
+          <declname>result</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Creates configuration data for a graphics pipeline. The state is set to match OpenGL defaults and can be adjusted later. <parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>result</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>Pipeline configuration data will be stored here. </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" line="64" column="6" declfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" declline="64" declcolumn="6"/>
+      </memberdef>
+      <memberdef kind="function" id="group__ngf__util_1gaa86f3ddc74dd73157e7a7b54f9202cd7" prot="public" static="no" const="no" explicit="no" inline="no" virt="non-virtual">
+        <type>const char *</type>
+        <definition>const char * ngf_util_get_error_name</definition>
+        <argsstring>(const ngf_error err)</argsstring>
+        <name>ngf_util_get_error_name</name>
+        <param>
+          <type>const <ref refid="group__ngf_1ga0cf1ffd267fbb5a398934dc6827053ad" kindref="member">ngf_error</ref></type>
+          <declname>err</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Converts an error enum to a human-readable error string. <parameterlist kind="param"><parameteritem>
+<parameternamelist>
+<parametername>err</parametername>
+</parameternamelist>
+<parameterdescription>
+<para>The error enum to get the string for. </para>
+</parameterdescription>
+</parameteritem>
+</parameterlist>
+</para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" line="71" column="12" declfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" declline="71" declcolumn="12"/>
+      </memberdef>
+      <memberdef kind="function" id="group__ngf__util_1ga1114751ba96f5397ec42fca95c7948ed" prot="public" static="yes" const="no" explicit="no" inline="yes" virt="non-virtual">
+        <type>size_t</type>
+        <definition>static size_t ngf_util_align_size</definition>
+        <argsstring>(size_t value, size_t alignment)</argsstring>
+        <name>ngf_util_align_size</name>
+        <param>
+          <type>size_t</type>
+          <declname>value</declname>
+        </param>
+        <param>
+          <type>size_t</type>
+          <declname>alignment</declname>
+        </param>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Rounds <computeroutput>value</computeroutput> up to the nearest multiple of <computeroutput>alignment</computeroutput>. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" line="77" column="22" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h" bodystart="77" bodyend="80"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Copyright (c) 2021 nicegraf contributors</para>
+<para>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the &quot;Software&quot;), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:</para>
+<para>The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.</para>
+<para>THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. </para>
+    </detaileddescription>
+    <programlisting>
+<codeline lineno="1"><highlight class="normal"></highlight></codeline>
+<codeline lineno="23"><highlight class="normal"></highlight><highlight class="preprocessor">#pragma<sp/>once</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="24"><highlight class="normal"></highlight></codeline>
+<codeline lineno="25"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&quot;<ref refid="nicegraf_8h" kindref="compound">nicegraf.h</ref>&quot;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="26"><highlight class="normal"></highlight></codeline>
+<codeline lineno="27"><highlight class="normal"></highlight><highlight class="preprocessor">#include<sp/>&lt;stdint.h&gt;</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="28"><highlight class="normal"></highlight></codeline>
+<codeline lineno="36"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="37"><highlight class="normal"></highlight><highlight class="keyword">extern</highlight><highlight class="normal"><sp/></highlight><highlight class="stringliteral">&quot;C&quot;</highlight><highlight class="normal"><sp/>{</highlight></codeline>
+<codeline lineno="38"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="39"><highlight class="normal"></highlight></codeline>
+<codeline lineno="48" refid="structngf__util__graphics__pipeline__data" refkind="compound"><highlight class="normal"></highlight><highlight class="keyword">typedef</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">struct<sp/></highlight><highlight class="normal"><ref refid="structngf__util__graphics__pipeline__data" kindref="compound">ngf_util_graphics_pipeline_data</ref><sp/>{</highlight></codeline>
+<codeline lineno="49"><highlight class="normal"><sp/><sp/><ref refid="structngf__graphics__pipeline__info" kindref="compound">ngf_graphics_pipeline_info</ref><sp/>pipeline_info;</highlight></codeline>
+<codeline lineno="50"><highlight class="normal"><sp/><sp/><ref refid="structngf__blend__info" kindref="compound">ngf_blend_info</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/><sp/>blend_info;</highlight></codeline>
+<codeline lineno="51"><highlight class="normal"><sp/><sp/><ref refid="structngf__depth__stencil__info" kindref="compound">ngf_depth_stencil_info</ref><sp/><sp/><sp/><sp/><sp/>depth_stencil_info;</highlight></codeline>
+<codeline lineno="52"><highlight class="normal"><sp/><sp/><ref refid="structngf__vertex__input__info" kindref="compound">ngf_vertex_input_info</ref><sp/><sp/><sp/><sp/><sp/><sp/>vertex_input_info;</highlight></codeline>
+<codeline lineno="53"><highlight class="normal"><sp/><sp/><ref refid="structngf__multisample__info" kindref="compound">ngf_multisample_info</ref><sp/><sp/><sp/><sp/><sp/><sp/><sp/>multisample_info;</highlight></codeline>
+<codeline lineno="54"><highlight class="normal"><sp/><sp/><ref refid="structngf__rasterization__info" kindref="compound">ngf_rasterization_info</ref><sp/><sp/><sp/><sp/><sp/>rasterization_info;</highlight></codeline>
+<codeline lineno="55"><highlight class="normal"><sp/><sp/><ref refid="structngf__specialization__info" kindref="compound">ngf_specialization_info</ref><sp/><sp/><sp/><sp/>spec_info;</highlight></codeline>
+<codeline lineno="56"><highlight class="normal">}<sp/><ref refid="structngf__util__graphics__pipeline__data" kindref="compound">ngf_util_graphics_pipeline_data</ref>;</highlight></codeline>
+<codeline lineno="57"><highlight class="normal"></highlight></codeline>
+<codeline lineno="64" refid="group__ngf__util_1ga590a9f828a3b02e12ae66c25192becbf" refkind="member"><highlight class="normal"></highlight><highlight class="keywordtype">void</highlight><highlight class="normal"><sp/><ref refid="group__ngf__util_1ga590a9f828a3b02e12ae66c25192becbf" kindref="member">ngf_util_create_default_graphics_pipeline_data</ref>(<ref refid="structngf__util__graphics__pipeline__data" kindref="compound">ngf_util_graphics_pipeline_data</ref>*<sp/>result);</highlight></codeline>
+<codeline lineno="65"><highlight class="normal"></highlight></codeline>
+<codeline lineno="71" refid="group__ngf__util_1gaa86f3ddc74dd73157e7a7b54f9202cd7" refkind="member"><highlight class="normal"></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">char</highlight><highlight class="normal">*<sp/><ref refid="group__ngf__util_1gaa86f3ddc74dd73157e7a7b54f9202cd7" kindref="member">ngf_util_get_error_name</ref>(</highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/><ref refid="group__ngf_1ga0cf1ffd267fbb5a398934dc6827053ad" kindref="member">ngf_error</ref><sp/>err);</highlight></codeline>
+<codeline lineno="72"><highlight class="normal"></highlight></codeline>
+<codeline lineno="77"><highlight class="normal"></highlight><highlight class="keyword">static</highlight><highlight class="normal"><sp/></highlight><highlight class="keyword">inline</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>ngf_util_align_size(</highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>value,<sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>alignment)<sp/>{</highlight></codeline>
+<codeline lineno="78"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keyword">const</highlight><highlight class="normal"><sp/></highlight><highlight class="keywordtype">size_t</highlight><highlight class="normal"><sp/>m<sp/>=<sp/>value<sp/>%<sp/>alignment;</highlight></codeline>
+<codeline lineno="79"><highlight class="normal"><sp/><sp/><sp/><sp/></highlight><highlight class="keywordflow">return</highlight><highlight class="normal"><sp/>value<sp/>+<sp/>(m<sp/>&gt;<sp/>0<sp/>?<sp/>(alignment<sp/>-<sp/>m)<sp/>:<sp/>0u);</highlight></codeline>
+<codeline lineno="80"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="81"><highlight class="normal"></highlight></codeline>
+<codeline lineno="82"><highlight class="normal"></highlight><highlight class="preprocessor">#ifdef<sp/>__cplusplus</highlight><highlight class="normal"></highlight></codeline>
+<codeline lineno="83"><highlight class="normal">}</highlight></codeline>
+<codeline lineno="84"><highlight class="normal"></highlight><highlight class="preprocessor">#endif</highlight></codeline>
+    </programlisting>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf-util.h"/>
+  </compounddef>
+</doxygen>

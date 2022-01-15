@@ -1,0 +1,36 @@
+\hypertarget{structngf__init__info}{}\doxysection{ngf\+\_\+init\+\_\+info Struct Reference}
+\label{structngf__init__info}\index{ngf\_init\_info@{ngf\_init\_info}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+const \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}} $\ast$ \mbox{\hyperlink{structngf__init__info_a197468280e940f9b69e5013ccc232410}{diag\+\_\+info}}
+\item 
+const \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}} $\ast$ \mbox{\hyperlink{structngf__init__info_a2e03925a39985824254e17f8d024192e}{allocation\+\_\+callbacks}}
+\item 
+\mbox{\hyperlink{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}{ngf\+\_\+device\+\_\+handle}} \mbox{\hyperlink{structngf__init__info_a5159cdedd9943cfadea3da7c7dc1bca8}{device}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+nicegraf initialization parameters. See also\+: \mbox{\hyperlink{group__ngf_ga067147fcb8d461a23c9099c0fea5b605}{ngf\+\_\+initialize}}. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__init__info_a2e03925a39985824254e17f8d024192e}\label{structngf__init__info_a2e03925a39985824254e17f8d024192e}} 
+\index{ngf\_init\_info@{ngf\_init\_info}!allocation\_callbacks@{allocation\_callbacks}}
+\index{allocation\_callbacks@{allocation\_callbacks}!ngf\_init\_info@{ngf\_init\_info}}
+\doxysubsubsection{\texorpdfstring{allocation\_callbacks}{allocation\_callbacks}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}}$\ast$ ngf\+\_\+init\+\_\+info\+::allocation\+\_\+callbacks}
+
+Pointer to a structure specifying custom allocation callbacks, which the library shall use to manage CPU memory for internal use. If this pointer is set to {\ttfamily NULL}, standard malloc and free are used. \mbox{\Hypertarget{structngf__init__info_a5159cdedd9943cfadea3da7c7dc1bca8}\label{structngf__init__info_a5159cdedd9943cfadea3da7c7dc1bca8}} 
+\index{ngf\_init\_info@{ngf\_init\_info}!device@{device}}
+\index{device@{device}!ngf\_init\_info@{ngf\_init\_info}}
+\doxysubsubsection{\texorpdfstring{device}{device}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}{ngf\+\_\+device\+\_\+handle}} ngf\+\_\+init\+\_\+info\+::device}
+
+Handle for the rendering device that nicegraf shall execute rendering commands on. A list of available device and their handles can be obtained with ngf\+\_\+enumerate\+\_\+devices. \mbox{\Hypertarget{structngf__init__info_a197468280e940f9b69e5013ccc232410}\label{structngf__init__info_a197468280e940f9b69e5013ccc232410}} 
+\index{ngf\_init\_info@{ngf\_init\_info}!diag\_info@{diag\_info}}
+\index{diag\_info@{diag\_info}!ngf\_init\_info@{ngf\_init\_info}}
+\doxysubsubsection{\texorpdfstring{diag\_info}{diag\_info}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}}$\ast$ ngf\+\_\+init\+\_\+info\+::diag\+\_\+info}
+
+Pointer to a structure containing a diagnostic log configuration. If this pointer is set to {\ttfamily NULL}, no diagnostic callback shall be invoked. 

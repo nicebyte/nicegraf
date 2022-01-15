@@ -1,0 +1,44 @@
+\hypertarget{structngf__pass__info}{}\doxysection{ngf\+\_\+pass\+\_\+info Struct Reference}
+\label{structngf__pass__info}\index{ngf\_pass\_info@{ngf\_pass\_info}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} \mbox{\hyperlink{structngf__pass__info_afc2061744dff85090c9b9442348e1ee3}{render\+\_\+target}}
+\item 
+const \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}} $\ast$ \mbox{\hyperlink{structngf__pass__info_a70993c73dd5c52a663b726d64f2578f4}{load\+\_\+ops}}
+\item 
+const \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}} $\ast$ \mbox{\hyperlink{structngf__pass__info_a6e8e2baf391ed0f223e122e1357e2c13}{store\+\_\+ops}}
+\item 
+const \mbox{\hyperlink{unionngf__clear__info}{ngf\+\_\+clear}} $\ast$ \mbox{\hyperlink{structngf__pass__info_a2cd8c309f8f88a6c944ba2d947055e29}{clears}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Information required to begin a render pass. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__pass__info_a2cd8c309f8f88a6c944ba2d947055e29}\label{structngf__pass__info_a2cd8c309f8f88a6c944ba2d947055e29}} 
+\index{ngf\_pass\_info@{ngf\_pass\_info}!clears@{clears}}
+\index{clears@{clears}!ngf\_pass\_info@{ngf\_pass\_info}}
+\doxysubsubsection{\texorpdfstring{clears}{clears}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{unionngf__clear__info}{ngf\+\_\+clear}}$\ast$ ngf\+\_\+pass\+\_\+info\+::clears}
+
+If no attachment has a clear as its load op, this field may be NULL. Otherwise, it shall be a pointer to a buffer of ngf\+\_\+clear objects. The buffer must contain at least as many elements as there are attachments in the render target. The {\ttfamily i}th element of the buffer corresponds to the {\ttfamily i}th attachment. For attachments that are to be cleared at the beginning of the pass, the clear values from the corresponding element of the buffer are used. The rest of the buffer\textquotesingle{}s elements are ignored. \mbox{\Hypertarget{structngf__pass__info_a70993c73dd5c52a663b726d64f2578f4}\label{structngf__pass__info_a70993c73dd5c52a663b726d64f2578f4}} 
+\index{ngf\_pass\_info@{ngf\_pass\_info}!load\_ops@{load\_ops}}
+\index{load\_ops@{load\_ops}!ngf\_pass\_info@{ngf\_pass\_info}}
+\doxysubsubsection{\texorpdfstring{load\_ops}{load\_ops}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}}$\ast$ ngf\+\_\+pass\+\_\+info\+::load\+\_\+ops}
+
+A pointer to a buffer of ngf\+\_\+load\+\_\+op enumerators specifying the operation to perform at the start of the render pass for each attachment of \mbox{\hyperlink{structngf__pass__info_afc2061744dff85090c9b9442348e1ee3}{ngf\+\_\+pass\+\_\+info\+::render\+\_\+target}}. The buffer must have at least the same number of elements as there are attachments in the render target. The {\ttfamily i}th element of the buffer corresponds to the {\ttfamily i}th attachment. \mbox{\Hypertarget{structngf__pass__info_afc2061744dff85090c9b9442348e1ee3}\label{structngf__pass__info_afc2061744dff85090c9b9442348e1ee3}} 
+\index{ngf\_pass\_info@{ngf\_pass\_info}!render\_target@{render\_target}}
+\index{render\_target@{render\_target}!ngf\_pass\_info@{ngf\_pass\_info}}
+\doxysubsubsection{\texorpdfstring{render\_target}{render\_target}}
+{\footnotesize\ttfamily \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} ngf\+\_\+pass\+\_\+info\+::render\+\_\+target}
+
+A render target that shall be rendered to during this pass. \mbox{\Hypertarget{structngf__pass__info_a6e8e2baf391ed0f223e122e1357e2c13}\label{structngf__pass__info_a6e8e2baf391ed0f223e122e1357e2c13}} 
+\index{ngf\_pass\_info@{ngf\_pass\_info}!store\_ops@{store\_ops}}
+\index{store\_ops@{store\_ops}!ngf\_pass\_info@{ngf\_pass\_info}}
+\doxysubsubsection{\texorpdfstring{store\_ops}{store\_ops}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}}$\ast$ ngf\+\_\+pass\+\_\+info\+::store\+\_\+ops}
+
+A pointer to a buffer of ngf\+\_\+store\+\_\+op enumerators specifying the operation to perform at the end of the render pass for each attachment of \mbox{\hyperlink{structngf__pass__info_afc2061744dff85090c9b9442348e1ee3}{ngf\+\_\+pass\+\_\+info\+::render\+\_\+target}}. The buffer must have at least the same number of elements as there are attachments in the render target. The {\ttfamily i}th element of the buffer corresponds to the {\ttfamily i}th attachment. 

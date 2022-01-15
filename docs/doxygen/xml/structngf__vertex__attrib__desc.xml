@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__vertex__attrib__desc" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_vertex_attrib_desc</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1a7905e2e37431d97704078cf8f287747d" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_attrib_desc::location</definition>
+        <argsstring></argsstring>
+        <name>location</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Attribute index. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="954" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="954" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1aa198b1a350ac424f6fc8da97b36f95cd" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_attrib_desc::binding</definition>
+        <argsstring></argsstring>
+        <name>binding</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The index of the vertex attribute buffer binding to use. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="955" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="955" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1a4d2fa44886ec084563c00649155fff00" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_attrib_desc::offset</definition>
+        <argsstring></argsstring>
+        <name>offset</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset in the buffer at which attribute data starts. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="956" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="956" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1a5d069c3a0e233c219e08a32f4ae2af90" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga01261322d7ece98dce30b32c477f7ad8" kindref="member">ngf_type</ref></type>
+        <definition>ngf_type ngf_vertex_attrib_desc::type</definition>
+        <argsstring></argsstring>
+        <name>type</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Type of attribute component. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="957" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="957" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1a3fbb8ca822963ac24b5d3a0206184ced" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_vertex_attrib_desc::size</definition>
+        <argsstring></argsstring>
+        <name>size</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Number of attribute components. This value has to be between 1 and 4 (inclusive). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="958" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="958" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__vertex__attrib__desc_1a05eb03b9cf589b75bee25f4c7b68830e" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_vertex_attrib_desc::normalized</definition>
+        <argsstring></argsstring>
+        <name>normalized</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Whether the vertex stage sees the raw or normalized values for the attribute components. Only attribute components of types <ref refid="nicegraf_8h_1ga01261322d7ece98dce30b32c477f7ad8ab6a39e0a95eda430bfb729be90e02ae1" kindref="member">NGF_TYPE_INT8</ref>, <ref refid="nicegraf_8h_1ga01261322d7ece98dce30b32c477f7ad8a00304ae4b72b5a8a9ce4d946a3748558" kindref="member">NGF_TYPE_UINT8</ref>, <ref refid="nicegraf_8h_1ga01261322d7ece98dce30b32c477f7ad8a31996be448adf63b1c8d2a104ccf7c18" kindref="member">NGF_TYPE_INT16</ref> and <ref refid="nicegraf_8h_1ga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2" kindref="member">NGF_TYPE_UINT16</ref> can be normalized. For signed types, the values are scaled to the [-1; 1] floating point range, for unsigned types they are scaled to [0; 1]. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="967" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="967" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Specifies information about a vertex attribute. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="953" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="953" bodyend="968"/>
+    <listofallmembers>
+      <member refid="structngf__vertex__attrib__desc_1aa198b1a350ac424f6fc8da97b36f95cd" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>binding</name></member>
+      <member refid="structngf__vertex__attrib__desc_1a7905e2e37431d97704078cf8f287747d" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>location</name></member>
+      <member refid="structngf__vertex__attrib__desc_1a05eb03b9cf589b75bee25f4c7b68830e" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>normalized</name></member>
+      <member refid="structngf__vertex__attrib__desc_1a4d2fa44886ec084563c00649155fff00" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>offset</name></member>
+      <member refid="structngf__vertex__attrib__desc_1a3fbb8ca822963ac24b5d3a0206184ced" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>size</name></member>
+      <member refid="structngf__vertex__attrib__desc_1a5d069c3a0e233c219e08a32f4ae2af90" prot="public" virt="non-virtual"><scope>ngf_vertex_attrib_desc</scope><name>type</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

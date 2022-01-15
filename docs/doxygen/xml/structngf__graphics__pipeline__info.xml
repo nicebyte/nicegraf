@@ -1,0 +1,258 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__graphics__pipeline__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_graphics_pipeline_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a84e08fc201fb4fd5bbf678ab4394fe41" prot="public" static="no" mutable="no">
+        <type><ref refid="structngf__shader__stage" kindref="compound">ngf_shader_stage</ref></type>
+        <definition>ngf_shader_stage ngf_graphics_pipeline_info::shader_stages[5]</definition>
+        <argsstring>[5]</argsstring>
+        <name>shader_stages</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The programmable stages for this pipeline. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1213" column="33" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1213" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a2f3b3afa5af600c937e368a5c23db622" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_graphics_pipeline_info::nshader_stages</definition>
+        <argsstring></argsstring>
+        <name>nshader_stages</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The number of programmable stages involved. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1214" column="33" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1214" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a6d846494bdae52536765f6ee8a054721" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__rasterization__info" kindref="compound">ngf_rasterization_info</ref> *</type>
+        <definition>const ngf_rasterization_info* ngf_graphics_pipeline_info::rasterization</definition>
+        <argsstring></argsstring>
+        <name>rasterization</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the parameters for the rasterizer. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1215" column="32" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1215" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1aeb163b9636f9a7ef314c0b72b55b08df" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__multisample__info" kindref="compound">ngf_multisample_info</ref> *</type>
+        <definition>const ngf_multisample_info* ngf_graphics_pipeline_info::multisample</definition>
+        <argsstring></argsstring>
+        <name>multisample</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the parameters for multisampling. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1216" column="32" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1216" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a4e93be0384cb0e71f4cee44723f543e1" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__depth__stencil__info" kindref="compound">ngf_depth_stencil_info</ref> *</type>
+        <definition>const ngf_depth_stencil_info* ngf_graphics_pipeline_info::depth_stencil</definition>
+        <argsstring></argsstring>
+        <name>depth_stencil</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the parameters for depth and stencil testing. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1221" column="32" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1221" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a55db589774ca37f05b6b790107fda722" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__blend__info" kindref="compound">ngf_blend_info</ref> *</type>
+        <definition>const ngf_blend_info* ngf_graphics_pipeline_info::blend</definition>
+        <argsstring></argsstring>
+        <name>blend</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the parameters for blending. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1226" column="24" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1226" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a2d84a5bd465b303244683c38040e24f5" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__vertex__input__info" kindref="compound">ngf_vertex_input_info</ref> *</type>
+        <definition>const ngf_vertex_input_info* ngf_graphics_pipeline_info::input_info</definition>
+        <argsstring></argsstring>
+        <name>input_info</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies vertex attributes and vertex attribute buffer bindings. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1231" column="31" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1231" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a49ccdbb0d35ed05de3057ce413cf3663" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga20e33fb5d8991ca17974bb3963a1a9cd" kindref="member">ngf_primitive_topology</ref></type>
+        <definition>ngf_primitive_topology ngf_graphics_pipeline_info::primitive_topology</definition>
+        <argsstring></argsstring>
+        <name>primitive_topology</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The primitive topology used by this pipeline. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1233" column="26" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1233" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1a5e588eab1cb5241dbb61055d931a072a" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__specialization__info" kindref="compound">ngf_specialization_info</ref> *</type>
+        <definition>const ngf_specialization_info* ngf_graphics_pipeline_info::spec_info</definition>
+        <argsstring></argsstring>
+        <name>spec_info</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies the values for specialization constants (if any) used by the programmable stages. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1234" column="33" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1234" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__graphics__pipeline__info_1aa7d63bb915975296fc856eb9c9c40161" prot="public" static="no" mutable="no">
+        <type>const <ref refid="structngf__attachment__descriptions" kindref="compound">ngf_attachment_descriptions</ref> *</type>
+        <definition>const ngf_attachment_descriptions* ngf_graphics_pipeline_info::compatible_rt_attachment_descs</definition>
+        <argsstring></argsstring>
+        <name>compatible_rt_attachment_descs</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Describes which render targets compatible with this pipeline. A compatible render target must have the same number of attachments as specified in the list, with matching type, format and sample count. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1242" column="37" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1242" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Contains all information necessary for creating a graphics pipeline object. </para>
+    </detaileddescription>
+    <collaborationgraph>
+      <node id="13">
+        <label>ngf_attachment_description</label>
+        <link refid="structngf__attachment__description"/>
+      </node>
+      <node id="12">
+        <label>ngf_attachment_descriptions</label>
+        <link refid="structngf__attachment__descriptions"/>
+        <childnode refid="13" relation="usage">
+          <edgelabel>descs</edgelabel>
+        </childnode>
+      </node>
+      <node id="6">
+        <label>ngf_blend_info</label>
+        <link refid="structngf__blend__info"/>
+      </node>
+      <node id="11">
+        <label>ngf_constant_specialization</label>
+        <link refid="structngf__constant__specialization"/>
+      </node>
+      <node id="4">
+        <label>ngf_depth_stencil_info</label>
+        <link refid="structngf__depth__stencil__info"/>
+        <childnode refid="5" relation="usage">
+          <edgelabel>back_stencil</edgelabel>
+          <edgelabel>front_stencil</edgelabel>
+        </childnode>
+      </node>
+      <node id="1">
+        <label>ngf_graphics_pipeline_info</label>
+        <link refid="structngf__graphics__pipeline__info"/>
+        <childnode refid="2" relation="usage">
+          <edgelabel>rasterization</edgelabel>
+        </childnode>
+        <childnode refid="3" relation="usage">
+          <edgelabel>multisample</edgelabel>
+        </childnode>
+        <childnode refid="4" relation="usage">
+          <edgelabel>depth_stencil</edgelabel>
+        </childnode>
+        <childnode refid="6" relation="usage">
+          <edgelabel>blend</edgelabel>
+        </childnode>
+        <childnode refid="7" relation="usage">
+          <edgelabel>input_info</edgelabel>
+        </childnode>
+        <childnode refid="10" relation="usage">
+          <edgelabel>spec_info</edgelabel>
+        </childnode>
+        <childnode refid="12" relation="usage">
+          <edgelabel>compatible_rt_attachment_descs</edgelabel>
+        </childnode>
+      </node>
+      <node id="3">
+        <label>ngf_multisample_info</label>
+        <link refid="structngf__multisample__info"/>
+      </node>
+      <node id="2">
+        <label>ngf_rasterization_info</label>
+        <link refid="structngf__rasterization__info"/>
+      </node>
+      <node id="10">
+        <label>ngf_specialization_info</label>
+        <link refid="structngf__specialization__info"/>
+        <childnode refid="11" relation="usage">
+          <edgelabel>specializations</edgelabel>
+        </childnode>
+      </node>
+      <node id="5">
+        <label>ngf_stencil_info</label>
+        <link refid="structngf__stencil__info"/>
+      </node>
+      <node id="9">
+        <label>ngf_vertex_attrib_desc</label>
+        <link refid="structngf__vertex__attrib__desc"/>
+      </node>
+      <node id="8">
+        <label>ngf_vertex_buf_binding_desc</label>
+        <link refid="structngf__vertex__buf__binding__desc"/>
+      </node>
+      <node id="7">
+        <label>ngf_vertex_input_info</label>
+        <link refid="structngf__vertex__input__info"/>
+        <childnode refid="8" relation="usage">
+          <edgelabel>vert_buf_bindings</edgelabel>
+        </childnode>
+        <childnode refid="9" relation="usage">
+          <edgelabel>attribs</edgelabel>
+        </childnode>
+      </node>
+    </collaborationgraph>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1212" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1212" bodyend="1243"/>
+    <listofallmembers>
+      <member refid="structngf__graphics__pipeline__info_1a55db589774ca37f05b6b790107fda722" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>blend</name></member>
+      <member refid="structngf__graphics__pipeline__info_1aa7d63bb915975296fc856eb9c9c40161" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>compatible_rt_attachment_descs</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a4e93be0384cb0e71f4cee44723f543e1" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>depth_stencil</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a2d84a5bd465b303244683c38040e24f5" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>input_info</name></member>
+      <member refid="structngf__graphics__pipeline__info_1aeb163b9636f9a7ef314c0b72b55b08df" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>multisample</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a2f3b3afa5af600c937e368a5c23db622" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>nshader_stages</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a49ccdbb0d35ed05de3057ce413cf3663" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>primitive_topology</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a6d846494bdae52536765f6ee8a054721" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>rasterization</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a84e08fc201fb4fd5bbf678ab4394fe41" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>shader_stages</name></member>
+      <member refid="structngf__graphics__pipeline__info_1a5e588eab1cb5241dbb61055d931a072a" prot="public" virt="non-virtual"><scope>ngf_graphics_pipeline_info</scope><name>spec_info</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

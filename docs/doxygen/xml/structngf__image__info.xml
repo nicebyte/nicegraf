@@ -1,0 +1,120 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__image__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_image_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__image__info_1a875ac68b3236fc1ddd6db493eecdd586" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga6c69d697d500e6f85fd9b3fe003f177b" kindref="member">ngf_image_type</ref></type>
+        <definition>ngf_image_type ngf_image_info::type</definition>
+        <argsstring></argsstring>
+        <name>type</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The image type. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1382" column="18" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1382" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__image__info_1a23e234b5bebbac0e67f27ddf61d08b4f" prot="public" static="no" mutable="no">
+        <type><ref refid="structngf__extent3d" kindref="compound">ngf_extent3d</ref></type>
+        <definition>ngf_extent3d ngf_image_info::extent</definition>
+        <argsstring></argsstring>
+        <name>extent</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The width, height and depth (for 3d images) or no. of layers (for layered images). </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1383" column="18" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1383" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__image__info_1abc18173bdb7298536836d8fe28d5c1f2" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_image_info::nmips</definition>
+        <argsstring></argsstring>
+        <name>nmips</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The number of mip levels in the image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1385" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1385" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__image__info_1a61e2aa559392820d3b7175205102a0c0" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga48bf7488f4d5c9421491c8c0b955132a" kindref="member">ngf_image_format</ref></type>
+        <definition>ngf_image_format ngf_image_info::format</definition>
+        <argsstring></argsstring>
+        <name>format</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Internal format. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1386" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1386" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__image__info_1ae0930882e4128bbdff1265d49e87f8ca" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga99d00b2bf653c4605c4c505275e6536f" kindref="member">ngf_sample_count</ref></type>
+        <definition>ngf_sample_count ngf_image_info::sample_count</definition>
+        <argsstring></argsstring>
+        <name>sample_count</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The number of samples per pixel in the image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1387" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1387" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__image__info_1abbb4c06625098aabaa5f837662d0825b" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_image_info::usage_hint</definition>
+        <argsstring></argsstring>
+        <name>usage_hint</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies how the client intends to use the image. Must be a combination of image usage flags. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1388" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1388" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Information required to create an image object. </para>
+    </detaileddescription>
+    <collaborationgraph>
+      <node id="2">
+        <label>ngf_extent3d</label>
+        <link refid="structngf__extent3d"/>
+      </node>
+      <node id="1">
+        <label>ngf_image_info</label>
+        <link refid="structngf__image__info"/>
+        <childnode refid="2" relation="usage">
+          <edgelabel>extent</edgelabel>
+        </childnode>
+      </node>
+    </collaborationgraph>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1381" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1381" bodyend="1390"/>
+    <listofallmembers>
+      <member refid="structngf__image__info_1a23e234b5bebbac0e67f27ddf61d08b4f" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>extent</name></member>
+      <member refid="structngf__image__info_1a61e2aa559392820d3b7175205102a0c0" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>format</name></member>
+      <member refid="structngf__image__info_1abc18173bdb7298536836d8fe28d5c1f2" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>nmips</name></member>
+      <member refid="structngf__image__info_1ae0930882e4128bbdff1265d49e87f8ca" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>sample_count</name></member>
+      <member refid="structngf__image__info_1a875ac68b3236fc1ddd6db493eecdd586" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>type</name></member>
+      <member refid="structngf__image__info_1abbb4c06625098aabaa5f837662d0825b" prot="public" virt="non-virtual"><scope>ngf_image_info</scope><name>usage_hint</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

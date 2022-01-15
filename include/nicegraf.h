@@ -2689,16 +2689,37 @@ void ngf_cmd_bind_resources(
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ * 
+ * Binds a vertex attribute buffer to be used in the next draw.
+ * 
+ * @param enc The handle to the render encoder.
+ * @param vbuf The handle to the vertex buffer to bind.
+ * @param binding The vertex buffer binding ID to bind the buffer to.
+ * @param offset The offset (in bytes) to bind at.
+ */
 void ngf_cmd_bind_attrib_buffer(
-    ngf_render_encoder buf,
+    ngf_render_encoder enc,
     const ngf_buffer   vbuf,
     uint32_t           binding,
     uint32_t           offset) NGF_NOEXCEPT;
-void ngf_cmd_bind_index_buffer(ngf_render_encoder buf, const ngf_buffer idxbuf, ngf_type index_type)
+
+/**
+ * \ingroup ngf
+ * 
+ * Binds an index buffer to be used in the next draw.
+ * 
+ * @param enc The handle to the render encoder.
+ * @param idxbuf The handle to the index buffer to bind.
+ * @param index_type The type of values that are stored in the index buffer. Can be either \ref
+ *                   NGF_TYPE_UINT32 or \ref NGF_TYPE_UINT16.
+ */
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer idxbuf, ngf_type index_type)
     NGF_NOEXCEPT;
 
 /**
- * Execute a draw call.
+ * Executes a draw.
  */
 void ngf_cmd_draw(
     ngf_render_encoder buf,

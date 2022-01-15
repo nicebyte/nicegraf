@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__device" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_device</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__device_1aaf316d6d127c87c9007a9cb7d9258db8" prot="public" static="no" mutable="no">
+        <type><ref refid="nicegraf_8h_1a14ee1c4e867d874070b50141dabad8dc" kindref="member">ngf_device_performance_tier</ref></type>
+        <definition>ngf_device_performance_tier ngf_device::performance_tier</definition>
+        <argsstring></argsstring>
+        <name>performance_tier</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Device&apos;s performance tier. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="333" column="31" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="333" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device_1a8e57f232fa3c5be018f6fe333bc277dd" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga93bf6330e6a48e0520aed9893ebc9f5e" kindref="member">ngf_device_handle</ref></type>
+        <definition>ngf_device_handle ngf_device::handle</definition>
+        <argsstring></argsstring>
+        <name>handle</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>A handle to be passed to <ref refid="group__ngf_1ga067147fcb8d461a23c9099c0fea5b605" kindref="member">ngf_initialize</ref>. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="334" column="31" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="334" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device_1ab7a9a4c4fe4c8edf6f1ea55c84cb7a6e" prot="public" static="no" mutable="no">
+        <type>char</type>
+        <definition>char ngf_device::name[NGF_DEVICE_NAME_MAX_LENGTH]</definition>
+        <argsstring>[NGF_DEVICE_NAME_MAX_LENGTH]</argsstring>
+        <name>name</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>A string associated with the device. This is <emphasis>not</emphasis> guaranteed to be unique per device. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="339" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="339" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__device_1a52e729c46b9e151745560eaf07393a87" prot="public" static="no" mutable="no">
+        <type><ref refid="structngf__device__capabilities" kindref="compound">ngf_device_capabilities</ref></type>
+        <definition>ngf_device_capabilities ngf_device::capabilities</definition>
+        <argsstring></argsstring>
+        <name>capabilities</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Device capabilities and limits. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="341" column="27" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="341" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Information about a rendering device. See also: <ref refid="group__ngf_1gab6fafd98f49fbcb76304780874986332" kindref="member">ngf_get_device_list</ref> </para>
+    </detaileddescription>
+    <collaborationgraph>
+      <node id="1">
+        <label>ngf_device</label>
+        <link refid="structngf__device"/>
+        <childnode refid="2" relation="usage">
+          <edgelabel>capabilities</edgelabel>
+        </childnode>
+      </node>
+      <node id="2">
+        <label>ngf_device_capabilities</label>
+        <link refid="structngf__device__capabilities"/>
+      </node>
+    </collaborationgraph>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="332" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="332" bodyend="342"/>
+    <listofallmembers>
+      <member refid="structngf__device_1a52e729c46b9e151745560eaf07393a87" prot="public" virt="non-virtual"><scope>ngf_device</scope><name>capabilities</name></member>
+      <member refid="structngf__device_1a8e57f232fa3c5be018f6fe333bc277dd" prot="public" virt="non-virtual"><scope>ngf_device</scope><name>handle</name></member>
+      <member refid="structngf__device_1ab7a9a4c4fe4c8edf6f1ea55c84cb7a6e" prot="public" virt="non-virtual"><scope>ngf_device</scope><name>name</name></member>
+      <member refid="structngf__device_1aaf316d6d127c87c9007a9cb7d9258db8" prot="public" virt="non-virtual"><scope>ngf_device</scope><name>performance_tier</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__shader__stage" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_shader_stage</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>A programmable stage of the rendering pipeline.</para>
+<para>Programmable stages are specified using backend-specific blobs of data, as described in the documentation for <ref refid="structngf__shader__stage__info_1a456425c00d87d3c485135ce41d8db8b1" kindref="member">ngf_shader_stage_info::content</ref>.</para>
+<para>On platforms that require a compilation step at runtime, details about compile errors are reported via the debug callback mechanism.</para>
+<para>Shader stage objects are necessary for creating <ref refid="structngf__graphics__pipeline" kindref="compound">ngf_graphics_pipeline</ref> objects, but once the pipelines have been created, the shader stages that had been used to create them can safely be disposed of.</para>
+<para>See also: <ref refid="structngf__shader__stage__info" kindref="compound">ngf_shader_stage_info</ref>, <ref refid="group__ngf_1ga6b11af603327969158d78a1d7b63a402" kindref="member">ngf_create_shader_stage</ref>, <ref refid="group__ngf_1ga4cdfd3d01bc3fad21af9eba68e3cb019" kindref="member">ngf_destroy_shader_stage</ref>. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="502" column="1"/>
+    <listofallmembers>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

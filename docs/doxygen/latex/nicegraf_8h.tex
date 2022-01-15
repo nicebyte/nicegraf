@@ -1,0 +1,1067 @@
+\hypertarget{nicegraf_8h}{}\doxysection{C\+:/\+Users/nicebyte/home/\+TERMINAL/nicegraf/include/nicegraf.h File Reference}
+\label{nicegraf_8h}\index{C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h@{C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h}}
+
+
+nicegraf declarations.  
+
+
+{\ttfamily \#include $<$stdbool.\+h$>$}\newline
+{\ttfamily \#include $<$stddef.\+h$>$}\newline
+{\ttfamily \#include $<$stdint.\+h$>$}\newline
+\doxysubsection*{Data Structures}
+\begin{DoxyCompactItemize}
+\item 
+struct \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}}
+\item 
+struct \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}}
+\item 
+struct \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}}
+\item 
+struct \mbox{\hyperlink{structngf__init__info}{ngf\+\_\+init\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}}
+\item 
+struct \mbox{\hyperlink{structngf__extent3d}{ngf\+\_\+extent3d}}
+\item 
+struct \mbox{\hyperlink{structngf__offset3d}{ngf\+\_\+offset3d}}
+\item 
+struct \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__depth__stencil__info}{ngf\+\_\+depth\+\_\+stencil\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__blend__info}{ngf\+\_\+blend\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__buf__binding__desc}{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__attrib__desc}{ngf\+\_\+vertex\+\_\+attrib\+\_\+desc}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__input__info}{ngf\+\_\+vertex\+\_\+input\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__multisample__info}{ngf\+\_\+multisample\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__attachment__description}{ngf\+\_\+attachment\+\_\+description}}
+\item 
+struct \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}}
+\item 
+struct \mbox{\hyperlink{structngf__constant__specialization}{ngf\+\_\+constant\+\_\+specialization}}
+\item 
+struct \mbox{\hyperlink{structngf__specialization__info}{ngf\+\_\+specialization\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__image__ref}{ngf\+\_\+image\+\_\+ref}}
+\item 
+struct \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{unionngf__clear__info}{ngf\+\_\+clear\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__buffer__bind__info}{ngf\+\_\+buffer\+\_\+bind\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__image__sampler__bind__info}{ngf\+\_\+image\+\_\+sampler\+\_\+bind\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}}
+\item 
+struct \mbox{\hyperlink{structngf__swapchain__info}{ngf\+\_\+swapchain\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}
+\item 
+struct \mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}
+\end{DoxyCompactItemize}
+\doxysubsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aba21aa43b6748e10b4dcba1b05a447a5}\label{nicegraf_8h_aba21aa43b6748e10b4dcba1b05a447a5}} 
+\#define {\bfseries NGF\+\_\+\+NOEXCEPT}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a6d44f4a28e30752969d7904c58428df4}\label{nicegraf_8h_a6d44f4a28e30752969d7904c58428df4}} 
+\#define {\bfseries NGF\+\_\+\+VER\+\_\+\+MAJ}~0
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa64d8c5b01772b7218f9dc116ffcca3e}\label{nicegraf_8h_aa64d8c5b01772b7218f9dc116ffcca3e}} 
+\#define {\bfseries NGF\+\_\+\+VER\+\_\+\+MIN}~0
+\item 
+\#define \mbox{\hyperlink{nicegraf_8h_a9222768b37347e17f3575c4d57a9388d}{NGF\+\_\+\+DEVICE\+\_\+\+LIMIT\+\_\+\+UNKNOWN}}~($\sim$0u)
+\item 
+\#define \mbox{\hyperlink{group__ngf_gab2cb27fa97957925fc471eb90633d756}{NGF\+\_\+\+DEVICE\+\_\+\+NAME\+\_\+\+MAX\+\_\+\+LENGTH}}~(256u)
+\end{DoxyCompactItemize}
+\doxysubsection*{Typedefs}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aefc00baa68657fe4a6ac789811058984}\label{nicegraf_8h_aefc00baa68657fe4a6ac789811058984}} 
+typedef struct \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} {\bfseries ngf\+\_\+device\+\_\+capabilities}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a8b12d1f619f7d9bfbfae9d9fb844f983}\label{nicegraf_8h_a8b12d1f619f7d9bfbfae9d9fb844f983}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}{ngf\+\_\+diagnostic\+\_\+log\+\_\+verbosity}} {\bfseries ngf\+\_\+diagnostic\+\_\+log\+\_\+verbosity}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad80591fa31c9f336be4f05b95655be96}\label{nicegraf_8h_ad80591fa31c9f336be4f05b95655be96}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}} {\bfseries ngf\+\_\+diagnostic\+\_\+message\+\_\+type}
+\item 
+typedef void($\ast$ \mbox{\hyperlink{nicegraf_8h_a4768a37f8f3eca04d3e787f6ebcdcf10}{ngf\+\_\+diagnostic\+\_\+callback}}) (\mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}}, void $\ast$, const char $\ast$,...)
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a69cd8c1204d5bec92333d189b1c9063d}\label{nicegraf_8h_a69cd8c1204d5bec92333d189b1c9063d}} 
+typedef struct \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}} {\bfseries ngf\+\_\+diagnostic\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a1422034ecacce861a180983ad7e96175}\label{nicegraf_8h_a1422034ecacce861a180983ad7e96175}} 
+typedef struct \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}} {\bfseries ngf\+\_\+allocation\+\_\+callbacks}
+\item 
+typedef uint32\+\_\+t \mbox{\hyperlink{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}{ngf\+\_\+device\+\_\+handle}}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a9811a2a2ebd85935ea28c9f93e7452d6}\label{nicegraf_8h_a9811a2a2ebd85935ea28c9f93e7452d6}} 
+typedef enum \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dc}{ngf\+\_\+device\+\_\+performance\+\_\+tier}} {\bfseries ngf\+\_\+device\+\_\+performance\+\_\+tier}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a3d014e852d98cb33434292891f63bbd7}\label{nicegraf_8h_a3d014e852d98cb33434292891f63bbd7}} 
+typedef struct \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}} {\bfseries ngf\+\_\+device}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a4d414cd3f4d9b3695f7cbe6d428283a4}\label{nicegraf_8h_a4d414cd3f4d9b3695f7cbe6d428283a4}} 
+typedef struct \mbox{\hyperlink{structngf__init__info}{ngf\+\_\+init\+\_\+info}} {\bfseries ngf\+\_\+init\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ac66d065bc0c6daefc9b564e23bf46a19}\label{nicegraf_8h_ac66d065bc0c6daefc9b564e23bf46a19}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} {\bfseries ngf\+\_\+error}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a858cb3cb6593994c3a25b851f008bcdf}\label{nicegraf_8h_a858cb3cb6593994c3a25b851f008bcdf}} 
+typedef struct \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} {\bfseries ngf\+\_\+irect2d}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a68f70aa1b50443d1f7403f89826eb4b2}\label{nicegraf_8h_a68f70aa1b50443d1f7403f89826eb4b2}} 
+typedef struct \mbox{\hyperlink{structngf__extent3d}{ngf\+\_\+extent3d}} {\bfseries ngf\+\_\+extent3d}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a60799e2a10abada621274736b4c1371c}\label{nicegraf_8h_a60799e2a10abada621274736b4c1371c}} 
+typedef struct \mbox{\hyperlink{structngf__offset3d}{ngf\+\_\+offset3d}} {\bfseries ngf\+\_\+offset3d}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a41c3df7c63e5fdd863aca85355be2f7e}\label{nicegraf_8h_a41c3df7c63e5fdd863aca85355be2f7e}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}{ngf\+\_\+stage\+\_\+type}} {\bfseries ngf\+\_\+stage\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_af85b53047a3185451ae368ae10134f37}\label{nicegraf_8h_af85b53047a3185451ae368ae10134f37}} 
+typedef struct \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}} {\bfseries ngf\+\_\+shader\+\_\+stage\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a734e3135dc9f3a5aa2918b1298ea1549}\label{nicegraf_8h_a734e3135dc9f3a5aa2918b1298ea1549}} 
+typedef struct ngf\+\_\+shader\+\_\+stage\+\_\+t $\ast$ {\bfseries ngf\+\_\+shader\+\_\+stage}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ab4e0fc0d0faaa0f2513a9fa9a6fca41c}\label{nicegraf_8h_ab4e0fc0d0faaa0f2513a9fa9a6fca41c}} 
+typedef enum \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517}{ngf\+\_\+polygon\+\_\+mode}} {\bfseries ngf\+\_\+polygon\+\_\+mode}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a71b13091a21cebf76a92c50e8d035c2e}\label{nicegraf_8h_a71b13091a21cebf76a92c50e8d035c2e}} 
+typedef enum \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}{ngf\+\_\+cull\+\_\+mode}} {\bfseries ngf\+\_\+cull\+\_\+mode}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a35cdff88e28e4769ffc9bd3fe3c1a51d}\label{nicegraf_8h_a35cdff88e28e4769ffc9bd3fe3c1a51d}} 
+typedef enum \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714}{ngf\+\_\+front\+\_\+face\+\_\+mode}} {\bfseries ngf\+\_\+front\+\_\+face\+\_\+mode}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a88b01fcddfd67e76ba7d2368734a561a}\label{nicegraf_8h_a88b01fcddfd67e76ba7d2368734a561a}} 
+typedef struct \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}} {\bfseries ngf\+\_\+rasterization\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a3963602f1fd9612f81e203b04eb45e97}\label{nicegraf_8h_a3963602f1fd9612f81e203b04eb45e97}} 
+typedef enum \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}} {\bfseries ngf\+\_\+compare\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a6cb0ea4adae4c5f1307eea935de1b0cd}\label{nicegraf_8h_a6cb0ea4adae4c5f1307eea935de1b0cd}} 
+typedef enum \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}{ngf\+\_\+stencil\+\_\+op}} {\bfseries ngf\+\_\+stencil\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a3e8ecfadc6422d44c4cc071564899ab1}\label{nicegraf_8h_a3e8ecfadc6422d44c4cc071564899ab1}} 
+typedef struct \mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}} {\bfseries ngf\+\_\+stencil\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_acb32e29d09c66b4954cba78f94b6b5fd}\label{nicegraf_8h_acb32e29d09c66b4954cba78f94b6b5fd}} 
+typedef struct \mbox{\hyperlink{structngf__depth__stencil__info}{ngf\+\_\+depth\+\_\+stencil\+\_\+info}} {\bfseries ngf\+\_\+depth\+\_\+stencil\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a487b3961ff9bf0f1279cf91a879c8211}\label{nicegraf_8h_a487b3961ff9bf0f1279cf91a879c8211}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} {\bfseries ngf\+\_\+blend\+\_\+factor}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a06776c7885646d0fd792062e390ec183}\label{nicegraf_8h_a06776c7885646d0fd792062e390ec183}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} {\bfseries ngf\+\_\+blend\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aeedb35dd3cbda274b1b7f27bc35ffd57}\label{nicegraf_8h_aeedb35dd3cbda274b1b7f27bc35ffd57}} 
+typedef struct \mbox{\hyperlink{structngf__blend__info}{ngf\+\_\+blend\+\_\+info}} {\bfseries ngf\+\_\+blend\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a0556d84c38e2d173662d46828a7e2e94}\label{nicegraf_8h_a0556d84c38e2d173662d46828a7e2e94}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}} {\bfseries ngf\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ab89ab575a418d9c03b4f51167accbb23}\label{nicegraf_8h_ab89ab575a418d9c03b4f51167accbb23}} 
+typedef enum \mbox{\hyperlink{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2}{ngf\+\_\+vertex\+\_\+input\+\_\+rate}} {\bfseries ngf\+\_\+vertex\+\_\+input\+\_\+rate}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa4f3b7707dcc90d6472da8722d9835e5}\label{nicegraf_8h_aa4f3b7707dcc90d6472da8722d9835e5}} 
+typedef struct \mbox{\hyperlink{structngf__vertex__buf__binding__desc}{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc}} {\bfseries ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a04e1406791ade3c6b8125dec79fc2d61}\label{nicegraf_8h_a04e1406791ade3c6b8125dec79fc2d61}} 
+typedef struct \mbox{\hyperlink{structngf__vertex__attrib__desc}{ngf\+\_\+vertex\+\_\+attrib\+\_\+desc}} {\bfseries ngf\+\_\+vertex\+\_\+attrib\+\_\+desc}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad9ed96dd86b8560e07ed55e97520040d}\label{nicegraf_8h_ad9ed96dd86b8560e07ed55e97520040d}} 
+typedef struct \mbox{\hyperlink{structngf__vertex__input__info}{ngf\+\_\+vertex\+\_\+input\+\_\+info}} {\bfseries ngf\+\_\+vertex\+\_\+input\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a57a38b95126e955b67072968ac1d7917}\label{nicegraf_8h_a57a38b95126e955b67072968ac1d7917}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}{ngf\+\_\+sample\+\_\+count}} {\bfseries ngf\+\_\+sample\+\_\+count}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ac3b58c93e0f49289c01eacae81cb0b6c}\label{nicegraf_8h_ac3b58c93e0f49289c01eacae81cb0b6c}} 
+typedef struct \mbox{\hyperlink{structngf__multisample__info}{ngf\+\_\+multisample\+\_\+info}} {\bfseries ngf\+\_\+multisample\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a09e3643a881b7b0a2b11ff9cca3e1643}\label{nicegraf_8h_a09e3643a881b7b0a2b11ff9cca3e1643}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}{ngf\+\_\+image\+\_\+format}} {\bfseries ngf\+\_\+image\+\_\+format}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_af9a1a1ccf5dde49ab327a6401697f329}\label{nicegraf_8h_af9a1a1ccf5dde49ab327a6401697f329}} 
+typedef enum \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}{ngf\+\_\+attachment\+\_\+type}} {\bfseries ngf\+\_\+attachment\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a12ea903a36c4073e2c4136448c52c174}\label{nicegraf_8h_a12ea903a36c4073e2c4136448c52c174}} 
+typedef struct \mbox{\hyperlink{structngf__attachment__description}{ngf\+\_\+attachment\+\_\+description}} {\bfseries ngf\+\_\+attachment\+\_\+description}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a974deb0317762c07b9bf1352fb720143}\label{nicegraf_8h_a974deb0317762c07b9bf1352fb720143}} 
+typedef struct \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}} {\bfseries ngf\+\_\+attachment\+\_\+descriptions}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a47efcbaf77e37a69af3d5d84c13ef15d}\label{nicegraf_8h_a47efcbaf77e37a69af3d5d84c13ef15d}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}{ngf\+\_\+primitive\+\_\+topology}} {\bfseries ngf\+\_\+primitive\+\_\+topology}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aeaa9d81e1b80440f752a7ae2c534d4dc}\label{nicegraf_8h_aeaa9d81e1b80440f752a7ae2c534d4dc}} 
+typedef struct \mbox{\hyperlink{structngf__constant__specialization}{ngf\+\_\+constant\+\_\+specialization}} {\bfseries ngf\+\_\+constant\+\_\+specialization}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_af8b206cbcd3704a1279a1e13080cb0ba}\label{nicegraf_8h_af8b206cbcd3704a1279a1e13080cb0ba}} 
+typedef struct \mbox{\hyperlink{structngf__specialization__info}{ngf\+\_\+specialization\+\_\+info}} {\bfseries ngf\+\_\+specialization\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a855122142366b36b967c05f7e3652da6}\label{nicegraf_8h_a855122142366b36b967c05f7e3652da6}} 
+typedef struct \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}} {\bfseries ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a0f04400d39d5dfca17e9c6ee08b09ca3}\label{nicegraf_8h_a0f04400d39d5dfca17e9c6ee08b09ca3}} 
+typedef struct ngf\+\_\+graphics\+\_\+pipeline\+\_\+t $\ast$ {\bfseries ngf\+\_\+graphics\+\_\+pipeline}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ac85c7f97c979dbe58d040abc14f63854}\label{nicegraf_8h_ac85c7f97c979dbe58d040abc14f63854}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}} {\bfseries ngf\+\_\+descriptor\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a864bd64c4f18f96e87be580e39ea1a8b}\label{nicegraf_8h_a864bd64c4f18f96e87be580e39ea1a8b}} 
+typedef enum \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283f}{ngf\+\_\+sampler\+\_\+filter}} {\bfseries ngf\+\_\+sampler\+\_\+filter}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad039ca8a82bfde70af148d19206f255e}\label{nicegraf_8h_ad039ca8a82bfde70af148d19206f255e}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}{ngf\+\_\+sampler\+\_\+wrap\+\_\+mode}} {\bfseries ngf\+\_\+sampler\+\_\+wrap\+\_\+mode}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a382b2bf7590c62ae8316c006dcc57251}\label{nicegraf_8h_a382b2bf7590c62ae8316c006dcc57251}} 
+typedef struct \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}} {\bfseries ngf\+\_\+sampler\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_abcd7b13c8aa92c079a119aab8cd900b9}\label{nicegraf_8h_abcd7b13c8aa92c079a119aab8cd900b9}} 
+typedef struct ngf\+\_\+sampler\+\_\+t $\ast$ {\bfseries ngf\+\_\+sampler}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aec3063b190839258997d5b3ff6830282}\label{nicegraf_8h_aec3063b190839258997d5b3ff6830282}} 
+typedef enum \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173}{ngf\+\_\+image\+\_\+usage}} {\bfseries ngf\+\_\+image\+\_\+usage}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a8315bff2050d0a7bc606d75cc167ea21}\label{nicegraf_8h_a8315bff2050d0a7bc606d75cc167ea21}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}{ngf\+\_\+image\+\_\+type}} {\bfseries ngf\+\_\+image\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa9051356d7b497018c23985df89d7534}\label{nicegraf_8h_aa9051356d7b497018c23985df89d7534}} 
+typedef struct \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}} {\bfseries ngf\+\_\+image\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a619203aebd69defff34e5214f6a64294}\label{nicegraf_8h_a619203aebd69defff34e5214f6a64294}} 
+typedef struct ngf\+\_\+image\+\_\+t $\ast$ {\bfseries ngf\+\_\+image}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a9726ec155851dbc23f737bcb68998a89}\label{nicegraf_8h_a9726ec155851dbc23f737bcb68998a89}} 
+typedef enum \mbox{\hyperlink{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}{ngf\+\_\+cubemap\+\_\+face}} {\bfseries ngf\+\_\+cubemap\+\_\+face}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a7ffb6d16493c51394c755bafe5164de8}\label{nicegraf_8h_a7ffb6d16493c51394c755bafe5164de8}} 
+typedef struct \mbox{\hyperlink{structngf__image__ref}{ngf\+\_\+image\+\_\+ref}} {\bfseries ngf\+\_\+image\+\_\+ref}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a456a5070dd384687c31e94733ae07ad0}\label{nicegraf_8h_a456a5070dd384687c31e94733ae07ad0}} 
+typedef struct \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}} {\bfseries ngf\+\_\+render\+\_\+target\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a25f525d47a05700858780bad29e26415}\label{nicegraf_8h_a25f525d47a05700858780bad29e26415}} 
+typedef struct ngf\+\_\+render\+\_\+target\+\_\+t $\ast$ {\bfseries ngf\+\_\+render\+\_\+target}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_abe9cb36c507434007766f187839aace1}\label{nicegraf_8h_abe9cb36c507434007766f187839aace1}} 
+typedef union \mbox{\hyperlink{unionngf__clear__info}{ngf\+\_\+clear\+\_\+info}} {\bfseries ngf\+\_\+clear}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a2c4ef8f4b51fc914a03e67fc0ed6c103}\label{nicegraf_8h_a2c4ef8f4b51fc914a03e67fc0ed6c103}} 
+typedef enum \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}} {\bfseries ngf\+\_\+attachment\+\_\+load\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_af8b9c8aa83d665ce6e082344cbe684e5}\label{nicegraf_8h_af8b9c8aa83d665ce6e082344cbe684e5}} 
+typedef enum \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}} {\bfseries ngf\+\_\+attachment\+\_\+store\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a463a98b1930cce88d2e9f016e99cbcfb}\label{nicegraf_8h_a463a98b1930cce88d2e9f016e99cbcfb}} 
+typedef struct \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}} {\bfseries ngf\+\_\+pass\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aaf6e2beb43ea0d30e3300cfa4c291e5c}\label{nicegraf_8h_aaf6e2beb43ea0d30e3300cfa4c291e5c}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}{ngf\+\_\+buffer\+\_\+storage\+\_\+type}} {\bfseries ngf\+\_\+buffer\+\_\+storage\+\_\+type}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a16b75db5b69439c25b090e6c91573cbc}\label{nicegraf_8h_a16b75db5b69439c25b090e6c91573cbc}} 
+typedef enum \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}{ngf\+\_\+buffer\+\_\+usage}} {\bfseries ngf\+\_\+buffer\+\_\+usage}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a0425547d884244cf0ea49ae418e49ff8}\label{nicegraf_8h_a0425547d884244cf0ea49ae418e49ff8}} 
+typedef struct \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} {\bfseries ngf\+\_\+buffer\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a4434e5322a636bee24b42086b64b297b}\label{nicegraf_8h_a4434e5322a636bee24b42086b64b297b}} 
+typedef struct ngf\+\_\+buffer\+\_\+t $\ast$ {\bfseries ngf\+\_\+buffer}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a2ed20e3450aedbf9569ed83884d47cb4}\label{nicegraf_8h_a2ed20e3450aedbf9569ed83884d47cb4}} 
+typedef struct \mbox{\hyperlink{structngf__buffer__bind__info}{ngf\+\_\+buffer\+\_\+bind\+\_\+info}} {\bfseries ngf\+\_\+buffer\+\_\+bind\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa93ea3e36b0705236f75591341d3b09d}\label{nicegraf_8h_aa93ea3e36b0705236f75591341d3b09d}} 
+typedef struct \mbox{\hyperlink{structngf__image__sampler__bind__info}{ngf\+\_\+image\+\_\+sampler\+\_\+bind\+\_\+info}} {\bfseries ngf\+\_\+image\+\_\+sampler\+\_\+bind\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad765e7995fad387c23694b0c84e0e143}\label{nicegraf_8h_ad765e7995fad387c23694b0c84e0e143}} 
+typedef struct \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}} {\bfseries ngf\+\_\+resource\+\_\+bind\+\_\+op}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa64e2367f866c50fde9968fa71bec77e}\label{nicegraf_8h_aa64e2367f866c50fde9968fa71bec77e}} 
+typedef enum \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}{ngf\+\_\+present\+\_\+mode}} {\bfseries ngf\+\_\+present\+\_\+mode}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a764b631931b6c248d841fb200b33c8b8}\label{nicegraf_8h_a764b631931b6c248d841fb200b33c8b8}} 
+typedef struct \mbox{\hyperlink{structngf__swapchain__info}{ngf\+\_\+swapchain\+\_\+info}} {\bfseries ngf\+\_\+swapchain\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a10de514e0f196c435f47400fb772ffa5}\label{nicegraf_8h_a10de514e0f196c435f47400fb772ffa5}} 
+typedef struct ngf\+\_\+context\+\_\+t $\ast$ {\bfseries ngf\+\_\+context}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a1f746beedf1b6581077bb0eb28e08e67}\label{nicegraf_8h_a1f746beedf1b6581077bb0eb28e08e67}} 
+typedef struct \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}} {\bfseries ngf\+\_\+context\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a3b12e14954943c4f15f669f7c526c40c}\label{nicegraf_8h_a3b12e14954943c4f15f669f7c526c40c}} 
+typedef struct \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}} {\bfseries ngf\+\_\+cmd\+\_\+buffer\+\_\+info}
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad161bf41b318c7a3baee04709292b964}\label{nicegraf_8h_ad161bf41b318c7a3baee04709292b964}} 
+typedef struct ngf\+\_\+cmd\+\_\+buffer\+\_\+t $\ast$ {\bfseries ngf\+\_\+cmd\+\_\+buffer}
+\item 
+typedef uint32\+\_\+t \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}
+\end{DoxyCompactItemize}
+\doxysubsection*{Enumerations}
+\begin{DoxyCompactItemize}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}{ngf\+\_\+diagnostic\+\_\+log\+\_\+verbosity}} \{ \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268aca503727f2fed73fd180a8d22e3bddf3ff}{NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DEFAULT}}
+, \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268acac59c61cc428e4a93da30c989e9b87e46}{NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DETAILED}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295aa70e8407af79ebca453f4fa05609b748}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+INFO}}
+, \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295a1f17cc66809804f63d34ecd032e7711a}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+WARNING}}
+, \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295accf8da1e63de333851b76a3016f2f9a4}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+ERROR}}
+ \}
+\item 
+enum \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dc}{ngf\+\_\+device\+\_\+performance\+\_\+tier}} \{ \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+HIGH}} = 0
+, \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+LOW}}
+, \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+UNKNOWN}}
+, {\bfseries NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ada8ac38db8dbdd216ac79d27a97d798b3b}{NGF\+\_\+\+ERROR\+\_\+\+OK}} = 0
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053adadd17b42301f6cc84bb9c52a2173575cb}{NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+MEM}}
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ada90b7ab7e308053d65e974e8113eb098a}{NGF\+\_\+\+ERROR\+\_\+\+OBJECT\+\_\+\+CREATION\+\_\+\+FAILED}}
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ada76702d3a886bd9b3993ab145db667ec2}{NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+BOUNDS}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053adadbc65a523916e3a11e9b8fe9b22c1186}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+FORMAT}}
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ada99cb11277b7ac0dc221022f4e9603690}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+SIZE}}
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053adaa976ccdd90dcc84ce6d488db18d84618}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+ENUM}}
+, \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ada8c6de603c28baa540ba7671b96bbbbac}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+OPERATION}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}{ngf\+\_\+stage\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40adac0306080cb7e6337a2620296b842c31c}{NGF\+\_\+\+STAGE\+\_\+\+VERTEX}} = 0
+, \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40adaf8ef9c6d445577ba7a80cd59254c827e}{NGF\+\_\+\+STAGE\+\_\+\+FRAGMENT}}
+, {\bfseries NGF\+\_\+\+STAGE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517}{ngf\+\_\+polygon\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517ab4542baf873fa0a148f10d36dae7f4f8}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+FILL}} = 0
+, \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517a8b5b774cd9f3afb8e148900e92d0c23d}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+LINE}}
+, \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517a8a3ef145d23450a68690ca51fcb46e06}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+POINT}}
+, {\bfseries NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}{ngf\+\_\+cull\+\_\+mode}} \{ \newline
+\mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2bace08b36931f91be08ab1b4e69717eb73}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+BACK}} = 0
+, \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2ba83d81edfe8ca53fcf0c403af99f6bd74}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT}}
+, \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2ba56a77ee9c6000d8234f0eb4512aa1f13}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT\+\_\+\+AND\+\_\+\+BACK}}
+, \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2bacc980598c9ec15cbabed7fac0318f52a}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+NONE}}
+, \newline
+{\bfseries NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714}{ngf\+\_\+front\+\_\+face\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714a85c1632cd0b13a746ffc049c6754a86a}{NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+COUNTER\+\_\+\+CLOCKWISE}} = 0
+, \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714a733a148f2da5ea5d958116c467436ece}{NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+CLOCKWISE}}
+, {\bfseries NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342eae4ab6ac80224dcffb6e06f29fbf3e2a6}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEVER}} = 0
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342eaa19ec9fd9da7657e9bc2d3da16e1daec}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LESS}}
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342ea1b983b52262fca72e5b2201e4144702e}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LEQUAL}}
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342ea6cf7bbfadeb5c10e5c56630197d0ec1e}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+EQUAL}}
+, \newline
+\mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342ea854afe959ff0638efe70d56984648c5c}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GEQUAL}}
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342ea1621956ffe3dc6815a137a8ae1a60fb4}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GREATER}}
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342ea3128259c58b5974caf12fd535fb9f190}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEQUAL}}
+, \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342eae948919f53066c265bad60753eb10658}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+ALWAYS}}
+, \newline
+{\bfseries NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}{ngf\+\_\+stencil\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70ea191b1db06028b6a43faf0b344f55bd9d}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+KEEP}} = 0
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70ea7b3092f8c1611a1118fa9afd0565a22a}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+ZERO}}
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70eab32d2f1f369ef724fa2b68f9e11ac300}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+REPLACE}}
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70eaff2a8d14fdf164fd3dec4d490c4cdec3}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+CLAMP}}
+, \newline
+\mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70eabc175e7d23351e18f4648ffd049dda28}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+WRAP}}
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70ea264745a7002821448f4b71a329435c32}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+CLAMP}}
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70ea0b623de5fe7bc3b196cc702e4aedd155}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+WRAP}}
+, \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70ea54699588d4076fb53d3e6618a1d93883}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INVERT}}
+, \newline
+{\bfseries NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a05e0a125602eb50d013ac6cdde576b80}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ZERO}} = 0
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82ad8718bfc8b969920bfed2b059492355f}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a28268db9df499033521f23f17bce14c0}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a2b0b4165c0f12da1228ad2be0c6f301e}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+COLOR}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a7e7981511408f96f533361c0ed589a04}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82ad5c3b51c9ce5f5d969c8af56a46029c8}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82adb55b234557f0a7783136e35ad3e8fda}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82adc8afc2e8945bee876a61e9a6f56272d}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+ALPHA}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82aad8f42e0fb437276ea1fecf3600346d2}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a49fcc42b208c3552ae7b7557aee74b6b}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+COLOR}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+ALPHA}}
+, {\bfseries NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6af0574648647d779caed27e8139f7f620}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+ADD}}
+, \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6a5d45f9d4f4f3e4aac93a1f0f7694be41}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+SUB}}
+, \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6a8230dcf7b4e6336bfdf940d94a38f3ff}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+REV\+\_\+\+SUB}}
+, \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6a50f9cab76b5e44880b328b3e43b2d54e}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MIN}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6ad60bfc6845dfe344b0bde5cf02d43b9b}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MAX}}
+, {\bfseries NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8ab6a39e0a95eda430bfb729be90e02ae1}{NGF\+\_\+\+TYPE\+\_\+\+INT8}} = 0
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8a00304ae4b72b5a8a9ce4d946a3748558}{NGF\+\_\+\+TYPE\+\_\+\+UINT8}}
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8a31996be448adf63b1c8d2a104ccf7c18}{NGF\+\_\+\+TYPE\+\_\+\+INT16}}
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2}{NGF\+\_\+\+TYPE\+\_\+\+UINT16}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8a2affe3abef69b1ae4fa1675d26c21825}{NGF\+\_\+\+TYPE\+\_\+\+INT32}}
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8a46f9ed208f47c6acf29a9605e862ae37}{NGF\+\_\+\+TYPE\+\_\+\+UINT32}}
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8aefddfaec8433530f5b4fbb255a7713b3}{NGF\+\_\+\+TYPE\+\_\+\+FLOAT}}
+, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8a85704ac5c4037b152f79eeda6d77c7c1}{NGF\+\_\+\+TYPE\+\_\+\+HALF\+\_\+\+FLOAT}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8ab3ddc8639d625361bc86701d0a1553e5}{NGF\+\_\+\+TYPE\+\_\+\+DOUBLE}}
+, {\bfseries NGF\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2}{ngf\+\_\+vertex\+\_\+input\+\_\+rate}} \{ \mbox{\hyperlink{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2aca3651af650beefb465310efee345e28}{NGF\+\_\+\+INPUT\+\_\+\+RATE\+\_\+\+VERTEX}} = 0
+, \mbox{\hyperlink{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2af0369363d6f1350a78cc9351fbee8f27}{NGF\+\_\+\+INPUT\+\_\+\+RATE\+\_\+\+INSTANCE}}
+, {\bfseries NGF\+\_\+\+VERTEX\+\_\+\+INPUT\+\_\+\+RATE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}{ngf\+\_\+sample\+\_\+count}} \{ \newline
+{\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+1} = 1
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+2} = 2
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+4} = 4
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+8} = 8
+, \newline
+{\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+16} = 16
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+32} = 32
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+64} = 64
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}{ngf\+\_\+image\+\_\+format}} \{ \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R8} = 0
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+SRGB8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+SRGBA8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGR8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGRA8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGR8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGRA8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG32F}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG16F}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG11\+B10F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB9\+E5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16\+\_\+\+UNORM}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16\+\_\+\+SNORM}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16S}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R32U}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BC7}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BC7\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+4x4}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+4x4\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x4}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x4\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x5}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x6}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x6}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x5}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x6}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x10}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x10\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x10}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x10\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x12}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x12\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH32}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH16}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH24\+\_\+\+STENCIL8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+UNDEFINED}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}{ngf\+\_\+attachment\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135aab188a950eecda313e02d6df8bd071403}{NGF\+\_\+\+ATTACHMENT\+\_\+\+COLOR}} = 0
+, \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135aab5212e206163c2f7e16d9e329fbf6b52}{NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH}}
+, \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135aa21dde9ed482efc4f521ab3e71df2ad07}{NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH\+\_\+\+STENCIL}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}{ngf\+\_\+primitive\+\_\+topology}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cda4522a5528f33bc3576d1d765ae074d58}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+LIST}} = 0
+, \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cda137862be96020af59267de3c5a215d57}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+STRIP}}
+, \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cda5f496f00ec5430a445dbf30b2b5fd6af}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+LIST}}
+, \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cda2a99c0876cf4762c2048462053af7d25}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+STRIP}}
+, \newline
+{\bfseries NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}} \{ \newline
+\mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835ae6b09eddb52389891d4ab2b282b69873}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+UNIFORM\+\_\+\+BUFFER}} = 0
+, \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835aebd2570d7b1a8fa3a247cd43e58e8727}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE}}
+, \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835aed13fc0d35dd9e94f92a498ea8478091}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+SAMPLER}}
+, \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE\+\_\+\+AND\+\_\+\+SAMPLER}}
+, \newline
+\mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835ad51efeead738e9553ef2d7b9f9cf718f}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+TEXEL\+\_\+\+BUFFER}}
+, {\bfseries NGF\+\_\+\+DESCRIPTOR\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283f}{ngf\+\_\+sampler\+\_\+filter}} \{ \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283fadb28fc69660039c5ebf5deccae61bc9e}{NGF\+\_\+\+FILTER\+\_\+\+NEAREST}} = 0
+, \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283fa3bdadc76704434ab8c4b9a5035e79b8d}{NGF\+\_\+\+FILTER\+\_\+\+LINEAR}}
+, {\bfseries NGF\+\_\+\+FILTER\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}{ngf\+\_\+sampler\+\_\+wrap\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81ea95a662a3df9173a19c94e961f86a3b11}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+CLAMP\+\_\+\+TO\+\_\+\+EDGE}} = 0
+, \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81ea3e36c346c33431fc080132e720eaed70}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+REPEAT}}
+, \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81ea14cd2d2a59555b38ff302209d56de884}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+MIRRORED\+\_\+\+REPEAT}}
+, {\bfseries NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173}{ngf\+\_\+image\+\_\+usage}} \{ \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173a1453701fecbf3902d1f0259ceb473fab}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+SAMPLE\+\_\+\+FROM}} = 0x01
+, \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173a3ecd301fa3251a07eb3778904ab2fc61}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+ATTACHMENT}} = 0x02
+, \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173a328194f46df2a96823000c6d476e6ff6}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST}} = 0x04
+, \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173aa933e75ce3dbba4e44c8c472209ed8e7}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+MIPMAP\+\_\+\+GENERATION}} = 0x08
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}{ngf\+\_\+image\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177ba5343fd7c187a40afe11397162737100b}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+2D}} = 0
+, \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177ba10161252c5145974d4379ece3f273904}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+3D}}
+, \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177ba9712c8cfdf206c435bbe921111ba22f6}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+CUBE}}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}{ngf\+\_\+cubemap\+\_\+face}} \{ \newline
+{\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+X}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+X}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+Y}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+Y}
+, \newline
+{\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+Z}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+Z}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}} \{ \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1a38008ecddba45629db9a607f238b398e}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+DONTCARE}} = 0
+, \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1afc1e9bbfaee309317e2e911f1415d73a}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+KEEP}}
+, \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1a3f6b389f886088b1d8ca0f69ddf50373}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+CLEAR}}
+, {\bfseries NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}} \{ \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0a07c3d1d05cbf8bd11e4f0cf8639d81fc}{NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+DONTCARE}} = 0
+, \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0af8bf2aec3a89797cd27f8eb6ff322202}{NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+STORE}}
+, {\bfseries NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}{ngf\+\_\+buffer\+\_\+storage\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277caa1133e4913490414b2c8a8a5a0849592}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE}}
+, \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277cabbbf82f224f27c14bee5691228c9b614}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+WRITEABLE}}
+, \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277cabac3191d61a3c294a512363b34a1f3a6}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE\+\_\+\+WRITEABLE}}
+, \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277ca7eb92bbd9e9d7df9cf3d868e61b54a39}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+PRIVATE}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}{ngf\+\_\+buffer\+\_\+usage}} \{ \newline
+\mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aea1eed2a0bc5fae403d090a61e3d71777d}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+SRC}} = 0x01
+, \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aeacdc2283292e5f3df16d018dc2c05fb24}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST}} = 0x02
+, \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aea47ce3bad4a3a486a9b315a716a758286}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+UNIFORM\+\_\+\+BUFFER}} = 0x04
+, \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aea3528e67460b81d2fac39fddde6663e5c}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+INDEX\+\_\+\+BUFFER}} = 0x08
+, \newline
+\mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aea72df4d25c1e8b814f186e9bcc9c5eb28}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+VERTEX\+\_\+\+BUFFER}} = 0x10
+, \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567aeaa09342ffab225411a3dff51002504fea}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+TEXEL\+\_\+\+BUFFER}} = 0x20
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}{ngf\+\_\+present\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37ab1d03c3ecbcc2f07630f0e828955f3aa}{NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+FIFO}}
+, \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37aad8aeab9a3073978366f1bea301b2cf9}{NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+IMMEDIATE}}
+ \}
+\end{DoxyCompactItemize}
+\doxysubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gab6fafd98f49fbcb76304780874986332}{ngf\+\_\+get\+\_\+device\+\_\+list}} (const \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}} $\ast$$\ast$devices, uint32\+\_\+t $\ast$ndevices)
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga067147fcb8d461a23c9099c0fea5b605}{ngf\+\_\+initialize}} (const \mbox{\hyperlink{structngf__init__info}{ngf\+\_\+init\+\_\+info}} $\ast$init\+\_\+info) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga5689c89f5def935f949a03ec158fbf5b}{ngf\+\_\+create\+\_\+context}} (const \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga8ba904bf2f053a20bd63cdcc34d8b5c2}{ngf\+\_\+destroy\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga2c4bccb7d7e5bfbf06acb181966872f1}{ngf\+\_\+resize\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx, uint32\+\_\+t new\+\_\+width, uint32\+\_\+t new\+\_\+height) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gaeb1e325adf6ca533050ea225e1895fd1}{ngf\+\_\+set\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}{ngf\+\_\+begin\+\_\+frame}} (\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} $\ast$token) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gabdc19420f2365a4d25d99d2ec92d3791}{ngf\+\_\+end\+\_\+frame}} (\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} token) NGF\+\_\+\+NOEXCEPT
+\item 
+const \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} $\ast$ \mbox{\hyperlink{group__ngf_ga64f16281740125152672a7ce38f1a853}{ngf\+\_\+get\+\_\+device\+\_\+capabilities}} (void) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga6b11af603327969158d78a1d7b63a402}{ngf\+\_\+create\+\_\+shader\+\_\+stage}} (const \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga4cdfd3d01bc3fad21af9eba68e3cb019}{ngf\+\_\+destroy\+\_\+shader\+\_\+stage}} (\mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}} stage) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga01f6e663642ece4213607e6197708f32}{ngf\+\_\+create\+\_\+graphics\+\_\+pipeline}} (const \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gaba2355db1b71d7e526b2a2e719b12666}{ngf\+\_\+destroy\+\_\+graphics\+\_\+pipeline}} (\mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} pipeline) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a6175e595bd3db7373493f2536d295a97}{ngf\+\_\+create\+\_\+image}} (const \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a823fcca9eab614317beb8e4c75d8574a}{ngf\+\_\+destroy\+\_\+image}} (\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} image) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_af5849344fb7781fe7ad84238bdfe12f5}{ngf\+\_\+create\+\_\+sampler}} (const \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_ac27b6d8f09c51b2cf7aeb03cfef5f09f}{ngf\+\_\+destroy\+\_\+sampler}} (\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} sampler) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} \mbox{\hyperlink{nicegraf_8h_a7a3c3e03440eb8986edfeb7087f5184f}{ngf\+\_\+default\+\_\+render\+\_\+target}} () NGF\+\_\+\+NOEXCEPT
+\item 
+const \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}} $\ast$ \mbox{\hyperlink{nicegraf_8h_a6f719e3f0647aadee613b74b20559699}{ngf\+\_\+default\+\_\+render\+\_\+target\+\_\+attachment\+\_\+descs}} () NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a32e5bee46abc13b7b25e96736a6f30bc}{ngf\+\_\+create\+\_\+render\+\_\+target}} (const \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_aa268ddd067cf43ef40436bfbf2c747cc}{ngf\+\_\+destroy\+\_\+render\+\_\+target}} (\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} target) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a8b30f1f0291b3935a4c89f1ab3377a1e}{ngf\+\_\+create\+\_\+buffer}} (const \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_ab79d65f9190a3511d3052d364ddf47c8}{ngf\+\_\+destroy\+\_\+buffer}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buffer) NGF\+\_\+\+NOEXCEPT
+\item 
+void $\ast$ \mbox{\hyperlink{nicegraf_8h_aaa6b04b8a3b7937ad4cb7248197ee4e5}{ngf\+\_\+buffer\+\_\+map\+\_\+range}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf, size\+\_\+t offset, size\+\_\+t size) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a96e3994c0ab0661a37fad696d2d0c3b9}{ngf\+\_\+buffer\+\_\+flush\+\_\+range}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf, size\+\_\+t offset, size\+\_\+t size) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a2540533cc84b220941168c92f8c6ffee}{ngf\+\_\+buffer\+\_\+unmap}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a0f14ddf5b1abfbc26a23684516e6f3bc}{ngf\+\_\+finish}} (void) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a9faa695e2aff70cf798d17d5463bd8ab}{ngf\+\_\+create\+\_\+cmd\+\_\+buffer}} (const \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a7f45a9fa25fcf22b88cdcc80fcdb0217}{ngf\+\_\+destroy\+\_\+cmd\+\_\+buffer}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buffer) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a52027dd2cf70d4530d60edabe5a6019c}{ngf\+\_\+start\+\_\+cmd\+\_\+buffer}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} token) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a19a0228d5d5568d37d3a75f1f91353e4}{ngf\+\_\+submit\+\_\+cmd\+\_\+buffers}} (uint32\+\_\+t nbuffers, \mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$bufs) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a093b1243f355682e1221ff351085c3a0}{ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, const \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}} $\ast$pass\+\_\+info, \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a404dcd621f51b384bf241992d6c24f43}{ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass\+\_\+simple}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} rt, float clear\+\_\+color\+\_\+r, float clear\+\_\+color\+\_\+g, float clear\+\_\+color\+\_\+b, float clear\+\_\+color\+\_\+a, float clear\+\_\+depth, uint32\+\_\+t clear\+\_\+stencil, \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a4de689db197c35be424ff9383ee07728}{ngf\+\_\+cmd\+\_\+begin\+\_\+xfer\+\_\+pass}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a7bb1c15551c2e3b9c8592b1431f6e451}{ngf\+\_\+cmd\+\_\+end\+\_\+render\+\_\+pass}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a9dfc74933a0cb255a9b0f9a296de63cb}{ngf\+\_\+cmd\+\_\+end\+\_\+xfer\+\_\+pass}} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ae9bd1412d5dda2f03c3717fdbca84619}\label{nicegraf_8h_ae9bd1412d5dda2f03c3717fdbca84619}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+bind\+\_\+gfx\+\_\+pipeline} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} pipeline) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a9fc3fb8fb5ca75b5c845e4cf05482b86}{ngf\+\_\+cmd\+\_\+viewport}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$r) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_aa558c9c2356786c7c8f75e1068848045}{ngf\+\_\+cmd\+\_\+scissor}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$r) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a598086325fff021d147e7be13ed5c1ca}\label{nicegraf_8h_a598086325fff021d147e7be13ed5c1ca}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+stencil\+\_\+reference} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a91bb66405705a3833c3ad14e0bad18b0}\label{nicegraf_8h_a91bb66405705a3833c3ad14e0bad18b0}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+stencil\+\_\+compare\+\_\+mask} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_ad925e83f480a62d6b8b8eacf291655bb}\label{nicegraf_8h_ad925e83f480a62d6b8b8eacf291655bb}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+stencil\+\_\+write\+\_\+mask} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aa9ec342f5469cdc5562d3e2d4f1f7553}\label{nicegraf_8h_aa9ec342f5469cdc5562d3e2d4f1f7553}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+line\+\_\+width} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, float line\+\_\+width) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_a500a2c255a8a858a9693cada1882b403}{ngf\+\_\+cmd\+\_\+bind\+\_\+resources}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}} $\ast$bind\+\_\+operations, uint32\+\_\+t nbind\+\_\+operations) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a10a5f5e4618c20a79d0c835bd06b48af}\label{nicegraf_8h_a10a5f5e4618c20a79d0c835bd06b48af}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+bind\+\_\+attrib\+\_\+buffer} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} vbuf, uint32\+\_\+t binding, uint32\+\_\+t offset) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aca32428a23fd0cfc89c66de4f138a0c8}\label{nicegraf_8h_aca32428a23fd0cfc89c66de4f138a0c8}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+bind\+\_\+index\+\_\+buffer} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} idxbuf, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}} index\+\_\+type) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{nicegraf_8h_ad7481041b40d2c99012837aa35047558}{ngf\+\_\+cmd\+\_\+draw}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, bool indexed, uint32\+\_\+t first\+\_\+element, uint32\+\_\+t nelements, uint32\+\_\+t ninstances) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_aced57bc3af19749ebfa6bcfb205ed68b}\label{nicegraf_8h_aced57bc3af19749ebfa6bcfb205ed68b}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+copy\+\_\+buffer} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} enc, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} src, \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} dst, size\+\_\+t size, size\+\_\+t src\+\_\+offset, size\+\_\+t dst\+\_\+offset) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\Hypertarget{nicegraf_8h_a9a2c2c34190b639e4b5ee596a9c05fc9}\label{nicegraf_8h_a9a2c2c34190b639e4b5ee596a9c05fc9}} 
+void {\bfseries ngf\+\_\+cmd\+\_\+write\+\_\+image} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} src, size\+\_\+t src\+\_\+offset, \mbox{\hyperlink{structngf__image__ref}{ngf\+\_\+image\+\_\+ref}} dst, \mbox{\hyperlink{structngf__offset3d}{ngf\+\_\+offset3d}} offset, \mbox{\hyperlink{structngf__extent3d}{ngf\+\_\+extent3d}} extent) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{nicegraf_8h_a55a2a27dfc26e3d79d31df0ff0805bb6}{ngf\+\_\+cmd\+\_\+generate\+\_\+mipmaps}} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} xfenc, \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} img) NGF\+\_\+\+NOEXCEPT
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+nicegraf declarations. 
+
+Copyright (c) 2021 nicegraf contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \char`\"{}\+Software\char`\"{}), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions\+:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED \char`\"{}\+AS IS\char`\"{}, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. 
+
+\doxysubsection{Macro Definition Documentation}
+\mbox{\Hypertarget{nicegraf_8h_a9222768b37347e17f3575c4d57a9388d}\label{nicegraf_8h_a9222768b37347e17f3575c4d57a9388d}} 
+\index{nicegraf.h@{nicegraf.h}!NGF\_DEVICE\_LIMIT\_UNKNOWN@{NGF\_DEVICE\_LIMIT\_UNKNOWN}}
+\index{NGF\_DEVICE\_LIMIT\_UNKNOWN@{NGF\_DEVICE\_LIMIT\_UNKNOWN}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{NGF\_DEVICE\_LIMIT\_UNKNOWN}{NGF\_DEVICE\_LIMIT\_UNKNOWN}}
+{\footnotesize\ttfamily \#define NGF\+\_\+\+DEVICE\+\_\+\+LIMIT\+\_\+\+UNKNOWN~($\sim$0u)}
+
+This is a special value used within the \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} structure to indicate that a limit value (i.\+e. max texture size) is not known or not relevant for the current backend. 
+
+\doxysubsection{Typedef Documentation}
+\mbox{\Hypertarget{nicegraf_8h_a4768a37f8f3eca04d3e787f6ebcdcf10}\label{nicegraf_8h_a4768a37f8f3eca04d3e787f6ebcdcf10}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_diagnostic\_callback@{ngf\_diagnostic\_callback}}
+\index{ngf\_diagnostic\_callback@{ngf\_diagnostic\_callback}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_diagnostic\_callback}{ngf\_diagnostic\_callback}}
+{\footnotesize\ttfamily typedef void($\ast$ ngf\+\_\+diagnostic\+\_\+callback) (\mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}}, void $\ast$, const char $\ast$,...)}
+
+The diagnostic callback function type. 
+
+\doxysubsection{Enumeration Type Documentation}
+\mbox{\Hypertarget{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dc}\label{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dc}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_device\_performance\_tier@{ngf\_device\_performance\_tier}}
+\index{ngf\_device\_performance\_tier@{ngf\_device\_performance\_tier}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_device\_performance\_tier}{ngf\_device\_performance\_tier}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dc}{ngf\+\_\+device\+\_\+performance\+\_\+tier}}}
+
+\begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH@{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH}!nicegraf.h@{nicegraf.h}}\index{nicegraf.h@{nicegraf.h}!NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH@{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH}}}\mbox{\Hypertarget{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}\label{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+HIGH&For high-\/performance devices, such as discrete GPU. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW@{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW}!nicegraf.h@{nicegraf.h}}\index{nicegraf.h@{nicegraf.h}!NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW@{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW}}}\mbox{\Hypertarget{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}\label{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+LOW&For low-\/power integrated GPUs, software rendering, etc. ~\newline
+ \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN@{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN}!nicegraf.h@{nicegraf.h}}\index{nicegraf.h@{nicegraf.h}!NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN@{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN}}}\mbox{\Hypertarget{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}\label{nicegraf_8h_a14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+UNKNOWN&The specific performance profile is unknown. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2}\label{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_vertex\_input\_rate@{ngf\_vertex\_input\_rate}}
+\index{ngf\_vertex\_input\_rate@{ngf\_vertex\_input\_rate}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_vertex\_input\_rate}{ngf\_vertex\_input\_rate}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2}{ngf\+\_\+vertex\+\_\+input\+\_\+rate}}}
+
+\begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_INPUT\_RATE\_VERTEX@{NGF\_INPUT\_RATE\_VERTEX}!nicegraf.h@{nicegraf.h}}\index{nicegraf.h@{nicegraf.h}!NGF\_INPUT\_RATE\_VERTEX@{NGF\_INPUT\_RATE\_VERTEX}}}\mbox{\Hypertarget{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2aca3651af650beefb465310efee345e28}\label{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2aca3651af650beefb465310efee345e28}} 
+NGF\+\_\+\+INPUT\+\_\+\+RATE\+\_\+\+VERTEX&Attributes are read per-\/vertex. With this vertex input rate, each vertex receives its own set of attributes. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_INPUT\_RATE\_INSTANCE@{NGF\_INPUT\_RATE\_INSTANCE}!nicegraf.h@{nicegraf.h}}\index{nicegraf.h@{nicegraf.h}!NGF\_INPUT\_RATE\_INSTANCE@{NGF\_INPUT\_RATE\_INSTANCE}}}\mbox{\Hypertarget{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2af0369363d6f1350a78cc9351fbee8f27}\label{nicegraf_8h_a0cb6495958cc48f224ec5f0d084897c2af0369363d6f1350a78cc9351fbee8f27}} 
+NGF\+\_\+\+INPUT\+\_\+\+RATE\+\_\+\+INSTANCE&Attributes are read per-\/instance. With this vertex input rate, all vertices within the same instance share the same attribute values. \\
+\hline
+
+\end{DoxyEnumFields}
+
+
+\doxysubsection{Function Documentation}
+\mbox{\Hypertarget{nicegraf_8h_a96e3994c0ab0661a37fad696d2d0c3b9}\label{nicegraf_8h_a96e3994c0ab0661a37fad696d2d0c3b9}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_buffer\_flush\_range@{ngf\_buffer\_flush\_range}}
+\index{ngf\_buffer\_flush\_range@{ngf\_buffer\_flush\_range}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_flush\_range()}{ngf\_buffer\_flush\_range()}}
+{\footnotesize\ttfamily void ngf\+\_\+buffer\+\_\+flush\+\_\+range (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf,  }\item[{size\+\_\+t}]{offset,  }\item[{size\+\_\+t}]{size }\end{DoxyParamCaption})}
+
+Ensure that any new data in the mapped range will be visible to subsequently submitted commands. 
+\begin{DoxyParams}{Parameters}
+{\em ptr} & A ngf\+\_\+buffer\+\_\+ptr object wrapping a handle to the buffer that needs to be flushed. \\
+\hline
+{\em offset} & Offset, relative to the start of the mapped range, at which the flushed region starts, in bytes. \\
+\hline
+{\em size} & Size of the flushed region in bytes. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_aaa6b04b8a3b7937ad4cb7248197ee4e5}\label{nicegraf_8h_aaa6b04b8a3b7937ad4cb7248197ee4e5}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_buffer\_map\_range@{ngf\_buffer\_map\_range}}
+\index{ngf\_buffer\_map\_range@{ngf\_buffer\_map\_range}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_map\_range()}{ngf\_buffer\_map\_range()}}
+{\footnotesize\ttfamily void $\ast$ ngf\+\_\+buffer\+\_\+map\+\_\+range (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf,  }\item[{size\+\_\+t}]{offset,  }\item[{size\+\_\+t}]{size }\end{DoxyParamCaption})}
+
+Map a region of a given buffer to host memory. It is an error to bind a mapped buffer using any command. If a buffer that needs to be bound is mapped, first call \mbox{\hyperlink{nicegraf_8h_a96e3994c0ab0661a37fad696d2d0c3b9}{ngf\+\_\+buffer\+\_\+flush\+\_\+range}} to ensure any new data in the mapped range becomes visible to the subsequent commands, then call \mbox{\hyperlink{nicegraf_8h_a2540533cc84b220941168c92f8c6ffee}{ngf\+\_\+buffer\+\_\+unmap}}. Then it shall be safe to bind the buffer. Writing into any region that could be in use by previously submitted commands results in undefined behavior. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The buffer to be mapped. \\
+\hline
+{\em offset} & Offset at which the mapped region starts, in bytes. It must satisfy platform-\/specific alignment requirements. \\
+\hline
+{\em size} & Size of the mapped region in bytes. \\
+\hline
+{\em flags} & A combination of flags from ngf\+\_\+buffer\+\_\+map\+\_\+flags. \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+A pointer to the mapped memory, or NULL if the buffer could not be mapped. 
+\end{DoxyReturn}
+\mbox{\Hypertarget{nicegraf_8h_a2540533cc84b220941168c92f8c6ffee}\label{nicegraf_8h_a2540533cc84b220941168c92f8c6ffee}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_buffer\_unmap@{ngf\_buffer\_unmap}}
+\index{ngf\_buffer\_unmap@{ngf\_buffer\_unmap}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_unmap()}{ngf\_buffer\_unmap()}}
+{\footnotesize\ttfamily void ngf\+\_\+buffer\+\_\+unmap (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf }\end{DoxyParamCaption})}
+
+Unmaps a previously mapped buffer. The pointer returned for that buffer by the corresponding call to \mbox{\hyperlink{nicegraf_8h_aaa6b04b8a3b7937ad4cb7248197ee4e5}{ngf\+\_\+buffer\+\_\+map\+\_\+range}} becomes invalid. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The buffer that needs to be unmapped. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a093b1243f355682e1221ff351085c3a0}\label{nicegraf_8h_a093b1243f355682e1221ff351085c3a0}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_begin\_render\_pass@{ngf\_cmd\_begin\_render\_pass}}
+\index{ngf\_cmd\_begin\_render\_pass@{ngf\_cmd\_begin\_render\_pass}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_render\_pass()}{ngf\_cmd\_begin\_render\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}} $\ast$}]{pass\+\_\+info,  }\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Starts a new render pass and returns an encoder to record the associated commands to. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The buffer to create the encoder for. Must be in the \char`\"{}ready\char`\"{} state, will be transitioned to the \char`\"{}recording\char`\"{} state. \\
+\hline
+{\em pass\+\_\+info} & Specifies renderpass parameters. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a404dcd621f51b384bf241992d6c24f43}\label{nicegraf_8h_a404dcd621f51b384bf241992d6c24f43}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_begin\_render\_pass\_simple@{ngf\_cmd\_begin\_render\_pass\_simple}}
+\index{ngf\_cmd\_begin\_render\_pass\_simple@{ngf\_cmd\_begin\_render\_pass\_simple}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_render\_pass\_simple()}{ngf\_cmd\_begin\_render\_pass\_simple()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass\+\_\+simple (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}}}]{rt,  }\item[{float}]{clear\+\_\+color\+\_\+r,  }\item[{float}]{clear\+\_\+color\+\_\+g,  }\item[{float}]{clear\+\_\+color\+\_\+b,  }\item[{float}]{clear\+\_\+color\+\_\+a,  }\item[{float}]{clear\+\_\+depth,  }\item[{uint32\+\_\+t}]{clear\+\_\+stencil,  }\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Similar to the above but with some choices pre-\/made\+:
+\begin{DoxyItemize}
+\item All color attachments of the render target are cleared to the specified color.
+\item Depth and stencil attachments are cleared to the specified respective values.
+\item The store action for any attachment that is not marked as sampled\+\_\+from, is set to NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+DONTCARE.
+\item The store action for attachments marked as sampled\+\_\+from, is set to NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+STORE. 
+\end{DoxyItemize}\mbox{\Hypertarget{nicegraf_8h_a4de689db197c35be424ff9383ee07728}\label{nicegraf_8h_a4de689db197c35be424ff9383ee07728}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_begin\_xfer\_pass@{ngf\_cmd\_begin\_xfer\_pass}}
+\index{ngf\_cmd\_begin\_xfer\_pass@{ngf\_cmd\_begin\_xfer\_pass}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_xfer\_pass()}{ngf\_cmd\_begin\_xfer\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+xfer\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Starts a new encoder for transfer commands associated with the given command buffer. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The buffer to create the encoder for. Must be in the \char`\"{}ready\char`\"{} state, will be transitioned to the \char`\"{}recording\char`\"{} state. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a500a2c255a8a858a9693cada1882b403}\label{nicegraf_8h_a500a2c255a8a858a9693cada1882b403}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_bind\_resources@{ngf\_cmd\_bind\_resources}}
+\index{ngf\_cmd\_bind\_resources@{ngf\_cmd\_bind\_resources}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_bind\_resources()}{ngf\_cmd\_bind\_resources()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+bind\+\_\+resources (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}} $\ast$}]{bind\+\_\+operations,  }\item[{uint32\+\_\+t}]{nbind\+\_\+operations }\end{DoxyParamCaption})}
+
+Bind resources for the shader to read. See \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}} for more information. \mbox{\Hypertarget{nicegraf_8h_ad7481041b40d2c99012837aa35047558}\label{nicegraf_8h_ad7481041b40d2c99012837aa35047558}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_draw@{ngf\_cmd\_draw}}
+\index{ngf\_cmd\_draw@{ngf\_cmd\_draw}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_draw()}{ngf\_cmd\_draw()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+draw (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{bool}]{indexed,  }\item[{uint32\+\_\+t}]{first\+\_\+element,  }\item[{uint32\+\_\+t}]{nelements,  }\item[{uint32\+\_\+t}]{ninstances }\end{DoxyParamCaption})}
+
+Execute a draw call. \mbox{\Hypertarget{nicegraf_8h_a7bb1c15551c2e3b9c8592b1431f6e451}\label{nicegraf_8h_a7bb1c15551c2e3b9c8592b1431f6e451}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_end\_render\_pass@{ngf\_cmd\_end\_render\_pass}}
+\index{ngf\_cmd\_end\_render\_pass@{ngf\_cmd\_end\_render\_pass}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_end\_render\_pass()}{ngf\_cmd\_end\_render\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+end\+\_\+render\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{enc }\end{DoxyParamCaption})}
+
+Disposes of the given render cmd encoder, transitioning its corresponding command buffer to the \char`\"{}ready\char`\"{} state. \mbox{\Hypertarget{nicegraf_8h_a9dfc74933a0cb255a9b0f9a296de63cb}\label{nicegraf_8h_a9dfc74933a0cb255a9b0f9a296de63cb}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_end\_xfer\_pass@{ngf\_cmd\_end\_xfer\_pass}}
+\index{ngf\_cmd\_end\_xfer\_pass@{ngf\_cmd\_end\_xfer\_pass}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_end\_xfer\_pass()}{ngf\_cmd\_end\_xfer\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+end\+\_\+xfer\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}}]{enc }\end{DoxyParamCaption})}
+
+Disposes of the given transfer cmd encoder, transitioning its corresponding command buffer to the \char`\"{}ready\char`\"{} state. \mbox{\Hypertarget{nicegraf_8h_a55a2a27dfc26e3d79d31df0ff0805bb6}\label{nicegraf_8h_a55a2a27dfc26e3d79d31df0ff0805bb6}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_generate\_mipmaps@{ngf\_cmd\_generate\_mipmaps}}
+\index{ngf\_cmd\_generate\_mipmaps@{ngf\_cmd\_generate\_mipmaps}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_generate\_mipmaps()}{ngf\_cmd\_generate\_mipmaps()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+generate\+\_\+mipmaps (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}}]{xfenc,  }\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}}]{img }\end{DoxyParamCaption})}
+
+Generate mipmaps from level 0 of the given image and write the results to the remaining levels of the given image. Requires the image to have been created with NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+MIPMAP\+\_\+\+GENERATION. \mbox{\Hypertarget{nicegraf_8h_aa558c9c2356786c7c8f75e1068848045}\label{nicegraf_8h_aa558c9c2356786c7c8f75e1068848045}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_scissor@{ngf\_cmd\_scissor}}
+\index{ngf\_cmd\_scissor@{ngf\_cmd\_scissor}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_scissor()}{ngf\_cmd\_scissor()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+scissor (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$}]{r }\end{DoxyParamCaption})}
+
+Sets the scissor region to be used in the subsequent rendering commands. The scissor defines a region of the framebuffer that can be affected by the rendering commands. Any pixels outside of that region are not written to. \mbox{\Hypertarget{nicegraf_8h_a9fc3fb8fb5ca75b5c845e4cf05482b86}\label{nicegraf_8h_a9fc3fb8fb5ca75b5c845e4cf05482b86}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_cmd\_viewport@{ngf\_cmd\_viewport}}
+\index{ngf\_cmd\_viewport@{ngf\_cmd\_viewport}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_viewport()}{ngf\_cmd\_viewport()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+viewport (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$}]{r }\end{DoxyParamCaption})}
+
+Sets the viewport to be used in subsequent rendering commands. The viewport defines a region of the destination framebuffer that the resulting rendering is scaled to fit into. \mbox{\Hypertarget{nicegraf_8h_a8b30f1f0291b3935a4c89f1ab3377a1e}\label{nicegraf_8h_a8b30f1f0291b3935a4c89f1ab3377a1e}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_create\_buffer@{ngf\_create\_buffer}}
+\index{ngf\_create\_buffer@{ngf\_create\_buffer}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_buffer()}{ngf\_create\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+buffer (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new buffer. 
+\begin{DoxyParams}{Parameters}
+{\em info} & see \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} \\
+\hline
+{\em result} & the new buffer handle will be stored here. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a9faa695e2aff70cf798d17d5463bd8ab}\label{nicegraf_8h_a9faa695e2aff70cf798d17d5463bd8ab}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_create\_cmd\_buffer@{ngf\_create\_cmd\_buffer}}
+\index{ngf\_create\_cmd\_buffer@{ngf\_create\_cmd\_buffer}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_cmd\_buffer()}{ngf\_create\_cmd\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new command buffer that is in the \char`\"{}ready\char`\"{} state. \mbox{\Hypertarget{nicegraf_8h_a6175e595bd3db7373493f2536d295a97}\label{nicegraf_8h_a6175e595bd3db7373493f2536d295a97}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_create\_image@{ngf\_create\_image}}
+\index{ngf\_create\_image@{ngf\_create\_image}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_image()}{ngf\_create\_image()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+image (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new image object. 
+\begin{DoxyParams}{Parameters}
+{\em info} & Configuration of the image. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a32e5bee46abc13b7b25e96736a6f30bc}\label{nicegraf_8h_a32e5bee46abc13b7b25e96736a6f30bc}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_create\_render\_target@{ngf\_create\_render\_target}}
+\index{ngf\_create\_render\_target@{ngf\_create\_render\_target}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_render\_target()}{ngf\_create\_render\_target()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+render\+\_\+target (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Create a new rendertarget with the given configuration. \mbox{\Hypertarget{nicegraf_8h_af5849344fb7781fe7ad84238bdfe12f5}\label{nicegraf_8h_af5849344fb7781fe7ad84238bdfe12f5}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_create\_sampler@{ngf\_create\_sampler}}
+\index{ngf\_create\_sampler@{ngf\_create\_sampler}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_sampler()}{ngf\_create\_sampler()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+sampler (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Create a sampler object with the given configuration. \mbox{\Hypertarget{nicegraf_8h_a7a3c3e03440eb8986edfeb7087f5184f}\label{nicegraf_8h_a7a3c3e03440eb8986edfeb7087f5184f}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_default\_render\_target@{ngf\_default\_render\_target}}
+\index{ngf\_default\_render\_target@{ngf\_default\_render\_target}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_default\_render\_target()}{ngf\_default\_render\_target()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} ngf\+\_\+default\+\_\+render\+\_\+target (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+Obtain a render target associated with the the current context\textquotesingle{}s swapchain. If the current context does not have a swapchain, the result shall be a null pointer. Otherwise, it shall be a render target that has a color attachment associated with the context\textquotesingle{}s swapchain. If the swapchain was created with an accompanying depth buffer, the render target shall have an attachment for that as well.
+
+The caller should not attempt to destroy the returned render target. It shall be destroyed automatically, together with the parent context. \mbox{\Hypertarget{nicegraf_8h_a6f719e3f0647aadee613b74b20559699}\label{nicegraf_8h_a6f719e3f0647aadee613b74b20559699}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_default\_render\_target\_attachment\_descs@{ngf\_default\_render\_target\_attachment\_descs}}
+\index{ngf\_default\_render\_target\_attachment\_descs@{ngf\_default\_render\_target\_attachment\_descs}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_default\_render\_target\_attachment\_descs()}{ngf\_default\_render\_target\_attachment\_descs()}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}} $\ast$ ngf\+\_\+default\+\_\+render\+\_\+target\+\_\+attachment\+\_\+descs (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+Obtain the attachment descriptions for the default render target. The caller should not attempt to free the returned pointer or modify the contents of the memory it points to. \mbox{\Hypertarget{nicegraf_8h_ab79d65f9190a3511d3052d364ddf47c8}\label{nicegraf_8h_ab79d65f9190a3511d3052d364ddf47c8}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_destroy\_buffer@{ngf\_destroy\_buffer}}
+\index{ngf\_destroy\_buffer@{ngf\_destroy\_buffer}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_buffer()}{ngf\_destroy\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buffer }\end{DoxyParamCaption})}
+
+Discards the given buffer. \mbox{\Hypertarget{nicegraf_8h_a7f45a9fa25fcf22b88cdcc80fcdb0217}\label{nicegraf_8h_a7f45a9fa25fcf22b88cdcc80fcdb0217}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_destroy\_cmd\_buffer@{ngf\_destroy\_cmd\_buffer}}
+\index{ngf\_destroy\_cmd\_buffer@{ngf\_destroy\_cmd\_buffer}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_cmd\_buffer()}{ngf\_destroy\_cmd\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buffer }\end{DoxyParamCaption})}
+
+Frees resources associated with the given command buffer. Any work previously submitted via this command buffer will be finished asynchronously. \mbox{\Hypertarget{nicegraf_8h_a823fcca9eab614317beb8e4c75d8574a}\label{nicegraf_8h_a823fcca9eab614317beb8e4c75d8574a}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_destroy\_image@{ngf\_destroy\_image}}
+\index{ngf\_destroy\_image@{ngf\_destroy\_image}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_image()}{ngf\_destroy\_image()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+image (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}}]{image }\end{DoxyParamCaption})}
+
+Destroy the given image object. \mbox{\Hypertarget{nicegraf_8h_aa268ddd067cf43ef40436bfbf2c747cc}\label{nicegraf_8h_aa268ddd067cf43ef40436bfbf2c747cc}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_destroy\_render\_target@{ngf\_destroy\_render\_target}}
+\index{ngf\_destroy\_render\_target@{ngf\_destroy\_render\_target}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_render\_target()}{ngf\_destroy\_render\_target()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+render\+\_\+target (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}}}]{target }\end{DoxyParamCaption})}
+
+Destroy the given render target. \mbox{\Hypertarget{nicegraf_8h_ac27b6d8f09c51b2cf7aeb03cfef5f09f}\label{nicegraf_8h_ac27b6d8f09c51b2cf7aeb03cfef5f09f}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_destroy\_sampler@{ngf\_destroy\_sampler}}
+\index{ngf\_destroy\_sampler@{ngf\_destroy\_sampler}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_sampler()}{ngf\_destroy\_sampler()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+sampler (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}}}]{sampler }\end{DoxyParamCaption})}
+
+Destroy a given sampler object. \mbox{\Hypertarget{nicegraf_8h_a0f14ddf5b1abfbc26a23684516e6f3bc}\label{nicegraf_8h_a0f14ddf5b1abfbc26a23684516e6f3bc}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_finish@{ngf\_finish}}
+\index{ngf\_finish@{ngf\_finish}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_finish()}{ngf\_finish()}}
+{\footnotesize\ttfamily void ngf\+\_\+finish (\begin{DoxyParamCaption}\item[{void}]{ }\end{DoxyParamCaption})}
+
+Wait for all pending rendering commands to complete. \mbox{\Hypertarget{nicegraf_8h_a52027dd2cf70d4530d60edabe5a6019c}\label{nicegraf_8h_a52027dd2cf70d4530d60edabe5a6019c}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_start\_cmd\_buffer@{ngf\_start\_cmd\_buffer}}
+\index{ngf\_start\_cmd\_buffer@{ngf\_start\_cmd\_buffer}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_start\_cmd\_buffer()}{ngf\_start\_cmd\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+start\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}}]{token }\end{DoxyParamCaption})}
+
+Erases all the commands previously recorded into the given command buffer, and prepares it for recording commands to be submitted within the frame identified by the specified token. The command buffer is required to be in the \char`\"{}ready\char`\"{} state. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The command buffer to operate on \\
+\hline
+{\em token} & The token for the frame within which the recorded commands are going to be submitted. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{nicegraf_8h_a19a0228d5d5568d37d3a75f1f91353e4}\label{nicegraf_8h_a19a0228d5d5568d37d3a75f1f91353e4}} 
+\index{nicegraf.h@{nicegraf.h}!ngf\_submit\_cmd\_buffers@{ngf\_submit\_cmd\_buffers}}
+\index{ngf\_submit\_cmd\_buffers@{ngf\_submit\_cmd\_buffers}!nicegraf.h@{nicegraf.h}}
+\doxysubsubsection{\texorpdfstring{ngf\_submit\_cmd\_buffers()}{ngf\_submit\_cmd\_buffers()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+submit\+\_\+cmd\+\_\+buffers (\begin{DoxyParamCaption}\item[{uint32\+\_\+t}]{nbuffers,  }\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$}]{bufs }\end{DoxyParamCaption})}
+
+Submits the commands recorded in the given command buffers for execution. All command buffers must be in the \char`\"{}ready\char`\"{} state, and will be transitioned to the \char`\"{}submitted\char`\"{} state. 

@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__constant__specialization" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_constant_specialization</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__constant__specialization_1ab3edff3b9bea9238a020631c8318a951" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_constant_specialization::constant_id</definition>
+        <argsstring></argsstring>
+        <name>constant_id</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>ID of the specialization constant used in the shader stage </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1184" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1184" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__constant__specialization_1a5392adbaff9d7da10bf7b3fdbd5b9165" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_constant_specialization::offset</definition>
+        <argsstring></argsstring>
+        <name>offset</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Offset at which the user-provided value is stored in the specialization buffer. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1185" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1185" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__constant__specialization_1a974ba80eb118ce5fd1030675cb03c551" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga01261322d7ece98dce30b32c477f7ad8" kindref="member">ngf_type</ref></type>
+        <definition>ngf_type ngf_constant_specialization::type</definition>
+        <argsstring></argsstring>
+        <name>type</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Type of the specialization constant. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1187" column="12" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1187" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>A constant specialization entry, sets the value for a single specialization constant. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1183" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1183" bodyend="1188"/>
+    <listofallmembers>
+      <member refid="structngf__constant__specialization_1ab3edff3b9bea9238a020631c8318a951" prot="public" virt="non-virtual"><scope>ngf_constant_specialization</scope><name>constant_id</name></member>
+      <member refid="structngf__constant__specialization_1a5392adbaff9d7da10bf7b3fdbd5b9165" prot="public" virt="non-virtual"><scope>ngf_constant_specialization</scope><name>offset</name></member>
+      <member refid="structngf__constant__specialization_1a974ba80eb118ce5fd1030675cb03c551" prot="public" virt="non-virtual"><scope>ngf_constant_specialization</scope><name>type</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

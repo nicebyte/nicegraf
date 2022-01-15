@@ -1,0 +1,47 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__multisample__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_multisample_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__multisample__info_1a9ca848d3b0c0ed3df3eacd4f33241a04" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga99d00b2bf653c4605c4c505275e6536f" kindref="member">ngf_sample_count</ref></type>
+        <definition>ngf_sample_count ngf_multisample_info::sample_count</definition>
+        <argsstring></argsstring>
+        <name>sample_count</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>MSAA sample count. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1013" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1013" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__multisample__info_1a39e98c2b25a85608ffb1477789a605cf" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_multisample_info::alpha_to_coverage</definition>
+        <argsstring></argsstring>
+        <name>alpha_to_coverage</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Whether alpha-to-coverage is enabled. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1014" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1014" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Specifies the state of multisampling. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1012" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1012" bodyend="1015"/>
+    <listofallmembers>
+      <member refid="structngf__multisample__info_1a39e98c2b25a85608ffb1477789a605cf" prot="public" virt="non-virtual"><scope>ngf_multisample_info</scope><name>alpha_to_coverage</name></member>
+      <member refid="structngf__multisample__info_1a9ca848d3b0c0ed3df3eacd4f33241a04" prot="public" virt="non-virtual"><scope>ngf_multisample_info</scope><name>sample_count</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

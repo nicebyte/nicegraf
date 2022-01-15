@@ -1,0 +1,1894 @@
+\hypertarget{group__ngf}{}\doxysection{Core C API}
+\label{group__ngf}\index{Core C API@{Core C API}}
+
+
+\doxysubsection{Detailed Description}
+This section contains the documentation for the core nicegraf routines, structures and enumerations.\hypertarget{group__ngf_core-remarks}{}\doxysubsubsection{General Remarks}\label{group__ngf_core-remarks}
+
+\begin{DoxyItemize}
+\item The library is currently not intended to be linked dynamically.
+\item When nicegraf\textquotesingle{}s C headers are included from C++, all global functions within them are automatically declared to have C linkage. Additionally, they are declared to be noexcept.
+\end{DoxyItemize}\hypertarget{group__ngf_object-model}{}\doxysubsubsection{Object Model}\label{group__ngf_object-model}
+nicegraf objects, such as images, buffers, render targets, etc., are represented using opaque handles. The objects are created and destroyed explicitly by the application, and it is the responsibility of the application to ensure a correct order of destruction.\hypertarget{group__ngf_error-reporting}{}\doxysubsubsection{Error Reporting}\label{group__ngf_error-reporting}
+Most nicegraf routines report their completion status by returning an \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}}, and write their results to out-\/parameters. The returned value is a generic error code. Detailed, human-\/readable information about errors may vary from platform to platform; nicegraf reports it by invoking a user-\/provided callback function (see \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}}). The callback function must accept the diagnostic message type (see \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}}), an arbitrary void pointer (the value of which the user may specify when providing the callback), a printf-\/style format string, and an arbitrary number of arguments specifying the data for the format-\/string.\hypertarget{group__ngf_host-memory-management}{}\doxysubsubsection{Host Memory Management}\label{group__ngf_host-memory-management}
+By default, nicegraf uses the standard malloc/free to manage host memory for internal purposes. The client may override this behavior by supplying custom memory allocation callbacks (see \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}}).\hypertarget{group__ngf_gpu-memory-management}{}\doxysubsubsection{GPU Memory Management}\label{group__ngf_gpu-memory-management}
+nicegraf internally manages GPU memory for all backends. It is currently not possible for clients to override this behavior and do their own GPU memory management. \doxysubsection*{Data Structures}
+\begin{DoxyCompactItemize}
+\item 
+struct \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}}
+\item 
+struct \mbox{\hyperlink{structngf__diagnostic__info}{ngf\+\_\+diagnostic\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__allocation__callbacks}{ngf\+\_\+allocation\+\_\+callbacks}}
+\item 
+struct \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}}
+\item 
+struct \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}}
+\item 
+struct \mbox{\hyperlink{structngf__extent3d}{ngf\+\_\+extent3d}}
+\item 
+struct \mbox{\hyperlink{structngf__offset3d}{ngf\+\_\+offset3d}}
+\item 
+struct \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}}
+\item 
+struct \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__depth__stencil__info}{ngf\+\_\+depth\+\_\+stencil\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__blend__info}{ngf\+\_\+blend\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__buf__binding__desc}{ngf\+\_\+vertex\+\_\+buf\+\_\+binding\+\_\+desc}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__attrib__desc}{ngf\+\_\+vertex\+\_\+attrib\+\_\+desc}}
+\item 
+struct \mbox{\hyperlink{structngf__vertex__input__info}{ngf\+\_\+vertex\+\_\+input\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__multisample__info}{ngf\+\_\+multisample\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__attachment__description}{ngf\+\_\+attachment\+\_\+description}}
+\item 
+struct \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}}
+\item 
+struct \mbox{\hyperlink{structngf__constant__specialization}{ngf\+\_\+constant\+\_\+specialization}}
+\item 
+struct \mbox{\hyperlink{structngf__specialization__info}{ngf\+\_\+specialization\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}}
+\item 
+struct \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}}
+\item 
+struct \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}
+\item 
+struct \mbox{\hyperlink{structngf__image__ref}{ngf\+\_\+image\+\_\+ref}}
+\item 
+struct \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}}
+\item 
+struct \mbox{\hyperlink{unionngf__clear__info}{ngf\+\_\+clear\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}
+\item 
+struct \mbox{\hyperlink{structngf__buffer__bind__info}{ngf\+\_\+buffer\+\_\+bind\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__image__sampler__bind__info}{ngf\+\_\+image\+\_\+sampler\+\_\+bind\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__resource__bind__op}{ngf\+\_\+resource\+\_\+bind\+\_\+op}}
+\item 
+struct \mbox{\hyperlink{structngf__swapchain__info}{ngf\+\_\+swapchain\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}
+\item 
+struct \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}}
+\item 
+struct \mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}
+\item 
+struct \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}
+\item 
+struct \mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}
+\end{DoxyCompactItemize}
+\doxysubsection*{Macros}
+\begin{DoxyCompactItemize}
+\item 
+\#define \mbox{\hyperlink{group__ngf_gab2cb27fa97957925fc471eb90633d756}{NGF\+\_\+\+DEVICE\+\_\+\+NAME\+\_\+\+MAX\+\_\+\+LENGTH}}~(256u)
+\end{DoxyCompactItemize}
+\doxysubsection*{Typedefs}
+\begin{DoxyCompactItemize}
+\item 
+typedef uint32\+\_\+t \mbox{\hyperlink{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}{ngf\+\_\+device\+\_\+handle}}
+\item 
+typedef uint32\+\_\+t \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}
+\end{DoxyCompactItemize}
+\doxysubsection*{Enumerations}
+\begin{DoxyCompactItemize}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}{ngf\+\_\+diagnostic\+\_\+log\+\_\+verbosity}} \{ \mbox{\hyperlink{group__ngf_gga7634ab295ada4ee1515e24b58ed268aca503727f2fed73fd180a8d22e3bddf3ff}{NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DEFAULT}}
+, \mbox{\hyperlink{group__ngf_gga7634ab295ada4ee1515e24b58ed268acac59c61cc428e4a93da30c989e9b87e46}{NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DETAILED}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_gga73f485c050416fe7ae3f5286cc418295aa70e8407af79ebca453f4fa05609b748}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+INFO}}
+, \mbox{\hyperlink{group__ngf_gga73f485c050416fe7ae3f5286cc418295a1f17cc66809804f63d34ecd032e7711a}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+WARNING}}
+, \mbox{\hyperlink{group__ngf_gga73f485c050416fe7ae3f5286cc418295accf8da1e63de333851b76a3016f2f9a4}{NGF\+\_\+\+DIAGNOSTIC\+\_\+\+ERROR}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga14ee1c4e867d874070b50141dabad8dc}{ngf\+\_\+device\+\_\+performance\+\_\+tier}} \{ \mbox{\hyperlink{group__ngf_gga14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+HIGH}} = 0
+, \mbox{\hyperlink{group__ngf_gga14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+LOW}}
+, \mbox{\hyperlink{group__ngf_gga14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}{NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+UNKNOWN}}
+, {\bfseries NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8ac38db8dbdd216ac79d27a97d798b3b}{NGF\+\_\+\+ERROR\+\_\+\+OK}} = 0
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadd17b42301f6cc84bb9c52a2173575cb}{NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+MEM}}
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada90b7ab7e308053d65e974e8113eb098a}{NGF\+\_\+\+ERROR\+\_\+\+OBJECT\+\_\+\+CREATION\+\_\+\+FAILED}}
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada76702d3a886bd9b3993ab145db667ec2}{NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+BOUNDS}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadbc65a523916e3a11e9b8fe9b22c1186}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+FORMAT}}
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada99cb11277b7ac0dc221022f4e9603690}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+SIZE}}
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adaa976ccdd90dcc84ce6d488db18d84618}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+ENUM}}
+, \mbox{\hyperlink{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8c6de603c28baa540ba7671b96bbbbac}{NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+OPERATION}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}{ngf\+\_\+stage\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adac0306080cb7e6337a2620296b842c31c}{NGF\+\_\+\+STAGE\+\_\+\+VERTEX}} = 0
+, \mbox{\hyperlink{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adaf8ef9c6d445577ba7a80cd59254c827e}{NGF\+\_\+\+STAGE\+\_\+\+FRAGMENT}}
+, {\bfseries NGF\+\_\+\+STAGE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517}{ngf\+\_\+polygon\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_ggab411421f89d976d54cb0d72b736ff517ab4542baf873fa0a148f10d36dae7f4f8}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+FILL}} = 0
+, \mbox{\hyperlink{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8b5b774cd9f3afb8e148900e92d0c23d}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+LINE}}
+, \mbox{\hyperlink{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8a3ef145d23450a68690ca51fcb46e06}{NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+POINT}}
+, {\bfseries NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}{ngf\+\_\+cull\+\_\+mode}} \{ \newline
+\mbox{\hyperlink{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bace08b36931f91be08ab1b4e69717eb73}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+BACK}} = 0
+, \mbox{\hyperlink{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba83d81edfe8ca53fcf0c403af99f6bd74}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT}}
+, \mbox{\hyperlink{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba56a77ee9c6000d8234f0eb4512aa1f13}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT\+\_\+\+AND\+\_\+\+BACK}}
+, \mbox{\hyperlink{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bacc980598c9ec15cbabed7fac0318f52a}{NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+NONE}}
+, \newline
+{\bfseries NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714}{ngf\+\_\+front\+\_\+face\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_ggac78e26eae8830282edaedc5636120714a85c1632cd0b13a746ffc049c6754a86a}{NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+COUNTER\+\_\+\+CLOCKWISE}} = 0
+, \mbox{\hyperlink{group__ngf_ggac78e26eae8830282edaedc5636120714a733a148f2da5ea5d958116c467436ece}{NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+CLOCKWISE}}
+, {\bfseries NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae4ab6ac80224dcffb6e06f29fbf3e2a6}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEVER}} = 0
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eaa19ec9fd9da7657e9bc2d3da16e1daec}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LESS}}
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1b983b52262fca72e5b2201e4144702e}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LEQUAL}}
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea6cf7bbfadeb5c10e5c56630197d0ec1e}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+EQUAL}}
+, \newline
+\mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea854afe959ff0638efe70d56984648c5c}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GEQUAL}}
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1621956ffe3dc6815a137a8ae1a60fb4}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GREATER}}
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea3128259c58b5974caf12fd535fb9f190}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEQUAL}}
+, \mbox{\hyperlink{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae948919f53066c265bad60753eb10658}{NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+ALWAYS}}
+, \newline
+{\bfseries NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}{ngf\+\_\+stencil\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea191b1db06028b6a43faf0b344f55bd9d}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+KEEP}} = 0
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea7b3092f8c1611a1118fa9afd0565a22a}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+ZERO}}
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eab32d2f1f369ef724fa2b68f9e11ac300}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+REPLACE}}
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eaff2a8d14fdf164fd3dec4d490c4cdec3}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+CLAMP}}
+, \newline
+\mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eabc175e7d23351e18f4648ffd049dda28}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+WRAP}}
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea264745a7002821448f4b71a329435c32}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+CLAMP}}
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea0b623de5fe7bc3b196cc702e4aedd155}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+WRAP}}
+, \mbox{\hyperlink{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea54699588d4076fb53d3e6618a1d93883}{NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INVERT}}
+, \newline
+{\bfseries NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a05e0a125602eb50d013ac6cdde576b80}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ZERO}} = 0
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad8718bfc8b969920bfed2b059492355f}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a28268db9df499033521f23f17bce14c0}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a2b0b4165c0f12da1228ad2be0c6f301e}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+COLOR}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a7e7981511408f96f533361c0ed589a04}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad5c3b51c9ce5f5d969c8af56a46029c8}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adb55b234557f0a7783136e35ad3e8fda}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adc8afc2e8945bee876a61e9a6f56272d}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+ALPHA}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aad8f42e0fb437276ea1fecf3600346d2}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a49fcc42b208c3552ae7b7557aee74b6b}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+COLOR}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+COLOR}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+ALPHA}}
+, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+ALPHA}}
+, {\bfseries NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga04782788330b1bf07c4c6328206386a6af0574648647d779caed27e8139f7f620}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+ADD}}
+, \mbox{\hyperlink{group__ngf_gga04782788330b1bf07c4c6328206386a6a5d45f9d4f4f3e4aac93a1f0f7694be41}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+SUB}}
+, \mbox{\hyperlink{group__ngf_gga04782788330b1bf07c4c6328206386a6a8230dcf7b4e6336bfdf940d94a38f3ff}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+REV\+\_\+\+SUB}}
+, \mbox{\hyperlink{group__ngf_gga04782788330b1bf07c4c6328206386a6a50f9cab76b5e44880b328b3e43b2d54e}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MIN}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga04782788330b1bf07c4c6328206386a6ad60bfc6845dfe344b0bde5cf02d43b9b}{NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MAX}}
+, {\bfseries NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab6a39e0a95eda430bfb729be90e02ae1}{NGF\+\_\+\+TYPE\+\_\+\+INT8}} = 0
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a00304ae4b72b5a8a9ce4d946a3748558}{NGF\+\_\+\+TYPE\+\_\+\+UINT8}}
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a31996be448adf63b1c8d2a104ccf7c18}{NGF\+\_\+\+TYPE\+\_\+\+INT16}}
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2}{NGF\+\_\+\+TYPE\+\_\+\+UINT16}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a2affe3abef69b1ae4fa1675d26c21825}{NGF\+\_\+\+TYPE\+\_\+\+INT32}}
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a46f9ed208f47c6acf29a9605e862ae37}{NGF\+\_\+\+TYPE\+\_\+\+UINT32}}
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8aefddfaec8433530f5b4fbb255a7713b3}{NGF\+\_\+\+TYPE\+\_\+\+FLOAT}}
+, \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a85704ac5c4037b152f79eeda6d77c7c1}{NGF\+\_\+\+TYPE\+\_\+\+HALF\+\_\+\+FLOAT}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab3ddc8639d625361bc86701d0a1553e5}{NGF\+\_\+\+TYPE\+\_\+\+DOUBLE}}
+, {\bfseries NGF\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}{ngf\+\_\+sample\+\_\+count}} \{ \newline
+{\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+1} = 1
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+2} = 2
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+4} = 4
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+8} = 8
+, \newline
+{\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+16} = 16
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+32} = 32
+, {\bfseries NGF\+\_\+\+SAMPLE\+\_\+\+COUNT\+\_\+64} = 64
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}{ngf\+\_\+image\+\_\+format}} \{ \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R8} = 0
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+SRGB8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+SRGBA8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGR8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGRA8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGR8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BGRA8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG32F}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA32F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG16F}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA16F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG11\+B10F}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB9\+E5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16\+\_\+\+UNORM}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16\+\_\+\+SNORM}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R16S}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA16U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+R32U}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RG32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGB32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+RGBA32U}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BC7}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+BC7\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+4x4}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+4x4\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x4}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x4\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x5}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+5x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x6}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+6x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x5}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x6}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+8x8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x5}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x5\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x6}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x6\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x8}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x8\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x10}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+10x10\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x10}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x10\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x12}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+ASTC\+\_\+12x12\+\_\+\+SRGB}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH32}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH16}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+DEPTH24\+\_\+\+STENCIL8}
+, \newline
+{\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+UNDEFINED}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+FORMAT\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}{ngf\+\_\+attachment\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab188a950eecda313e02d6df8bd071403}{NGF\+\_\+\+ATTACHMENT\+\_\+\+COLOR}} = 0
+, \mbox{\hyperlink{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab5212e206163c2f7e16d9e329fbf6b52}{NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH}}
+, \mbox{\hyperlink{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aa21dde9ed482efc4f521ab3e71df2ad07}{NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH\+\_\+\+STENCIL}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}{ngf\+\_\+primitive\+\_\+topology}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda4522a5528f33bc3576d1d765ae074d58}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+LIST}} = 0
+, \mbox{\hyperlink{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda137862be96020af59267de3c5a215d57}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+STRIP}}
+, \mbox{\hyperlink{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda5f496f00ec5430a445dbf30b2b5fd6af}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+LIST}}
+, \mbox{\hyperlink{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda2a99c0876cf4762c2048462053af7d25}{NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+STRIP}}
+, \newline
+{\bfseries NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}} \{ \newline
+\mbox{\hyperlink{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ae6b09eddb52389891d4ab2b282b69873}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+UNIFORM\+\_\+\+BUFFER}} = 0
+, \mbox{\hyperlink{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aebd2570d7b1a8fa3a247cd43e58e8727}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE}}
+, \mbox{\hyperlink{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aed13fc0d35dd9e94f92a498ea8478091}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+SAMPLER}}
+, \mbox{\hyperlink{group__ngf_gga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE\+\_\+\+AND\+\_\+\+SAMPLER}}
+, \newline
+\mbox{\hyperlink{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ad51efeead738e9553ef2d7b9f9cf718f}{NGF\+\_\+\+DESCRIPTOR\+\_\+\+TEXEL\+\_\+\+BUFFER}}
+, {\bfseries NGF\+\_\+\+DESCRIPTOR\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283f}{ngf\+\_\+sampler\+\_\+filter}} \{ \mbox{\hyperlink{group__ngf_ggabcde3381b55395f963eca78b2773283fadb28fc69660039c5ebf5deccae61bc9e}{NGF\+\_\+\+FILTER\+\_\+\+NEAREST}} = 0
+, \mbox{\hyperlink{group__ngf_ggabcde3381b55395f963eca78b2773283fa3bdadc76704434ab8c4b9a5035e79b8d}{NGF\+\_\+\+FILTER\+\_\+\+LINEAR}}
+, {\bfseries NGF\+\_\+\+FILTER\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}{ngf\+\_\+sampler\+\_\+wrap\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea95a662a3df9173a19c94e961f86a3b11}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+CLAMP\+\_\+\+TO\+\_\+\+EDGE}} = 0
+, \mbox{\hyperlink{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea3e36c346c33431fc080132e720eaed70}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+REPEAT}}
+, \mbox{\hyperlink{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea14cd2d2a59555b38ff302209d56de884}{NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+MIRRORED\+\_\+\+REPEAT}}
+, {\bfseries NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173}{ngf\+\_\+image\+\_\+usage}} \{ \mbox{\hyperlink{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a1453701fecbf3902d1f0259ceb473fab}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+SAMPLE\+\_\+\+FROM}} = 0x01
+, \mbox{\hyperlink{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a3ecd301fa3251a07eb3778904ab2fc61}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+ATTACHMENT}} = 0x02
+, \mbox{\hyperlink{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a328194f46df2a96823000c6d476e6ff6}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST}} = 0x04
+, \mbox{\hyperlink{group__ngf_ggad488948359d867a2c93c6fc0b50c9173aa933e75ce3dbba4e44c8c472209ed8e7}{NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+MIPMAP\+\_\+\+GENERATION}} = 0x08
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}{ngf\+\_\+image\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba5343fd7c187a40afe11397162737100b}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+2D}} = 0
+, \mbox{\hyperlink{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba10161252c5145974d4379ece3f273904}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+3D}}
+, \mbox{\hyperlink{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba9712c8cfdf206c435bbe921111ba22f6}{NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+CUBE}}
+, {\bfseries NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}{ngf\+\_\+cubemap\+\_\+face}} \{ \newline
+{\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+X}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+X}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+Y}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+Y}
+, \newline
+{\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+POSITIVE\+\_\+Z}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+NEGATIVE\+\_\+Z}
+, {\bfseries NGF\+\_\+\+CUBEMAP\+\_\+\+FACE\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}} \{ \mbox{\hyperlink{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a38008ecddba45629db9a607f238b398e}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+DONTCARE}} = 0
+, \mbox{\hyperlink{group__ngf_ggafe674efd40411229fb8f4b1757d337e1afc1e9bbfaee309317e2e911f1415d73a}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+KEEP}}
+, \mbox{\hyperlink{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a3f6b389f886088b1d8ca0f69ddf50373}{NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+CLEAR}}
+, {\bfseries NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}} \{ \mbox{\hyperlink{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0a07c3d1d05cbf8bd11e4f0cf8639d81fc}{NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+DONTCARE}} = 0
+, \mbox{\hyperlink{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0af8bf2aec3a89797cd27f8eb6ff322202}{NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+STORE}}
+, {\bfseries NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+COUNT}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}{ngf\+\_\+buffer\+\_\+storage\+\_\+type}} \{ \mbox{\hyperlink{group__ngf_gga8415050dbe6582bbb7dd038c3712277caa1133e4913490414b2c8a8a5a0849592}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE}}
+, \mbox{\hyperlink{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabbbf82f224f27c14bee5691228c9b614}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+WRITEABLE}}
+, \mbox{\hyperlink{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabac3191d61a3c294a512363b34a1f3a6}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE\+\_\+\+WRITEABLE}}
+, \mbox{\hyperlink{group__ngf_gga8415050dbe6582bbb7dd038c3712277ca7eb92bbd9e9d7df9cf3d868e61b54a39}{NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+PRIVATE}}
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}{ngf\+\_\+buffer\+\_\+usage}} \{ \newline
+\mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea1eed2a0bc5fae403d090a61e3d71777d}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+SRC}} = 0x01
+, \mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeacdc2283292e5f3df16d018dc2c05fb24}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST}} = 0x02
+, \mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea47ce3bad4a3a486a9b315a716a758286}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+UNIFORM\+\_\+\+BUFFER}} = 0x04
+, \mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea3528e67460b81d2fac39fddde6663e5c}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+INDEX\+\_\+\+BUFFER}} = 0x08
+, \newline
+\mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea72df4d25c1e8b814f186e9bcc9c5eb28}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+VERTEX\+\_\+\+BUFFER}} = 0x10
+, \mbox{\hyperlink{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeaa09342ffab225411a3dff51002504fea}{NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+TEXEL\+\_\+\+BUFFER}} = 0x20
+ \}
+\item 
+enum \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}{ngf\+\_\+present\+\_\+mode}} \{ \mbox{\hyperlink{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37ab1d03c3ecbcc2f07630f0e828955f3aa}{NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+FIFO}}
+, \mbox{\hyperlink{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37aad8aeab9a3073978366f1bea301b2cf9}{NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+IMMEDIATE}}
+ \}
+\end{DoxyCompactItemize}
+\doxysubsection*{Functions}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gab6fafd98f49fbcb76304780874986332}{ngf\+\_\+get\+\_\+device\+\_\+list}} (const \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}} $\ast$$\ast$devices, uint32\+\_\+t $\ast$ndevices)
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga067147fcb8d461a23c9099c0fea5b605}{ngf\+\_\+initialize}} (const \mbox{\hyperlink{structngf__init__info}{ngf\+\_\+init\+\_\+info}} $\ast$init\+\_\+info) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga5689c89f5def935f949a03ec158fbf5b}{ngf\+\_\+create\+\_\+context}} (const \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga8ba904bf2f053a20bd63cdcc34d8b5c2}{ngf\+\_\+destroy\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga2c4bccb7d7e5bfbf06acb181966872f1}{ngf\+\_\+resize\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx, uint32\+\_\+t new\+\_\+width, uint32\+\_\+t new\+\_\+height) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gaeb1e325adf6ca533050ea225e1895fd1}{ngf\+\_\+set\+\_\+context}} (\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ctx) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}{ngf\+\_\+begin\+\_\+frame}} (\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} $\ast$token) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gabdc19420f2365a4d25d99d2ec92d3791}{ngf\+\_\+end\+\_\+frame}} (\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} token) NGF\+\_\+\+NOEXCEPT
+\item 
+const \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} $\ast$ \mbox{\hyperlink{group__ngf_ga64f16281740125152672a7ce38f1a853}{ngf\+\_\+get\+\_\+device\+\_\+capabilities}} (void) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga6b11af603327969158d78a1d7b63a402}{ngf\+\_\+create\+\_\+shader\+\_\+stage}} (const \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga4cdfd3d01bc3fad21af9eba68e3cb019}{ngf\+\_\+destroy\+\_\+shader\+\_\+stage}} (\mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}} stage) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga01f6e663642ece4213607e6197708f32}{ngf\+\_\+create\+\_\+graphics\+\_\+pipeline}} (const \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gaba2355db1b71d7e526b2a2e719b12666}{ngf\+\_\+destroy\+\_\+graphics\+\_\+pipeline}} (\mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} pipeline) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga6175e595bd3db7373493f2536d295a97}{ngf\+\_\+create\+\_\+image}} (const \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga823fcca9eab614317beb8e4c75d8574a}{ngf\+\_\+destroy\+\_\+image}} (\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} image) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_gaf5849344fb7781fe7ad84238bdfe12f5}{ngf\+\_\+create\+\_\+sampler}} (const \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gac27b6d8f09c51b2cf7aeb03cfef5f09f}{ngf\+\_\+destroy\+\_\+sampler}} (\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} sampler) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga32e5bee46abc13b7b25e96736a6f30bc}{ngf\+\_\+create\+\_\+render\+\_\+target}} (const \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gaf495e14f8af348e3cefcfc7bad46f162}{ngf\+\_\+destroy\+\_\+render\+\_\+target}} (\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} rendertarget) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} \mbox{\hyperlink{group__ngf_ga7a3c3e03440eb8986edfeb7087f5184f}{ngf\+\_\+default\+\_\+render\+\_\+target}} () NGF\+\_\+\+NOEXCEPT
+\item 
+const \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}} $\ast$ \mbox{\hyperlink{group__ngf_ga6f719e3f0647aadee613b74b20559699}{ngf\+\_\+default\+\_\+render\+\_\+target\+\_\+attachment\+\_\+descs}} () NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga8b30f1f0291b3935a4c89f1ab3377a1e}{ngf\+\_\+create\+\_\+buffer}} (const \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gab79d65f9190a3511d3052d364ddf47c8}{ngf\+\_\+destroy\+\_\+buffer}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buffer) NGF\+\_\+\+NOEXCEPT
+\item 
+void $\ast$ \mbox{\hyperlink{group__ngf_gaaa6b04b8a3b7937ad4cb7248197ee4e5}{ngf\+\_\+buffer\+\_\+map\+\_\+range}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf, size\+\_\+t offset, size\+\_\+t size) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga96e3994c0ab0661a37fad696d2d0c3b9}{ngf\+\_\+buffer\+\_\+flush\+\_\+range}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf, size\+\_\+t offset, size\+\_\+t size) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga2540533cc84b220941168c92f8c6ffee}{ngf\+\_\+buffer\+\_\+unmap}} (\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} buf) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga0f14ddf5b1abfbc26a23684516e6f3bc}{ngf\+\_\+finish}} (void) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga9faa695e2aff70cf798d17d5463bd8ab}{ngf\+\_\+create\+\_\+cmd\+\_\+buffer}} (const \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}} $\ast$info, \mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$result) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga7f45a9fa25fcf22b88cdcc80fcdb0217}{ngf\+\_\+destroy\+\_\+cmd\+\_\+buffer}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buffer) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga52027dd2cf70d4530d60edabe5a6019c}{ngf\+\_\+start\+\_\+cmd\+\_\+buffer}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} token) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga19a0228d5d5568d37d3a75f1f91353e4}{ngf\+\_\+submit\+\_\+cmd\+\_\+buffers}} (uint32\+\_\+t nbuffers, \mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$bufs) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga093b1243f355682e1221ff351085c3a0}{ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, const \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}} $\ast$pass\+\_\+info, \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga404dcd621f51b384bf241992d6c24f43}{ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass\+\_\+simple}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} rt, float clear\+\_\+color\+\_\+r, float clear\+\_\+color\+\_\+g, float clear\+\_\+color\+\_\+b, float clear\+\_\+color\+\_\+a, float clear\+\_\+depth, uint32\+\_\+t clear\+\_\+stencil, \mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga7bb1c15551c2e3b9c8592b1431f6e451}{ngf\+\_\+cmd\+\_\+end\+\_\+render\+\_\+pass}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga4de689db197c35be424ff9383ee07728}{ngf\+\_\+cmd\+\_\+begin\+\_\+xfer\+\_\+pass}} (\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} buf, \mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} $\ast$enc) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga9dfc74933a0cb255a9b0f9a296de63cb}{ngf\+\_\+cmd\+\_\+end\+\_\+xfer\+\_\+pass}} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} enc) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga9fc3fb8fb5ca75b5c845e4cf05482b86}{ngf\+\_\+cmd\+\_\+viewport}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$r) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gaa558c9c2356786c7c8f75e1068848045}{ngf\+\_\+cmd\+\_\+scissor}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$r) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga598086325fff021d147e7be13ed5c1ca}{ngf\+\_\+cmd\+\_\+stencil\+\_\+reference}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga91bb66405705a3833c3ad14e0bad18b0}{ngf\+\_\+cmd\+\_\+stencil\+\_\+compare\+\_\+mask}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_gad925e83f480a62d6b8b8eacf291655bb}{ngf\+\_\+cmd\+\_\+stencil\+\_\+write\+\_\+mask}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} buf, uint32\+\_\+t front, uint32\+\_\+t back) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga904b09eb0463b98ca9b30b9e790dc432}{ngf\+\_\+cmd\+\_\+bind\+\_\+attrib\+\_\+buffer}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} enc, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} vbuf, uint32\+\_\+t binding, uint32\+\_\+t offset) NGF\+\_\+\+NOEXCEPT
+\item 
+void \mbox{\hyperlink{group__ngf_ga0b0ca70fd815664f862c76dbb40e03e5}{ngf\+\_\+cmd\+\_\+bind\+\_\+index\+\_\+buffer}} (\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} enc, const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} idxbuf, \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}} index\+\_\+type) NGF\+\_\+\+NOEXCEPT
+\item 
+\mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} \mbox{\hyperlink{group__ngf_ga55a2a27dfc26e3d79d31df0ff0805bb6}{ngf\+\_\+cmd\+\_\+generate\+\_\+mipmaps}} (\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} xfenc, \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} img) NGF\+\_\+\+NOEXCEPT
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Macro Definition Documentation}
+\mbox{\Hypertarget{group__ngf_gab2cb27fa97957925fc471eb90633d756}\label{group__ngf_gab2cb27fa97957925fc471eb90633d756}} 
+\index{Core C API@{Core C API}!NGF\_DEVICE\_NAME\_MAX\_LENGTH@{NGF\_DEVICE\_NAME\_MAX\_LENGTH}}
+\index{NGF\_DEVICE\_NAME\_MAX\_LENGTH@{NGF\_DEVICE\_NAME\_MAX\_LENGTH}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{NGF\_DEVICE\_NAME\_MAX\_LENGTH}{NGF\_DEVICE\_NAME\_MAX\_LENGTH}}
+{\footnotesize\ttfamily \#define NGF\+\_\+\+DEVICE\+\_\+\+NAME\+\_\+\+MAX\+\_\+\+LENGTH~(256u)}
+
+Maximum length of a device\textquotesingle{}s name. 
+
+\doxysubsection{Typedef Documentation}
+\mbox{\Hypertarget{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}\label{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}} 
+\index{Core C API@{Core C API}!ngf\_device\_handle@{ngf\_device\_handle}}
+\index{ngf\_device\_handle@{ngf\_device\_handle}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_device\_handle}{ngf\_device\_handle}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga93bf6330e6a48e0520aed9893ebc9f5e}{ngf\+\_\+device\+\_\+handle}}}
+
+A handle that uniquely identifies a rendering device.
+
+Note that the value of the handle corresponding to the same exact physical device may be different across different instances of the same client. In other words, if the client application shuts down, then starts up again, it may get different values for device handles than it did before. Therefore, device handles should not be persisted. \mbox{\Hypertarget{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}\label{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}} 
+\index{Core C API@{Core C API}!ngf\_frame\_token@{ngf\_frame\_token}}
+\index{ngf\_frame\_token@{ngf\_frame\_token}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_frame\_token}{ngf\_frame\_token}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}}
+
+A token identifying a frame of rendering. See \mbox{\hyperlink{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}{ngf\+\_\+begin\+\_\+frame}} and \mbox{\hyperlink{group__ngf_gabdc19420f2365a4d25d99d2ec92d3791}{ngf\+\_\+end\+\_\+frame}} for details. 
+
+\doxysubsection{Enumeration Type Documentation}
+\mbox{\Hypertarget{group__ngf_gafe674efd40411229fb8f4b1757d337e1}\label{group__ngf_gafe674efd40411229fb8f4b1757d337e1}} 
+\index{Core C API@{Core C API}!ngf\_attachment\_load\_op@{ngf\_attachment\_load\_op}}
+\index{ngf\_attachment\_load\_op@{ngf\_attachment\_load\_op}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_attachment\_load\_op}{ngf\_attachment\_load\_op}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gafe674efd40411229fb8f4b1757d337e1}{ngf\+\_\+attachment\+\_\+load\+\_\+op}}}
+
+Enumerates actions that can be performed on attachment \char`\"{}load\char`\"{} (at the start of a render pass). \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_LOAD\_OP\_DONTCARE@{NGF\_LOAD\_OP\_DONTCARE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_LOAD\_OP\_DONTCARE@{NGF\_LOAD\_OP\_DONTCARE}}}\mbox{\Hypertarget{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a38008ecddba45629db9a607f238b398e}\label{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a38008ecddba45629db9a607f238b398e}} 
+NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+DONTCARE&Don\textquotesingle{}t care what happens. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_LOAD\_OP\_KEEP@{NGF\_LOAD\_OP\_KEEP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_LOAD\_OP\_KEEP@{NGF\_LOAD\_OP\_KEEP}}}\mbox{\Hypertarget{group__ngf_ggafe674efd40411229fb8f4b1757d337e1afc1e9bbfaee309317e2e911f1415d73a}\label{group__ngf_ggafe674efd40411229fb8f4b1757d337e1afc1e9bbfaee309317e2e911f1415d73a}} 
+NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+KEEP&Preserve the prior contents of the attachment. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_LOAD\_OP\_CLEAR@{NGF\_LOAD\_OP\_CLEAR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_LOAD\_OP\_CLEAR@{NGF\_LOAD\_OP\_CLEAR}}}\mbox{\Hypertarget{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a3f6b389f886088b1d8ca0f69ddf50373}\label{group__ngf_ggafe674efd40411229fb8f4b1757d337e1a3f6b389f886088b1d8ca0f69ddf50373}} 
+NGF\+\_\+\+LOAD\+\_\+\+OP\+\_\+\+CLEAR&Clear the attachment. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}\label{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}} 
+\index{Core C API@{Core C API}!ngf\_attachment\_store\_op@{ngf\_attachment\_store\_op}}
+\index{ngf\_attachment\_store\_op@{ngf\_attachment\_store\_op}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_attachment\_store\_op}{ngf\_attachment\_store\_op}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gab4a2ec1593a7dc69b50ebb6a134237e0}{ngf\+\_\+attachment\+\_\+store\+\_\+op}}}
+
+Enumerates actions that can be performed on attachment \char`\"{}store\char`\"{} (at the end of a render pass). \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STORE\_OP\_DONTCARE@{NGF\_STORE\_OP\_DONTCARE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STORE\_OP\_DONTCARE@{NGF\_STORE\_OP\_DONTCARE}}}\mbox{\Hypertarget{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0a07c3d1d05cbf8bd11e4f0cf8639d81fc}\label{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0a07c3d1d05cbf8bd11e4f0cf8639d81fc}} 
+NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+DONTCARE&Don\textquotesingle{}t care what happens. Use this if you don\textquotesingle{}t plan on reading back the contents of the attachment in any shaders, or presenting it to screen. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STORE\_OP\_STORE@{NGF\_STORE\_OP\_STORE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STORE\_OP\_STORE@{NGF\_STORE\_OP\_STORE}}}\mbox{\Hypertarget{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0af8bf2aec3a89797cd27f8eb6ff322202}\label{group__ngf_ggab4a2ec1593a7dc69b50ebb6a134237e0af8bf2aec3a89797cd27f8eb6ff322202}} 
+NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+STORE&Use this if you plan on reading the contents of the attachment in any shaders or presenting it to screen. The contents of the attachment shall be written out to system memory. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}\label{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}} 
+\index{Core C API@{Core C API}!ngf\_attachment\_type@{ngf\_attachment\_type}}
+\index{ngf\_attachment\_type@{ngf\_attachment\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_attachment\_type}{ngf\_attachment\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gae330c9a2dd7ef60b523e68f1f273135a}{ngf\+\_\+attachment\+\_\+type}}}
+
+Enumerates render target attachment types. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ATTACHMENT\_COLOR@{NGF\_ATTACHMENT\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ATTACHMENT\_COLOR@{NGF\_ATTACHMENT\_COLOR}}}\mbox{\Hypertarget{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab188a950eecda313e02d6df8bd071403}\label{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab188a950eecda313e02d6df8bd071403}} 
+NGF\+\_\+\+ATTACHMENT\+\_\+\+COLOR&For attachments containing color data. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ATTACHMENT\_DEPTH@{NGF\_ATTACHMENT\_DEPTH}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ATTACHMENT\_DEPTH@{NGF\_ATTACHMENT\_DEPTH}}}\mbox{\Hypertarget{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab5212e206163c2f7e16d9e329fbf6b52}\label{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aab5212e206163c2f7e16d9e329fbf6b52}} 
+NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH&For attachments containing depth data. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ATTACHMENT\_DEPTH\_STENCIL@{NGF\_ATTACHMENT\_DEPTH\_STENCIL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ATTACHMENT\_DEPTH\_STENCIL@{NGF\_ATTACHMENT\_DEPTH\_STENCIL}}}\mbox{\Hypertarget{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aa21dde9ed482efc4f521ab3e71df2ad07}\label{group__ngf_ggae330c9a2dd7ef60b523e68f1f273135aa21dde9ed482efc4f521ab3e71df2ad07}} 
+NGF\+\_\+\+ATTACHMENT\+\_\+\+DEPTH\+\_\+\+STENCIL&For attachments containing combined depth and stencil data. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}\label{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}} 
+\index{Core C API@{Core C API}!ngf\_blend\_factor@{ngf\_blend\_factor}}
+\index{ngf\_blend\_factor@{ngf\_blend\_factor}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_blend\_factor}{ngf\_blend\_factor}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}}}
+
+Factors that can be used for source and destination values during the blend operation. The factor can be thought See \mbox{\hyperlink{structngf__blend__info}{ngf\+\_\+blend\+\_\+info}} for details. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ZERO@{NGF\_BLEND\_FACTOR\_ZERO}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ZERO@{NGF\_BLEND\_FACTOR\_ZERO}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a05e0a125602eb50d013ac6cdde576b80}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a05e0a125602eb50d013ac6cdde576b80}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ZERO&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: sets each color component to 0;
+\item if used as a blend factor for alpha\+: sets alpha to 0. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE@{NGF\_BLEND\_FACTOR\_ONE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE@{NGF\_BLEND\_FACTOR\_ONE}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad8718bfc8b969920bfed2b059492355f}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad8718bfc8b969920bfed2b059492355f}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: leaves the color unchanged;
+\item if used as a blend factor for alpha\+: leaves the alpha value unchanged. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_SRC\_COLOR@{NGF\_BLEND\_FACTOR\_SRC\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_SRC\_COLOR@{NGF\_BLEND\_FACTOR\_SRC\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a28268db9df499033521f23f17bce14c0}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a28268db9df499033521f23f17bce14c0}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by the corresponding component of the \char`\"{}source\char`\"{} color value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by the \char`\"{}source\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a2b0b4165c0f12da1228ad2be0c6f301e}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a2b0b4165c0f12da1228ad2be0c6f301e}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by one minus the corresponding component of the \char`\"{}source\char`\"{} color value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by one minus the \char`\"{}source\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_DST\_COLOR@{NGF\_BLEND\_FACTOR\_DST\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_DST\_COLOR@{NGF\_BLEND\_FACTOR\_DST\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a7e7981511408f96f533361c0ed589a04}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a7e7981511408f96f533361c0ed589a04}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by the corresponding component of the \char`\"{}destination\char`\"{} color value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by the \char`\"{}destination\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad5c3b51c9ce5f5d969c8af56a46029c8}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad5c3b51c9ce5f5d969c8af56a46029c8}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by one minus the corresponding component of the \char`\"{}destination\char`\"{} color value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by one minus the \char`\"{}destination\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_SRC\_ALPHA@{NGF\_BLEND\_FACTOR\_SRC\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_SRC\_ALPHA@{NGF\_BLEND\_FACTOR\_SRC\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adb55b234557f0a7783136e35ad3e8fda}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adb55b234557f0a7783136e35ad3e8fda}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+SRC\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by the \char`\"{}source\char`\"{} alpha value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by the \char`\"{}source\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_SRC\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adc8afc2e8945bee876a61e9a6f56272d}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82adc8afc2e8945bee876a61e9a6f56272d}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+SRC\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by one minus the \char`\"{}source\char`\"{} alpha value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by one minus the \char`\"{}source\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_DST\_ALPHA@{NGF\_BLEND\_FACTOR\_DST\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_DST\_ALPHA@{NGF\_BLEND\_FACTOR\_DST\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aad8f42e0fb437276ea1fecf3600346d2}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aad8f42e0fb437276ea1fecf3600346d2}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+DST\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by the \char`\"{}destination\char`\"{} alpha value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by the \char`\"{}destination\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_DST\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a49fcc42b208c3552ae7b7557aee74b6b}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a49fcc42b208c3552ae7b7557aee74b6b}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+DST\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies each color component by one minus the \char`\"{}destination\char`\"{} alpha value;
+\item if used as a blend factor for alpha\+: multiples the alpha value by one minus the \char`\"{}destination\char`\"{} alpha value. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_CONSTANT\_COLOR@{NGF\_BLEND\_FACTOR\_CONSTANT\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_CONSTANT\_COLOR@{NGF\_BLEND\_FACTOR\_CONSTANT\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies the red, green and blue components of the color by the 1st, 2nd and 3rd elements of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}} respectively;
+\item if used as a blend factor for alpha\+: multiplies the alpha value by the 4th component of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}}. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_COLOR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_COLOR@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_COLOR}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+COLOR&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies the red, green and blue components of the color by one minus the 1st, 2nd and 3rd elements of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}} respectively;
+\item if used as a blend factor for alpha\+: multiplies the alpha value by one minus the 4th component of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}}. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_CONSTANT\_ALPHA@{NGF\_BLEND\_FACTOR\_CONSTANT\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_CONSTANT\_ALPHA@{NGF\_BLEND\_FACTOR\_CONSTANT\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies the components of the color by the 4th element of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}};
+\item if used as a blend factor for alpha\+: multiplies the alpha value by the 4th component of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}}. 
+\end{DoxyItemize}\\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_ALPHA}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_ALPHA@{NGF\_BLEND\_FACTOR\_ONE\_MINUS\_CONSTANT\_ALPHA}}}\mbox{\Hypertarget{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588}\label{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588}} 
+NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+ALPHA&
+\begin{DoxyItemize}
+\item If used as a blend factor for color\+: multiplies the components of the color by one minus the 4th element of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}};
+\item if used as a blend factor for alpha\+: multiplies the alpha value by one minus the 4th component of \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts}}. 
+\end{DoxyItemize}\\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga04782788330b1bf07c4c6328206386a6}\label{group__ngf_ga04782788330b1bf07c4c6328206386a6}} 
+\index{Core C API@{Core C API}!ngf\_blend\_op@{ngf\_blend\_op}}
+\index{ngf\_blend\_op@{ngf\_blend\_op}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_blend\_op}{ngf\_blend\_op}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}}}
+
+Operations that can be performed to blend the values computed by the fragment stage (source values, denoted {\ttfamily S} in the member documentation) with values already present in the target color attachment of the framebuffer (destination values, denoted {\ttfamily D} in the member documentation).
+
+The factors (\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}}) for the source and destination values are denoted as {\ttfamily Fs} and {\ttfamily Fd} respectively in the member documentation below. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_OP\_ADD@{NGF\_BLEND\_OP\_ADD}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_OP\_ADD@{NGF\_BLEND\_OP\_ADD}}}\mbox{\Hypertarget{group__ngf_gga04782788330b1bf07c4c6328206386a6af0574648647d779caed27e8139f7f620}\label{group__ngf_gga04782788330b1bf07c4c6328206386a6af0574648647d779caed27e8139f7f620}} 
+NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+ADD&The result of the blend operation shall be {\ttfamily S$\ast$\+Fs + D$\ast$\+Fd} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_OP\_SUB@{NGF\_BLEND\_OP\_SUB}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_OP\_SUB@{NGF\_BLEND\_OP\_SUB}}}\mbox{\Hypertarget{group__ngf_gga04782788330b1bf07c4c6328206386a6a5d45f9d4f4f3e4aac93a1f0f7694be41}\label{group__ngf_gga04782788330b1bf07c4c6328206386a6a5d45f9d4f4f3e4aac93a1f0f7694be41}} 
+NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+SUB&The result of the blend operation shall be {\ttfamily S$\ast$\+Fs -\/ D$\ast$\+Fd} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_OP\_REV\_SUB@{NGF\_BLEND\_OP\_REV\_SUB}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_OP\_REV\_SUB@{NGF\_BLEND\_OP\_REV\_SUB}}}\mbox{\Hypertarget{group__ngf_gga04782788330b1bf07c4c6328206386a6a8230dcf7b4e6336bfdf940d94a38f3ff}\label{group__ngf_gga04782788330b1bf07c4c6328206386a6a8230dcf7b4e6336bfdf940d94a38f3ff}} 
+NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+REV\+\_\+\+SUB&The result of the blend operation shall be {\ttfamily D$\ast$\+Fd -\/ S$\ast$\+Fs} \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_OP\_MIN@{NGF\_BLEND\_OP\_MIN}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_OP\_MIN@{NGF\_BLEND\_OP\_MIN}}}\mbox{\Hypertarget{group__ngf_gga04782788330b1bf07c4c6328206386a6a50f9cab76b5e44880b328b3e43b2d54e}\label{group__ngf_gga04782788330b1bf07c4c6328206386a6a50f9cab76b5e44880b328b3e43b2d54e}} 
+NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MIN&The result of the blend operation shall be {\ttfamily min(\+S, D)} ~\newline
+ \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BLEND\_OP\_MAX@{NGF\_BLEND\_OP\_MAX}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BLEND\_OP\_MAX@{NGF\_BLEND\_OP\_MAX}}}\mbox{\Hypertarget{group__ngf_gga04782788330b1bf07c4c6328206386a6ad60bfc6845dfe344b0bde5cf02d43b9b}\label{group__ngf_gga04782788330b1bf07c4c6328206386a6ad60bfc6845dfe344b0bde5cf02d43b9b}} 
+NGF\+\_\+\+BLEND\+\_\+\+OP\+\_\+\+MAX&The result of the blend operation shall be {\ttfamily max(\+S, D)} ~\newline
+ \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}\label{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}} 
+\index{Core C API@{Core C API}!ngf\_buffer\_storage\_type@{ngf\_buffer\_storage\_type}}
+\index{ngf\_buffer\_storage\_type@{ngf\_buffer\_storage\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_storage\_type}{ngf\_buffer\_storage\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga8415050dbe6582bbb7dd038c3712277c}{ngf\+\_\+buffer\+\_\+storage\+\_\+type}}}
+
+Enumerates types of memory backing a buffer object. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_STORAGE\_HOST\_READABLE@{NGF\_BUFFER\_STORAGE\_HOST\_READABLE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_STORAGE\_HOST\_READABLE@{NGF\_BUFFER\_STORAGE\_HOST\_READABLE}}}\mbox{\Hypertarget{group__ngf_gga8415050dbe6582bbb7dd038c3712277caa1133e4913490414b2c8a8a5a0849592}\label{group__ngf_gga8415050dbe6582bbb7dd038c3712277caa1133e4913490414b2c8a8a5a0849592}} 
+NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE&Memory that can be read by the host. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_STORAGE\_HOST\_WRITEABLE@{NGF\_BUFFER\_STORAGE\_HOST\_WRITEABLE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_STORAGE\_HOST\_WRITEABLE@{NGF\_BUFFER\_STORAGE\_HOST\_WRITEABLE}}}\mbox{\Hypertarget{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabbbf82f224f27c14bee5691228c9b614}\label{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabbbf82f224f27c14bee5691228c9b614}} 
+NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+WRITEABLE&Memory that can be written to by the host. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_STORAGE\_HOST\_READABLE\_WRITEABLE@{NGF\_BUFFER\_STORAGE\_HOST\_READABLE\_WRITEABLE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_STORAGE\_HOST\_READABLE\_WRITEABLE@{NGF\_BUFFER\_STORAGE\_HOST\_READABLE\_WRITEABLE}}}\mbox{\Hypertarget{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabac3191d61a3c294a512363b34a1f3a6}\label{group__ngf_gga8415050dbe6582bbb7dd038c3712277cabac3191d61a3c294a512363b34a1f3a6}} 
+NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+HOST\+\_\+\+READABLE\+\_\+\+WRITEABLE&Memory that can be both read from and written to by the host. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_STORAGE\_PRIVATE@{NGF\_BUFFER\_STORAGE\_PRIVATE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_STORAGE\_PRIVATE@{NGF\_BUFFER\_STORAGE\_PRIVATE}}}\mbox{\Hypertarget{group__ngf_gga8415050dbe6582bbb7dd038c3712277ca7eb92bbd9e9d7df9cf3d868e61b54a39}\label{group__ngf_gga8415050dbe6582bbb7dd038c3712277ca7eb92bbd9e9d7df9cf3d868e61b54a39}} 
+NGF\+\_\+\+BUFFER\+\_\+\+STORAGE\+\_\+\+PRIVATE&Private memory that cannot be accessed by the host directly. The contents of a buffer backed by this type of memory can only be modified by executing a ngf\+\_\+cmd\+\_\+copy\+\_\+buffer. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}\label{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}} 
+\index{Core C API@{Core C API}!ngf\_buffer\_usage@{ngf\_buffer\_usage}}
+\index{ngf\_buffer\_usage@{ngf\_buffer\_usage}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_usage}{ngf\_buffer\_usage}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gabc1d94f0d06bf458e3345d05558567ae}{ngf\+\_\+buffer\+\_\+usage}}}
+
+Enumerates the buffer usage flags. A valid buffer usage mask may be formed by combining a subset of these values with a bitwise OR operator. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_XFER\_SRC@{NGF\_BUFFER\_USAGE\_XFER\_SRC}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_XFER\_SRC@{NGF\_BUFFER\_USAGE\_XFER\_SRC}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea1eed2a0bc5fae403d090a61e3d71777d}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea1eed2a0bc5fae403d090a61e3d71777d}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+SRC&The buffer may be used as a source for transfer operations. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_XFER\_DST@{NGF\_BUFFER\_USAGE\_XFER\_DST}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_XFER\_DST@{NGF\_BUFFER\_USAGE\_XFER\_DST}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeacdc2283292e5f3df16d018dc2c05fb24}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeacdc2283292e5f3df16d018dc2c05fb24}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST&The buffer may be used as a destination for transfer operations. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_UNIFORM\_BUFFER@{NGF\_BUFFER\_USAGE\_UNIFORM\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_UNIFORM\_BUFFER@{NGF\_BUFFER\_USAGE\_UNIFORM\_BUFFER}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea47ce3bad4a3a486a9b315a716a758286}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea47ce3bad4a3a486a9b315a716a758286}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+UNIFORM\+\_\+\+BUFFER&The buffer may be bound as a uniform buffer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_INDEX\_BUFFER@{NGF\_BUFFER\_USAGE\_INDEX\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_INDEX\_BUFFER@{NGF\_BUFFER\_USAGE\_INDEX\_BUFFER}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea3528e67460b81d2fac39fddde6663e5c}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea3528e67460b81d2fac39fddde6663e5c}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+INDEX\+\_\+\+BUFFER&The buffer may be used as the source of index data for indexed draws. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_VERTEX\_BUFFER@{NGF\_BUFFER\_USAGE\_VERTEX\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_VERTEX\_BUFFER@{NGF\_BUFFER\_USAGE\_VERTEX\_BUFFER}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea72df4d25c1e8b814f186e9bcc9c5eb28}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aea72df4d25c1e8b814f186e9bcc9c5eb28}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+VERTEX\+\_\+\+BUFFER&The buffer may be used as a source of vertex attribute data. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_BUFFER\_USAGE\_TEXEL\_BUFFER@{NGF\_BUFFER\_USAGE\_TEXEL\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_BUFFER\_USAGE\_TEXEL\_BUFFER@{NGF\_BUFFER\_USAGE\_TEXEL\_BUFFER}}}\mbox{\Hypertarget{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeaa09342ffab225411a3dff51002504fea}\label{group__ngf_ggabc1d94f0d06bf458e3345d05558567aeaa09342ffab225411a3dff51002504fea}} 
+NGF\+\_\+\+BUFFER\+\_\+\+USAGE\+\_\+\+TEXEL\+\_\+\+BUFFER&The buffer may be bound as a uniform texel buffer. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}\label{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}} 
+\index{Core C API@{Core C API}!ngf\_compare\_op@{ngf\_compare\_op}}
+\index{ngf\_compare\_op@{ngf\_compare\_op}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_compare\_op}{ngf\_compare\_op}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}}}
+
+Compare operations used in depth and stencil tests. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_NEVER@{NGF\_COMPARE\_OP\_NEVER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_NEVER@{NGF\_COMPARE\_OP\_NEVER}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae4ab6ac80224dcffb6e06f29fbf3e2a6}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae4ab6ac80224dcffb6e06f29fbf3e2a6}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEVER&Comparison test never succeeds. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_LESS@{NGF\_COMPARE\_OP\_LESS}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_LESS@{NGF\_COMPARE\_OP\_LESS}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eaa19ec9fd9da7657e9bc2d3da16e1daec}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eaa19ec9fd9da7657e9bc2d3da16e1daec}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LESS&Comparison test succeeds if A \texorpdfstring{$<$}{<} B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_LEQUAL@{NGF\_COMPARE\_OP\_LEQUAL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_LEQUAL@{NGF\_COMPARE\_OP\_LEQUAL}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1b983b52262fca72e5b2201e4144702e}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1b983b52262fca72e5b2201e4144702e}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+LEQUAL&Comparison test succeeds if A \texorpdfstring{$<$}{<}= B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_EQUAL@{NGF\_COMPARE\_OP\_EQUAL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_EQUAL@{NGF\_COMPARE\_OP\_EQUAL}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea6cf7bbfadeb5c10e5c56630197d0ec1e}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea6cf7bbfadeb5c10e5c56630197d0ec1e}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+EQUAL&Comparison test succeeds if A == B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_GEQUAL@{NGF\_COMPARE\_OP\_GEQUAL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_GEQUAL@{NGF\_COMPARE\_OP\_GEQUAL}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea854afe959ff0638efe70d56984648c5c}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea854afe959ff0638efe70d56984648c5c}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GEQUAL&Comparison test succeeds if A \texorpdfstring{$>$}{>}= B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_GREATER@{NGF\_COMPARE\_OP\_GREATER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_GREATER@{NGF\_COMPARE\_OP\_GREATER}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1621956ffe3dc6815a137a8ae1a60fb4}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea1621956ffe3dc6815a137a8ae1a60fb4}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+GREATER&Comparison test succeeds if A \texorpdfstring{$>$}{>} B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_NEQUAL@{NGF\_COMPARE\_OP\_NEQUAL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_NEQUAL@{NGF\_COMPARE\_OP\_NEQUAL}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea3128259c58b5974caf12fd535fb9f190}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342ea3128259c58b5974caf12fd535fb9f190}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+NEQUAL&Comparison test succeeds if A != B. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_COMPARE\_OP\_ALWAYS@{NGF\_COMPARE\_OP\_ALWAYS}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_COMPARE\_OP\_ALWAYS@{NGF\_COMPARE\_OP\_ALWAYS}}}\mbox{\Hypertarget{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae948919f53066c265bad60753eb10658}\label{group__ngf_ggae7023890d9364d3f8aa87c0e7807342eae948919f53066c265bad60753eb10658}} 
+NGF\+\_\+\+COMPARE\+\_\+\+OP\+\_\+\+ALWAYS&Comparison test always succeeds. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}\label{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}} 
+\index{Core C API@{Core C API}!ngf\_cubemap\_face@{ngf\_cubemap\_face}}
+\index{ngf\_cubemap\_face@{ngf\_cubemap\_face}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cubemap\_face}{ngf\_cubemap\_face}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gacc2fb9fa76d71abcae842fa895e1c6d0}{ngf\+\_\+cubemap\+\_\+face}}}
+
+Members of this enumeration are used to refer to the different faces of a cubemap. \mbox{\Hypertarget{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}\label{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}} 
+\index{Core C API@{Core C API}!ngf\_cull\_mode@{ngf\_cull\_mode}}
+\index{ngf\_cull\_mode@{ngf\_cull\_mode}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cull\_mode}{ngf\_cull\_mode}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gac58dd9a88f616e4b9822e2645cdbfb2b}{ngf\+\_\+cull\+\_\+mode}}}
+
+Enumerates polygon culling strategies. See also \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}}. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_CULL\_MODE\_BACK@{NGF\_CULL\_MODE\_BACK}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_CULL\_MODE\_BACK@{NGF\_CULL\_MODE\_BACK}}}\mbox{\Hypertarget{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bace08b36931f91be08ab1b4e69717eb73}\label{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bace08b36931f91be08ab1b4e69717eb73}} 
+NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+BACK&Cull back-\/facing polygons. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_CULL\_MODE\_FRONT@{NGF\_CULL\_MODE\_FRONT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_CULL\_MODE\_FRONT@{NGF\_CULL\_MODE\_FRONT}}}\mbox{\Hypertarget{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba83d81edfe8ca53fcf0c403af99f6bd74}\label{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba83d81edfe8ca53fcf0c403af99f6bd74}} 
+NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT&Cull front-\/facing polygons. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_CULL\_MODE\_FRONT\_AND\_BACK@{NGF\_CULL\_MODE\_FRONT\_AND\_BACK}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_CULL\_MODE\_FRONT\_AND\_BACK@{NGF\_CULL\_MODE\_FRONT\_AND\_BACK}}}\mbox{\Hypertarget{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba56a77ee9c6000d8234f0eb4512aa1f13}\label{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2ba56a77ee9c6000d8234f0eb4512aa1f13}} 
+NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+FRONT\+\_\+\+AND\+\_\+\+BACK&Cull all polygons. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_CULL\_MODE\_NONE@{NGF\_CULL\_MODE\_NONE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_CULL\_MODE\_NONE@{NGF\_CULL\_MODE\_NONE}}}\mbox{\Hypertarget{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bacc980598c9ec15cbabed7fac0318f52a}\label{group__ngf_ggac58dd9a88f616e4b9822e2645cdbfb2bacc980598c9ec15cbabed7fac0318f52a}} 
+NGF\+\_\+\+CULL\+\_\+\+MODE\+\_\+\+NONE&Do not cull anything. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}\label{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}} 
+\index{Core C API@{Core C API}!ngf\_descriptor\_type@{ngf\_descriptor\_type}}
+\index{ngf\_descriptor\_type@{ngf\_descriptor\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_descriptor\_type}{ngf\_descriptor\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga8a0ef5b45413475065aa68cf8508b835}{ngf\+\_\+descriptor\+\_\+type}}}
+
+Available descriptor types. Not that some back-\/ends may not support all of the listed descriptor types. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DESCRIPTOR\_UNIFORM\_BUFFER@{NGF\_DESCRIPTOR\_UNIFORM\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DESCRIPTOR\_UNIFORM\_BUFFER@{NGF\_DESCRIPTOR\_UNIFORM\_BUFFER}}}\mbox{\Hypertarget{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ae6b09eddb52389891d4ab2b282b69873}\label{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ae6b09eddb52389891d4ab2b282b69873}} 
+NGF\+\_\+\+DESCRIPTOR\+\_\+\+UNIFORM\+\_\+\+BUFFER&A uniform buffer, also known as a constant buffer, can be used to pass a small to medium sized chunk of data to the shader in a structured way. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DESCRIPTOR\_IMAGE@{NGF\_DESCRIPTOR\_IMAGE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DESCRIPTOR\_IMAGE@{NGF\_DESCRIPTOR\_IMAGE}}}\mbox{\Hypertarget{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aebd2570d7b1a8fa3a247cd43e58e8727}\label{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aebd2570d7b1a8fa3a247cd43e58e8727}} 
+NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE&An \mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DESCRIPTOR\_SAMPLER@{NGF\_DESCRIPTOR\_SAMPLER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DESCRIPTOR\_SAMPLER@{NGF\_DESCRIPTOR\_SAMPLER}}}\mbox{\Hypertarget{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aed13fc0d35dd9e94f92a498ea8478091}\label{group__ngf_gga8a0ef5b45413475065aa68cf8508b835aed13fc0d35dd9e94f92a498ea8478091}} 
+NGF\+\_\+\+DESCRIPTOR\+\_\+\+SAMPLER&An \mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}}. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DESCRIPTOR\_IMAGE\_AND\_SAMPLER@{NGF\_DESCRIPTOR\_IMAGE\_AND\_SAMPLER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DESCRIPTOR\_IMAGE\_AND\_SAMPLER@{NGF\_DESCRIPTOR\_IMAGE\_AND\_SAMPLER}}}\mbox{\Hypertarget{group__ngf_gga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3}\label{group__ngf_gga8a0ef5b45413475065aa68cf8508b835a936f9e18629c082be14a63446f2a00f3}} 
+NGF\+\_\+\+DESCRIPTOR\+\_\+\+IMAGE\+\_\+\+AND\+\_\+\+SAMPLER&A combination of an image and sampler in a single object. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DESCRIPTOR\_TEXEL\_BUFFER@{NGF\_DESCRIPTOR\_TEXEL\_BUFFER}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DESCRIPTOR\_TEXEL\_BUFFER@{NGF\_DESCRIPTOR\_TEXEL\_BUFFER}}}\mbox{\Hypertarget{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ad51efeead738e9553ef2d7b9f9cf718f}\label{group__ngf_gga8a0ef5b45413475065aa68cf8508b835ad51efeead738e9553ef2d7b9f9cf718f}} 
+NGF\+\_\+\+DESCRIPTOR\+\_\+\+TEXEL\+\_\+\+BUFFER&A texel buffer can be used to pass a large amount of unstructured data (i.\+e. a big array of {\ttfamily float4}s) to the shader. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga14ee1c4e867d874070b50141dabad8dc}\label{group__ngf_ga14ee1c4e867d874070b50141dabad8dc}} 
+\index{Core C API@{Core C API}!ngf\_device\_performance\_tier@{ngf\_device\_performance\_tier}}
+\index{ngf\_device\_performance\_tier@{ngf\_device\_performance\_tier}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_device\_performance\_tier}{ngf\_device\_performance\_tier}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga14ee1c4e867d874070b50141dabad8dc}{ngf\+\_\+device\+\_\+performance\+\_\+tier}}}
+
+Enumerates different types of rendering devices. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH@{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH@{NGF\_DEVICE\_PERFORMANCE\_TIER\_HIGH}}}\mbox{\Hypertarget{group__ngf_gga14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}\label{group__ngf_gga14ee1c4e867d874070b50141dabad8dca821cc4a5e3afaab982d85913ecd6b143}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+HIGH&For high-\/performance devices, such as discrete GPU. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW@{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW@{NGF\_DEVICE\_PERFORMANCE\_TIER\_LOW}}}\mbox{\Hypertarget{group__ngf_gga14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}\label{group__ngf_gga14ee1c4e867d874070b50141dabad8dcaab93c4567a422d8d8a234fe99e4daddd}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+LOW&For low-\/power integrated GPUs, software rendering, etc. ~\newline
+ \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN@{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN@{NGF\_DEVICE\_PERFORMANCE\_TIER\_UNKNOWN}}}\mbox{\Hypertarget{group__ngf_gga14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}\label{group__ngf_gga14ee1c4e867d874070b50141dabad8dca851302b553dff2c5a20b78ea63ecd570}} 
+NGF\+\_\+\+DEVICE\+\_\+\+PERFORMANCE\+\_\+\+TIER\+\_\+\+UNKNOWN&The specific performance profile is unknown. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}\label{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}} 
+\index{Core C API@{Core C API}!ngf\_diagnostic\_log\_verbosity@{ngf\_diagnostic\_log\_verbosity}}
+\index{ngf\_diagnostic\_log\_verbosity@{ngf\_diagnostic\_log\_verbosity}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_diagnostic\_log\_verbosity}{ngf\_diagnostic\_log\_verbosity}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga7634ab295ada4ee1515e24b58ed268ac}{ngf\+\_\+diagnostic\+\_\+log\+\_\+verbosity}}}
+
+Verbosity levels for the diagnostic message log. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DIAGNOSTICS\_VERBOSITY\_DEFAULT@{NGF\_DIAGNOSTICS\_VERBOSITY\_DEFAULT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DIAGNOSTICS\_VERBOSITY\_DEFAULT@{NGF\_DIAGNOSTICS\_VERBOSITY\_DEFAULT}}}\mbox{\Hypertarget{group__ngf_gga7634ab295ada4ee1515e24b58ed268aca503727f2fed73fd180a8d22e3bddf3ff}\label{group__ngf_gga7634ab295ada4ee1515e24b58ed268aca503727f2fed73fd180a8d22e3bddf3ff}} 
+NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DEFAULT&Normal level, reports only severe errors. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DIAGNOSTICS\_VERBOSITY\_DETAILED@{NGF\_DIAGNOSTICS\_VERBOSITY\_DETAILED}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DIAGNOSTICS\_VERBOSITY\_DETAILED@{NGF\_DIAGNOSTICS\_VERBOSITY\_DETAILED}}}\mbox{\Hypertarget{group__ngf_gga7634ab295ada4ee1515e24b58ed268acac59c61cc428e4a93da30c989e9b87e46}\label{group__ngf_gga7634ab295ada4ee1515e24b58ed268acac59c61cc428e4a93da30c989e9b87e46}} 
+NGF\+\_\+\+DIAGNOSTICS\+\_\+\+VERBOSITY\+\_\+\+DETAILED&Recommended for debug builds, may induce performance overhead. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga73f485c050416fe7ae3f5286cc418295}\label{group__ngf_ga73f485c050416fe7ae3f5286cc418295}} 
+\index{Core C API@{Core C API}!ngf\_diagnostic\_message\_type@{ngf\_diagnostic\_message\_type}}
+\index{ngf\_diagnostic\_message\_type@{ngf\_diagnostic\_message\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_diagnostic\_message\_type}{ngf\_diagnostic\_message\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga73f485c050416fe7ae3f5286cc418295}{ngf\+\_\+diagnostic\+\_\+message\+\_\+type}}}
+
+Type of a diagnostic log entry. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DIAGNOSTIC\_INFO@{NGF\_DIAGNOSTIC\_INFO}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DIAGNOSTIC\_INFO@{NGF\_DIAGNOSTIC\_INFO}}}\mbox{\Hypertarget{group__ngf_gga73f485c050416fe7ae3f5286cc418295aa70e8407af79ebca453f4fa05609b748}\label{group__ngf_gga73f485c050416fe7ae3f5286cc418295aa70e8407af79ebca453f4fa05609b748}} 
+NGF\+\_\+\+DIAGNOSTIC\+\_\+\+INFO&Informational message, not actionable. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DIAGNOSTIC\_WARNING@{NGF\_DIAGNOSTIC\_WARNING}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DIAGNOSTIC\_WARNING@{NGF\_DIAGNOSTIC\_WARNING}}}\mbox{\Hypertarget{group__ngf_gga73f485c050416fe7ae3f5286cc418295a1f17cc66809804f63d34ecd032e7711a}\label{group__ngf_gga73f485c050416fe7ae3f5286cc418295a1f17cc66809804f63d34ecd032e7711a}} 
+NGF\+\_\+\+DIAGNOSTIC\+\_\+\+WARNING&Message warns of a potential issue with an API call. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_DIAGNOSTIC\_ERROR@{NGF\_DIAGNOSTIC\_ERROR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_DIAGNOSTIC\_ERROR@{NGF\_DIAGNOSTIC\_ERROR}}}\mbox{\Hypertarget{group__ngf_gga73f485c050416fe7ae3f5286cc418295accf8da1e63de333851b76a3016f2f9a4}\label{group__ngf_gga73f485c050416fe7ae3f5286cc418295accf8da1e63de333851b76a3016f2f9a4}} 
+NGF\+\_\+\+DIAGNOSTIC\+\_\+\+ERROR&Message provides details of an API call failure or a severe performance issue. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}\label{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}} 
+\index{Core C API@{Core C API}!ngf\_error@{ngf\_error}}
+\index{ngf\_error@{ngf\_error}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_error}{ngf\_error}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}}}
+
+Enumerates the error codes that nicegraf routines may return. See also \mbox{\hyperlink{group__ngf_error-reporting}{Error Reporting}}. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_OK@{NGF\_ERROR\_OK}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_OK@{NGF\_ERROR\_OK}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8ac38db8dbdd216ac79d27a97d798b3b}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8ac38db8dbdd216ac79d27a97d798b3b}} 
+NGF\+\_\+\+ERROR\+\_\+\+OK&No error, operation finished successfully. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_OUT\_OF\_MEM@{NGF\_ERROR\_OUT\_OF\_MEM}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_OUT\_OF\_MEM@{NGF\_ERROR\_OUT\_OF\_MEM}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadd17b42301f6cc84bb9c52a2173575cb}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadd17b42301f6cc84bb9c52a2173575cb}} 
+NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+MEM&Host memory allocation failed. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_OBJECT\_CREATION\_FAILED@{NGF\_ERROR\_OBJECT\_CREATION\_FAILED}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_OBJECT\_CREATION\_FAILED@{NGF\_ERROR\_OBJECT\_CREATION\_FAILED}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada90b7ab7e308053d65e974e8113eb098a}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada90b7ab7e308053d65e974e8113eb098a}} 
+NGF\+\_\+\+ERROR\+\_\+\+OBJECT\+\_\+\+CREATION\+\_\+\+FAILED&A call to the backend API that was supposed to create an object failed. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_OUT\_OF\_BOUNDS@{NGF\_ERROR\_OUT\_OF\_BOUNDS}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_OUT\_OF\_BOUNDS@{NGF\_ERROR\_OUT\_OF\_BOUNDS}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada76702d3a886bd9b3993ab145db667ec2}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada76702d3a886bd9b3993ab145db667ec2}} 
+NGF\+\_\+\+ERROR\+\_\+\+OUT\+\_\+\+OF\+\_\+\+BOUNDS&The operation would have resulted in an out of bounds access. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_INVALID\_FORMAT@{NGF\_ERROR\_INVALID\_FORMAT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_INVALID\_FORMAT@{NGF\_ERROR\_INVALID\_FORMAT}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadbc65a523916e3a11e9b8fe9b22c1186}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adadbc65a523916e3a11e9b8fe9b22c1186}} 
+NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+FORMAT&A format enumerator provided as part of an argument to the call is not valid in that context. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_INVALID\_SIZE@{NGF\_ERROR\_INVALID\_SIZE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_INVALID\_SIZE@{NGF\_ERROR\_INVALID\_SIZE}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada99cb11277b7ac0dc221022f4e9603690}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada99cb11277b7ac0dc221022f4e9603690}} 
+NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+SIZE&A size passed as part of an argument to the call is either too large or too small. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_INVALID\_ENUM@{NGF\_ERROR\_INVALID\_ENUM}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_INVALID\_ENUM@{NGF\_ERROR\_INVALID\_ENUM}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adaa976ccdd90dcc84ce6d488db18d84618}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053adaa976ccdd90dcc84ce6d488db18d84618}} 
+NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+ENUM&An enumerator passed as part of an argument to the call is not valid in that context. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_ERROR\_INVALID\_OPERATION@{NGF\_ERROR\_INVALID\_OPERATION}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_ERROR\_INVALID\_OPERATION@{NGF\_ERROR\_INVALID\_OPERATION}}}\mbox{\Hypertarget{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8c6de603c28baa540ba7671b96bbbbac}\label{group__ngf_gga0cf1ffd267fbb5a398934dc6827053ada8c6de603c28baa540ba7671b96bbbbac}} 
+NGF\+\_\+\+ERROR\+\_\+\+INVALID\+\_\+\+OPERATION&The routine did not complete successfully. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gac78e26eae8830282edaedc5636120714}\label{group__ngf_gac78e26eae8830282edaedc5636120714}} 
+\index{Core C API@{Core C API}!ngf\_front\_face\_mode@{ngf\_front\_face\_mode}}
+\index{ngf\_front\_face\_mode@{ngf\_front\_face\_mode}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_front\_face\_mode}{ngf\_front\_face\_mode}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gac78e26eae8830282edaedc5636120714}{ngf\+\_\+front\+\_\+face\+\_\+mode}}}
+
+Enumerates possible vertex winding orders, which are used to decide which polygons are front-\/ or back-\/facing. See also \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}}. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_FRONT\_FACE\_COUNTER\_CLOCKWISE@{NGF\_FRONT\_FACE\_COUNTER\_CLOCKWISE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_FRONT\_FACE\_COUNTER\_CLOCKWISE@{NGF\_FRONT\_FACE\_COUNTER\_CLOCKWISE}}}\mbox{\Hypertarget{group__ngf_ggac78e26eae8830282edaedc5636120714a85c1632cd0b13a746ffc049c6754a86a}\label{group__ngf_ggac78e26eae8830282edaedc5636120714a85c1632cd0b13a746ffc049c6754a86a}} 
+NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+COUNTER\+\_\+\+CLOCKWISE&Polygons with vertices in counter-\/clockwise order are considered front-\/facing. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_FRONT\_FACE\_CLOCKWISE@{NGF\_FRONT\_FACE\_CLOCKWISE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_FRONT\_FACE\_CLOCKWISE@{NGF\_FRONT\_FACE\_CLOCKWISE}}}\mbox{\Hypertarget{group__ngf_ggac78e26eae8830282edaedc5636120714a733a148f2da5ea5d958116c467436ece}\label{group__ngf_ggac78e26eae8830282edaedc5636120714a733a148f2da5ea5d958116c467436ece}} 
+NGF\+\_\+\+FRONT\+\_\+\+FACE\+\_\+\+CLOCKWISE&Polygons with vertices in clockwise order are considered front-\/facing. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}\label{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}} 
+\index{Core C API@{Core C API}!ngf\_image\_format@{ngf\_image\_format}}
+\index{ngf\_image\_format@{ngf\_image\_format}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_image\_format}{ngf\_image\_format}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga48bf7488f4d5c9421491c8c0b955132a}{ngf\+\_\+image\+\_\+format}}}
+
+Image formats.
+
+Some backends may not support all of those. Using an s\+RGB format in a color attachment or swapchain image means that all color values output by the fragment stage are interpreted as being in linear color space, and an appropriate transfer function is applied to them to covert them to the s\+RGB colorspace before writing them to the target. Using an s\+RGB format in a sampled image means that all color values stored in the image are interpreted to be in the s\+RGB color space, and all read operations automatically apply a transfer function to convert the values from s\+RGB to linear color space. \mbox{\Hypertarget{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}\label{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}} 
+\index{Core C API@{Core C API}!ngf\_image\_type@{ngf\_image\_type}}
+\index{ngf\_image\_type@{ngf\_image\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_image\_type}{ngf\_image\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga6c69d697d500e6f85fd9b3fe003f177b}{ngf\+\_\+image\+\_\+type}}}
+
+Enumerates the possible image types. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_TYPE\_IMAGE\_2D@{NGF\_IMAGE\_TYPE\_IMAGE\_2D}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_TYPE\_IMAGE\_2D@{NGF\_IMAGE\_TYPE\_IMAGE\_2D}}}\mbox{\Hypertarget{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba5343fd7c187a40afe11397162737100b}\label{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba5343fd7c187a40afe11397162737100b}} 
+NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+2D&Two-\/dimensional image. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_TYPE\_IMAGE\_3D@{NGF\_IMAGE\_TYPE\_IMAGE\_3D}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_TYPE\_IMAGE\_3D@{NGF\_IMAGE\_TYPE\_IMAGE\_3D}}}\mbox{\Hypertarget{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba10161252c5145974d4379ece3f273904}\label{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba10161252c5145974d4379ece3f273904}} 
+NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+IMAGE\+\_\+3D&Three-\/dimensional image. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_TYPE\_CUBE@{NGF\_IMAGE\_TYPE\_CUBE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_TYPE\_CUBE@{NGF\_IMAGE\_TYPE\_CUBE}}}\mbox{\Hypertarget{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba9712c8cfdf206c435bbe921111ba22f6}\label{group__ngf_gga6c69d697d500e6f85fd9b3fe003f177ba9712c8cfdf206c435bbe921111ba22f6}} 
+NGF\+\_\+\+IMAGE\+\_\+\+TYPE\+\_\+\+CUBE&Cubemap. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gad488948359d867a2c93c6fc0b50c9173}\label{group__ngf_gad488948359d867a2c93c6fc0b50c9173}} 
+\index{Core C API@{Core C API}!ngf\_image\_usage@{ngf\_image\_usage}}
+\index{ngf\_image\_usage@{ngf\_image\_usage}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_image\_usage}{ngf\_image\_usage}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gad488948359d867a2c93c6fc0b50c9173}{ngf\+\_\+image\+\_\+usage}}}
+
+Image usage flags.
+
+A valid image usage mask may be formed by combining one or more of these values with a bitwise OR operator. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_USAGE\_SAMPLE\_FROM@{NGF\_IMAGE\_USAGE\_SAMPLE\_FROM}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_USAGE\_SAMPLE\_FROM@{NGF\_IMAGE\_USAGE\_SAMPLE\_FROM}}}\mbox{\Hypertarget{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a1453701fecbf3902d1f0259ceb473fab}\label{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a1453701fecbf3902d1f0259ceb473fab}} 
+NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+SAMPLE\+\_\+\+FROM&The image may be read from in a shader. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_USAGE\_ATTACHMENT@{NGF\_IMAGE\_USAGE\_ATTACHMENT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_USAGE\_ATTACHMENT@{NGF\_IMAGE\_USAGE\_ATTACHMENT}}}\mbox{\Hypertarget{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a3ecd301fa3251a07eb3778904ab2fc61}\label{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a3ecd301fa3251a07eb3778904ab2fc61}} 
+NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+ATTACHMENT&The image may be used as an attachment for a render target. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_USAGE\_XFER\_DST@{NGF\_IMAGE\_USAGE\_XFER\_DST}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_USAGE\_XFER\_DST@{NGF\_IMAGE\_USAGE\_XFER\_DST}}}\mbox{\Hypertarget{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a328194f46df2a96823000c6d476e6ff6}\label{group__ngf_ggad488948359d867a2c93c6fc0b50c9173a328194f46df2a96823000c6d476e6ff6}} 
+NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+XFER\+\_\+\+DST&The image may be used as a destination for a transfer operation. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_IMAGE\_USAGE\_MIPMAP\_GENERATION@{NGF\_IMAGE\_USAGE\_MIPMAP\_GENERATION}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_IMAGE\_USAGE\_MIPMAP\_GENERATION@{NGF\_IMAGE\_USAGE\_MIPMAP\_GENERATION}}}\mbox{\Hypertarget{group__ngf_ggad488948359d867a2c93c6fc0b50c9173aa933e75ce3dbba4e44c8c472209ed8e7}\label{group__ngf_ggad488948359d867a2c93c6fc0b50c9173aa933e75ce3dbba4e44c8c472209ed8e7}} 
+NGF\+\_\+\+IMAGE\+\_\+\+USAGE\+\_\+\+MIPMAP\+\_\+\+GENERATION&Mipmaps may be generated for the image with \mbox{\hyperlink{group__ngf_ga55a2a27dfc26e3d79d31df0ff0805bb6}{ngf\+\_\+cmd\+\_\+generate\+\_\+mipmaps}}. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gab411421f89d976d54cb0d72b736ff517}\label{group__ngf_gab411421f89d976d54cb0d72b736ff517}} 
+\index{Core C API@{Core C API}!ngf\_polygon\_mode@{ngf\_polygon\_mode}}
+\index{ngf\_polygon\_mode@{ngf\_polygon\_mode}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_polygon\_mode}{ngf\_polygon\_mode}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gab411421f89d976d54cb0d72b736ff517}{ngf\+\_\+polygon\+\_\+mode}}}
+
+Enumerates ways to draw polygons. See also \mbox{\hyperlink{structngf__rasterization__info}{ngf\+\_\+rasterization\+\_\+info}}. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_POLYGON\_MODE\_FILL@{NGF\_POLYGON\_MODE\_FILL}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_POLYGON\_MODE\_FILL@{NGF\_POLYGON\_MODE\_FILL}}}\mbox{\Hypertarget{group__ngf_ggab411421f89d976d54cb0d72b736ff517ab4542baf873fa0a148f10d36dae7f4f8}\label{group__ngf_ggab411421f89d976d54cb0d72b736ff517ab4542baf873fa0a148f10d36dae7f4f8}} 
+NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+FILL&Fill the entire polyoon. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_POLYGON\_MODE\_LINE@{NGF\_POLYGON\_MODE\_LINE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_POLYGON\_MODE\_LINE@{NGF\_POLYGON\_MODE\_LINE}}}\mbox{\Hypertarget{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8b5b774cd9f3afb8e148900e92d0c23d}\label{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8b5b774cd9f3afb8e148900e92d0c23d}} 
+NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+LINE&Outline only. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_POLYGON\_MODE\_POINT@{NGF\_POLYGON\_MODE\_POINT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_POLYGON\_MODE\_POINT@{NGF\_POLYGON\_MODE\_POINT}}}\mbox{\Hypertarget{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8a3ef145d23450a68690ca51fcb46e06}\label{group__ngf_ggab411421f89d976d54cb0d72b736ff517a8a3ef145d23450a68690ca51fcb46e06}} 
+NGF\+\_\+\+POLYGON\+\_\+\+MODE\+\_\+\+POINT&Vertices only. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}\label{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}} 
+\index{Core C API@{Core C API}!ngf\_present\_mode@{ngf\_present\_mode}}
+\index{ngf\_present\_mode@{ngf\_present\_mode}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_present\_mode}{ngf\_present\_mode}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga1fee3c1a4a2e46ea1215541acdb92f37}{ngf\+\_\+present\+\_\+mode}}}
+
+Enumerates possible presentation modes. \char`\"{}\+Presentation mode\char`\"{} refers to the particular way the CPU, GPU and the presentation engine interact. Some of the listed presentation modes may not be supported on various backend, hardware or OS combinations. If an unsupported mode is requested, nicegraf silently falls back onto \mbox{\hyperlink{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37ab1d03c3ecbcc2f07630f0e828955f3aa}{NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+FIFO}}. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRESENTATION\_MODE\_FIFO@{NGF\_PRESENTATION\_MODE\_FIFO}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRESENTATION\_MODE\_FIFO@{NGF\_PRESENTATION\_MODE\_FIFO}}}\mbox{\Hypertarget{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37ab1d03c3ecbcc2f07630f0e828955f3aa}\label{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37ab1d03c3ecbcc2f07630f0e828955f3aa}} 
+NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+FIFO&This is the only presentation mode that is guaranteed to be supported. In this mode, the presentation requests are queued internally, and the presentation engine waits for the vertical blanking signal to present the image at the front of the queue. This mode guarantees no frame tearing. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRESENTATION\_MODE\_IMMEDIATE@{NGF\_PRESENTATION\_MODE\_IMMEDIATE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRESENTATION\_MODE\_IMMEDIATE@{NGF\_PRESENTATION\_MODE\_IMMEDIATE}}}\mbox{\Hypertarget{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37aad8aeab9a3073978366f1bea301b2cf9}\label{group__ngf_gga1fee3c1a4a2e46ea1215541acdb92f37aad8aeab9a3073978366f1bea301b2cf9}} 
+NGF\+\_\+\+PRESENTATION\+\_\+\+MODE\+\_\+\+IMMEDIATE&In this mode, the presentation engine does not wait for the vertical blanking signal, instead presenting an image immediately. This mode results in lower latency but may induce frame tearing. It is not recommended to use this mode on mobile targets. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}\label{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}} 
+\index{Core C API@{Core C API}!ngf\_primitive\_topology@{ngf\_primitive\_topology}}
+\index{ngf\_primitive\_topology@{ngf\_primitive\_topology}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_primitive\_topology}{ngf\_primitive\_topology}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga20e33fb5d8991ca17974bb3963a1a9cd}{ngf\+\_\+primitive\+\_\+topology}}}
+
+Enumerates the available primitive topologies (ways to group vertices into primitives). \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_LIST@{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_LIST}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_LIST@{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_LIST}}}\mbox{\Hypertarget{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda4522a5528f33bc3576d1d765ae074d58}\label{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda4522a5528f33bc3576d1d765ae074d58}} 
+NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+LIST&A list of separate triangles -\/ each three vertices define a separate triangle. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_STRIP@{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_STRIP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_STRIP@{NGF\_PRIMITIVE\_TOPOLOGY\_TRIANGLE\_STRIP}}}\mbox{\Hypertarget{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda137862be96020af59267de3c5a215d57}\label{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda137862be96020af59267de3c5a215d57}} 
+NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+TRIANGLE\+\_\+\+STRIP&A list of connected triangles, with consecutive triangles sharing an edge like so\+: 
+\begin{DoxyCode}{1}
+\DoxyCodeLine{o-\/-\/-\/-\/-\/-\/-\/-\/-\/o-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/o}
+\DoxyCodeLine{ \(\backslash\)       /  \(\backslash\)       /}
+\DoxyCodeLine{   \(\backslash\)   /      \(\backslash\)   / ...}
+\DoxyCodeLine{     o-\/-\/-\/-\/-\/-\/-\/-\/-\/-\/o}
+
+\end{DoxyCode}
+ \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_LIST@{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_LIST}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_LIST@{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_LIST}}}\mbox{\Hypertarget{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda5f496f00ec5430a445dbf30b2b5fd6af}\label{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda5f496f00ec5430a445dbf30b2b5fd6af}} 
+NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+LIST&A list of separate lines. Each two vertices define a separate line. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_STRIP@{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_STRIP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_STRIP@{NGF\_PRIMITIVE\_TOPOLOGY\_LINE\_STRIP}}}\mbox{\Hypertarget{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda2a99c0876cf4762c2048462053af7d25}\label{group__ngf_gga20e33fb5d8991ca17974bb3963a1a9cda2a99c0876cf4762c2048462053af7d25}} 
+NGF\+\_\+\+PRIMITIVE\+\_\+\+TOPOLOGY\+\_\+\+LINE\+\_\+\+STRIP&A list of connected lines. The end of a line is the beginning of the next line in the list. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}\label{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}} 
+\index{Core C API@{Core C API}!ngf\_sample\_count@{ngf\_sample\_count}}
+\index{ngf\_sample\_count@{ngf\_sample\_count}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_sample\_count}{ngf\_sample\_count}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga99d00b2bf653c4605c4c505275e6536f}{ngf\+\_\+sample\+\_\+count}}}
+
+Specifies the number of MSAA samples. \mbox{\Hypertarget{group__ngf_gabcde3381b55395f963eca78b2773283f}\label{group__ngf_gabcde3381b55395f963eca78b2773283f}} 
+\index{Core C API@{Core C API}!ngf\_sampler\_filter@{ngf\_sampler\_filter}}
+\index{ngf\_sampler\_filter@{ngf\_sampler\_filter}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_sampler\_filter}{ngf\_sampler\_filter}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gabcde3381b55395f963eca78b2773283f}{ngf\+\_\+sampler\+\_\+filter}}}
+
+Enumerates filters for texture lookups. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_FILTER\_NEAREST@{NGF\_FILTER\_NEAREST}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_FILTER\_NEAREST@{NGF\_FILTER\_NEAREST}}}\mbox{\Hypertarget{group__ngf_ggabcde3381b55395f963eca78b2773283fadb28fc69660039c5ebf5deccae61bc9e}\label{group__ngf_ggabcde3381b55395f963eca78b2773283fadb28fc69660039c5ebf5deccae61bc9e}} 
+NGF\+\_\+\+FILTER\+\_\+\+NEAREST&When used as the minification (\mbox{\hyperlink{structngf__sampler__info_afe0f979f267c816201c7ade4223ad00e}{ngf\+\_\+sampler\+\_\+info\+::min\+\_\+filter}}) or magnification (\mbox{\hyperlink{structngf__sampler__info_a16e4909ea0faf45bdd470cfc73de4945}{ngf\+\_\+sampler\+\_\+info\+::mag\+\_\+filter}}) filter, the result of the filtering operation shall be the value of the texel whose center is nearest to the sample.
+
+When used as \mbox{\hyperlink{structngf__sampler__info_ae50b36c07bc64038335b803d0e5ba00d}{ngf\+\_\+sampler\+\_\+info\+::mip\+\_\+filter}}, makes the selected mip level snap to the one that is closest to the requested mip level value. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_FILTER\_LINEAR@{NGF\_FILTER\_LINEAR}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_FILTER\_LINEAR@{NGF\_FILTER\_LINEAR}}}\mbox{\Hypertarget{group__ngf_ggabcde3381b55395f963eca78b2773283fa3bdadc76704434ab8c4b9a5035e79b8d}\label{group__ngf_ggabcde3381b55395f963eca78b2773283fa3bdadc76704434ab8c4b9a5035e79b8d}} 
+NGF\+\_\+\+FILTER\+\_\+\+LINEAR&When used as the minification (\mbox{\hyperlink{structngf__sampler__info_afe0f979f267c816201c7ade4223ad00e}{ngf\+\_\+sampler\+\_\+info\+::min\+\_\+filter}}) or magnification (\mbox{\hyperlink{structngf__sampler__info_a16e4909ea0faf45bdd470cfc73de4945}{ngf\+\_\+sampler\+\_\+info\+::mag\+\_\+filter}}) filter, the result of the filtering operation shall be linearly interpolated from the values of 4 (in case of 2D images) or 8 (in case of 3D images) texels whose centers are nearest to the sample.
+
+When used as \mbox{\hyperlink{structngf__sampler__info_ae50b36c07bc64038335b803d0e5ba00d}{ngf\+\_\+sampler\+\_\+info\+::mip\+\_\+filter}}, linearly blends the values from two mip levels closest to the requested mip level value. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}\label{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}} 
+\index{Core C API@{Core C API}!ngf\_sampler\_wrap\_mode@{ngf\_sampler\_wrap\_mode}}
+\index{ngf\_sampler\_wrap\_mode@{ngf\_sampler\_wrap\_mode}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_sampler\_wrap\_mode}{ngf\_sampler\_wrap\_mode}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga9e66e1eb316415e8793897338bdbd81e}{ngf\+\_\+sampler\+\_\+wrap\+\_\+mode}}}
+
+Enumerates strategies for dealing with sampling an image out-\/of-\/bounds. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_WRAP\_MODE\_CLAMP\_TO\_EDGE@{NGF\_WRAP\_MODE\_CLAMP\_TO\_EDGE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_WRAP\_MODE\_CLAMP\_TO\_EDGE@{NGF\_WRAP\_MODE\_CLAMP\_TO\_EDGE}}}\mbox{\Hypertarget{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea95a662a3df9173a19c94e961f86a3b11}\label{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea95a662a3df9173a19c94e961f86a3b11}} 
+NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+CLAMP\+\_\+\+TO\+\_\+\+EDGE&Clamp the texel value to what\textquotesingle{}s at the edge of the image. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_WRAP\_MODE\_REPEAT@{NGF\_WRAP\_MODE\_REPEAT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_WRAP\_MODE\_REPEAT@{NGF\_WRAP\_MODE\_REPEAT}}}\mbox{\Hypertarget{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea3e36c346c33431fc080132e720eaed70}\label{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea3e36c346c33431fc080132e720eaed70}} 
+NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+REPEAT&Repeat the image contents. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_WRAP\_MODE\_MIRRORED\_REPEAT@{NGF\_WRAP\_MODE\_MIRRORED\_REPEAT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_WRAP\_MODE\_MIRRORED\_REPEAT@{NGF\_WRAP\_MODE\_MIRRORED\_REPEAT}}}\mbox{\Hypertarget{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea14cd2d2a59555b38ff302209d56de884}\label{group__ngf_gga9e66e1eb316415e8793897338bdbd81ea14cd2d2a59555b38ff302209d56de884}} 
+NGF\+\_\+\+WRAP\+\_\+\+MODE\+\_\+\+MIRRORED\+\_\+\+REPEAT&Repeat the image contents, mirrored. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}\label{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}} 
+\index{Core C API@{Core C API}!ngf\_stage\_type@{ngf\_stage\_type}}
+\index{ngf\_stage\_type@{ngf\_stage\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_stage\_type}{ngf\_stage\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga1d4c5d0fc2b02831d28914bb92cc40ad}{ngf\+\_\+stage\+\_\+type}}}
+
+Shader stage types. Note that some back-\/ends might not support all of these. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STAGE\_VERTEX@{NGF\_STAGE\_VERTEX}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STAGE\_VERTEX@{NGF\_STAGE\_VERTEX}}}\mbox{\Hypertarget{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adac0306080cb7e6337a2620296b842c31c}\label{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adac0306080cb7e6337a2620296b842c31c}} 
+NGF\+\_\+\+STAGE\+\_\+\+VERTEX&Indicates the vertex processing stage. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STAGE\_FRAGMENT@{NGF\_STAGE\_FRAGMENT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STAGE\_FRAGMENT@{NGF\_STAGE\_FRAGMENT}}}\mbox{\Hypertarget{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adaf8ef9c6d445577ba7a80cd59254c827e}\label{group__ngf_gga1d4c5d0fc2b02831d28914bb92cc40adaf8ef9c6d445577ba7a80cd59254c827e}} 
+NGF\+\_\+\+STAGE\+\_\+\+FRAGMENT&Indicates the fragment processing stage. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}\label{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}} 
+\index{Core C API@{Core C API}!ngf\_stencil\_op@{ngf\_stencil\_op}}
+\index{ngf\_stencil\_op@{ngf\_stencil\_op}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_stencil\_op}{ngf\_stencil\_op}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_gafe59df51f356ebf0a6da4966ec0eb70e}{ngf\+\_\+stencil\+\_\+op}}}
+
+Operations that can be performed on stencil buffer. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_KEEP@{NGF\_STENCIL\_OP\_KEEP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_KEEP@{NGF\_STENCIL\_OP\_KEEP}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea191b1db06028b6a43faf0b344f55bd9d}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea191b1db06028b6a43faf0b344f55bd9d}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+KEEP&Don\textquotesingle{}t touch. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_ZERO@{NGF\_STENCIL\_OP\_ZERO}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_ZERO@{NGF\_STENCIL\_OP\_ZERO}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea7b3092f8c1611a1118fa9afd0565a22a}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea7b3092f8c1611a1118fa9afd0565a22a}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+ZERO&Set to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_REPLACE@{NGF\_STENCIL\_OP\_REPLACE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_REPLACE@{NGF\_STENCIL\_OP\_REPLACE}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eab32d2f1f369ef724fa2b68f9e11ac300}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eab32d2f1f369ef724fa2b68f9e11ac300}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+REPLACE&Replace with reference value. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_INCR\_CLAMP@{NGF\_STENCIL\_OP\_INCR\_CLAMP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_INCR\_CLAMP@{NGF\_STENCIL\_OP\_INCR\_CLAMP}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eaff2a8d14fdf164fd3dec4d490c4cdec3}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eaff2a8d14fdf164fd3dec4d490c4cdec3}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+CLAMP&Increment, clamping to max value. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_INCR\_WRAP@{NGF\_STENCIL\_OP\_INCR\_WRAP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_INCR\_WRAP@{NGF\_STENCIL\_OP\_INCR\_WRAP}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eabc175e7d23351e18f4648ffd049dda28}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70eabc175e7d23351e18f4648ffd049dda28}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INCR\+\_\+\+WRAP&Increment, wrapping to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_DECR\_CLAMP@{NGF\_STENCIL\_OP\_DECR\_CLAMP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_DECR\_CLAMP@{NGF\_STENCIL\_OP\_DECR\_CLAMP}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea264745a7002821448f4b71a329435c32}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea264745a7002821448f4b71a329435c32}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+CLAMP&Decrement, clamping to 0. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_DECR\_WRAP@{NGF\_STENCIL\_OP\_DECR\_WRAP}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_DECR\_WRAP@{NGF\_STENCIL\_OP\_DECR\_WRAP}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea0b623de5fe7bc3b196cc702e4aedd155}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea0b623de5fe7bc3b196cc702e4aedd155}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+DECR\+\_\+\+WRAP&Decrement, wrapping to max value. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_STENCIL\_OP\_INVERT@{NGF\_STENCIL\_OP\_INVERT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_STENCIL\_OP\_INVERT@{NGF\_STENCIL\_OP\_INVERT}}}\mbox{\Hypertarget{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea54699588d4076fb53d3e6618a1d93883}\label{group__ngf_ggafe59df51f356ebf0a6da4966ec0eb70ea54699588d4076fb53d3e6618a1d93883}} 
+NGF\+\_\+\+STENCIL\+\_\+\+OP\+\_\+\+INVERT&Bitwise invert. \\
+\hline
+
+\end{DoxyEnumFields}
+\mbox{\Hypertarget{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}\label{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}} 
+\index{Core C API@{Core C API}!ngf\_type@{ngf\_type}}
+\index{ngf\_type@{ngf\_type}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_type}{ngf\_type}}
+{\footnotesize\ttfamily enum \mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}}}
+
+Enumerates the available vertex attribute component types. \begin{DoxyEnumFields}{Enumerator}
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_INT8@{NGF\_TYPE\_INT8}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_INT8@{NGF\_TYPE\_INT8}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab6a39e0a95eda430bfb729be90e02ae1}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab6a39e0a95eda430bfb729be90e02ae1}} 
+NGF\+\_\+\+TYPE\+\_\+\+INT8&Signed 8-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_UINT8@{NGF\_TYPE\_UINT8}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_UINT8@{NGF\_TYPE\_UINT8}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a00304ae4b72b5a8a9ce4d946a3748558}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a00304ae4b72b5a8a9ce4d946a3748558}} 
+NGF\+\_\+\+TYPE\+\_\+\+UINT8&Unsigned 8-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_INT16@{NGF\_TYPE\_INT16}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_INT16@{NGF\_TYPE\_INT16}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a31996be448adf63b1c8d2a104ccf7c18}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a31996be448adf63b1c8d2a104ccf7c18}} 
+NGF\+\_\+\+TYPE\+\_\+\+INT16&Signed 16-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_UINT16@{NGF\_TYPE\_UINT16}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_UINT16@{NGF\_TYPE\_UINT16}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2}} 
+NGF\+\_\+\+TYPE\+\_\+\+UINT16&Unsigned 16-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_INT32@{NGF\_TYPE\_INT32}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_INT32@{NGF\_TYPE\_INT32}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a2affe3abef69b1ae4fa1675d26c21825}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a2affe3abef69b1ae4fa1675d26c21825}} 
+NGF\+\_\+\+TYPE\+\_\+\+INT32&Signed 32-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_UINT32@{NGF\_TYPE\_UINT32}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_UINT32@{NGF\_TYPE\_UINT32}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a46f9ed208f47c6acf29a9605e862ae37}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a46f9ed208f47c6acf29a9605e862ae37}} 
+NGF\+\_\+\+TYPE\+\_\+\+UINT32&Unsigned 32-\/bit integer. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_FLOAT@{NGF\_TYPE\_FLOAT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_FLOAT@{NGF\_TYPE\_FLOAT}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8aefddfaec8433530f5b4fbb255a7713b3}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8aefddfaec8433530f5b4fbb255a7713b3}} 
+NGF\+\_\+\+TYPE\+\_\+\+FLOAT&32-\/bit floating point number. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_HALF\_FLOAT@{NGF\_TYPE\_HALF\_FLOAT}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_HALF\_FLOAT@{NGF\_TYPE\_HALF\_FLOAT}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a85704ac5c4037b152f79eeda6d77c7c1}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a85704ac5c4037b152f79eeda6d77c7c1}} 
+NGF\+\_\+\+TYPE\+\_\+\+HALF\+\_\+\+FLOAT&16-\/bit floating point number. \\
+\hline
+
+\raisebox{\heightof{T}}[0pt][0pt]{\index{NGF\_TYPE\_DOUBLE@{NGF\_TYPE\_DOUBLE}!Core C API@{Core C API}}\index{Core C API@{Core C API}!NGF\_TYPE\_DOUBLE@{NGF\_TYPE\_DOUBLE}}}\mbox{\Hypertarget{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab3ddc8639d625361bc86701d0a1553e5}\label{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab3ddc8639d625361bc86701d0a1553e5}} 
+NGF\+\_\+\+TYPE\+\_\+\+DOUBLE&Double-\/precision floating point number. \\
+\hline
+
+\end{DoxyEnumFields}
+
+
+\doxysubsection{Function Documentation}
+\mbox{\Hypertarget{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}\label{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}} 
+\index{Core C API@{Core C API}!ngf\_begin\_frame@{ngf\_begin\_frame}}
+\index{ngf\_begin\_frame@{ngf\_begin\_frame}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_begin\_frame()}{ngf\_begin\_frame()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+begin\+\_\+frame (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}} $\ast$}]{token }\end{DoxyParamCaption})}
+
+Begin a frame of rendering.
+
+This function starts a frame of rendering in the calling thread\textquotesingle{}s current context. It generates a special token associated with the frame, which is required for recording command buffers (see \mbox{\hyperlink{group__ngf_ga52027dd2cf70d4530d60edabe5a6019c}{ngf\+\_\+start\+\_\+cmd\+\_\+buffer}}). 
+\begin{DoxyParams}{Parameters}
+{\em token} & A pointer to a \mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}. The generated frame token shall be returned here. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga96e3994c0ab0661a37fad696d2d0c3b9}\label{group__ngf_ga96e3994c0ab0661a37fad696d2d0c3b9}} 
+\index{Core C API@{Core C API}!ngf\_buffer\_flush\_range@{ngf\_buffer\_flush\_range}}
+\index{ngf\_buffer\_flush\_range@{ngf\_buffer\_flush\_range}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_flush\_range()}{ngf\_buffer\_flush\_range()}}
+{\footnotesize\ttfamily void ngf\+\_\+buffer\+\_\+flush\+\_\+range (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf,  }\item[{size\+\_\+t}]{offset,  }\item[{size\+\_\+t}]{size }\end{DoxyParamCaption})}
+
+Ensures that any writes performed by the CPU into the mapped range are be visible to subsequently submitted rendering commands executed by the rendering device. 
+\begin{DoxyParams}{Parameters}
+{\em ptr} & The handle to the buffer that needs to be flushed. \\
+\hline
+{\em offset} & The offset, relative to the start of the mapped range, at which the flushed region starts, in bytes. \\
+\hline
+{\em size} & The size of the flushed region, in bytes. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaaa6b04b8a3b7937ad4cb7248197ee4e5}\label{group__ngf_gaaa6b04b8a3b7937ad4cb7248197ee4e5}} 
+\index{Core C API@{Core C API}!ngf\_buffer\_map\_range@{ngf\_buffer\_map\_range}}
+\index{ngf\_buffer\_map\_range@{ngf\_buffer\_map\_range}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_map\_range()}{ngf\_buffer\_map\_range()}}
+{\footnotesize\ttfamily void $\ast$ ngf\+\_\+buffer\+\_\+map\+\_\+range (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf,  }\item[{size\+\_\+t}]{offset,  }\item[{size\+\_\+t}]{size }\end{DoxyParamCaption})}
+
+Maps a region of a given buffer to host memory.
+
+It is an error to bind a buffer that is currently mapped using any command. If a buffer that needs to be bound is mapped, first call \mbox{\hyperlink{group__ngf_ga96e3994c0ab0661a37fad696d2d0c3b9}{ngf\+\_\+buffer\+\_\+flush\+\_\+range}} to ensure any new data in the mapped range becomes visible to the subsequent commands, then call \mbox{\hyperlink{group__ngf_ga2540533cc84b220941168c92f8c6ffee}{ngf\+\_\+buffer\+\_\+unmap}}. Writing into any region that could be in use by previously submitted commands results in undefined behavior.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buf} & The handle to the buffer to be mapped. \\
+\hline
+{\em offset} & The offset at which the mapped region starts, in bytes. It must satisfy platform-\/specific alignment requirements. See, for example, \mbox{\hyperlink{structngf__device__capabilities_a437794f030cd5837276d3701a5706ad8}{ngf\+\_\+device\+\_\+capabilities\+::uniform\+\_\+buffer\+\_\+offset\+\_\+alignment}} and ngf\+\_\+device\+\_\+capabilities\+::texel\+\_\+buffer\+\_\+offet\+\_\+alignment. \\
+\hline
+{\em size} & The size of the mapped region, in bytes. \\
+\hline
+{\em flags} & A combination of flags from ngf\+\_\+buffer\+\_\+map\+\_\+flags. \\
+\hline
+\end{DoxyParams}
+\begin{DoxyReturn}{Returns}
+A pointer to the mapped memory, or NULL if the buffer could not be mapped. 
+\end{DoxyReturn}
+\mbox{\Hypertarget{group__ngf_ga2540533cc84b220941168c92f8c6ffee}\label{group__ngf_ga2540533cc84b220941168c92f8c6ffee}} 
+\index{Core C API@{Core C API}!ngf\_buffer\_unmap@{ngf\_buffer\_unmap}}
+\index{ngf\_buffer\_unmap@{ngf\_buffer\_unmap}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_buffer\_unmap()}{ngf\_buffer\_unmap()}}
+{\footnotesize\ttfamily void ngf\+\_\+buffer\+\_\+unmap (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buf }\end{DoxyParamCaption})}
+
+Unmaps a previously mapped buffer.
+
+If multiple regions were mapped, all of them are unmapped. Any pointers returned by prior calls to \mbox{\hyperlink{group__ngf_gaaa6b04b8a3b7937ad4cb7248197ee4e5}{ngf\+\_\+buffer\+\_\+map\+\_\+range}} are invalidated.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buf} & The buffer that needs to be unmapped. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga093b1243f355682e1221ff351085c3a0}\label{group__ngf_ga093b1243f355682e1221ff351085c3a0}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_begin\_render\_pass@{ngf\_cmd\_begin\_render\_pass}}
+\index{ngf\_cmd\_begin\_render\_pass@{ngf\_cmd\_begin\_render\_pass}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_render\_pass()}{ngf\_cmd\_begin\_render\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__pass__info}{ngf\+\_\+pass\+\_\+info}} $\ast$}]{pass\+\_\+info,  }\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Begins a new render pass.
+
+A render pass can be thought of as a sequence of rendering commands associated with a particular render target. At the start of the pass, an \char`\"{}load operation\char`\"{} is performed for each attachment. The application code may specify exactly what load operations to perform for each individual attachment. After that, all the rendering commands are executed. Finally, at the end of the pass, a \char`\"{}store operation\char`\"{} is performed for each attachment. Again, the application code may specify exactly which store operations to perform for each individual attachment. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The command buffer to operate on. Must be in the \char`\"{}ready\char`\"{} state, shall be transitioned to the \char`\"{}recording\char`\"{} state. \\
+\hline
+{\em pass\+\_\+info} & Specifies the renderpass parameters, such as load and store operations. \\
+\hline
+{\em enc} & Pointer to memory into which a handle to a render encoder will be returned. All the commands associated with the renderpass must be recorder using that encoder. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga404dcd621f51b384bf241992d6c24f43}\label{group__ngf_ga404dcd621f51b384bf241992d6c24f43}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_begin\_render\_pass\_simple@{ngf\_cmd\_begin\_render\_pass\_simple}}
+\index{ngf\_cmd\_begin\_render\_pass\_simple@{ngf\_cmd\_begin\_render\_pass\_simple}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_render\_pass\_simple()}{ngf\_cmd\_begin\_render\_pass\_simple()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass\+\_\+simple (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}}}]{rt,  }\item[{float}]{clear\+\_\+color\+\_\+r,  }\item[{float}]{clear\+\_\+color\+\_\+g,  }\item[{float}]{clear\+\_\+color\+\_\+b,  }\item[{float}]{clear\+\_\+color\+\_\+a,  }\item[{float}]{clear\+\_\+depth,  }\item[{uint32\+\_\+t}]{clear\+\_\+stencil,  }\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Similar to \mbox{\hyperlink{group__ngf_ga093b1243f355682e1221ff351085c3a0}{ngf\+\_\+cmd\+\_\+begin\+\_\+render\+\_\+pass}}, but with some choices pre-\/made\+:
+\begin{DoxyItemize}
+\item All color attachments of the render target are cleared to the specified color.
+\item Depth and stencil attachments are cleared to the specified respective values (if they are present).
+\item The store action for any attachment that is not marked as \char`\"{}sampled from\char`\"{} (see \mbox{\hyperlink{structngf__attachment__description_aa0c802638a0f6118c91ff07c5c2655e3}{ngf\+\_\+attachment\+\_\+description\+::is\+\_\+sampled}}), is set to NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+DONTCARE.
+\item The store action for attachments marked as \char`\"{}sampled from\char`\"{}, is set to NGF\+\_\+\+STORE\+\_\+\+OP\+\_\+\+STORE. 
+\begin{DoxyParams}{Parameters}
+{\em buf} & The command buffer to operate on. \\
+\hline
+{\em rt} & The handle to the render target to use for the pass. \\
+\hline
+{\em clear\+\_\+color\+\_\+r} & The red component of the clear color to be used on color attachments. Ignored for attachments that don\textquotesingle{}t have that channel. \\
+\hline
+{\em clear\+\_\+color\+\_\+g} & The red component of the clear color to be used on color attachments. Ignored for attachments that don\textquotesingle{}t have that channel. \\
+\hline
+{\em clear\+\_\+color\+\_\+b} & The red component of the clear color to be used on color attachments. Ignored for attachments that don\textquotesingle{}t have that channel. \\
+\hline
+{\em clear\+\_\+color\+\_\+a} & The red component of the clear color to be used on color attachments. Ignored for attachments that don\textquotesingle{}t have that channel. \\
+\hline
+{\em clear\+\_\+depth} & The value to clear the depth attachment to (if it is present). \\
+\hline
+{\em clear\+\_\+stencil} & The value to clear the stencil attachment to (if it is present). \\
+\hline
+\end{DoxyParams}
+
+\end{DoxyItemize}\mbox{\Hypertarget{group__ngf_ga4de689db197c35be424ff9383ee07728}\label{group__ngf_ga4de689db197c35be424ff9383ee07728}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_begin\_xfer\_pass@{ngf\_cmd\_begin\_xfer\_pass}}
+\index{ngf\_cmd\_begin\_xfer\_pass@{ngf\_cmd\_begin\_xfer\_pass}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_begin\_xfer\_pass()}{ngf\_cmd\_begin\_xfer\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+begin\+\_\+xfer\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}} $\ast$}]{enc }\end{DoxyParamCaption})}
+
+Begins a transfer pass.
+
+A transfer pass is a sequence of commands that copy data.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buf} & The handle to the command buffer to operate on. Must be in the \char`\"{}ready\char`\"{} state, will be transitioned to the \char`\"{}recording\char`\"{} state. \\
+\hline
+{\em enc} & Pointer to memory where a handle to a transfer encoder shall be returned. All commands associated with the transfer pass must be recorded using that encoder. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga904b09eb0463b98ca9b30b9e790dc432}\label{group__ngf_ga904b09eb0463b98ca9b30b9e790dc432}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_bind\_attrib\_buffer@{ngf\_cmd\_bind\_attrib\_buffer}}
+\index{ngf\_cmd\_bind\_attrib\_buffer@{ngf\_cmd\_bind\_attrib\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_bind\_attrib\_buffer()}{ngf\_cmd\_bind\_attrib\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+bind\+\_\+attrib\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{enc,  }\item[{const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{vbuf,  }\item[{uint32\+\_\+t}]{binding,  }\item[{uint32\+\_\+t}]{offset }\end{DoxyParamCaption})}
+
+Binds a vertex attribute buffer to be used in the next draw.
+
+
+\begin{DoxyParams}{Parameters}
+{\em enc} & The handle to the render encoder. \\
+\hline
+{\em vbuf} & The handle to the vertex buffer to bind. \\
+\hline
+{\em binding} & The binding ID to bind the buffer to. \\
+\hline
+{\em offset} & The offset (in bytes) to bind at. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga0b0ca70fd815664f862c76dbb40e03e5}\label{group__ngf_ga0b0ca70fd815664f862c76dbb40e03e5}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_bind\_index\_buffer@{ngf\_cmd\_bind\_index\_buffer}}
+\index{ngf\_cmd\_bind\_index\_buffer@{ngf\_cmd\_bind\_index\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_bind\_index\_buffer()}{ngf\_cmd\_bind\_index\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+bind\+\_\+index\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{enc,  }\item[{const \mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{idxbuf,  }\item[{\mbox{\hyperlink{group__ngf_ga01261322d7ece98dce30b32c477f7ad8}{ngf\+\_\+type}}}]{index\+\_\+type }\end{DoxyParamCaption})}
+
+Binds an index buffer to be used in the next draw.
+
+
+\begin{DoxyParams}{Parameters}
+{\em enc} & The handle to the render encoder. \\
+\hline
+{\em idxbuf} & The handle to the index buffer to bind. \\
+\hline
+{\em index\+\_\+type} & The type of values that are stored in the index buffer. Can be either \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8a46f9ed208f47c6acf29a9605e862ae37}{NGF\+\_\+\+TYPE\+\_\+\+UINT32}} or \mbox{\hyperlink{group__ngf_gga01261322d7ece98dce30b32c477f7ad8ab33b9ddc72d88b48d1461964b51387a2}{NGF\+\_\+\+TYPE\+\_\+\+UINT16}}. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga7bb1c15551c2e3b9c8592b1431f6e451}\label{group__ngf_ga7bb1c15551c2e3b9c8592b1431f6e451}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_end\_render\_pass@{ngf\_cmd\_end\_render\_pass}}
+\index{ngf\_cmd\_end\_render\_pass@{ngf\_cmd\_end\_render\_pass}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_end\_render\_pass()}{ngf\_cmd\_end\_render\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+end\+\_\+render\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{enc }\end{DoxyParamCaption})}
+
+Ends a render pass.
+
+Disposes of the given render command encoder, transitioning its corresponding command buffer to the \char`\"{}ready\char`\"{} state. \mbox{\Hypertarget{group__ngf_ga9dfc74933a0cb255a9b0f9a296de63cb}\label{group__ngf_ga9dfc74933a0cb255a9b0f9a296de63cb}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_end\_xfer\_pass@{ngf\_cmd\_end\_xfer\_pass}}
+\index{ngf\_cmd\_end\_xfer\_pass@{ngf\_cmd\_end\_xfer\_pass}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_end\_xfer\_pass()}{ngf\_cmd\_end\_xfer\_pass()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+end\+\_\+xfer\+\_\+pass (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}}]{enc }\end{DoxyParamCaption})}
+
+Ends a transfer pass.
+
+Disposes of the given transfer cmd encoder, transitioning its corresponding command buffer to the \char`\"{}ready\char`\"{} state. \mbox{\Hypertarget{group__ngf_ga55a2a27dfc26e3d79d31df0ff0805bb6}\label{group__ngf_ga55a2a27dfc26e3d79d31df0ff0805bb6}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_generate\_mipmaps@{ngf\_cmd\_generate\_mipmaps}}
+\index{ngf\_cmd\_generate\_mipmaps@{ngf\_cmd\_generate\_mipmaps}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_generate\_mipmaps()}{ngf\_cmd\_generate\_mipmaps()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+cmd\+\_\+generate\+\_\+mipmaps (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__xfer__encoder}{ngf\+\_\+xfer\+\_\+encoder}}}]{xfenc,  }\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}}]{img }\end{DoxyParamCaption})}
+
+Generates mipmaps automatically.
+
+Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level specified when creating the image, using the data from the preceding level as the source. Level 0 of each layer is expected to be populated by the application code prior to calling this function.
+
+
+\begin{DoxyParams}{Parameters}
+{\em xfenc} & A transfer command encoder. \\
+\hline
+{\em img} & The handle to the image to operate on. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaa558c9c2356786c7c8f75e1068848045}\label{group__ngf_gaa558c9c2356786c7c8f75e1068848045}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_scissor@{ngf\_cmd\_scissor}}
+\index{ngf\_cmd\_scissor@{ngf\_cmd\_scissor}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_scissor()}{ngf\_cmd\_scissor()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+scissor (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$}]{r }\end{DoxyParamCaption})}
+
+Sets the scissor region to be used in the subsequent rendering commands. The scissor defines a region of the framebuffer that can be affected by the rendering commands. Any pixels outside of that region are not written to. \mbox{\Hypertarget{group__ngf_ga91bb66405705a3833c3ad14e0bad18b0}\label{group__ngf_ga91bb66405705a3833c3ad14e0bad18b0}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_stencil\_compare\_mask@{ngf\_cmd\_stencil\_compare\_mask}}
+\index{ngf\_cmd\_stencil\_compare\_mask@{ngf\_cmd\_stencil\_compare\_mask}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_stencil\_compare\_mask()}{ngf\_cmd\_stencil\_compare\_mask()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+stencil\+\_\+compare\+\_\+mask (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{uint32\+\_\+t}]{front,  }\item[{uint32\+\_\+t}]{back }\end{DoxyParamCaption})}
+
+Set the compare mask to be used in stencil tests. \mbox{\Hypertarget{group__ngf_ga598086325fff021d147e7be13ed5c1ca}\label{group__ngf_ga598086325fff021d147e7be13ed5c1ca}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_stencil\_reference@{ngf\_cmd\_stencil\_reference}}
+\index{ngf\_cmd\_stencil\_reference@{ngf\_cmd\_stencil\_reference}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_stencil\_reference()}{ngf\_cmd\_stencil\_reference()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+stencil\+\_\+reference (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{uint32\+\_\+t}]{front,  }\item[{uint32\+\_\+t}]{back }\end{DoxyParamCaption})}
+
+Sets the reference value to be used in stencil tests. \mbox{\Hypertarget{group__ngf_gad925e83f480a62d6b8b8eacf291655bb}\label{group__ngf_gad925e83f480a62d6b8b8eacf291655bb}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_stencil\_write\_mask@{ngf\_cmd\_stencil\_write\_mask}}
+\index{ngf\_cmd\_stencil\_write\_mask@{ngf\_cmd\_stencil\_write\_mask}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_stencil\_write\_mask()}{ngf\_cmd\_stencil\_write\_mask()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+stencil\+\_\+write\+\_\+mask (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{uint32\+\_\+t}]{front,  }\item[{uint32\+\_\+t}]{back }\end{DoxyParamCaption})}
+
+Sets the stencil write mask. \mbox{\Hypertarget{group__ngf_ga9fc3fb8fb5ca75b5c845e4cf05482b86}\label{group__ngf_ga9fc3fb8fb5ca75b5c845e4cf05482b86}} 
+\index{Core C API@{Core C API}!ngf\_cmd\_viewport@{ngf\_cmd\_viewport}}
+\index{ngf\_cmd\_viewport@{ngf\_cmd\_viewport}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_cmd\_viewport()}{ngf\_cmd\_viewport()}}
+{\footnotesize\ttfamily void ngf\+\_\+cmd\+\_\+viewport (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__encoder}{ngf\+\_\+render\+\_\+encoder}}}]{buf,  }\item[{const \mbox{\hyperlink{structngf__irect2d}{ngf\+\_\+irect2d}} $\ast$}]{r }\end{DoxyParamCaption})}
+
+Sets the viewport to be used in subsequent rendering commands. The viewport defines a region of the destination framebuffer that the resulting rendering is scaled to fit into. \mbox{\Hypertarget{group__ngf_ga8b30f1f0291b3935a4c89f1ab3377a1e}\label{group__ngf_ga8b30f1f0291b3935a4c89f1ab3377a1e}} 
+\index{Core C API@{Core C API}!ngf\_create\_buffer@{ngf\_create\_buffer}}
+\index{ngf\_create\_buffer@{ngf\_create\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_buffer()}{ngf\_create\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+buffer (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__buffer__info}{ngf\+\_\+buffer\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new buffer object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & Information required to construct the buffer object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be written to. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga9faa695e2aff70cf798d17d5463bd8ab}\label{group__ngf_ga9faa695e2aff70cf798d17d5463bd8ab}} 
+\index{Core C API@{Core C API}!ngf\_create\_cmd\_buffer@{ngf\_create\_cmd\_buffer}}
+\index{ngf\_create\_cmd\_buffer@{ngf\_create\_cmd\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_cmd\_buffer()}{ngf\_create\_cmd\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__cmd__buffer__info}{ngf\+\_\+cmd\+\_\+buffer\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new command buffer.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & The information required to create the new command buffer. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created command buffer will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga5689c89f5def935f949a03ec158fbf5b}\label{group__ngf_ga5689c89f5def935f949a03ec158fbf5b}} 
+\index{Core C API@{Core C API}!ngf\_create\_context@{ngf\_create\_context}}
+\index{ngf\_create\_context@{ngf\_create\_context}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_context()}{ngf\_create\_context()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+context (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__context__info}{ngf\+\_\+context\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & The context configuration. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga01f6e663642ece4213607e6197708f32}\label{group__ngf_ga01f6e663642ece4213607e6197708f32}} 
+\index{Core C API@{Core C API}!ngf\_create\_graphics\_pipeline@{ngf\_create\_graphics\_pipeline}}
+\index{ngf\_create\_graphics\_pipeline@{ngf\_create\_graphics\_pipeline}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_graphics\_pipeline()}{ngf\_create\_graphics\_pipeline()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+graphics\+\_\+pipeline (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__graphics__pipeline__info}{ngf\+\_\+graphics\+\_\+pipeline\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new graphics pipeline object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & Information required to construct the graphics pipeline object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga6175e595bd3db7373493f2536d295a97}\label{group__ngf_ga6175e595bd3db7373493f2536d295a97}} 
+\index{Core C API@{Core C API}!ngf\_create\_image@{ngf\_create\_image}}
+\index{ngf\_create\_image@{ngf\_create\_image}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_image()}{ngf\_create\_image()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+image (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__image__info}{ngf\+\_\+image\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new image object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & Information required to construct the image object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga32e5bee46abc13b7b25e96736a6f30bc}\label{group__ngf_ga32e5bee46abc13b7b25e96736a6f30bc}} 
+\index{Core C API@{Core C API}!ngf\_create\_render\_target@{ngf\_create\_render\_target}}
+\index{ngf\_create\_render\_target@{ngf\_create\_render\_target}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_render\_target()}{ngf\_create\_render\_target()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+render\+\_\+target (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__render__target__info}{ngf\+\_\+render\+\_\+target\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Create a new rendertarget object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & Information required to construct the rendertarget object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaf5849344fb7781fe7ad84238bdfe12f5}\label{group__ngf_gaf5849344fb7781fe7ad84238bdfe12f5}} 
+\index{Core C API@{Core C API}!ngf\_create\_sampler@{ngf\_create\_sampler}}
+\index{ngf\_create\_sampler@{ngf\_create\_sampler}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_sampler()}{ngf\_create\_sampler()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+sampler (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__sampler__info}{ngf\+\_\+sampler\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new sampler object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em info} & Information required to construct the sampler object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga6b11af603327969158d78a1d7b63a402}\label{group__ngf_ga6b11af603327969158d78a1d7b63a402}} 
+\index{Core C API@{Core C API}!ngf\_create\_shader\_stage@{ngf\_create\_shader\_stage}}
+\index{ngf\_create\_shader\_stage@{ngf\_create\_shader\_stage}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_create\_shader\_stage()}{ngf\_create\_shader\_stage()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+create\+\_\+shader\+\_\+stage (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__shader__stage__info}{ngf\+\_\+shader\+\_\+stage\+\_\+info}} $\ast$}]{info,  }\item[{\mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}} $\ast$}]{result }\end{DoxyParamCaption})}
+
+Creates a new shader stage object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em stages} & Information required to construct the shader stage object. \\
+\hline
+{\em result} & Pointer to where the handle to the newly created object will be returned. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga7a3c3e03440eb8986edfeb7087f5184f}\label{group__ngf_ga7a3c3e03440eb8986edfeb7087f5184f}} 
+\index{Core C API@{Core C API}!ngf\_default\_render\_target@{ngf\_default\_render\_target}}
+\index{ngf\_default\_render\_target@{ngf\_default\_render\_target}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_default\_render\_target()}{ngf\_default\_render\_target()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} ngf\+\_\+default\+\_\+render\+\_\+target (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+Returns the handle to the \mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}} associated with the the current context\textquotesingle{}s swapchain (aka the default render target). If the current context does not have a swapchain, the result shall be null. Otherwise, it shall be a render target that has a color attachment associated with the context\textquotesingle{}s swapchain. If the swapchain was created with an accompanying depth buffer, the render target shall have an attachment for that as well.
+
+The caller should not attempt to destroy the returned render target. It shall be destroyed automatically, together with the parent context. \mbox{\Hypertarget{group__ngf_ga6f719e3f0647aadee613b74b20559699}\label{group__ngf_ga6f719e3f0647aadee613b74b20559699}} 
+\index{Core C API@{Core C API}!ngf\_default\_render\_target\_attachment\_descs@{ngf\_default\_render\_target\_attachment\_descs}}
+\index{ngf\_default\_render\_target\_attachment\_descs@{ngf\_default\_render\_target\_attachment\_descs}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_default\_render\_target\_attachment\_descs()}{ngf\_default\_render\_target\_attachment\_descs()}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__attachment__descriptions}{ngf\+\_\+attachment\+\_\+descriptions}} $\ast$ ngf\+\_\+default\+\_\+render\+\_\+target\+\_\+attachment\+\_\+descs (\begin{DoxyParamCaption}{ }\end{DoxyParamCaption})}
+
+Returns the attachment descriptions for the default render target. The caller should not attempt to free the returned pointer or modify the contents of the memory it points to. \mbox{\Hypertarget{group__ngf_gab79d65f9190a3511d3052d364ddf47c8}\label{group__ngf_gab79d65f9190a3511d3052d364ddf47c8}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_buffer@{ngf\_destroy\_buffer}}
+\index{ngf\_destroy\_buffer@{ngf\_destroy\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_buffer()}{ngf\_destroy\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__buffer}{ngf\+\_\+buffer}}}]{buffer }\end{DoxyParamCaption})}
+
+Destroys the given buffer object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buffer} & The handle to the buffer object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga7f45a9fa25fcf22b88cdcc80fcdb0217}\label{group__ngf_ga7f45a9fa25fcf22b88cdcc80fcdb0217}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_cmd\_buffer@{ngf\_destroy\_cmd\_buffer}}
+\index{ngf\_destroy\_cmd\_buffer@{ngf\_destroy\_cmd\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_cmd\_buffer()}{ngf\_destroy\_cmd\_buffer()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buffer }\end{DoxyParamCaption})}
+
+Destroys the given command buffer.
+
+If there is any work submitted via the given command buffer still pending on the rendering device, it shall be executed asynchronously. Therefore, application code doesn\textquotesingle{}t need to wait for the commands associated with the command buffer to finish before it can safely dispose of the command buffer.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buffer} & The handle to the command buffer object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga8ba904bf2f053a20bd63cdcc34d8b5c2}\label{group__ngf_ga8ba904bf2f053a20bd63cdcc34d8b5c2}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_context@{ngf\_destroy\_context}}
+\index{ngf\_destroy\_context@{ngf\_destroy\_context}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_context()}{ngf\_destroy\_context()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+context (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}}]{ctx }\end{DoxyParamCaption})}
+
+Destroys the given \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}.
+
+
+\begin{DoxyParams}{Parameters}
+{\em ctx} & The context to destroy. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaba2355db1b71d7e526b2a2e719b12666}\label{group__ngf_gaba2355db1b71d7e526b2a2e719b12666}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_graphics\_pipeline@{ngf\_destroy\_graphics\_pipeline}}
+\index{ngf\_destroy\_graphics\_pipeline@{ngf\_destroy\_graphics\_pipeline}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_graphics\_pipeline()}{ngf\_destroy\_graphics\_pipeline()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+graphics\+\_\+pipeline (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__graphics__pipeline}{ngf\+\_\+graphics\+\_\+pipeline}}}]{pipeline }\end{DoxyParamCaption})}
+
+Destroys the given graphics pipeline object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em pipeline} & The handle to the pipeline object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga823fcca9eab614317beb8e4c75d8574a}\label{group__ngf_ga823fcca9eab614317beb8e4c75d8574a}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_image@{ngf\_destroy\_image}}
+\index{ngf\_destroy\_image@{ngf\_destroy\_image}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_image()}{ngf\_destroy\_image()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+image (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__image}{ngf\+\_\+image}}}]{image }\end{DoxyParamCaption})}
+
+Destroys the given image object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em image} & The handle to the image object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaf495e14f8af348e3cefcfc7bad46f162}\label{group__ngf_gaf495e14f8af348e3cefcfc7bad46f162}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_render\_target@{ngf\_destroy\_render\_target}}
+\index{ngf\_destroy\_render\_target@{ngf\_destroy\_render\_target}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_render\_target()}{ngf\_destroy\_render\_target()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+render\+\_\+target (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__render__target}{ngf\+\_\+render\+\_\+target}}}]{rendertarget }\end{DoxyParamCaption})}
+
+Destroys the given render target.
+
+
+\begin{DoxyParams}{Parameters}
+{\em rendertarget} & The handle to the rendertarget object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gac27b6d8f09c51b2cf7aeb03cfef5f09f}\label{group__ngf_gac27b6d8f09c51b2cf7aeb03cfef5f09f}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_sampler@{ngf\_destroy\_sampler}}
+\index{ngf\_destroy\_sampler@{ngf\_destroy\_sampler}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_sampler()}{ngf\_destroy\_sampler()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+sampler (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__sampler}{ngf\+\_\+sampler}}}]{sampler }\end{DoxyParamCaption})}
+
+Destroys the given sampler object.
+
+
+\begin{DoxyParams}{Parameters}
+{\em ssampler} & The handle to the sampler object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga4cdfd3d01bc3fad21af9eba68e3cb019}\label{group__ngf_ga4cdfd3d01bc3fad21af9eba68e3cb019}} 
+\index{Core C API@{Core C API}!ngf\_destroy\_shader\_stage@{ngf\_destroy\_shader\_stage}}
+\index{ngf\_destroy\_shader\_stage@{ngf\_destroy\_shader\_stage}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_destroy\_shader\_stage()}{ngf\_destroy\_shader\_stage()}}
+{\footnotesize\ttfamily void ngf\+\_\+destroy\+\_\+shader\+\_\+stage (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__shader__stage}{ngf\+\_\+shader\+\_\+stage}}}]{stage }\end{DoxyParamCaption})}
+
+Destroys the given shader stage.
+
+
+\begin{DoxyParams}{Parameters}
+{\em stage} & The handle to the shader stage object to be destroyed. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gabdc19420f2365a4d25d99d2ec92d3791}\label{group__ngf_gabdc19420f2365a4d25d99d2ec92d3791}} 
+\index{Core C API@{Core C API}!ngf\_end\_frame@{ngf\_end\_frame}}
+\index{ngf\_end\_frame@{ngf\_end\_frame}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_end\_frame()}{ngf\_end\_frame()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+end\+\_\+frame (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}}]{token }\end{DoxyParamCaption})}
+
+End the current frame of rendering on the calling thread\textquotesingle{}s context.
+
+
+\begin{DoxyParams}{Parameters}
+{\em token} & The frame token generated by the corresponding preceding call to \mbox{\hyperlink{group__ngf_gad79ddd8fb25cee47494d89b5a25dccbc}{ngf\+\_\+begin\+\_\+frame}}. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga0f14ddf5b1abfbc26a23684516e6f3bc}\label{group__ngf_ga0f14ddf5b1abfbc26a23684516e6f3bc}} 
+\index{Core C API@{Core C API}!ngf\_finish@{ngf\_finish}}
+\index{ngf\_finish@{ngf\_finish}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_finish()}{ngf\_finish()}}
+{\footnotesize\ttfamily void ngf\+\_\+finish (\begin{DoxyParamCaption}\item[{void}]{ }\end{DoxyParamCaption})}
+
+Waits for all pending rendering commands to complete.
+
+Do not use this function lightly. It is expensive because it introduces a sync point between the CPU and the rendering device. \mbox{\Hypertarget{group__ngf_ga64f16281740125152672a7ce38f1a853}\label{group__ngf_ga64f16281740125152672a7ce38f1a853}} 
+\index{Core C API@{Core C API}!ngf\_get\_device\_capabilities@{ngf\_get\_device\_capabilities}}
+\index{ngf\_get\_device\_capabilities@{ngf\_get\_device\_capabilities}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_get\_device\_capabilities()}{ngf\_get\_device\_capabilities()}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} $\ast$ ngf\+\_\+get\+\_\+device\+\_\+capabilities (\begin{DoxyParamCaption}\item[{void}]{ }\end{DoxyParamCaption})}
+
+\begin{DoxyReturn}{Returns}
+A pointer to an \mbox{\hyperlink{structngf__device__capabilities}{ngf\+\_\+device\+\_\+capabilities}} instance, or NULL, if no context is present on the calling thread. 
+\end{DoxyReturn}
+\mbox{\Hypertarget{group__ngf_gab6fafd98f49fbcb76304780874986332}\label{group__ngf_gab6fafd98f49fbcb76304780874986332}} 
+\index{Core C API@{Core C API}!ngf\_get\_device\_list@{ngf\_get\_device\_list}}
+\index{ngf\_get\_device\_list@{ngf\_get\_device\_list}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_get\_device\_list()}{ngf\_get\_device\_list()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+get\+\_\+device\+\_\+list (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}} $\ast$$\ast$}]{devices,  }\item[{uint32\+\_\+t $\ast$}]{ndevices }\end{DoxyParamCaption})}
+
+Obtains a list of rendering devices available to nicegraf.
+
+This function is not thread-\/safe. The devices are not returned in any particular order, and the order is not guaranteed to be the same every time the function is called. 
+\begin{DoxyParams}{Parameters}
+{\em devices} & pointer to a pointer to {\ttfamily const} \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}}. If not {\ttfamily NULL}, this will be populated with a pointer to an array of \mbox{\hyperlink{structngf__device}{ngf\+\_\+device}} instances, each containing data about a rendering device available to the system. Callers should not attempt to free the returned pointer. \\
+\hline
+{\em ndevices} & pointer to a {\ttfamily uint32\+\_\+t}. If not NULL, the number of available rendering devices shall be written to the memory pointed to by this parameter. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga067147fcb8d461a23c9099c0fea5b605}\label{group__ngf_ga067147fcb8d461a23c9099c0fea5b605}} 
+\index{Core C API@{Core C API}!ngf\_initialize@{ngf\_initialize}}
+\index{ngf\_initialize@{ngf\_initialize}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_initialize()}{ngf\_initialize()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+initialize (\begin{DoxyParamCaption}\item[{const \mbox{\hyperlink{structngf__init__info}{ngf\+\_\+init\+\_\+info}} $\ast$}]{init\+\_\+info }\end{DoxyParamCaption})}
+
+Initializes nicegraf.
+
+The client should call this function only once during the entire lifetime of the application. This function is not thread safe. 
+\begin{DoxyParams}{Parameters}
+{\em init\+\_\+info} & Initialization parameters. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga2c4bccb7d7e5bfbf06acb181966872f1}\label{group__ngf_ga2c4bccb7d7e5bfbf06acb181966872f1}} 
+\index{Core C API@{Core C API}!ngf\_resize\_context@{ngf\_resize\_context}}
+\index{ngf\_resize\_context@{ngf\_resize\_context}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_resize\_context()}{ngf\_resize\_context()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+resize\+\_\+context (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}}]{ctx,  }\item[{uint32\+\_\+t}]{new\+\_\+width,  }\item[{uint32\+\_\+t}]{new\+\_\+height }\end{DoxyParamCaption})}
+
+Adjust the images associated with the given context\textquotesingle{}s swapchain.
+
+This function must be called every time that the window the context\textquotesingle{}s presenting to is resized. It is up to the client application to detect the resize events and call this function. Not calling this function on resize results in undefined behavior.
+
+
+\begin{DoxyParams}{Parameters}
+{\em ctx} & The context to operate on \\
+\hline
+{\em new\+\_\+width} & New window client area width in pixels \\
+\hline
+{\em new\+\_\+height} & New window client area height in pixels \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_gaeb1e325adf6ca533050ea225e1895fd1}\label{group__ngf_gaeb1e325adf6ca533050ea225e1895fd1}} 
+\index{Core C API@{Core C API}!ngf\_set\_context@{ngf\_set\_context}}
+\index{ngf\_set\_context@{ngf\_set\_context}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_set\_context()}{ngf\_set\_context()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+set\+\_\+context (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__context}{ngf\+\_\+context}}}]{ctx }\end{DoxyParamCaption})}
+
+Set the given nicegraf context as current for the calling thread.
+
+All subsequent rendering operations invoked from the calling thread shall affect the given context.
+
+Once a context has been set as current on a thread, it cannot be migrated to another thread.
+
+
+\begin{DoxyParams}{Parameters}
+{\em ctx} & The context to set as current. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga52027dd2cf70d4530d60edabe5a6019c}\label{group__ngf_ga52027dd2cf70d4530d60edabe5a6019c}} 
+\index{Core C API@{Core C API}!ngf\_start\_cmd\_buffer@{ngf\_start\_cmd\_buffer}}
+\index{ngf\_start\_cmd\_buffer@{ngf\_start\_cmd\_buffer}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_start\_cmd\_buffer()}{ngf\_start\_cmd\_buffer()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+start\+\_\+cmd\+\_\+buffer (\begin{DoxyParamCaption}\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}}}]{buf,  }\item[{\mbox{\hyperlink{group__ngf_gacb4c6ccc06f85f30379f5a1014d8ff37}{ngf\+\_\+frame\+\_\+token}}}]{token }\end{DoxyParamCaption})}
+
+Resets the command buffer.
+
+Erases all the commands previously recorded into the given command buffer, and prepares it for recording commands to be submitted within the frame identified by the specified token.
+
+The command buffer is required to be in the \char`\"{}ready\char`\"{} state.
+
+
+\begin{DoxyParams}{Parameters}
+{\em buf} & The handle to the command buffer to operate on \\
+\hline
+{\em token} & The token for the frame within which the recorded commands are going to be submitted. \\
+\hline
+\end{DoxyParams}
+\mbox{\Hypertarget{group__ngf_ga19a0228d5d5568d37d3a75f1f91353e4}\label{group__ngf_ga19a0228d5d5568d37d3a75f1f91353e4}} 
+\index{Core C API@{Core C API}!ngf\_submit\_cmd\_buffers@{ngf\_submit\_cmd\_buffers}}
+\index{ngf\_submit\_cmd\_buffers@{ngf\_submit\_cmd\_buffers}!Core C API@{Core C API}}
+\doxysubsubsection{\texorpdfstring{ngf\_submit\_cmd\_buffers()}{ngf\_submit\_cmd\_buffers()}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga0cf1ffd267fbb5a398934dc6827053ad}{ngf\+\_\+error}} ngf\+\_\+submit\+\_\+cmd\+\_\+buffers (\begin{DoxyParamCaption}\item[{uint32\+\_\+t}]{nbuffers,  }\item[{\mbox{\hyperlink{structngf__cmd__buffer}{ngf\+\_\+cmd\+\_\+buffer}} $\ast$}]{bufs }\end{DoxyParamCaption})}
+
+Submits the commands recorded in the given command buffers for execution. All command buffers must be in the \char`\"{}awaiting submission\char`\"{} state, and shall be transitioned to the \char`\"{}submitted\char`\"{} state.
+
+
+\begin{DoxyParams}{Parameters}
+{\em nbuffers} & The number of command buffers being submitted for execution. \\
+\hline
+{\em bufs} & A pointer to a contiguous array of nbuffers handles to command buffer objects to be submitted for execution. \\
+\hline
+\end{DoxyParams}

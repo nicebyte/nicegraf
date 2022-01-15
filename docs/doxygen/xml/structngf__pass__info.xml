@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__pass__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_pass_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__pass__info_1afc2061744dff85090c9b9442348e1ee3" prot="public" static="no" mutable="no">
+        <type><ref refid="structngf__render__target" kindref="compound">ngf_render_target</ref></type>
+        <definition>ngf_render_target ngf_pass_info::render_target</definition>
+        <argsstring></argsstring>
+        <name>render_target</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>A render target that shall be rendered to during this pass. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1512" column="21" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1512" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__pass__info_1a70993c73dd5c52a663b726d64f2578f4" prot="public" static="no" mutable="no">
+        <type>const <ref refid="group__ngf_1gafe674efd40411229fb8f4b1757d337e1" kindref="member">ngf_attachment_load_op</ref> *</type>
+        <definition>const ngf_attachment_load_op* ngf_pass_info::load_ops</definition>
+        <argsstring></argsstring>
+        <name>load_ops</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>A pointer to a buffer of ngf_load_op enumerators specifying the operation to perform at the start of the render pass for each attachment of <ref refid="structngf__pass__info_1afc2061744dff85090c9b9442348e1ee3" kindref="member">ngf_pass_info::render_target</ref>. The buffer must have at least the same number of elements as there are attachments in the render target. The <computeroutput>i</computeroutput>th element of the buffer corresponds to the <computeroutput>i</computeroutput>th attachment. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1520" column="32" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1520" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__pass__info_1a6e8e2baf391ed0f223e122e1357e2c13" prot="public" static="no" mutable="no">
+        <type>const <ref refid="group__ngf_1gab4a2ec1593a7dc69b50ebb6a134237e0" kindref="member">ngf_attachment_store_op</ref> *</type>
+        <definition>const ngf_attachment_store_op* ngf_pass_info::store_ops</definition>
+        <argsstring></argsstring>
+        <name>store_ops</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>A pointer to a buffer of ngf_store_op enumerators specifying the operation to perform at the end of the render pass for each attachment of <ref refid="structngf__pass__info_1afc2061744dff85090c9b9442348e1ee3" kindref="member">ngf_pass_info::render_target</ref>. The buffer must have at least the same number of elements as there are attachments in the render target. The <computeroutput>i</computeroutput>th element of the buffer corresponds to the <computeroutput>i</computeroutput>th attachment. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1528" column="33" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1528" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__pass__info_1a2cd8c309f8f88a6c944ba2d947055e29" prot="public" static="no" mutable="no">
+        <type>const <ref refid="unionngf__clear__info" kindref="compound">ngf_clear</ref> *</type>
+        <definition>const ngf_clear* ngf_pass_info::clears</definition>
+        <argsstring></argsstring>
+        <name>clears</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>If no attachment has a clear as its load op, this field may be NULL. Otherwise, it shall be a pointer to a buffer of ngf_clear objects. The buffer must contain at least as many elements as there are attachments in the render target. The <computeroutput>i</computeroutput>th element of the buffer corresponds to the <computeroutput>i</computeroutput>th attachment. For attachments that are to be cleared at the beginning of the pass, the clear values from the corresponding element of the buffer are used. The rest of the buffer&apos;s elements are ignored. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1538" column="19" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1538" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Information required to begin a render pass. </para>
+    </detaileddescription>
+    <collaborationgraph>
+      <node id="2">
+        <label>ngf_clear_info</label>
+        <link refid="unionngf__clear__info"/>
+      </node>
+      <node id="1">
+        <label>ngf_pass_info</label>
+        <link refid="structngf__pass__info"/>
+        <childnode refid="2" relation="usage">
+          <edgelabel>clears</edgelabel>
+        </childnode>
+      </node>
+    </collaborationgraph>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1508" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1508" bodyend="1539"/>
+    <listofallmembers>
+      <member refid="structngf__pass__info_1a2cd8c309f8f88a6c944ba2d947055e29" prot="public" virt="non-virtual"><scope>ngf_pass_info</scope><name>clears</name></member>
+      <member refid="structngf__pass__info_1a70993c73dd5c52a663b726d64f2578f4" prot="public" virt="non-virtual"><scope>ngf_pass_info</scope><name>load_ops</name></member>
+      <member refid="structngf__pass__info_1afc2061744dff85090c9b9442348e1ee3" prot="public" virt="non-virtual"><scope>ngf_pass_info</scope><name>render_target</name></member>
+      <member refid="structngf__pass__info_1a6e8e2baf391ed0f223e122e1357e2c13" prot="public" virt="non-virtual"><scope>ngf_pass_info</scope><name>store_ops</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

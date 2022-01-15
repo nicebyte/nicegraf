@@ -1,0 +1,77 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__attachment__description" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_attachment_description</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__attachment__description_1a7a74187cd310eaf52fe70bed8ce48c0a" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1gae330c9a2dd7ef60b523e68f1f273135a" kindref="member">ngf_attachment_type</ref></type>
+        <definition>ngf_attachment_type ngf_attachment_description::type</definition>
+        <argsstring></argsstring>
+        <name>type</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>What the attachment shall be used for. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1119" column="23" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1119" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__attachment__description_1aa4b561383d884419c79278925d9236a2" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga48bf7488f4d5c9421491c8c0b955132a" kindref="member">ngf_image_format</ref></type>
+        <definition>ngf_image_format ngf_attachment_description::format</definition>
+        <argsstring></argsstring>
+        <name>format</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Format of the associated image. Note that it must be valid for the given attachment type. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1120" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1120" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__attachment__description_1a587dc650464f554ab8eb60955f5b8bd0" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga99d00b2bf653c4605c4c505275e6536f" kindref="member">ngf_sample_count</ref></type>
+        <definition>ngf_sample_count ngf_attachment_description::sample_count</definition>
+        <argsstring></argsstring>
+        <name>sample_count</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Number of samples per pixel in the associated image. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1122" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1122" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__attachment__description_1aa0c802638a0f6118c91ff07c5c2655e3" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_attachment_description::is_sampled</definition>
+        <argsstring></argsstring>
+        <name>is_sampled</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Whether the image associated with this attachment is sampled from a shader at any point. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1123" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1123" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Describes the type and format of a render target attachment. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1118" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1118" bodyend="1125"/>
+    <listofallmembers>
+      <member refid="structngf__attachment__description_1aa4b561383d884419c79278925d9236a2" prot="public" virt="non-virtual"><scope>ngf_attachment_description</scope><name>format</name></member>
+      <member refid="structngf__attachment__description_1aa0c802638a0f6118c91ff07c5c2655e3" prot="public" virt="non-virtual"><scope>ngf_attachment_description</scope><name>is_sampled</name></member>
+      <member refid="structngf__attachment__description_1a587dc650464f554ab8eb60955f5b8bd0" prot="public" virt="non-virtual"><scope>ngf_attachment_description</scope><name>sample_count</name></member>
+      <member refid="structngf__attachment__description_1a7a74187cd310eaf52fe70bed8ce48c0a" prot="public" virt="non-virtual"><scope>ngf_attachment_description</scope><name>type</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

@@ -1,0 +1,62 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__diagnostic__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_diagnostic_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__diagnostic__info_1a330cd93b17fcdc20979e141f6fe6d5af" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga7634ab295ada4ee1515e24b58ed268ac" kindref="member">ngf_diagnostic_log_verbosity</ref></type>
+        <definition>ngf_diagnostic_log_verbosity ngf_diagnostic_info::verbosity</definition>
+        <argsstring></argsstring>
+        <name>verbosity</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Diagnostic log verbosity. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="262" column="32" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="262" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__diagnostic__info_1a43530a52e6da492d3f079168b3e4c312" prot="public" static="no" mutable="no">
+        <type>void *</type>
+        <definition>void* ngf_diagnostic_info::userdata</definition>
+        <argsstring></argsstring>
+        <name>userdata</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Arbitrary pointer that will be passed as-is to the callback. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="263" column="31" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="263" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__diagnostic__info_1ad8848ffb545450996d055c47101cf2f8" prot="public" static="no" mutable="no">
+        <type><ref refid="nicegraf_8h_1a4768a37f8f3eca04d3e787f6ebcdcf10" kindref="member">ngf_diagnostic_callback</ref></type>
+        <definition>ngf_diagnostic_callback ngf_diagnostic_info::callback</definition>
+        <argsstring></argsstring>
+        <name>callback</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Pointer to the diagnostic message callback function. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="266" column="27" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="266" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Diagnostic configuration. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="261" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="261" bodyend="268"/>
+    <listofallmembers>
+      <member refid="structngf__diagnostic__info_1ad8848ffb545450996d055c47101cf2f8" prot="public" virt="non-virtual"><scope>ngf_diagnostic_info</scope><name>callback</name></member>
+      <member refid="structngf__diagnostic__info_1a43530a52e6da492d3f079168b3e4c312" prot="public" virt="non-virtual"><scope>ngf_diagnostic_info</scope><name>userdata</name></member>
+      <member refid="structngf__diagnostic__info_1a330cd93b17fcdc20979e141f6fe6d5af" prot="public" virt="non-virtual"><scope>ngf_diagnostic_info</scope><name>verbosity</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

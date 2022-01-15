@@ -1,0 +1,28 @@
+\hypertarget{structngf__context__info}{}\doxysection{ngf\+\_\+context\+\_\+info Struct Reference}
+\label{structngf__context__info}\index{ngf\_context\_info@{ngf\_context\_info}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+const \mbox{\hyperlink{structngf__swapchain__info}{ngf\+\_\+swapchain\+\_\+info}} $\ast$ \mbox{\hyperlink{structngf__context__info_a7457a17ecc47f90b4183d7fe2788b4be}{swapchain\+\_\+info}}
+\item 
+const \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} \mbox{\hyperlink{structngf__context__info_a14fa180524811ece217c0ffb5f1ef69f}{shared\+\_\+context}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Configures a nicegraf rendering context. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__context__info_a14fa180524811ece217c0ffb5f1ef69f}\label{structngf__context__info_a14fa180524811ece217c0ffb5f1ef69f}} 
+\index{ngf\_context\_info@{ngf\_context\_info}!shared\_context@{shared\_context}}
+\index{shared\_context@{shared\_context}!ngf\_context\_info@{ngf\_context\_info}}
+\doxysubsubsection{\texorpdfstring{shared\_context}{shared\_context}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__context}{ngf\+\_\+context}} ngf\+\_\+context\+\_\+info\+::shared\+\_\+context}
+
+A reference to another context; the newly created context shall be able to use the resources (such as buffers and images) created within the given context, and vice versa Can be NULL. \mbox{\Hypertarget{structngf__context__info_a7457a17ecc47f90b4183d7fe2788b4be}\label{structngf__context__info_a7457a17ecc47f90b4183d7fe2788b4be}} 
+\index{ngf\_context\_info@{ngf\_context\_info}!swapchain\_info@{swapchain\_info}}
+\index{swapchain\_info@{swapchain\_info}!ngf\_context\_info@{ngf\_context\_info}}
+\doxysubsubsection{\texorpdfstring{swapchain\_info}{swapchain\_info}}
+{\footnotesize\ttfamily const \mbox{\hyperlink{structngf__swapchain__info}{ngf\+\_\+swapchain\+\_\+info}}$\ast$ ngf\+\_\+context\+\_\+info\+::swapchain\+\_\+info}
+
+Configures the swapchain that the context will be presenting to. This can be NULL if all rendering is done off-\/screen and the context never presents to a window. 

@@ -1,0 +1,80 @@
+\hypertarget{structngf__blend__info}{}\doxysection{ngf\+\_\+blend\+\_\+info Struct Reference}
+\label{structngf__blend__info}\index{ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} \mbox{\hyperlink{structngf__blend__info_a9d1204b18f0a55392258088c9085d72a}{blend\+\_\+op\+\_\+color}}
+\item 
+\mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} \mbox{\hyperlink{structngf__blend__info_a69b865b89f554ffc12ab2ea2090e5e20}{blend\+\_\+op\+\_\+alpha}}
+\item 
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \mbox{\hyperlink{structngf__blend__info_a80a4b037383038c5aff53ee1aa4cd07e}{src\+\_\+color\+\_\+blend\+\_\+factor}}
+\item 
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \mbox{\hyperlink{structngf__blend__info_a6a604f5b7eefee07ba81c0bf9ba76e03}{dst\+\_\+color\+\_\+blend\+\_\+factor}}
+\item 
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \mbox{\hyperlink{structngf__blend__info_a960ffc6db1ab46a2265ced6f41c7633d}{src\+\_\+alpha\+\_\+blend\+\_\+factor}}
+\item 
+\mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} \mbox{\hyperlink{structngf__blend__info_a1fcfe150a082ebe505294ab183904433}{dst\+\_\+alpha\+\_\+blend\+\_\+factor}}
+\item 
+float \mbox{\hyperlink{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}{blend\+\_\+consts}} \mbox{[}4\mbox{]}
+\item 
+bool \mbox{\hyperlink{structngf__blend__info_a0a708e5d7e81b9cec192303189117001}{enable}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+Describes how blending should be handled by the pipeline. If blending is disabled, the resulting color and alpha values are directly assigned the color and alpha values computed at the fragment stage.
+
+When blending is enabled, the resulting color and alpha values are computed using the corresponding blend operations and factors (specified separately for color and alpha). Note that if the render target attachment from which the destination values are read uses an s\+RGB format, the destination color values are linearized prior to being used in a blend operation.
+
+If the render target attachment uses an s\+RGB format, the resulting color value is converted to an s\+RGB representation prior to being finally written to the attachment. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}\label{structngf__blend__info_a61a8fd68fbbb553972bf3426745f9399}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!blend\_consts@{blend\_consts}}
+\index{blend\_consts@{blend\_consts}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{blend\_consts}{blend\_consts}}
+{\footnotesize\ttfamily float ngf\+\_\+blend\+\_\+info\+::blend\+\_\+consts\mbox{[}4\mbox{]}}
+
+Blend constants used by \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+COLOR}}, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+CONSTANT\+\_\+\+ALPHA}}, \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+COLOR}} and \mbox{\hyperlink{group__ngf_gga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588}{NGF\+\_\+\+BLEND\+\_\+\+FACTOR\+\_\+\+ONE\+\_\+\+MINUS\+\_\+\+CONSTANT\+\_\+\+ALPHA}} . \mbox{\Hypertarget{structngf__blend__info_a69b865b89f554ffc12ab2ea2090e5e20}\label{structngf__blend__info_a69b865b89f554ffc12ab2ea2090e5e20}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!blend\_op\_alpha@{blend\_op\_alpha}}
+\index{blend\_op\_alpha@{blend\_op\_alpha}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{blend\_op\_alpha}{blend\_op\_alpha}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} ngf\+\_\+blend\+\_\+info\+::blend\+\_\+op\+\_\+alpha}
+
+The blend operation to perform for alpha. \mbox{\Hypertarget{structngf__blend__info_a9d1204b18f0a55392258088c9085d72a}\label{structngf__blend__info_a9d1204b18f0a55392258088c9085d72a}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!blend\_op\_color@{blend\_op\_color}}
+\index{blend\_op\_color@{blend\_op\_color}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{blend\_op\_color}{blend\_op\_color}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga04782788330b1bf07c4c6328206386a6}{ngf\+\_\+blend\+\_\+op}} ngf\+\_\+blend\+\_\+info\+::blend\+\_\+op\+\_\+color}
+
+The blend operation to perform for color. \mbox{\Hypertarget{structngf__blend__info_a1fcfe150a082ebe505294ab183904433}\label{structngf__blend__info_a1fcfe150a082ebe505294ab183904433}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!dst\_alpha\_blend\_factor@{dst\_alpha\_blend\_factor}}
+\index{dst\_alpha\_blend\_factor@{dst\_alpha\_blend\_factor}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{dst\_alpha\_blend\_factor}{dst\_alpha\_blend\_factor}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} ngf\+\_\+blend\+\_\+info\+::dst\+\_\+alpha\+\_\+blend\+\_\+factor}
+
+The destination blend factor for alpha. \mbox{\Hypertarget{structngf__blend__info_a6a604f5b7eefee07ba81c0bf9ba76e03}\label{structngf__blend__info_a6a604f5b7eefee07ba81c0bf9ba76e03}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!dst\_color\_blend\_factor@{dst\_color\_blend\_factor}}
+\index{dst\_color\_blend\_factor@{dst\_color\_blend\_factor}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{dst\_color\_blend\_factor}{dst\_color\_blend\_factor}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} ngf\+\_\+blend\+\_\+info\+::dst\+\_\+color\+\_\+blend\+\_\+factor}
+
+The destination blend factor for color. \mbox{\Hypertarget{structngf__blend__info_a0a708e5d7e81b9cec192303189117001}\label{structngf__blend__info_a0a708e5d7e81b9cec192303189117001}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!enable@{enable}}
+\index{enable@{enable}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{enable}{enable}}
+{\footnotesize\ttfamily bool ngf\+\_\+blend\+\_\+info\+::enable}
+
+Specifies whether blending is enabled. \mbox{\Hypertarget{structngf__blend__info_a960ffc6db1ab46a2265ced6f41c7633d}\label{structngf__blend__info_a960ffc6db1ab46a2265ced6f41c7633d}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!src\_alpha\_blend\_factor@{src\_alpha\_blend\_factor}}
+\index{src\_alpha\_blend\_factor@{src\_alpha\_blend\_factor}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{src\_alpha\_blend\_factor}{src\_alpha\_blend\_factor}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} ngf\+\_\+blend\+\_\+info\+::src\+\_\+alpha\+\_\+blend\+\_\+factor}
+
+The source blend factor for alpha. \mbox{\Hypertarget{structngf__blend__info_a80a4b037383038c5aff53ee1aa4cd07e}\label{structngf__blend__info_a80a4b037383038c5aff53ee1aa4cd07e}} 
+\index{ngf\_blend\_info@{ngf\_blend\_info}!src\_color\_blend\_factor@{src\_color\_blend\_factor}}
+\index{src\_color\_blend\_factor@{src\_color\_blend\_factor}!ngf\_blend\_info@{ngf\_blend\_info}}
+\doxysubsubsection{\texorpdfstring{src\_color\_blend\_factor}{src\_color\_blend\_factor}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_ga7111d15881b99ea1372d4af5f0acda82}{ngf\+\_\+blend\+\_\+factor}} ngf\+\_\+blend\+\_\+info\+::src\+\_\+color\+\_\+blend\+\_\+factor}
+
+The source blend factor for color. 

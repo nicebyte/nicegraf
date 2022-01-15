@@ -1,0 +1,60 @@
+\hypertarget{structngf__depth__stencil__info}{}\doxysection{ngf\+\_\+depth\+\_\+stencil\+\_\+info Struct Reference}
+\label{structngf__depth__stencil__info}\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsection*{Data Fields}
+\begin{DoxyCompactItemize}
+\item 
+\mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}} \mbox{\hyperlink{structngf__depth__stencil__info_af8b43ffd1508053a9aadbebf39d0b9c3}{front\+\_\+stencil}}
+\item 
+\mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}} \mbox{\hyperlink{structngf__depth__stencil__info_a4a01a5578725c5fda20344d9f8e0310e}{back\+\_\+stencil}}
+\item 
+\mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}} \mbox{\hyperlink{structngf__depth__stencil__info_aba97c26a9f6c744bea1f5abd9bda214e}{depth\+\_\+compare}}
+\item 
+bool \mbox{\hyperlink{structngf__depth__stencil__info_a72c9cbcc7403ac0ac11651acc45e4df5}{stencil\+\_\+test}}
+\item 
+bool \mbox{\hyperlink{structngf__depth__stencil__info_ab08f98f3874165dd7e7b9fac4322305f}{depth\+\_\+test}}
+\item 
+bool \mbox{\hyperlink{structngf__depth__stencil__info_a1b8f0dd36545d36382aac74961259143}{depth\+\_\+write}}
+\end{DoxyCompactItemize}
+
+
+\doxysubsection{Detailed Description}
+A graphics pipeline\textquotesingle{}s depth/stencil state description. 
+
+\doxysubsection{Field Documentation}
+\mbox{\Hypertarget{structngf__depth__stencil__info_a4a01a5578725c5fda20344d9f8e0310e}\label{structngf__depth__stencil__info_a4a01a5578725c5fda20344d9f8e0310e}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!back\_stencil@{back\_stencil}}
+\index{back\_stencil@{back\_stencil}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{back\_stencil}{back\_stencil}}
+{\footnotesize\ttfamily \mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}} ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::back\+\_\+stencil}
+
+Stencil test and actions for back-\/facing polys. This is ignored when stencil testing is disabled. \mbox{\Hypertarget{structngf__depth__stencil__info_aba97c26a9f6c744bea1f5abd9bda214e}\label{structngf__depth__stencil__info_aba97c26a9f6c744bea1f5abd9bda214e}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!depth\_compare@{depth\_compare}}
+\index{depth\_compare@{depth\_compare}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{depth\_compare}{depth\_compare}}
+{\footnotesize\ttfamily \mbox{\hyperlink{group__ngf_gae7023890d9364d3f8aa87c0e7807342e}{ngf\+\_\+compare\+\_\+op}} ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::depth\+\_\+compare}
+
+The comparison function to use when performing the depth test. This is ignored when depth testing is disabled. \mbox{\Hypertarget{structngf__depth__stencil__info_ab08f98f3874165dd7e7b9fac4322305f}\label{structngf__depth__stencil__info_ab08f98f3874165dd7e7b9fac4322305f}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!depth\_test@{depth\_test}}
+\index{depth\_test@{depth\_test}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{depth\_test}{depth\_test}}
+{\footnotesize\ttfamily bool ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::depth\+\_\+test}
+
+Whether to enable depth test. When this is enabled, fragments that fail the test specified in \mbox{\hyperlink{structngf__depth__stencil__info_aba97c26a9f6c744bea1f5abd9bda214e}{ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::depth\+\_\+compare}}, get discarded. \mbox{\Hypertarget{structngf__depth__stencil__info_a1b8f0dd36545d36382aac74961259143}\label{structngf__depth__stencil__info_a1b8f0dd36545d36382aac74961259143}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!depth\_write@{depth\_write}}
+\index{depth\_write@{depth\_write}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{depth\_write}{depth\_write}}
+{\footnotesize\ttfamily bool ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::depth\+\_\+write}
+
+Whether to enable writing to the depth buffer. When this is enabled, fragments that pass the depth test have their depth written into the depth buffer. \mbox{\Hypertarget{structngf__depth__stencil__info_af8b43ffd1508053a9aadbebf39d0b9c3}\label{structngf__depth__stencil__info_af8b43ffd1508053a9aadbebf39d0b9c3}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!front\_stencil@{front\_stencil}}
+\index{front\_stencil@{front\_stencil}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{front\_stencil}{front\_stencil}}
+{\footnotesize\ttfamily \mbox{\hyperlink{structngf__stencil__info}{ngf\+\_\+stencil\+\_\+info}} ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::front\+\_\+stencil}
+
+Stencil test and actions for front-\/facing polys. This is ignored when stencil testing is disabled. \mbox{\Hypertarget{structngf__depth__stencil__info_a72c9cbcc7403ac0ac11651acc45e4df5}\label{structngf__depth__stencil__info_a72c9cbcc7403ac0ac11651acc45e4df5}} 
+\index{ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}!stencil\_test@{stencil\_test}}
+\index{stencil\_test@{stencil\_test}!ngf\_depth\_stencil\_info@{ngf\_depth\_stencil\_info}}
+\doxysubsubsection{\texorpdfstring{stencil\_test}{stencil\_test}}
+{\footnotesize\ttfamily bool ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::stencil\+\_\+test}
+
+Whether to enable stencil testing. The exact procedure for the stencil test, and the actions to perform on success or failure can be specified separately for front-\/ and back-\/facing polygons (see \mbox{\hyperlink{structngf__depth__stencil__info_af8b43ffd1508053a9aadbebf39d0b9c3}{ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::front\+\_\+stencil}} and \mbox{\hyperlink{structngf__depth__stencil__info_a4a01a5578725c5fda20344d9f8e0310e}{ngf\+\_\+depth\+\_\+stencil\+\_\+info\+::back\+\_\+stencil}}). 

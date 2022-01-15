@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="indexpage" kind="page">
+    <compoundname>index</compoundname>
+    <title>Reference Documentation</title>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>These pages contain documentation automatically generated from nicegraf&apos;s code comments. The text&apos;s purpose is to concisely describe the intended behavior and failure modes of the API.</para>
+<para>If viewing this document in a web browser or a PDF viewer, click one of the following links to proceed to the documentation for the corresponding module.</para>
+<para><itemizedlist>
+<listitem><para><ref refid="group__ngf" kindref="compound">Core C API</ref></para>
+</listitem><listitem><para><ref refid="group__ngf__util" kindref="compound">Utility Library</ref> </para>
+</listitem></itemizedlist>
+</para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h"/>
+  </compounddef>
+</doxygen>

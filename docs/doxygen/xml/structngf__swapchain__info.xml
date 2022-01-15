@@ -1,0 +1,137 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__swapchain__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_swapchain_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__swapchain__info_1a4d92298db06b1938399a57335c46292c" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga48bf7488f4d5c9421491c8c0b955132a" kindref="member">ngf_image_format</ref></type>
+        <definition>ngf_image_format ngf_swapchain_info::color_format</definition>
+        <argsstring></argsstring>
+        <name>color_format</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Swapchain image format. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1680" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1680" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a9e8421806559210830da838379cafe5f" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga48bf7488f4d5c9421491c8c0b955132a" kindref="member">ngf_image_format</ref></type>
+        <definition>ngf_image_format ngf_swapchain_info::depth_format</definition>
+        <argsstring></argsstring>
+        <name>depth_format</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Format to use for the depth buffer, if set to NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1681" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1681" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a880eb6cfe83d6fa8d9608f98e7a29830" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga99d00b2bf653c4605c4c505275e6536f" kindref="member">ngf_sample_count</ref></type>
+        <definition>ngf_sample_count ngf_swapchain_info::sample_count</definition>
+        <argsstring></argsstring>
+        <name>sample_count</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Number of samples per pixel (0 for non-multisampled) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1683" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1683" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a97f706aeef8f8ec71c9455bd50ec354b" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_swapchain_info::capacity_hint</definition>
+        <argsstring></argsstring>
+        <name>capacity_hint</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Number of images in swapchain (may be ignored) </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1684" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1684" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a151faab9e2faa9690869bc81d7661cf3" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_swapchain_info::width</definition>
+        <argsstring></argsstring>
+        <name>width</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Width of swapchain images in pixels. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1685" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1685" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a1692a279f3f8f9d510db88e60d9355bc" prot="public" static="no" mutable="no">
+        <type>uint32_t</type>
+        <definition>uint32_t ngf_swapchain_info::height</definition>
+        <argsstring></argsstring>
+        <name>height</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Height of swapchain images in pixels. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1686" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1686" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1a794e6f51f8a5353fb62c7933b3b6ac6e" prot="public" static="no" mutable="no">
+        <type>uintptr_t</type>
+        <definition>uintptr_t ngf_swapchain_info::native_handle</definition>
+        <argsstring></argsstring>
+        <name>native_handle</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>HWND, ANativeWindow, NSWindow, etc. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1687" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1687" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__swapchain__info_1ad719ee0584b379cf249c25c9d7dff0ba" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga1fee3c1a4a2e46ea1215541acdb92f37" kindref="member">ngf_present_mode</ref></type>
+        <definition>ngf_present_mode ngf_swapchain_info::present_mode</definition>
+        <argsstring></argsstring>
+        <name>present_mode</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Desired present mode. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1688" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1688" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Swapchain configuration. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="1679" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="1679" bodyend="1689"/>
+    <listofallmembers>
+      <member refid="structngf__swapchain__info_1a97f706aeef8f8ec71c9455bd50ec354b" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>capacity_hint</name></member>
+      <member refid="structngf__swapchain__info_1a4d92298db06b1938399a57335c46292c" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>color_format</name></member>
+      <member refid="structngf__swapchain__info_1a9e8421806559210830da838379cafe5f" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>depth_format</name></member>
+      <member refid="structngf__swapchain__info_1a1692a279f3f8f9d510db88e60d9355bc" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>height</name></member>
+      <member refid="structngf__swapchain__info_1a794e6f51f8a5353fb62c7933b3b6ac6e" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>native_handle</name></member>
+      <member refid="structngf__swapchain__info_1ad719ee0584b379cf249c25c9d7dff0ba" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>present_mode</name></member>
+      <member refid="structngf__swapchain__info_1a880eb6cfe83d6fa8d9608f98e7a29830" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>sample_count</name></member>
+      <member refid="structngf__swapchain__info_1a151faab9e2faa9690869bc81d7661cf3" prot="public" virt="non-virtual"><scope>ngf_swapchain_info</scope><name>width</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

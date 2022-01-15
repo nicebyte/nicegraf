@@ -1,0 +1,139 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.2" xml:lang="en-US">
+  <compounddef id="structngf__blend__info" kind="struct" language="C++" prot="public">
+    <compoundname>ngf_blend_info</compoundname>
+    <includes refid="nicegraf_8h" local="no">nicegraf.h</includes>
+      <sectiondef kind="public-attrib">
+      <memberdef kind="variable" id="structngf__blend__info_1a9d1204b18f0a55392258088c9085d72a" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga04782788330b1bf07c4c6328206386a6" kindref="member">ngf_blend_op</ref></type>
+        <definition>ngf_blend_op ngf_blend_info::blend_op_color</definition>
+        <argsstring></argsstring>
+        <name>blend_op_color</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The blend operation to perform for color. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="833" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="833" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a69b865b89f554ffc12ab2ea2090e5e20" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga04782788330b1bf07c4c6328206386a6" kindref="member">ngf_blend_op</ref></type>
+        <definition>ngf_blend_op ngf_blend_info::blend_op_alpha</definition>
+        <argsstring></argsstring>
+        <name>blend_op_alpha</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The blend operation to perform for alpha. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="834" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="834" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a80a4b037383038c5aff53ee1aa4cd07e" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga7111d15881b99ea1372d4af5f0acda82" kindref="member">ngf_blend_factor</ref></type>
+        <definition>ngf_blend_factor ngf_blend_info::src_color_blend_factor</definition>
+        <argsstring></argsstring>
+        <name>src_color_blend_factor</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The source blend factor for color. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="835" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="835" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a6a604f5b7eefee07ba81c0bf9ba76e03" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga7111d15881b99ea1372d4af5f0acda82" kindref="member">ngf_blend_factor</ref></type>
+        <definition>ngf_blend_factor ngf_blend_info::dst_color_blend_factor</definition>
+        <argsstring></argsstring>
+        <name>dst_color_blend_factor</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The destination blend factor for color. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="836" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="836" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a960ffc6db1ab46a2265ced6f41c7633d" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga7111d15881b99ea1372d4af5f0acda82" kindref="member">ngf_blend_factor</ref></type>
+        <definition>ngf_blend_factor ngf_blend_info::src_alpha_blend_factor</definition>
+        <argsstring></argsstring>
+        <name>src_alpha_blend_factor</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The source blend factor for alpha. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="837" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="837" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a1fcfe150a082ebe505294ab183904433" prot="public" static="no" mutable="no">
+        <type><ref refid="group__ngf_1ga7111d15881b99ea1372d4af5f0acda82" kindref="member">ngf_blend_factor</ref></type>
+        <definition>ngf_blend_factor ngf_blend_info::dst_alpha_blend_factor</definition>
+        <argsstring></argsstring>
+        <name>dst_alpha_blend_factor</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>The destination blend factor for alpha. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="838" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="838" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a61a8fd68fbbb553972bf3426745f9399" prot="public" static="no" mutable="no">
+        <type>float</type>
+        <definition>float ngf_blend_info::blend_consts[4]</definition>
+        <argsstring>[4]</argsstring>
+        <name>blend_consts</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Blend constants used by <ref refid="nicegraf_8h_1ga7111d15881b99ea1372d4af5f0acda82a37602a168c32f37dffccd2eb360f8515" kindref="member">NGF_BLEND_FACTOR_CONSTANT_COLOR</ref>, <ref refid="nicegraf_8h_1ga7111d15881b99ea1372d4af5f0acda82a08010e2d97c46f0c857862b7557735a5" kindref="member">NGF_BLEND_FACTOR_CONSTANT_ALPHA</ref>, <ref refid="nicegraf_8h_1ga7111d15881b99ea1372d4af5f0acda82ad560e75f31a7ec7998cb336a02bc2b3f" kindref="member">NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR</ref> and <ref refid="nicegraf_8h_1ga7111d15881b99ea1372d4af5f0acda82aeb51c0a3ae649296f327c6e585228588" kindref="member">NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA</ref> . </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="839" column="20" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="839" bodyend="-1"/>
+      </memberdef>
+      <memberdef kind="variable" id="structngf__blend__info_1a0a708e5d7e81b9cec192303189117001" prot="public" static="no" mutable="no">
+        <type>bool</type>
+        <definition>bool ngf_blend_info::enable</definition>
+        <argsstring></argsstring>
+        <name>enable</name>
+        <briefdescription>
+        </briefdescription>
+        <detaileddescription>
+<para>Specifies whether blending is enabled. </para>
+        </detaileddescription>
+        <inbodydescription>
+        </inbodydescription>
+        <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="844" column="8" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="844" bodyend="-1"/>
+      </memberdef>
+      </sectiondef>
+    <briefdescription>
+    </briefdescription>
+    <detaileddescription>
+<para>Describes how blending should be handled by the pipeline. If blending is disabled, the resulting color and alpha values are directly assigned the color and alpha values computed at the fragment stage.</para>
+<para>When blending is enabled, the resulting color and alpha values are computed using the corresponding blend operations and factors (specified separately for color and alpha). Note that if the render target attachment from which the destination values are read uses an sRGB format, the destination color values are linearized prior to being used in a blend operation.</para>
+<para>If the render target attachment uses an sRGB format, the resulting color value is converted to an sRGB representation prior to being finally written to the attachment. </para>
+    </detaileddescription>
+    <location file="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" line="832" column="1" bodyfile="C:/Users/nicebyte/home/TERMINAL/nicegraf/include/nicegraf.h" bodystart="832" bodyend="845"/>
+    <listofallmembers>
+      <member refid="structngf__blend__info_1a61a8fd68fbbb553972bf3426745f9399" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>blend_consts</name></member>
+      <member refid="structngf__blend__info_1a69b865b89f554ffc12ab2ea2090e5e20" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>blend_op_alpha</name></member>
+      <member refid="structngf__blend__info_1a9d1204b18f0a55392258088c9085d72a" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>blend_op_color</name></member>
+      <member refid="structngf__blend__info_1a1fcfe150a082ebe505294ab183904433" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>dst_alpha_blend_factor</name></member>
+      <member refid="structngf__blend__info_1a6a604f5b7eefee07ba81c0bf9ba76e03" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>dst_color_blend_factor</name></member>
+      <member refid="structngf__blend__info_1a0a708e5d7e81b9cec192303189117001" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>enable</name></member>
+      <member refid="structngf__blend__info_1a960ffc6db1ab46a2265ced6f41c7633d" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>src_alpha_blend_factor</name></member>
+      <member refid="structngf__blend__info_1a80a4b037383038c5aff53ee1aa4cd07e" prot="public" virt="non-virtual"><scope>ngf_blend_info</scope><name>src_color_blend_factor</name></member>
+    </listofallmembers>
+  </compounddef>
+</doxygen>
