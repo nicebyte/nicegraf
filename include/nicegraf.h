@@ -2113,7 +2113,7 @@ typedef struct ngf_cmd_buffer_info {
  *   - submitted.
  *
  * Every newly created command buffer is in the "new" state. It can be
- * transitioned to the "ready" state by calling `ngf_start_cmd_buffer` on it.
+ * transitioned to the "ready" state by calling \ref ngf_start_cmd_buffer on it.
  *
  * When a command buffer is in the "ready" state, you may begin recording a new
  * series of rendering commands into it.
@@ -2136,7 +2136,7 @@ typedef struct ngf_cmd_buffer_info {
  *
  * Once all of the desired commands have been recorded, and the command buffer
  * is in the "awaiting submission" state, the command buffer may be submitted
- * for execution via a call to \ref ngf_cmd_buffer_submit, which transitions it
+ * for execution via a call to \ref ngf_submit_cmd_buffers, which transitions it
  * into the "submitted" state.
  *
  * Submission may only be performed on command buffers that are in the
@@ -2151,9 +2151,9 @@ typedef struct ngf_cmd_buffer_info {
  *
  * Calling a command buffer function on a buffer that is in a state not
  * expected by that function will result in an error. For example, calling
- * \ref ngf_cmd_buffer_submit would produce an error on a buffer that is in
+ * \ref ngf_submit_cmd_buffers would produce an error on a buffer that is in
  * the "ready" state, since, according to the rules outlined above,
- * \ref ngf_cmd_buffer_submit expects command buffers to be in the "awaiting
+ * \ref ngf_submit_cmd_buffers expects command buffers to be in the "awaiting
  * submission" state.
  *
  */
@@ -2486,38 +2486,67 @@ void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEX
 void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
 
 /**
- * Wait for all pending rendering commands to complete.
+ * \ingroup ngf
+ *
+ * Waits for all pending rendering commands to complete.
+ * 
+ * Do not use this function lightly. It is expensive because it introduces a sync point between the
+ * CPU and the rendering device.
  */
 void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
- * Creates a new command buffer that is in the "ready" state.
+ * \ingroup ngf
+ * 
+ * Creates a new command buffer.
+ * 
+ * @param info The information required to create the new command buffer.
+ * @param result Pointer to where the handle to the newly created command buffer will be returned.
  */
 ngf_error
 ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) NGF_NOEXCEPT;
 
 /**
- * Frees resources associated with the given command buffer.
- * Any work previously submitted via this command buffer will be finished
- * asynchronously.
+ * \ingroup ngf
+ * 
+ * Destroys the given command buffer.
+ * 
+ * If there is any work submitted via the given command buffer still pending on the rendering
+ * device, it shall be executed asynchronously. Therefore, application code doesn't need to wait for
+ * the commands associated with the command buffer to finish before it can safely dispose of the
+ * command buffer.
+ * 
+ * @param buffer The handle to the command buffer object to be destroyed.
  */
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
+ * Resets the command buffer.
+ * 
  * Erases all the commands previously recorded into the given command buffer,
  * and prepares it for recording commands to be submitted within the frame
  * identified by the specified token.
+ * 
  * The command buffer is required to be in the "ready" state.
- * @param buf The command buffer to operate on
- * @param token The token for the frame within which the recorded commands are going
- *              to be submitted.
+ * 
+ * @param buf The handle to the command buffer to operate on
+ * @param token The token for the frame within which the recorded commands are going to be
+ *              submitted.
  */
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf, ngf_frame_token token) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
  * Submits the commands recorded in the given command buffers for execution.
- * All command buffers must be in the "ready" state, and will be transitioned
- * to the "submitted" state.
+ * All command buffers must be in the "awaiting submission" state, and shall be transitioned to the
+ * "submitted" state.
+ * 
+ * @param nbuffers The number of command buffers being submitted for execution.
+ * @param bufs A pointer to a contiguous array of \ref nbuffers handles to command buffer objects to
+ *             be submitted for execution.
  */
 ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NOEXCEPT;
 
