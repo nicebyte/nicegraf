@@ -23,11 +23,13 @@
 /**
  * @file
  * @brief nicegraf declarations.
+ * 
+ * This file contains the core nicegraf API declarations.
  */
 
 /**
  * \mainpage Reference Documentation
- *
+ * 
  * These pages contain documentation automatically generated from nicegraf's
  * code comments. The text's purpose is to concisely describe the intended
  * behavior and failure modes of the API.
@@ -234,10 +236,15 @@ typedef struct ngf_device_capabilities {
  * Verbosity levels for the diagnostic message log.
  */
 typedef enum ngf_diagnostic_log_verbosity {
-  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT, /**< Normal level, reports only severe
-                                        errors. */
-  NGF_DIAGNOSTICS_VERBOSITY_DETAILED /**< Recommended for debug builds, may
-                                        induce performance overhead. */
+  /**
+   * \ingroup ngf 
+   * Normal level, reports only severe errors. */
+  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT, 
+
+  /**
+   * \ingroup ngf 
+   * Recommended for debug builds, may induce performance overhead. */
+  NGF_DIAGNOSTICS_VERBOSITY_DETAILED 
 } ngf_diagnostic_log_verbosity;
 
 /**
@@ -246,11 +253,20 @@ typedef enum ngf_diagnostic_log_verbosity {
  * Type of a diagnostic log entry.
  */
 typedef enum ngf_diagnostic_message_type {
-  NGF_DIAGNOSTIC_INFO,    /**< Informational message, not actionable. */
-  NGF_DIAGNOSTIC_WARNING, /**< Message warns of a potential issue with an API
-                             call. */
-  NGF_DIAGNOSTIC_ERROR    /**< Message provides details of an API call failure or a
-                             severe performance issue. */
+  /**
+   * \ingroup ngf
+   * Informational message, not actionable. */
+  NGF_DIAGNOSTIC_INFO,
+
+  /**
+   * \ingroup ngf
+   * Message warns of a potential issue with an API call.*/
+  NGF_DIAGNOSTIC_WARNING, 
+
+  /**
+   * \ingroup ngf
+   * Message provides details of an API call failure or a severe performance issue. */
+  NGF_DIAGNOSTIC_ERROR
 } ngf_diagnostic_message_type;
 
 /**
@@ -295,6 +311,8 @@ typedef struct ngf_allocation_callbacks {
 
 /**
  * @typedef ngf_device_handle
+ * \ingroup ngf
+ * 
  * A handle that uniquely identifies a rendering device.
  *
  * Note that the value of the handle corresponding to the same exact physical device may be
@@ -305,18 +323,21 @@ typedef struct ngf_allocation_callbacks {
 typedef uint32_t ngf_device_handle;
 
 /**
- * @enum ngf_device_type
+ * @enum ngf_device_performance_tier
  * Enumerates different types of rendering devices.
  * \ingroup ngf
  */
 typedef enum ngf_device_performance_tier {
-  /** For high-performance devices, such as discrete GPU. */
+  /** \ingroup ngf
+   * For high-performance devices, such as discrete GPU. */
   NGF_DEVICE_PERFORMANCE_TIER_HIGH = 0,
 
-  /** For low-power integrated GPUs, software rendering, etc.  */
+  /** \ingroup ngf
+   * For low-power integrated GPUs, software rendering, etc.  */
   NGF_DEVICE_PERFORMANCE_TIER_LOW,
 
-  /** The specific performance profile is unknown. */
+  /** \ingroup ngf
+   * The specific performance profile is unknown. */
   NGF_DEVICE_PERFORMANCE_TIER_UNKNOWN,
 
   NGF_DEVICE_PERFORMANCE_TIER_COUNT
@@ -379,20 +400,40 @@ typedef struct ngf_init_info {
  * See also \ref error-reporting.
  */
 typedef enum ngf_error {
-  NGF_ERROR_OK = 0,                 /**< No error, operation finished successfully. */
-  NGF_ERROR_OUT_OF_MEM,             /**< Host memory allocation failed. */
-  NGF_ERROR_OBJECT_CREATION_FAILED, /**< A call to the backend API that was
-                                       supposed to create an object failed. */
-  NGF_ERROR_OUT_OF_BOUNDS,          /**< The operation would have resulted in an out of
-                                       bounds access. */
-  NGF_ERROR_INVALID_FORMAT,         /**< A format enumerator provided as part of an
-                                       argument to the call is not valid in that
-                                       context.*/
-  NGF_ERROR_INVALID_SIZE,           /**< A size passed as part of an argument to the
-                                      call is either too large or too small.*/
-  NGF_ERROR_INVALID_ENUM,           /**< An enumerator passed as part of an argument to
-                                       the call is not valid in that context.*/
-  NGF_ERROR_INVALID_OPERATION       /**< The routine did not complete successfully. */
+  /** \ingroup ngf
+   * No error, operation finished successfully. */
+  NGF_ERROR_OK = 0,
+
+  /** \ingroup ngf
+   * Host memory allocation failed. */
+  NGF_ERROR_OUT_OF_MEM,
+
+  /** \ingroup ngf
+   * A call to the backend API that was
+   * supposed to create an object failed.*/
+  NGF_ERROR_OBJECT_CREATION_FAILED,
+
+  /** \ingroup ngf
+   * The operation would have resulted in an out of
+   * bounds access. */
+  NGF_ERROR_OUT_OF_BOUNDS,
+
+  /** \ingroup ngf
+   * A format enumerator provided as part of an argument to the call is not valid in that context.
+   */
+  NGF_ERROR_INVALID_FORMAT,
+
+  /** \ingroup ngf
+   * A size passed as part of an argument to the call is either too large or too small.*/
+  NGF_ERROR_INVALID_SIZE,
+
+  /** \ingroup ngf
+   * An enumerator passed as part of an argument to the call is not valid in that context.*/
+  NGF_ERROR_INVALID_ENUM,
+
+  /** \ingroup ngf
+   * The routine did not complete successfully. */
+  NGF_ERROR_INVALID_OPERATION
   /*..add new errors above this line */
 } ngf_error;
 
@@ -437,8 +478,13 @@ typedef struct ngf_offset3d {
  * Note that some back-ends might not support all of these.
  */
 typedef enum ngf_stage_type {
-  NGF_STAGE_VERTEX = 0, /**< Indicates the vertex processing stage. */
-  NGF_STAGE_FRAGMENT,   /**< Indicates the fragment processing stage. */
+  /** \ingroup ngf
+   * Indicates the vertex processing stage. */
+  NGF_STAGE_VERTEX = 0, 
+
+  /** \ingroup ngf
+   * Indicates the fragment processing stage. */
+  NGF_STAGE_FRAGMENT,
   // TODO: compute pipelines
   NGF_STAGE_COUNT
 } ngf_stage_type;
@@ -531,9 +577,17 @@ typedef struct ngf_shader_stage_t* ngf_shader_stage;
  * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_polygon_mode {
-  NGF_POLYGON_MODE_FILL = 0, /**< Fill entire polyoon.*/
-  NGF_POLYGON_MODE_LINE,     /**< Outline only.*/
-  NGF_POLYGON_MODE_POINT,    /**< Vertices only.*/
+  /** \ingroup ngf
+   * Fill the entire polyoon.*/
+  NGF_POLYGON_MODE_FILL = 0, 
+
+  /** \ingroup ngf
+   * Outline only.*/
+  NGF_POLYGON_MODE_LINE,
+  
+  /** \ingroup ngf
+   * Vertices only.*/
+  NGF_POLYGON_MODE_POINT,   
   NGF_POLYGON_MODE_COUNT
 } ngf_polygon_mode;
 
@@ -545,10 +599,21 @@ typedef enum ngf_polygon_mode {
  * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_cull_mode {
-  NGF_CULL_MODE_BACK = 0,       /**< Cull back-facing polygons.*/
-  NGF_CULL_MODE_FRONT,          /**< Cull front-facing polygons. */
-  NGF_CULL_MODE_FRONT_AND_BACK, /**< Cull all polygons.*/
-  NGF_CULL_MODE_NONE,           /**< Do not cull anything. */
+  /** \ingroup ngf
+   * Cull back-facing polygons. */
+  NGF_CULL_MODE_BACK = 0,       
+
+  /** \ingroup ngf
+   * Cull front-facing polygons. */
+  NGF_CULL_MODE_FRONT,   
+  
+  /** \ingroup ngf
+   * Cull all polygons. */
+  NGF_CULL_MODE_FRONT_AND_BACK, 
+
+  /** \ingroup ngf
+   * Do not cull anything. */
+  NGF_CULL_MODE_NONE,           
   NGF_CULL_MODE_COUNT
 } ngf_cull_mode;
 
@@ -560,10 +625,12 @@ typedef enum ngf_cull_mode {
  * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_front_face_mode {
-  /** Polygons with vertices in counter-clockwise order are considered front-facing. */
+  /** \ingroup ngf
+   * Polygons with vertices in counter-clockwise order are considered front-facing. */
   NGF_FRONT_FACE_COUNTER_CLOCKWISE = 0,
 
-  /** Polygons with vertices in clockwise order are considered front-facing. */
+  /** \ingroup ngf
+   * Polygons with vertices in clockwise order are considered front-facing. */
   NGF_FRONT_FACE_CLOCKWISE,
 
   NGF_FRONT_FACE_COUNT
@@ -588,14 +655,38 @@ typedef struct ngf_rasterization_info {
  * Compare operations used in depth and stencil tests.
  */
 typedef enum ngf_compare_op {
-  NGF_COMPARE_OP_NEVER = 0, /**< Comparison test never succeeds. */
-  NGF_COMPARE_OP_LESS,      /**< Comparison test succeeds if A < B. */
-  NGF_COMPARE_OP_LEQUAL,    /**< Comparison test succeeds if A <= B. */
-  NGF_COMPARE_OP_EQUAL,     /**< Comparison test succeeds if A == B. */
-  NGF_COMPARE_OP_GEQUAL,    /**< Comparison test succeeds if A >= B. */
-  NGF_COMPARE_OP_GREATER,   /**< Comparison test succeeds if A > B. */
-  NGF_COMPARE_OP_NEQUAL,    /**< Comparison test succeeds if A != B. */
-  NGF_COMPARE_OP_ALWAYS,    /**< Comparison test always succeeds. */
+  /** \ingroup ngf
+   * Comparison test never succeeds. */
+  NGF_COMPARE_OP_NEVER = 0,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A < B. */
+  NGF_COMPARE_OP_LESS,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A <= B. */
+  NGF_COMPARE_OP_LEQUAL,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A == B. */
+  NGF_COMPARE_OP_EQUAL,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A >= B. */
+  NGF_COMPARE_OP_GEQUAL,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A > B. */
+  NGF_COMPARE_OP_GREATER,
+
+  /** \ingroup ngf
+   * Comparison test succeeds if A != B. */
+  NGF_COMPARE_OP_NEQUAL,
+
+  /** \ingroup ngf
+   * Comparison test always succeeds. */
+  NGF_COMPARE_OP_ALWAYS,
+
   NGF_COMPARE_OP_COUNT
 } ngf_compare_op;
 
@@ -605,14 +696,38 @@ typedef enum ngf_compare_op {
  * Operations that can be performed on stencil buffer.
  */
 typedef enum ngf_stencil_op {
-  NGF_STENCIL_OP_KEEP = 0,   /**< Don't touch.*/
-  NGF_STENCIL_OP_ZERO,       /**< Set to 0.*/
-  NGF_STENCIL_OP_REPLACE,    /**< Replace with reference value.*/
-  NGF_STENCIL_OP_INCR_CLAMP, /**< Increment, clamping to max value.*/
-  NGF_STENCIL_OP_INCR_WRAP,  /**< Increment, wrapping to 0.*/
-  NGF_STENCIL_OP_DECR_CLAMP, /**< Decrement, clamping to 0.*/
-  NGF_STENCIL_OP_DECR_WRAP,  /**< Decrement, wrapping to max value.*/
-  NGF_STENCIL_OP_INVERT,     /**< Bitwise invert*/
+  /** \ingroup ngf
+   * Don't touch. */
+  NGF_STENCIL_OP_KEEP = 0,
+
+  /** \ingroup ngf
+   * Set to 0. */
+  NGF_STENCIL_OP_ZERO,
+
+  /** \ingroup ngf
+   * Replace with reference value. */
+  NGF_STENCIL_OP_REPLACE,
+
+  /** \ingroup ngf
+   * Increment, clamping to max value. */
+  NGF_STENCIL_OP_INCR_CLAMP,
+
+  /** \ingroup ngf
+   * Increment, wrapping to 0. */
+  NGF_STENCIL_OP_INCR_WRAP,
+
+  /** \ingroup ngf
+   * Decrement, clamping to 0. */
+  NGF_STENCIL_OP_DECR_CLAMP,
+
+  /** \ingroup ngf
+   * Decrement, wrapping to max value. */
+  NGF_STENCIL_OP_DECR_WRAP,
+
+  /** \ingroup ngf
+   * Bitwise invert. */
+  NGF_STENCIL_OP_INVERT,
+
   NGF_STENCIL_OP_COUNT
 } ngf_stencil_op;
 
@@ -689,18 +804,21 @@ typedef struct ngf_depth_stencil_info {
  */
 typedef enum ngf_blend_factor {
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: sets each color component to 0;
    * - if used as a blend factor for alpha: sets alpha to 0.
    */
   NGF_BLEND_FACTOR_ZERO = 0,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: leaves the color unchanged;
    * - if used as a blend factor for alpha: leaves the alpha value unchanged.
    */
   NGF_BLEND_FACTOR_ONE,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by the corresponding
    * component of the "source" color value;
    * - if used as a blend factor for alpha: multiples the alpha value by the "source" alpha value.
@@ -708,6 +826,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_SRC_COLOR,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by one minus the
    * corresponding component of the "source" color value;
    * - if used as a blend factor for alpha: multiples the alpha value by one minus the "source"
@@ -715,7 +834,8 @@ typedef enum ngf_blend_factor {
    */
   NGF_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
 
-  /**
+  /** 
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by the corresponding
    * component of the "destination" color value;
    * - if used as a blend factor for alpha: multiples the alpha value by the "destination" alpha
@@ -724,6 +844,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_DST_COLOR,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by one minus the
    * corresponding component of the "destination" color value;
    * - if used as a blend factor for alpha: multiples the alpha value by one minus the "destination"
@@ -732,6 +853,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by the "source" alpha
    * value;
    * - if used as a blend factor for alpha: multiples the alpha value by the "source" alpha value.
@@ -739,6 +861,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_SRC_ALPHA,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by one minus the
    * "source" alpha value;
    * - if used as a blend factor for alpha: multiples the alpha value by one minus the "source"
@@ -747,6 +870,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by the "destination"
    * alpha value;
    * - if used as a blend factor for alpha: multiples the alpha value by the "destination" alpha
@@ -755,6 +879,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_DST_ALPHA,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by one minus the
    * "destination" alpha value;
    * - if used as a blend factor for alpha: multiples the alpha value by one minus the "destination"
@@ -763,6 +888,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
    * color by the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts respectively;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
@@ -771,6 +897,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_CONSTANT_COLOR,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
    * color by one minus the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts
    * respectively;
@@ -780,6 +907,7 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by the 4th
    * element of \ref ngf_blend_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
@@ -788,12 +916,14 @@ typedef enum ngf_blend_factor {
   NGF_BLEND_FACTOR_CONSTANT_ALPHA,
 
   /**
+   * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by one minus the
    * 4th element of \ref ngf_blend_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
    * component of \ref ngf_blend_info::blend_consts.
    */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
+
   NGF_BLEND_FACTOR_COUNT
 } ngf_blend_factor;
 
@@ -810,11 +940,26 @@ typedef enum ngf_blend_factor {
  *
  */
 typedef enum ngf_blend_op {
-  NGF_BLEND_OP_ADD,     /**< The result of the blend operation shall be `S*Fs + D*Fd` */
-  NGF_BLEND_OP_SUB,     /**< The result of the blend operation shall be `S*Fs - D*Fd` */
-  NGF_BLEND_OP_REV_SUB, /**< The result of the blend operation shall be `D*Fd - S*Fs` */
-  NGF_BLEND_OP_MIN,     /**< The result of the blend operation shall be `min(S, D)`   */
-  NGF_BLEND_OP_MAX,     /**< The result of the blend operation shall be `max(S, D)`   */
+  /** \ingroup ngf
+   * The result of the blend operation shall be `S*Fs + D*Fd` */
+  NGF_BLEND_OP_ADD,     
+
+  /** \ingroup ngf
+   * The result of the blend operation shall be `S*Fs - D*Fd` */
+  NGF_BLEND_OP_SUB,     
+
+  /** \ingroup ngf
+   * The result of the blend operation shall be `D*Fd - S*Fs` */
+  NGF_BLEND_OP_REV_SUB, 
+
+  /** \ingroup ngf
+   * The result of the blend operation shall be `min(S, D)`   */
+  NGF_BLEND_OP_MIN,     
+
+  /** \ingroup ngf
+   * The result of the blend operation shall be `max(S, D)`   */
+  NGF_BLEND_OP_MAX,     
+
   NGF_BLEND_OP_COUNT
 } ngf_blend_op;
 
@@ -855,15 +1000,42 @@ typedef struct ngf_blend_info {
  * Enumerates the available vertex attribute component types.
  */
 typedef enum ngf_type {
-  NGF_TYPE_INT8 = 0,   /**< Signed 8-bit integer. */
-  NGF_TYPE_UINT8,      /**< Unsigned 8-bit integer. */
-  NGF_TYPE_INT16,      /**< Signed 16-bit integer. */
-  NGF_TYPE_UINT16,     /**< Unsigned 16-bit integer. */
-  NGF_TYPE_INT32,      /**< Signed 32-bit integer. */
-  NGF_TYPE_UINT32,     /**< Unsigned 32-bit integer. */
-  NGF_TYPE_FLOAT,      /**< 32-bit floating point number. */
-  NGF_TYPE_HALF_FLOAT, /**< 16-bit floating point number. */
-  NGF_TYPE_DOUBLE,     /**< Double-precision floating point number. */
+  /** \ingroup ngf
+   * Signed 8-bit integer. */
+  NGF_TYPE_INT8 = 0,
+
+  /** \ingroup ngf
+   * Unsigned 8-bit integer. */
+  NGF_TYPE_UINT8,
+
+  /** \ingroup ngf
+   * Signed 16-bit integer. */
+  NGF_TYPE_INT16,
+
+  /** \ingroup ngf
+   * Unsigned 16-bit integer. */
+  NGF_TYPE_UINT16,
+
+  /** \ingroup ngf
+   * Signed 32-bit integer. */
+  NGF_TYPE_INT32,
+
+  /** \ingroup ngf
+   * Unsigned 32-bit integer. */
+  NGF_TYPE_UINT32,
+
+  /** \ingroup ngf
+   * 32-bit floating point number. */
+  NGF_TYPE_FLOAT,
+
+  /** \ingroup ngf
+   * 16-bit floating point number. */
+  NGF_TYPE_HALF_FLOAT,
+
+  /** \ingroup ngf
+   * Double-precision floating point number. */
+  NGF_TYPE_DOUBLE,
+
   NGF_TYPE_COUNT
 } ngf_type;
 
@@ -875,12 +1047,16 @@ typedef enum ngf_type {
  */
 typedef enum ngf_vertex_input_rate {
   /**
+   * \ingroup ngf
+   * 
    * Attributes are read per-vertex.
    * With this vertex input rate, each vertex receives its own set of attributes.
    */
   NGF_INPUT_RATE_VERTEX = 0,
 
   /**
+   * \ingroup ngf
+   *
    * Attributes are read per-instance.
    * With this vertex input rate, all vertices within the same instance share the same
    * attribute values.
@@ -1110,9 +1286,17 @@ typedef enum ngf_image_format {
  * Enumerates render target attachment types.
  */
 typedef enum ngf_attachment_type {
-  NGF_ATTACHMENT_COLOR = 0,    /**< For attachments containing color data. */
-  NGF_ATTACHMENT_DEPTH,        /**< For attachments containing depth data. */
-  NGF_ATTACHMENT_DEPTH_STENCIL /**< For attachments containing combined depth and stencil data. */
+  /** \ingroup ngf
+   * For attachments containing color data. */
+  NGF_ATTACHMENT_COLOR = 0,    
+
+  /** \ingroup ngf
+   * For attachments containing depth data. */
+  NGF_ATTACHMENT_DEPTH,        
+
+  /** \ingroup ngf
+   * For attachments containing combined depth and stencil data. */
+  NGF_ATTACHMENT_DEPTH_STENCIL 
 } ngf_attachment_type;
 
 /**
@@ -1151,11 +1335,13 @@ typedef struct ngf_attachment_descriptions {
  */
 typedef enum ngf_primitive_topology {
   /**
+   * \ingroup ngf
    * A list of separate triangles - each three vertices define a separate triangle.
    */
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 0,
 
   /**
+   * \ingroup ngf
    * A list of connected triangles, with consecutive triangles sharing an edge like so:
    * ```
    *  o---------o-----------o
@@ -1168,14 +1354,17 @@ typedef enum ngf_primitive_topology {
   NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
 
   /**
+   * \ingroup ngf
    * A list of separate lines. Each two vertices define a separate line.
    */
   NGF_PRIMITIVE_TOPOLOGY_LINE_LIST,
 
   /**
+   * \ingroup ngf
    * A list of connected lines. The end of a line is the beginning of the next line in the list.
    */
   NGF_PRIMITIVE_TOPOLOGY_LINE_STRIP,
+
   NGF_PRIMITIVE_TOPOLOGY_COUNT
 } ngf_primitive_topology;
 
@@ -1266,6 +1455,8 @@ typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
  */
 typedef enum ngf_descriptor_type {
   /**
+   * \ingroup ngf
+   * 
    * A uniform buffer, also known as a constant buffer, can be used to pass
    * a small to medium sized chunk of data to the shader in a structured way.
    * See also \ref ngf_buffer.
@@ -1273,21 +1464,29 @@ typedef enum ngf_descriptor_type {
   NGF_DESCRIPTOR_UNIFORM_BUFFER = 0,
 
   /**
+   * \ingroup ngf
+   * 
    * An \ref ngf_image.
    */
   NGF_DESCRIPTOR_IMAGE,
 
   /**
+   * \ingroup ngf
+   * 
    * An \ref ngf_sampler.
    */
   NGF_DESCRIPTOR_SAMPLER,
 
   /**
+   * \ingroup ngf
+   * 
    * A combination of an image and sampler in a single object.
    */
   NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
 
   /**
+   * \ingroup ngf
+   * 
    * A texel buffer can be used to pass a large amount of unstructured data
    * (i.e. a big array of `float4`s) to the shader. See also \ref ngf_buffer.
    */
@@ -1300,11 +1499,33 @@ typedef enum ngf_descriptor_type {
  * @enum ngf_sampler_filter
  * \ingroup ngf
  * 
- *  Enumerates minification and magnification filters.
+ *  Enumerates filters for texture lookups.
  */
 typedef enum ngf_sampler_filter {
-  NGF_FILTER_NEAREST = 0, /**< Pick the nearest value. */
-  NGF_FILTER_LINEAR,      /**< Linearly interpolate between the nearest values. */
+  /** 
+   * \ingroup ngf
+   * 
+   * When used as the minification (\ref ngf_sampler_info::min_filter) or  magnification (\ref
+   * ngf_sampler_info::mag_filter) filter, the result of the filtering operation shall be the
+   * value of the texel whose center is nearest to the sample.
+   * 
+   * When used as \ref ngf_sampler_info::mip_filter, makes the selected mip level snap to the one
+   * that is closest to the requested mip level value.
+   */
+  NGF_FILTER_NEAREST = 0, 
+
+  /** 
+   * \ingroup ngf
+   * 
+   * When used as the minification (\ref ngf_sampler_info::min_filter) or  magnification (\ref
+   * ngf_sampler_info::mag_filter) filter, the result of the filtering operation shall be linearly
+   * interpolated from the values of 4 (in case of 2D images) or 8 (in case of 3D images) texels
+   * whose centers are nearest to the sample.
+   * 
+   * When used as \ref ngf_sampler_info::mip_filter, linearly blends the values from two mip levels
+   * closest to the requested mip level value.
+   */
+  NGF_FILTER_LINEAR,      
   NGF_FILTER_COUNT
 } ngf_sampler_filter;
 
@@ -1315,9 +1536,18 @@ typedef enum ngf_sampler_filter {
  * Enumerates strategies for dealing with sampling an image out-of-bounds.
  */
 typedef enum ngf_sampler_wrap_mode {
-  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, /**< Clamp the pixel value to what's at the edge of the image. */
-  NGF_WRAP_MODE_REPEAT,            /**< Repeat the image contents. */
-  NGF_WRAP_MODE_MIRRORED_REPEAT,   /**< Repeat the image contents, mirrored. */
+  /** \ingroup ngf
+   * Clamp the texel value to what's at the edge of the image. */
+  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, 
+
+  /** \ingroup ngf
+   * Repeat the image contents. */
+  NGF_WRAP_MODE_REPEAT,            
+
+  /** \ingroup ngf
+   * Repeat the image contents, mirrored. */
+  NGF_WRAP_MODE_MIRRORED_REPEAT,   
+
   NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
 
@@ -1325,28 +1555,46 @@ typedef enum ngf_sampler_wrap_mode {
  * @struct ngf_sampler_info
  * \ingroup ngf
  * 
- * Information for creating a sampler object.
+ * Information for creating an \ref ngf_sampler object.
  */
 typedef struct ngf_sampler_info {
-  ngf_sampler_filter    min_filter;        /**< Minification filter.*/
-  ngf_sampler_filter    mag_filter;        /**< Magnification filter.*/
-  ngf_sampler_filter    mip_filter;        /**< Mipmap filter. */
-  ngf_sampler_wrap_mode wrap_u;            /**< Wrap mode for the U coordinate. */
-  ngf_sampler_wrap_mode wrap_v;            /**< Wrap mode for the V coordinate. */
-  ngf_sampler_wrap_mode wrap_w;            /**< Wrap mode for the W coordinate. */
-  float                 lod_max;           /**< Max mip level.*/
-  float                 lod_min;           /**< Min mip level.*/
-  float                 lod_bias;          /**< Level bias.*/
-  float                 max_anisotropy;    /**< Max allowed degree of anisotropy. */
-  bool                  enable_anisotropy; /**< Whether to allow anisotropic filtering. */
+  ngf_sampler_filter    min_filter; /**< The filter to apply when the sampled image is minified .*/
+  ngf_sampler_filter    mag_filter; /**< The filter to apply when the sampled image is magnified. */
+  ngf_sampler_filter    mip_filter; /**< The filter to use when transitioning between mip levels. */
+  ngf_sampler_wrap_mode wrap_u;     /**< Wrap mode for the U coordinate. */
+  ngf_sampler_wrap_mode wrap_v;     /**< Wrap mode for the V coordinate. */
+  ngf_sampler_wrap_mode wrap_w;     /**< Wrap mode for the W coordinate. */
+  float lod_max;          /**< Maximum mip level that shall be used during the filtering operation.
+                           *  Note that this refers to the _level itself_ and not the dimensions of data
+                           *  residing in that level, e.g. level 0 (the smallest possible level) has
+                           *  the largest dimensions.
+                           */
+  float lod_min;          /**< Minimum mip level that shall be used during the filtering operation.
+                           *  Note that this refers to the _level itself_ and not the dimensions of data
+                           *  residing in that level, e.g. level 0 (the smallest possible level) has
+                           *  the largest dimensions.
+                           */
+  float lod_bias;         /**< A bias to add to the mip level calculated during the sample operation. */
+  float max_anisotropy;   /**< Max allowed degree of anisotropy. Ignored if \ref
+                            * ngf_sampler_info::enable_anisotropy is false.
+                            */
+  bool enable_anisotropy; /**< Whether to allow anisotropic filtering. */
 } ngf_sampler_info;
 
 /**
  * @struct ngf_sampler
  * \ingroup ngf
  * 
- * An opaque handle for a sampler object. See also \ref ngf_sampler_info and \ref
- * ngf_create_sampler.
+ * An opaque handle for a sampler object.  
+ * 
+ * Samplers encapsulate how to filter an image - what happens when an image is minified or
+ * magnified, whether anisotropic filtering is enabled, etc. See \ref ngf_sampler_info for more
+ * details.
+ * 
+ * Samplers can be bound separately from images - in which case the shader code sees them as two
+ * distinct objects, and the same sampler can be ussed to sample two different images. They can also
+ * be combined into a single descriptor (see \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER), in which case
+ * the shader code sees only a single image object, which can be sampled only one certain way.
  */
 typedef struct ngf_sampler_t* ngf_sampler;
 
@@ -1360,15 +1608,20 @@ typedef struct ngf_sampler_t* ngf_sampler;
  * values with a bitwise OR operator.
  */
 typedef enum ngf_image_usage {
-  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, /**< The image may be read from in a shader.*/
+  /** \ingroup ngf
+   * The image may be read from in a shader.*/
+  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, 
 
-  /** The image may be used as an attachment for a render target.*/
+  /** \ingroup ngf
+   * The image may be used as an attachment for a render target.*/
   NGF_IMAGE_USAGE_ATTACHMENT = 0x02,
 
-  /** The image may be used as a destination for a transfer operation. **/
+  /** \ingroup ngf
+   * The image may be used as a destination for a transfer operation. **/
   NGF_IMAGE_USAGE_XFER_DST = 0x04,
 
-  /** Mipmaps may be generated for the image with \ref ngf_cmd_generate_mipmaps. */
+  /** \ingroup ngf
+   * Mipmaps may be generated for the image with \ref ngf_cmd_generate_mipmaps. */
   NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08
 } ngf_image_usage;
 
@@ -1379,13 +1632,16 @@ typedef enum ngf_image_usage {
  * Enumerates the possible image types.
  */
 typedef enum ngf_image_type {
-  /** Two-dimensional image. */
+  /** \ingroup ngf
+   * Two-dimensional image. */
   NGF_IMAGE_TYPE_IMAGE_2D = 0,
 
-  /** Three-dimensional image. */
+  /** \ingroup ngf
+   * Three-dimensional image. */
   NGF_IMAGE_TYPE_IMAGE_3D,
 
-  /** Cubemap. */
+  /** \ingroup ngf 
+   * Cubemap. */
   NGF_IMAGE_TYPE_CUBE,
 
   NGF_IMAGE_TYPE_COUNT
@@ -1395,7 +1651,7 @@ typedef enum ngf_image_type {
  * @struct ngf_image_info
  * \ingroup ngf
  * 
- * Information required to create an image object.
+ * Information required to create an \ref ngf_image object.
  */
 typedef struct ngf_image_info {
   ngf_image_type type;    /**< The image type. */
@@ -1500,8 +1756,9 @@ typedef struct ngf_render_target_t* ngf_render_target;
 typedef union ngf_clear_info {
   /**
    * The color to clear to. Each element corresponds to the red, green, blue and alpha channel
-   * respectively. If the format of the render target image does not have that channel, the value is
-   * ignored.
+   * respectively, and is a floating point value within the [0; 1] range, with 0.0 corresponding to
+   * none an 1.0 corresponding to full intensity. If the format of the render target image does not
+   * have a corresponding channel, the value is ignored.
    * This field is used for color attachments only.
    */
   float clear_color[4];
@@ -1522,9 +1779,17 @@ typedef union ngf_clear_info {
  * Enumerates actions that can be performed on attachment "load" (at the start of a render pass).
  */
 typedef enum ngf_attachment_load_op {
-  NGF_LOAD_OP_DONTCARE = 0, /**< Don't care what happens. */
-  NGF_LOAD_OP_KEEP,         /**< Preserve the prior contents of the attachment. */
-  NGF_LOAD_OP_CLEAR,        /**< Clear the attachment. */
+  /** \ingroup ngf
+   * Don't care what happens. */
+  NGF_LOAD_OP_DONTCARE = 0, 
+
+  /** \ingroup ngf
+   * Preserve the prior contents of the attachment. */
+  NGF_LOAD_OP_KEEP,         
+  
+  /** \ingroup ngf
+   * Clear the attachment. */
+  NGF_LOAD_OP_CLEAR,        
   NGF_LOAD_OP_COUNT
 } ngf_attachment_load_op;
 
@@ -1535,12 +1800,16 @@ typedef enum ngf_attachment_load_op {
  */
 typedef enum ngf_attachment_store_op {
   /**
+   * \ingroup ngf
+   * 
    * Don't care what happens. Use this if you don't plan on reading back the
    * contents of the attachment in any shaders, or presenting it to screen.
    */
   NGF_STORE_OP_DONTCARE = 0,
 
   /**
+   * \ingroup ngf
+   * 
    * Use this if you plan on reading the contents of the attachment in any shaders or
    * presenting it to screen. The contents of the attachment shall be written out to system memory.
    */
@@ -1594,22 +1863,27 @@ typedef struct ngf_pass_info {
  */
 typedef enum ngf_buffer_storage_type {
   /**
+   * \ingroup ngf
    * Memory that can be read by the host.
    */
   NGF_BUFFER_STORAGE_HOST_READABLE,
 
   /**
+   * \ingroup ngf
    * Memory that can be written to by the host.
    */
   NGF_BUFFER_STORAGE_HOST_WRITEABLE,
 
   /**
+   * \ingroup ngf
    * Memory that can be both read from and written to by the
    * host.
    */
   NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
 
   /**
+   * \ingroup ngf
+   * 
    * Private memory that cannot be accessed by the host directly. The contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * \ref ngf_cmd_copy_buffer.
@@ -1624,16 +1898,29 @@ typedef enum ngf_buffer_storage_type {
  * of these values with a bitwise OR operator.
  */
 typedef enum ngf_buffer_usage {
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       /**< The buffer may be used as a source
-                                             for transfer operations. */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,       /**< The buffer may be used as a destination
-                                             for transfer operations.  */
-  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, /**< The buffer may be bound as a uniform buffer. */
-  NGF_BUFFER_USAGE_INDEX_BUFFER   = 0x08, /**< The buffer may be used as the source of
-                                               index data for indexed draws. */
-  NGF_BUFFER_USAGE_VERTEX_BUFFER = 0x10,  /**< The buffer may be used as a source
-                                             of vertex attribute data. */
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20    /**< The buffer may be bound as a uniform texel buffer. */
+  /** \ingroup ngf
+   * The buffer may be used as a source for transfer operations. */
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       
+  
+  /** \ingroup ngf
+   * The buffer may be used as a destination for transfer operations. */
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,       
+
+  /** \ingroup ngf
+   * The buffer may be bound as a uniform buffer. */
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, 
+
+  /** \ingroup ngf
+  * The buffer may be used as the source of index data for indexed draws. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER   = 0x08, 
+  
+  /** \ingroup ngf
+   * The buffer may be used as a source of vertex attribute data. */
+  NGF_BUFFER_USAGE_VERTEX_BUFFER = 0x10,  
+
+  /** \ingroup ngf
+   * The buffer may be bound as a uniform texel buffer. */
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20    
 } ngf_buffer_usage;
 
 /**
@@ -1704,6 +1991,8 @@ typedef struct ngf_resource_bind_op {
  */
 typedef enum ngf_present_mode {
   /**
+   * \ingroup ngf
+   * 
    * This is the only presentation mode that is guaranteed to be supported.
    * In this mode, the presentation requests are queued internally, and the
    * presentation engine waits for the vertical blanking signal to present
@@ -1713,6 +2002,8 @@ typedef enum ngf_present_mode {
   NGF_PRESENTATION_MODE_FIFO,
 
   /**
+   * \ingroup ngf
+   * 
    * In this mode, the presentation engine does not wait for the vertical blanking signal, instead
    * presenting an image immediately. This mode results in lower latency but may induce frame
    * tearing. It is not recommended to use this mode on mobile targets.
@@ -2042,6 +2333,7 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
+ * 
  * Creates a new image object.
  * 
  * @param info Information required to construct the image object.
@@ -2059,12 +2351,21 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NO
 void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
 
 /**
- * Create a sampler object with the given configuration.
+ * \ingroup ngf
+ * 
+ * Creates a new sampler object.
+ * 
+ * @param info Information required to construct the sampler object.
+ * @param result Pointer ti where the handle to the newly created object will be returned.
  */
 ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT;
 
 /**
- * Destroy a given sampler object.
+ * \ingroup ngf
+ * 
+ * Destroys the given sampler object.
+ * 
+ * @param ssampler The handle to the sampler object to be destroyed.
  */
 void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 
