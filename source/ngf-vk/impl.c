@@ -1211,6 +1211,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
 
   NGFI_DARRAY_FOREACH(frame_res->retire_buffers, a) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
+    vmaUnmapMemory(b->parent_allocator, b->vma_alloc);
     vmaDestroyBuffer(b->parent_allocator, (VkBuffer)b->obj_handle, b->vma_alloc);
   }
 
