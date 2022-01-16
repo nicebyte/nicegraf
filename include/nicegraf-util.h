@@ -29,8 +29,8 @@
 /**
  * @file
  * \defgroup ngf_util Utility Library
- * This module contains routines that provide auxiliary
- * functionality or help reduce boilerplate.
+ * 
+ * This module contains routines and structures that provide auxiliary functionality or help reduce boilerplate.
  */
 
 #ifdef __cplusplus
@@ -40,13 +40,14 @@ extern "C" {
 /**
  * @struct ngf_util_graphics_pipeline_data
  * \ingroup ngf_util
+ * 
  * Contains all the data describing a graphics pipeline, with the exception
  * of shader stages.
- * Use the `pipeline_info` member of this struct to initialize a new pipeline
- * object.
+ * 
+ * See \ref ngf_util_create_default_graphics_pipeline_data for more details.
  */
 typedef struct ngf_util_graphics_pipeline_data {
-  ngf_graphics_pipeline_info pipeline_info;
+  ngf_graphics_pipeline_info pipeline_info; /**< Can be used to initialize a new pipeline object. */
   ngf_blend_info             blend_info;
   ngf_depth_stencil_info     depth_stencil_info;
   ngf_vertex_input_info      vertex_input_info;
@@ -57,21 +58,34 @@ typedef struct ngf_util_graphics_pipeline_data {
 
 /**
  * \ingroup ngf_util
- * Creates configuration data for a graphics pipeline.
- * The state is set to match OpenGL defaults and can be adjusted later.
+ * 
+ * Creates a configuration for a graphics pipeline object with some pre-set defaults.
+ * 
+ * The fields of the members of the resulting \ref ngf_util_graphics_pipeline_data are set such that
+ * they match OpenGL defaults. They can be adjusted later. The pointer fields of \ref
+ * ngf_util_graphics_pipeline_data::pipeline_info are set to point to the corresponding members of
+ * \ref ngf_util_graphics_pipeline_data.
+ * 
+ * The only aspect of configuration that this function does not set are the programmable shader stages. After the application code sets those, \ref
+ * ngf_util_graphics_pipeline_data::pipeline_info can be used to create a new pipeline object.
+ * 
  * @param result Pipeline configuration data will be stored here.
  */
 void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result);
 
 /**
  * \ingroup ngf_util
- * Converts an error enum to a human-readable error string.
+ * 
+ * Converts a nicegraf error code to a human-readable string.
+ * 
  * @param err The error enum to get the string for.
+ * @return A human-readable error message.
  */
 const char* ngf_util_get_error_name(const ngf_error err);
 
 /**
  * \ingroup ngf_util
+ * 
  * Rounds `value` up to the nearest multiple of `alignment`.
  */
 static inline size_t ngf_util_align_size(size_t value, size_t alignment) {
