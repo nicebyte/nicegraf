@@ -2749,10 +2749,23 @@ void ngf_cmd_copy_buffer(
     size_t           dst_offset) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
  * Copies data from a buffer into an image.
+ * 
+ * For non-compressed formats, the source data is assumed to be arranged in a simple linear layout.
+ * Cubemap faces and layers are assumed to be stored successively in the source buffer, from first to last.
+ * For each layer, the first texel corresponds to the lower left corner of the image, and the
+ * subsequent texels progress from left to right, through the remainder of the bottom row, and from
+ * then on, through higher rows.
  * 
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
+ * @param src_offset The offset in the source buffer from which to start copying.
+ * @param dst Reference to the image region that shall be written to.
+ * @param offset Offset within the target mip level to write to (in texels).
+ * @param extent The size of the region in the target mip level being overwritten.
+ * @param nlayers The number of layers affected by the copy.
  */
 void ngf_cmd_write_image(
     ngf_xfer_encoder enc,
