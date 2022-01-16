@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2017-2018 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2017-2019 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,35 +22,41 @@
 
 #ifdef _WIN32
 
+#include "SparseBindingTest.h"
 #include "Tests.h"
 #include "VmaUsage.h"
 #include "Common.h"
+#include <atomic>
 
 static const char* const SHADER_PATH1 = "./";
 static const char* const SHADER_PATH2 = "../bin/";
 static const wchar_t* const WINDOW_CLASS_NAME = L"VULKAN_MEMORY_ALLOCATOR_SAMPLE";
 static const char* const VALIDATION_LAYER_NAME = "VK_LAYER_LUNARG_standard_validation";
-static const char* const APP_TITLE_A =     "Vulkan Memory Allocator Sample 2.0";
-static const wchar_t* const APP_TITLE_W = L"Vulkan Memory Allocator Sample 2.0";
+static const char* const APP_TITLE_A =     "Vulkan Memory Allocator Sample 2.3.0";
+static const wchar_t* const APP_TITLE_W = L"Vulkan Memory Allocator Sample 2.3.0";
 
 static const bool VSYNC = true;
 static const uint32_t COMMAND_BUFFER_COUNT = 2;
 static void* const CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA = (void*)(intptr_t)43564544;
-static const bool USE_CUSTOM_CPU_ALLOCATION_CALLBACKS = false;
+static const bool USE_CUSTOM_CPU_ALLOCATION_CALLBACKS = true;
 
 VkPhysicalDevice g_hPhysicalDevice;
 VkDevice g_hDevice;
 VmaAllocator g_hAllocator;
+VkInstance g_hVulkanInstance;
 bool g_MemoryAliasingWarningEnabled = true;
 
 static bool g_EnableValidationLayer = true;
 static bool VK_KHR_get_memory_requirements2_enabled = false;
+static bool VK_KHR_get_physical_device_properties2_enabled = false;
 static bool VK_KHR_dedicated_allocation_enabled = false;
+static bool VK_KHR_bind_memory2_enabled = false;
+static bool VK_EXT_memory_budget_enabled = false;
+bool g_SparseBindingEnabled = false;
 
 static HINSTANCE g_hAppInstance;
 static HWND g_hWnd;
 static LONG g_SizeX = 1280, g_SizeY = 720;
-static VkInstance g_hVulkanInstance;
 static VkSurfaceKHR g_hSurface;
 static VkQueue g_hPresentQueue;
 static VkSurfaceFormatKHR g_SurfaceFormat;
@@ -62,11 +68,13 @@ static std::vector<VkFramebuffer> g_Framebuffers;
 static VkCommandPool g_hCommandPool;
 static VkCommandBuffer g_MainCommandBuffers[COMMAND_BUFFER_COUNT];
 static VkFence g_MainCommandBufferExecutedFances[COMMAND_BUFFER_COUNT];
+VkFence g_ImmediateFence;
 static uint32_t g_NextCommandBufferIndex;
 static VkSemaphore g_hImageAvailableSemaphore;
 static VkSemaphore g_hRenderFinishedSemaphore;
 static uint32_t g_GraphicsQueueFamilyIndex = UINT_MAX;
 static uint32_t g_PresentQueueFamilyIndex = UINT_MAX;
+static uint32_t g_SparseBindingQueueFamilyIndex = UINT_MAX;
 static VkDescriptorSetLayout g_hDescriptorSetLayout;
 static VkDescriptorPool g_hDescriptorPool;
 static VkDescriptorSet g_hDescriptorSet; // Automatically destroyed with m_DescriptorPool.
@@ -86,7 +94,8 @@ static PFN_vkDestroyDebugReportCallbackEXT g_pvkDestroyDebugReportCallbackEXT;
 static VkDebugReportCallbackEXT g_hCallback;
 
 static VkQueue g_hGraphicsQueue;
-static VkCommandBuffer g_hTemporaryCommandBuffer;
+VkQueue g_hSparseBindingQueue;
+VkCommandBuffer g_hTemporaryCommandBuffer;
 
 static VkPipelineLayout g_hPipelineLayout;
 static VkRenderPass g_hRenderPass;
@@ -103,12 +112,19 @@ static VkImage g_hTextureImage;
 static VmaAllocation g_hTextureImageAlloc;
 static VkImageView g_hTextureImageView;
 
+static std::atomic_uint32_t g_CpuAllocCount;
+
 static void* CustomCpuAllocation(
     void* pUserData, size_t size, size_t alignment,
     VkSystemAllocationScope allocationScope)
 {
     assert(pUserData == CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA);
-    return _aligned_malloc(size, alignment);
+    void* const result = _aligned_malloc(size, alignment);
+    if(result)
+    {
+        ++g_CpuAllocCount;
+    }
+    return result;
 }
 
 static void* CustomCpuReallocation(
@@ -116,23 +132,46 @@ static void* CustomCpuReallocation(
     VkSystemAllocationScope allocationScope)
 {
     assert(pUserData == CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA);
-    return _aligned_realloc(pOriginal, size, alignment);
+    void* const result = _aligned_realloc(pOriginal, size, alignment);
+    if(pOriginal && !result)
+    {
+        --g_CpuAllocCount;
+    }
+    else if(!pOriginal && result)
+    {
+        ++g_CpuAllocCount;
+    }
+    return result;
 }
 
 static void CustomCpuFree(void* pUserData, void* pMemory)
 {
     assert(pUserData == CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA);
-    _aligned_free(pMemory);
+    if(pMemory)
+    {
+        const uint32_t oldAllocCount = g_CpuAllocCount.fetch_sub(1);
+        TEST(oldAllocCount > 0);
+        _aligned_free(pMemory);
+    }
 }
 
-static void BeginSingleTimeCommands()
+static const VkAllocationCallbacks g_CpuAllocationCallbacks = {
+    CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA, // pUserData
+    &CustomCpuAllocation, // pfnAllocation
+    &CustomCpuReallocation, // pfnReallocation
+    &CustomCpuFree // pfnFree
+};
+
+const VkAllocationCallbacks* g_Allocs;
+
+void BeginSingleTimeCommands()
 {
     VkCommandBufferBeginInfo cmdBufBeginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
     cmdBufBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     ERR_GUARD_VULKAN( vkBeginCommandBuffer(g_hTemporaryCommandBuffer, &cmdBufBeginInfo) );
 }
 
-static void EndSingleTimeCommands()
+void EndSingleTimeCommands()
 {
     ERR_GUARD_VULKAN( vkEndCommandBuffer(g_hTemporaryCommandBuffer) );
 
@@ -144,7 +183,7 @@ static void EndSingleTimeCommands()
     ERR_GUARD_VULKAN( vkQueueWaitIdle(g_hGraphicsQueue) );
 }
 
-static void LoadShader(std::vector<char>& out, const char* fileName)
+void LoadShader(std::vector<char>& out, const char* fileName)
 {
     std::ifstream file(std::string(SHADER_PATH1) + fileName, std::ios::ate | std::ios::binary);
     if(file.is_open() == false)
@@ -407,44 +446,25 @@ static void CreateMesh()
 
 static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
 {
-    // Create Image
+    // Create staging buffer.
 
     const VkDeviceSize imageSize = sizeX * sizeY * 4;
 
-    VkImageCreateInfo stagingImageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-    stagingImageInfo.imageType = VK_IMAGE_TYPE_2D;
-    stagingImageInfo.extent.width = sizeX;
-    stagingImageInfo.extent.height = sizeY;
-    stagingImageInfo.extent.depth = 1;
-    stagingImageInfo.mipLevels = 1;
-    stagingImageInfo.arrayLayers = 1;
-    stagingImageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    stagingImageInfo.tiling = VK_IMAGE_TILING_LINEAR;
-    stagingImageInfo.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    stagingImageInfo.usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-    stagingImageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    stagingImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    stagingImageInfo.flags = 0;
+    VkBufferCreateInfo stagingBufInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    stagingBufInfo.size = imageSize;
+    stagingBufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+    VmaAllocationCreateInfo stagingBufAllocCreateInfo = {};
+    stagingBufAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    stagingBufAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
     
-    VmaAllocationCreateInfo stagingImageAllocCreateInfo = {};
-    stagingImageAllocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
-    stagingImageAllocCreateInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
-    
-    VkImage stagingImage = VK_NULL_HANDLE;
-    VmaAllocation stagingImageAlloc = VK_NULL_HANDLE;
-    VmaAllocationInfo stagingImageAllocInfo = {};
-    ERR_GUARD_VULKAN( vmaCreateImage(g_hAllocator, &stagingImageInfo, &stagingImageAllocCreateInfo, &stagingImage, &stagingImageAlloc, &stagingImageAllocInfo) );
+    VkBuffer stagingBuf = VK_NULL_HANDLE;
+    VmaAllocation stagingBufAlloc = VK_NULL_HANDLE;
+    VmaAllocationInfo stagingBufAllocInfo = {};
+    ERR_GUARD_VULKAN( vmaCreateBuffer(g_hAllocator, &stagingBufInfo, &stagingBufAllocCreateInfo, &stagingBuf, &stagingBufAlloc, &stagingBufAllocInfo) );
 
-    VkImageSubresource imageSubresource = {};
-    imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageSubresource.mipLevel = 0;
-    imageSubresource.arrayLayer = 0;
-
-    VkSubresourceLayout imageLayout = {};
-    vkGetImageSubresourceLayout(g_hDevice, stagingImage, &imageSubresource, &imageLayout);
-
-    char* const pMipLevelData = (char*)stagingImageAllocInfo.pMappedData + imageLayout.offset;
-    uint8_t* pRowData = (uint8_t*)pMipLevelData;
+    char* const pImageData = (char*)stagingBufAllocInfo.pMappedData;
+    uint8_t* pRowData = (uint8_t*)pImageData;
     for(uint32_t y = 0; y < sizeY; ++y)
     {
         uint32_t* pPixelData = (uint32_t*)pRowData;
@@ -457,7 +477,7 @@ static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
                 ((y & 0x18) == 0x10 ? 0x00FF0000 : 0x00000000);
             ++pPixelData;
         }
-        pRowData += imageLayout.rowPitch;
+        pRowData += sizeX * 4;
     }
 
     // No need to flush stagingImage memory because CPU_ONLY memory is always HOST_COHERENT.
@@ -489,28 +509,13 @@ static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
     BeginSingleTimeCommands();
 
     VkImageMemoryBarrier imgMemBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    imgMemBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
-    imgMemBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     imgMemBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imgMemBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imgMemBarrier.image = stagingImage;
     imgMemBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     imgMemBarrier.subresourceRange.baseMipLevel = 0;
     imgMemBarrier.subresourceRange.levelCount = 1;
     imgMemBarrier.subresourceRange.baseArrayLayer = 0;
     imgMemBarrier.subresourceRange.layerCount = 1;
-    imgMemBarrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-    imgMemBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-
-    vkCmdPipelineBarrier(
-        g_hTemporaryCommandBuffer,
-        VK_PIPELINE_STAGE_HOST_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0,
-        0, nullptr,
-        0, nullptr,
-        1, &imgMemBarrier);
-
     imgMemBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     imgMemBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     imgMemBarrier.image = g_hTextureImage;
@@ -526,29 +531,14 @@ static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
         0, nullptr,
         1, &imgMemBarrier);
 
-    VkImageCopy imageCopy = {};
-    imageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopy.srcSubresource.baseArrayLayer = 0;
-    imageCopy.srcSubresource.mipLevel = 0;
-    imageCopy.srcSubresource.layerCount = 1;
-    imageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    imageCopy.dstSubresource.baseArrayLayer = 0;
-    imageCopy.dstSubresource.mipLevel = 0;
-    imageCopy.dstSubresource.layerCount = 1;
-    imageCopy.srcOffset.x = 0;
-    imageCopy.srcOffset.y = 0;
-    imageCopy.srcOffset.z = 0;
-    imageCopy.dstOffset.x = 0;
-    imageCopy.dstOffset.y = 0;
-    imageCopy.dstOffset.z = 0;
-    imageCopy.extent.width = sizeX;
-    imageCopy.extent.height = sizeY;
-    imageCopy.extent.depth = 1;
-    vkCmdCopyImage(
-        g_hTemporaryCommandBuffer,
-        stagingImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        g_hTextureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        1, &imageCopy);
+    VkBufferImageCopy region = {};
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent.width = sizeX;
+    region.imageExtent.height = sizeY;
+    region.imageExtent.depth = 1;
+
+    vkCmdCopyBufferToImage(g_hTemporaryCommandBuffer, stagingBuf, g_hTextureImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
     imgMemBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     imgMemBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -567,7 +557,7 @@ static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
 
     EndSingleTimeCommands();
 
-    vmaDestroyImage(g_hAllocator, stagingImage, stagingImageAlloc);
+    vmaDestroyBuffer(g_hAllocator, stagingBuf, stagingBufAlloc);
 
     // Create ImageView
 
@@ -580,7 +570,7 @@ static void CreateTexture(uint32_t sizeX, uint32_t sizeY)
     textureImageViewInfo.subresourceRange.levelCount = 1;
     textureImageViewInfo.subresourceRange.baseArrayLayer = 0;
     textureImageViewInfo.subresourceRange.layerCount = 1;
-    ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &textureImageViewInfo, nullptr, &g_hTextureImageView) );
+    ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &textureImageViewInfo, g_Allocs, &g_hTextureImageView) );
 }
 
 struct UniformBufferObject
@@ -614,7 +604,7 @@ static void RegisterDebugCallbacks()
     callbackCreateInfo.pfnCallback = &MyDebugReportCallback;
     callbackCreateInfo.pUserData   = nullptr;
 
-    ERR_GUARD_VULKAN( g_pvkCreateDebugReportCallbackEXT(g_hVulkanInstance, &callbackCreateInfo, nullptr, &g_hCallback) );
+    ERR_GUARD_VULKAN( g_pvkCreateDebugReportCallbackEXT(g_hVulkanInstance, &callbackCreateInfo, g_Allocs, &g_hCallback) );
 }
 
 static bool IsLayerSupported(const VkLayerProperties* pProps, size_t propCount, const char* pLayerName)
@@ -721,9 +711,9 @@ static void CreateSwapchain()
     }
 
     VkSwapchainKHR hNewSwapchain = VK_NULL_HANDLE;
-    ERR_GUARD_VULKAN( vkCreateSwapchainKHR(g_hDevice, &swapChainInfo, nullptr, &hNewSwapchain) );
+    ERR_GUARD_VULKAN( vkCreateSwapchainKHR(g_hDevice, &swapChainInfo, g_Allocs, &hNewSwapchain) );
     if(g_hSwapchain != VK_NULL_HANDLE)
-        vkDestroySwapchainKHR(g_hDevice, g_hSwapchain, nullptr);
+        vkDestroySwapchainKHR(g_hDevice, g_hSwapchain, g_Allocs);
     g_hSwapchain = hNewSwapchain;
 
     // Retrieve swapchain images.
@@ -736,7 +726,7 @@ static void CreateSwapchain()
     // Create swapchain image views.
 
     for(size_t i = g_SwapchainImageViews.size(); i--; )
-        vkDestroyImageView(g_hDevice, g_SwapchainImageViews[i], nullptr);
+        vkDestroyImageView(g_hDevice, g_SwapchainImageViews[i], g_Allocs);
     g_SwapchainImageViews.clear();
 
     VkImageViewCreateInfo swapchainImageViewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
@@ -755,7 +745,7 @@ static void CreateSwapchain()
         swapchainImageViewInfo.subresourceRange.levelCount = 1;
         swapchainImageViewInfo.subresourceRange.baseArrayLayer = 0;
         swapchainImageViewInfo.subresourceRange.layerCount = 1;
-        ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &swapchainImageViewInfo, nullptr, &g_SwapchainImageViews[i]) );
+        ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &swapchainImageViewInfo, g_Allocs, &g_SwapchainImageViews[i]) );
     }
 
     // Create depth buffer
@@ -793,13 +783,13 @@ static void CreateSwapchain()
     depthImageViewInfo.subresourceRange.baseArrayLayer = 0;
     depthImageViewInfo.subresourceRange.layerCount = 1;
 
-    ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &depthImageViewInfo, nullptr, &g_hDepthImageView) );
+    ERR_GUARD_VULKAN( vkCreateImageView(g_hDevice, &depthImageViewInfo, g_Allocs, &g_hDepthImageView) );
 
     // Create pipeline layout
     {
         if(g_hPipelineLayout != VK_NULL_HANDLE)
         {
-            vkDestroyPipelineLayout(g_hDevice, g_hPipelineLayout, nullptr);
+            vkDestroyPipelineLayout(g_hDevice, g_hPipelineLayout, g_Allocs);
             g_hPipelineLayout = VK_NULL_HANDLE;
         }
 
@@ -815,14 +805,14 @@ static void CreateSwapchain()
         pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts;
         pipelineLayoutInfo.pushConstantRangeCount = 1;
         pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges;
-        ERR_GUARD_VULKAN( vkCreatePipelineLayout(g_hDevice, &pipelineLayoutInfo, nullptr, &g_hPipelineLayout) );
+        ERR_GUARD_VULKAN( vkCreatePipelineLayout(g_hDevice, &pipelineLayoutInfo, g_Allocs, &g_hPipelineLayout) );
     }
 
     // Create render pass
     {
         if(g_hRenderPass != VK_NULL_HANDLE)
         {
-            vkDestroyRenderPass(g_hDevice, g_hRenderPass, nullptr);
+            vkDestroyRenderPass(g_hDevice, g_hRenderPass, g_Allocs);
             g_hRenderPass = VK_NULL_HANDLE;
         }
 
@@ -867,7 +857,7 @@ static void CreateSwapchain()
         renderPassInfo.subpassCount = 1;
         renderPassInfo.pSubpasses = &subpassDesc;
         renderPassInfo.dependencyCount = 0;
-        ERR_GUARD_VULKAN( vkCreateRenderPass(g_hDevice, &renderPassInfo, nullptr, &g_hRenderPass) );
+        ERR_GUARD_VULKAN( vkCreateRenderPass(g_hDevice, &renderPassInfo, g_Allocs, &g_hRenderPass) );
     }
 
     // Create pipeline
@@ -878,14 +868,14 @@ static void CreateSwapchain()
         shaderModuleInfo.codeSize = vertShaderCode.size();
         shaderModuleInfo.pCode = (const uint32_t*)vertShaderCode.data();
         VkShaderModule hVertShaderModule = VK_NULL_HANDLE;
-        ERR_GUARD_VULKAN( vkCreateShaderModule(g_hDevice, &shaderModuleInfo, nullptr, &hVertShaderModule) );
+        ERR_GUARD_VULKAN( vkCreateShaderModule(g_hDevice, &shaderModuleInfo, g_Allocs, &hVertShaderModule) );
 
         std::vector<char> hFragShaderCode;
         LoadShader(hFragShaderCode, "Shader.frag.spv");
         shaderModuleInfo.codeSize = hFragShaderCode.size();
         shaderModuleInfo.pCode = (const uint32_t*)hFragShaderCode.data();
         VkShaderModule fragShaderModule = VK_NULL_HANDLE;
-        ERR_GUARD_VULKAN( vkCreateShaderModule(g_hDevice, &shaderModuleInfo, nullptr, &fragShaderModule) );
+        ERR_GUARD_VULKAN( vkCreateShaderModule(g_hDevice, &shaderModuleInfo, g_Allocs, &fragShaderModule) );
 
         VkPipelineShaderStageCreateInfo vertPipelineShaderStageInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
         vertPipelineShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -1021,17 +1011,18 @@ static void CreateSwapchain()
             g_hDevice,
             VK_NULL_HANDLE,
             1,
-            &pipelineInfo, nullptr,
+            &pipelineInfo,
+            g_Allocs,
             &g_hPipeline) );
 
-        vkDestroyShaderModule(g_hDevice, fragShaderModule, nullptr);
-        vkDestroyShaderModule(g_hDevice, hVertShaderModule, nullptr);
+        vkDestroyShaderModule(g_hDevice, fragShaderModule, g_Allocs);
+        vkDestroyShaderModule(g_hDevice, hVertShaderModule, g_Allocs);
     }
 
     // Create frambuffers
 
     for(size_t i = g_Framebuffers.size(); i--; )
-        vkDestroyFramebuffer(g_hDevice, g_Framebuffers[i], nullptr);
+        vkDestroyFramebuffer(g_hDevice, g_Framebuffers[i], g_Allocs);
     g_Framebuffers.clear();
 
     g_Framebuffers.resize(g_SwapchainImageViews.size());
@@ -1046,47 +1037,47 @@ static void CreateSwapchain()
         framebufferInfo.width = g_Extent.width;
         framebufferInfo.height = g_Extent.height;
         framebufferInfo.layers = 1;
-        ERR_GUARD_VULKAN( vkCreateFramebuffer(g_hDevice, &framebufferInfo, nullptr, &g_Framebuffers[i]) );
+        ERR_GUARD_VULKAN( vkCreateFramebuffer(g_hDevice, &framebufferInfo, g_Allocs, &g_Framebuffers[i]) );
     }
 
     // Create semaphores
 
     if(g_hImageAvailableSemaphore != VK_NULL_HANDLE)
     {
-        vkDestroySemaphore(g_hDevice, g_hImageAvailableSemaphore, nullptr);
+        vkDestroySemaphore(g_hDevice, g_hImageAvailableSemaphore, g_Allocs);
         g_hImageAvailableSemaphore = VK_NULL_HANDLE;
     }
     if(g_hRenderFinishedSemaphore != VK_NULL_HANDLE)
     {
-        vkDestroySemaphore(g_hDevice, g_hRenderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(g_hDevice, g_hRenderFinishedSemaphore, g_Allocs);
         g_hRenderFinishedSemaphore = VK_NULL_HANDLE;
     }
 
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    ERR_GUARD_VULKAN( vkCreateSemaphore(g_hDevice, &semaphoreInfo, nullptr, &g_hImageAvailableSemaphore) );
-    ERR_GUARD_VULKAN( vkCreateSemaphore(g_hDevice, &semaphoreInfo, nullptr, &g_hRenderFinishedSemaphore) );
+    ERR_GUARD_VULKAN( vkCreateSemaphore(g_hDevice, &semaphoreInfo, g_Allocs, &g_hImageAvailableSemaphore) );
+    ERR_GUARD_VULKAN( vkCreateSemaphore(g_hDevice, &semaphoreInfo, g_Allocs, &g_hRenderFinishedSemaphore) );
 }
 
 static void DestroySwapchain(bool destroyActualSwapchain)
 {
     if(g_hImageAvailableSemaphore != VK_NULL_HANDLE)
     {
-        vkDestroySemaphore(g_hDevice, g_hImageAvailableSemaphore, nullptr);
+        vkDestroySemaphore(g_hDevice, g_hImageAvailableSemaphore, g_Allocs);
         g_hImageAvailableSemaphore = VK_NULL_HANDLE;
     }
     if(g_hRenderFinishedSemaphore != VK_NULL_HANDLE)
     {
-        vkDestroySemaphore(g_hDevice, g_hRenderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(g_hDevice, g_hRenderFinishedSemaphore, g_Allocs);
         g_hRenderFinishedSemaphore = VK_NULL_HANDLE;
     }
 
     for(size_t i = g_Framebuffers.size(); i--; )
-        vkDestroyFramebuffer(g_hDevice, g_Framebuffers[i], nullptr);
+        vkDestroyFramebuffer(g_hDevice, g_Framebuffers[i], g_Allocs);
     g_Framebuffers.clear();
 
     if(g_hDepthImageView != VK_NULL_HANDLE)
     {
-        vkDestroyImageView(g_hDevice, g_hDepthImageView, nullptr);
+        vkDestroyImageView(g_hDevice, g_hDepthImageView, g_Allocs);
         g_hDepthImageView = VK_NULL_HANDLE;
     }
     if(g_hDepthImage != VK_NULL_HANDLE)
@@ -1097,35 +1088,40 @@ static void DestroySwapchain(bool destroyActualSwapchain)
 
     if(g_hPipeline != VK_NULL_HANDLE)
     {
-        vkDestroyPipeline(g_hDevice, g_hPipeline, nullptr);
+        vkDestroyPipeline(g_hDevice, g_hPipeline, g_Allocs);
         g_hPipeline = VK_NULL_HANDLE;
     }
 
     if(g_hRenderPass != VK_NULL_HANDLE)
     {
-        vkDestroyRenderPass(g_hDevice, g_hRenderPass, nullptr);
+        vkDestroyRenderPass(g_hDevice, g_hRenderPass, g_Allocs);
         g_hRenderPass = VK_NULL_HANDLE;
     }
 
     if(g_hPipelineLayout != VK_NULL_HANDLE)
     {
-        vkDestroyPipelineLayout(g_hDevice, g_hPipelineLayout, nullptr);
+        vkDestroyPipelineLayout(g_hDevice, g_hPipelineLayout, g_Allocs);
         g_hPipelineLayout = VK_NULL_HANDLE;
     }
     
     for(size_t i = g_SwapchainImageViews.size(); i--; )
-        vkDestroyImageView(g_hDevice, g_SwapchainImageViews[i], nullptr);
+        vkDestroyImageView(g_hDevice, g_SwapchainImageViews[i], g_Allocs);
     g_SwapchainImageViews.clear();
 
     if(destroyActualSwapchain && (g_hSwapchain != VK_NULL_HANDLE))
     {
-        vkDestroySwapchainKHR(g_hDevice, g_hSwapchain, nullptr);
+        vkDestroySwapchainKHR(g_hDevice, g_hSwapchain, g_Allocs);
         g_hSwapchain = VK_NULL_HANDLE;
     }
 }
 
 static void InitializeApplication()
 {
+    if(USE_CUSTOM_CPU_ALLOCATION_CALLBACKS)
+    {
+        g_Allocs = &g_CpuAllocationCallbacks;
+    }
+
     uint32_t instanceLayerPropCount = 0;
     ERR_GUARD_VULKAN( vkEnumerateInstanceLayerProperties(&instanceLayerPropCount, nullptr) );
     std::vector<VkLayerProperties> instanceLayerProps(instanceLayerPropCount);
@@ -1143,15 +1139,32 @@ static void InitializeApplication()
         }
     }
 
-    std::vector<const char*> instanceExtensions;
-    instanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-    instanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
+    uint32_t availableInstanceExtensionCount = 0;
+    ERR_GUARD_VULKAN( vkEnumerateInstanceExtensionProperties(nullptr, &availableInstanceExtensionCount, nullptr) );
+    std::vector<VkExtensionProperties> availableInstanceExtensions(availableInstanceExtensionCount);
+    if(availableInstanceExtensionCount > 0)
+    {
+        ERR_GUARD_VULKAN( vkEnumerateInstanceExtensionProperties(nullptr, &availableInstanceExtensionCount, availableInstanceExtensions.data()) );
+    }
+
+    std::vector<const char*> enabledInstanceExtensions;
+    enabledInstanceExtensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
+    enabledInstanceExtensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
 
     std::vector<const char*> instanceLayers;
     if(g_EnableValidationLayer == true)
     {
         instanceLayers.push_back(VALIDATION_LAYER_NAME);
-        instanceExtensions.push_back("VK_EXT_debug_report");
+        enabledInstanceExtensions.push_back("VK_EXT_debug_report");
+    }
+
+    for(const auto& extensionProperties : availableInstanceExtensions)
+    {
+        if(strcmp(extensionProperties.extensionName, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME) == 0)
+        {
+            enabledInstanceExtensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+            VK_KHR_get_physical_device_properties2_enabled = true;
+        }
     }
 
     VkApplicationInfo appInfo = { VK_STRUCTURE_TYPE_APPLICATION_INFO };
@@ -1159,22 +1172,22 @@ static void InitializeApplication()
     appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.pEngineName = "Adam Sawicki Engine";
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    appInfo.apiVersion = VMA_VULKAN_VERSION == 1001000 ? VK_API_VERSION_1_1 : VK_API_VERSION_1_0;
 
     VkInstanceCreateInfo instInfo = { VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO };
     instInfo.pApplicationInfo = &appInfo;
-    instInfo.enabledExtensionCount = static_cast<uint32_t>(instanceExtensions.size());
-    instInfo.ppEnabledExtensionNames = instanceExtensions.data();
+    instInfo.enabledExtensionCount = static_cast<uint32_t>(enabledInstanceExtensions.size());
+    instInfo.ppEnabledExtensionNames = enabledInstanceExtensions.data();
     instInfo.enabledLayerCount = static_cast<uint32_t>(instanceLayers.size());
     instInfo.ppEnabledLayerNames = instanceLayers.data();
 
-    ERR_GUARD_VULKAN( vkCreateInstance(&instInfo, NULL, &g_hVulkanInstance) );
+    ERR_GUARD_VULKAN( vkCreateInstance(&instInfo, g_Allocs, &g_hVulkanInstance) );
 
     // Create VkSurfaceKHR.
     VkWin32SurfaceCreateInfoKHR surfaceInfo = { VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR };
     surfaceInfo.hinstance = g_hAppInstance;
     surfaceInfo.hwnd = g_hWnd;
-    VkResult result = vkCreateWin32SurfaceKHR(g_hVulkanInstance, &surfaceInfo, NULL, &g_hSurface);
+    VkResult result = vkCreateWin32SurfaceKHR(g_hVulkanInstance, &surfaceInfo, g_Allocs, &g_hSurface);
     assert(result == VK_SUCCESS);
 
     if(g_EnableValidationLayer == true)
@@ -1196,8 +1209,10 @@ static void InitializeApplication()
     VkPhysicalDeviceProperties physicalDeviceProperties = {};
     vkGetPhysicalDeviceProperties(g_hPhysicalDevice, &physicalDeviceProperties);
 
-    //VkPhysicalDeviceFeatures physicalDeviceFreatures = {};
-    //vkGetPhysicalDeviceFeatures(g_PhysicalDevice, &physicalDeviceFreatures);
+    VkPhysicalDeviceFeatures physicalDeviceFeatures = {};
+    vkGetPhysicalDeviceFeatures(g_hPhysicalDevice, &physicalDeviceFeatures);
+
+    g_SparseBindingEnabled = physicalDeviceFeatures.sparseBinding != 0;
 
     // Find queue family index
 
@@ -1208,13 +1223,16 @@ static void InitializeApplication()
     vkGetPhysicalDeviceQueueFamilyProperties(g_hPhysicalDevice, &queueFamilyCount, queueFamilies.data());
     for(uint32_t i = 0;
         (i < queueFamilyCount) &&
-            (g_GraphicsQueueFamilyIndex == UINT_MAX || g_PresentQueueFamilyIndex == UINT_MAX);
+            (g_GraphicsQueueFamilyIndex == UINT_MAX ||
+                g_PresentQueueFamilyIndex == UINT_MAX ||
+                (g_SparseBindingEnabled && g_SparseBindingQueueFamilyIndex == UINT_MAX));
         ++i)
     {
         if(queueFamilies[i].queueCount > 0)
         {
+            const uint32_t flagsForGraphicsQueue = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
             if((g_GraphicsQueueFamilyIndex != 0) &&
-                ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0))
+                ((queueFamilies[i].queueFlags & flagsForGraphicsQueue) == flagsForGraphicsQueue))
             {
                 g_GraphicsQueueFamilyIndex = i;
             }
@@ -1225,26 +1243,56 @@ static void InitializeApplication()
             {
                 g_PresentQueueFamilyIndex = i;
             }
+
+            if(g_SparseBindingEnabled &&
+                g_SparseBindingQueueFamilyIndex == UINT32_MAX &&
+                (queueFamilies[i].queueFlags & VK_QUEUE_SPARSE_BINDING_BIT) != 0)
+            {
+                g_SparseBindingQueueFamilyIndex = i;
+            }
         }
     }
     assert(g_GraphicsQueueFamilyIndex != UINT_MAX);
+
+    g_SparseBindingEnabled = g_SparseBindingEnabled && g_SparseBindingQueueFamilyIndex != UINT32_MAX;
 
     // Create logical device
 
     const float queuePriority = 1.f;
 
-    VkDeviceQueueCreateInfo deviceQueueCreateInfo[2] = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-    deviceQueueCreateInfo[0].queueFamilyIndex = g_GraphicsQueueFamilyIndex;
-    deviceQueueCreateInfo[0].queueCount = 1;
-    deviceQueueCreateInfo[0].pQueuePriorities = &queuePriority;
-    deviceQueueCreateInfo[1].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    deviceQueueCreateInfo[1].queueFamilyIndex = g_PresentQueueFamilyIndex;
-    deviceQueueCreateInfo[1].queueCount = 1;
-    deviceQueueCreateInfo[1].pQueuePriorities = &queuePriority;
+    VkDeviceQueueCreateInfo queueCreateInfo[3] = {};
+    uint32_t queueCount = 1;
+    queueCreateInfo[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueCreateInfo[0].queueFamilyIndex = g_GraphicsQueueFamilyIndex;
+    queueCreateInfo[0].queueCount = 1;
+    queueCreateInfo[0].pQueuePriorities = &queuePriority;
+    
+    if(g_PresentQueueFamilyIndex != g_GraphicsQueueFamilyIndex)
+    {
+
+        queueCreateInfo[queueCount].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo[queueCount].queueFamilyIndex = g_PresentQueueFamilyIndex;
+        queueCreateInfo[queueCount].queueCount = 1;
+        queueCreateInfo[queueCount].pQueuePriorities = &queuePriority;
+        ++queueCount;
+    }
+    
+    if(g_SparseBindingEnabled &&
+        g_SparseBindingQueueFamilyIndex != g_GraphicsQueueFamilyIndex &&
+        g_SparseBindingQueueFamilyIndex != g_PresentQueueFamilyIndex)
+    {
+
+        queueCreateInfo[queueCount].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queueCreateInfo[queueCount].queueFamilyIndex = g_SparseBindingQueueFamilyIndex;
+        queueCreateInfo[queueCount].queueCount = 1;
+        queueCreateInfo[queueCount].pQueuePriorities = &queuePriority;
+        ++queueCount;
+    }
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
-    deviceFeatures.fillModeNonSolid = VK_TRUE;
+    //deviceFeatures.fillModeNonSolid = VK_TRUE;
     deviceFeatures.samplerAnisotropy = VK_TRUE;
+    deviceFeatures.sparseBinding = g_SparseBindingEnabled ? VK_TRUE : VK_FALSE;
 
     // Determine list of device extensions to enable.
     std::vector<const char*> enabledDeviceExtensions;
@@ -1270,6 +1318,16 @@ static void InitializeApplication()
                     enabledDeviceExtensions.push_back(VK_KHR_DEDICATED_ALLOCATION_EXTENSION_NAME);
                     VK_KHR_dedicated_allocation_enabled = true;
                 }
+                else if(strcmp(properties[i].extensionName, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME) == 0)
+                {
+                    enabledDeviceExtensions.push_back(VK_KHR_BIND_MEMORY_2_EXTENSION_NAME);
+                    VK_KHR_bind_memory2_enabled = true;
+                }
+                else if(strcmp(properties[i].extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME) == 0)
+                {
+                    enabledDeviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+                    VK_EXT_memory_budget_enabled = true;
+                }
             }
         }
     }
@@ -1279,48 +1337,78 @@ static void InitializeApplication()
     deviceCreateInfo.ppEnabledLayerNames = nullptr;
     deviceCreateInfo.enabledExtensionCount = (uint32_t)enabledDeviceExtensions.size();
     deviceCreateInfo.ppEnabledExtensionNames = !enabledDeviceExtensions.empty() ? enabledDeviceExtensions.data() : nullptr;
-    deviceCreateInfo.queueCreateInfoCount = g_PresentQueueFamilyIndex != g_GraphicsQueueFamilyIndex ? 2 : 1;
-    deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfo;
+    deviceCreateInfo.queueCreateInfoCount = queueCount;
+    deviceCreateInfo.pQueueCreateInfos = queueCreateInfo;
     deviceCreateInfo.pEnabledFeatures = &deviceFeatures;
 
-    ERR_GUARD_VULKAN( vkCreateDevice(g_hPhysicalDevice, &deviceCreateInfo, nullptr, &g_hDevice) );
+    ERR_GUARD_VULKAN( vkCreateDevice(g_hPhysicalDevice, &deviceCreateInfo, g_Allocs, &g_hDevice) );
 
     // Create memory allocator
 
     VmaAllocatorCreateInfo allocatorInfo = {};
     allocatorInfo.physicalDevice = g_hPhysicalDevice;
     allocatorInfo.device = g_hDevice;
+    allocatorInfo.instance = g_hVulkanInstance;
+    allocatorInfo.vulkanApiVersion = appInfo.apiVersion;
 
     if(VK_KHR_dedicated_allocation_enabled)
     {
         allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_DEDICATED_ALLOCATION_BIT;
     }
+    if(VK_KHR_bind_memory2_enabled)
+    {
+        allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_KHR_BIND_MEMORY2_BIT;
+    }
+#if !defined(VMA_MEMORY_BUDGET) || VMA_MEMORY_BUDGET == 1
+    if(VK_EXT_memory_budget_enabled && VK_KHR_get_physical_device_properties2_enabled)
+    {
+        allocatorInfo.flags |= VMA_ALLOCATOR_CREATE_EXT_MEMORY_BUDGET_BIT;
+    }
+#endif
 
-    VkAllocationCallbacks cpuAllocationCallbacks = {};
     if(USE_CUSTOM_CPU_ALLOCATION_CALLBACKS)
     {
-        cpuAllocationCallbacks.pUserData = CUSTOM_CPU_ALLOCATION_CALLBACK_USER_DATA;
-        cpuAllocationCallbacks.pfnAllocation = &CustomCpuAllocation;
-        cpuAllocationCallbacks.pfnReallocation = &CustomCpuReallocation;
-        cpuAllocationCallbacks.pfnFree = &CustomCpuFree;
-        allocatorInfo.pAllocationCallbacks = &cpuAllocationCallbacks;
+        allocatorInfo.pAllocationCallbacks = &g_CpuAllocationCallbacks;
     }
+
+    // Uncomment to enable recording to CSV file.
+    /*
+    {
+        VmaRecordSettings recordSettings = {};
+        recordSettings.pFilePath = "VulkanSample.csv";
+        allocatorInfo.pRecordSettings = &recordSettings;
+    }
+    */
+
+    // Uncomment to enable HeapSizeLimit.
+    /*
+    std::array<VkDeviceSize, VK_MAX_MEMORY_HEAPS> heapSizeLimit;
+    std::fill(heapSizeLimit.begin(), heapSizeLimit.end(), VK_WHOLE_SIZE);
+    heapSizeLimit[0] = 512ull * 1024 * 1024;
+    allocatorInfo.pHeapSizeLimit = heapSizeLimit.data();
+    */
 
     ERR_GUARD_VULKAN( vmaCreateAllocator(&allocatorInfo, &g_hAllocator) );
 
-    // Retrieve queue (doesn't need to be destroyed)
+    // Retrieve queues (don't need to be destroyed).
 
     vkGetDeviceQueue(g_hDevice, g_GraphicsQueueFamilyIndex, 0, &g_hGraphicsQueue);
     vkGetDeviceQueue(g_hDevice, g_PresentQueueFamilyIndex, 0, &g_hPresentQueue);
     assert(g_hGraphicsQueue);
     assert(g_hPresentQueue);
 
+    if(g_SparseBindingEnabled)
+    {
+        vkGetDeviceQueue(g_hDevice, g_SparseBindingQueueFamilyIndex, 0, &g_hSparseBindingQueue);
+        assert(g_hSparseBindingQueue);
+    }
+
     // Create command pool
 
     VkCommandPoolCreateInfo commandPoolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
     commandPoolInfo.queueFamilyIndex = g_GraphicsQueueFamilyIndex;
     commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    ERR_GUARD_VULKAN( vkCreateCommandPool(g_hDevice, &commandPoolInfo, nullptr, &g_hCommandPool) );
+    ERR_GUARD_VULKAN( vkCreateCommandPool(g_hDevice, &commandPoolInfo, g_Allocs, &g_hCommandPool) );
 
     VkCommandBufferAllocateInfo commandBufferInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
     commandBufferInfo.commandPool = g_hCommandPool;
@@ -1332,8 +1420,10 @@ static void InitializeApplication()
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     for(size_t i = 0; i < COMMAND_BUFFER_COUNT; ++i)
     {
-        ERR_GUARD_VULKAN( vkCreateFence(g_hDevice, &fenceInfo, nullptr, &g_MainCommandBufferExecutedFances[i]) );
+        ERR_GUARD_VULKAN( vkCreateFence(g_hDevice, &fenceInfo, g_Allocs, &g_MainCommandBufferExecutedFances[i]) );
     }
+
+    ERR_GUARD_VULKAN( vkCreateFence(g_hDevice, &fenceInfo, g_Allocs, &g_ImmediateFence) );
 
     commandBufferInfo.commandBufferCount = 1;
     ERR_GUARD_VULKAN( vkAllocateCommandBuffers(g_hDevice, &commandBufferInfo, &g_hTemporaryCommandBuffer) );
@@ -1356,7 +1446,7 @@ static void InitializeApplication()
     samplerInfo.mipLodBias = 0.f;
     samplerInfo.minLod = 0.f;
     samplerInfo.maxLod = FLT_MAX;
-    ERR_GUARD_VULKAN( vkCreateSampler(g_hDevice, &samplerInfo, nullptr, &g_hSampler) );
+    ERR_GUARD_VULKAN( vkCreateSampler(g_hDevice, &samplerInfo, g_Allocs, &g_hSampler) );
 
     CreateTexture(128, 128);
     CreateMesh();
@@ -1370,7 +1460,7 @@ static void InitializeApplication()
     VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
     descriptorSetLayoutInfo.bindingCount = 1;
     descriptorSetLayoutInfo.pBindings = &samplerLayoutBinding;
-    ERR_GUARD_VULKAN( vkCreateDescriptorSetLayout(g_hDevice, &descriptorSetLayoutInfo, nullptr, &g_hDescriptorSetLayout) );
+    ERR_GUARD_VULKAN( vkCreateDescriptorSetLayout(g_hDevice, &descriptorSetLayoutInfo, g_Allocs, &g_hDescriptorSetLayout) );
 
     // Create descriptor pool
 
@@ -1385,7 +1475,7 @@ static void InitializeApplication()
     descriptorPoolInfo.poolSizeCount = (uint32_t)_countof(descriptorPoolSizes);
     descriptorPoolInfo.pPoolSizes = descriptorPoolSizes;
     descriptorPoolInfo.maxSets = 1;
-    ERR_GUARD_VULKAN( vkCreateDescriptorPool(g_hDevice, &descriptorPoolInfo, nullptr, &g_hDescriptorPool) );
+    ERR_GUARD_VULKAN( vkCreateDescriptorPool(g_hDevice, &descriptorPoolInfo, g_Allocs, &g_hDescriptorPool) );
 
     // Create descriptor set layout
 
@@ -1422,19 +1512,19 @@ static void FinalizeApplication()
 
     if(g_hDescriptorPool != VK_NULL_HANDLE)
     {
-        vkDestroyDescriptorPool(g_hDevice, g_hDescriptorPool, nullptr);
+        vkDestroyDescriptorPool(g_hDevice, g_hDescriptorPool, g_Allocs);
         g_hDescriptorPool = VK_NULL_HANDLE;
     }
 
     if(g_hDescriptorSetLayout != VK_NULL_HANDLE)
     {
-        vkDestroyDescriptorSetLayout(g_hDevice, g_hDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(g_hDevice, g_hDescriptorSetLayout, g_Allocs);
         g_hDescriptorSetLayout = VK_NULL_HANDLE;
     }
 
     if(g_hTextureImageView != VK_NULL_HANDLE)
     {
-        vkDestroyImageView(g_hDevice, g_hTextureImageView, nullptr);
+        vkDestroyImageView(g_hDevice, g_hTextureImageView, g_Allocs);
         g_hTextureImageView = VK_NULL_HANDLE;
     }
     if(g_hTextureImage != VK_NULL_HANDLE)
@@ -1456,15 +1546,21 @@ static void FinalizeApplication()
     
     if(g_hSampler != VK_NULL_HANDLE)
     {
-        vkDestroySampler(g_hDevice, g_hSampler, nullptr);
+        vkDestroySampler(g_hDevice, g_hSampler, g_Allocs);
         g_hSampler = VK_NULL_HANDLE;
+    }
+
+    if(g_ImmediateFence)
+    {
+        vkDestroyFence(g_hDevice, g_ImmediateFence, g_Allocs);
+        g_ImmediateFence = VK_NULL_HANDLE;
     }
 
     for(size_t i = COMMAND_BUFFER_COUNT; i--; )
     {
         if(g_MainCommandBufferExecutedFances[i] != VK_NULL_HANDLE)
         {
-            vkDestroyFence(g_hDevice, g_MainCommandBufferExecutedFances[i], nullptr);
+            vkDestroyFence(g_hDevice, g_MainCommandBufferExecutedFances[i], g_Allocs);
             g_MainCommandBufferExecutedFances[i] = VK_NULL_HANDLE;
         }
     }
@@ -1481,7 +1577,7 @@ static void FinalizeApplication()
 
     if(g_hCommandPool != VK_NULL_HANDLE)
     {
-        vkDestroyCommandPool(g_hDevice, g_hCommandPool, nullptr);
+        vkDestroyCommandPool(g_hDevice, g_hCommandPool, g_Allocs);
         g_hCommandPool = VK_NULL_HANDLE;
     }
 
@@ -1493,25 +1589,25 @@ static void FinalizeApplication()
 
     if(g_hDevice != VK_NULL_HANDLE)
     {
-        vkDestroyDevice(g_hDevice, nullptr);
+        vkDestroyDevice(g_hDevice, g_Allocs);
         g_hDevice = nullptr;
     }
 
     if(g_pvkDestroyDebugReportCallbackEXT && g_hCallback != VK_NULL_HANDLE)
     {
-        g_pvkDestroyDebugReportCallbackEXT(g_hVulkanInstance, g_hCallback, nullptr);
+        g_pvkDestroyDebugReportCallbackEXT(g_hVulkanInstance, g_hCallback, g_Allocs);
         g_hCallback = VK_NULL_HANDLE;
     }
 
     if(g_hSurface != VK_NULL_HANDLE)
     {
-        vkDestroySurfaceKHR(g_hVulkanInstance, g_hSurface, NULL);
+        vkDestroySurfaceKHR(g_hVulkanInstance, g_hSurface, g_Allocs);
         g_hSurface = VK_NULL_HANDLE;
     }
 
     if(g_hVulkanInstance != VK_NULL_HANDLE)
     {
-        vkDestroyInstance(g_hVulkanInstance, NULL);
+        vkDestroyInstance(g_hVulkanInstance, g_Allocs);
         g_hVulkanInstance = VK_NULL_HANDLE;
     }
 }
@@ -1714,7 +1810,31 @@ static LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
             PostMessage(hWnd, WM_CLOSE, 0, 0);
             break;
         case 'T':
-            Test();
+            try
+            {
+                Test();
+            }
+            catch(const std::exception& ex)
+            {
+                printf("ERROR: %s\n", ex.what());
+            }
+            break;
+        case 'S':
+            try
+            {
+                if(g_SparseBindingEnabled)
+                {
+                    TestSparseBinding();
+                }
+                else
+                {
+                    printf("Sparse binding not supported.\n");
+                }
+            }
+            catch(const std::exception& ex)
+            {
+                printf("ERROR: %s\n", ex.what());
+            }
             break;
         }
         return 0;
@@ -1766,6 +1886,8 @@ int main()
         if(g_hDevice != VK_NULL_HANDLE)
             DrawFrame();
     }
+
+    TEST(g_CpuAllocCount.load() == 0);
 
     return 0;
 }
