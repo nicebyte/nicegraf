@@ -1977,8 +1977,17 @@ typedef struct ngf_image_sampler_bind_info {
 /**
  * @struct ngf_resource_bind_op
  * \ingroup ngf
- * Specifies a resource (image, buffer, etc.) bind operation, together with
- * the target set and binding IDs. See \ref ngf_cmd_bind_resources for details.
+ * 
+ * Specifies a resource binding operation.
+ * 
+ * The resource binding model in nicegraf is similar to that of Vulkan. Shaders group their
+ * resources into "sets", and individual slot within thosse sets are referred to as "bindings".
+ * The main difference in nicegraf is that one does not have to explicitly allocate descriptor pools like in Vulkan.
+ * Instead, the application code simply says which set and binding to assign a particular resource to. Internally,
+ * some optimization may be performed to avoid redundant binds.
+ * For backends that don't have a similar resource binding model (e.g. Metal), a special comment musst be added to the
+ * shader code that maps the backend's "native" binding model onto this one. See \ref ngf_shader_stage_info::content for
+ * more details on that.
  */
 typedef struct ngf_resource_bind_op {
   uint32_t            target_set;     /**< Target set ID. */
@@ -2682,10 +2691,16 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front, uint32
 void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ * 
  * Bind resources for the shader to read. See ngf_resource_bind_op for more information.
+ * 
+ * @param enc The handle to the render encoder object to record the command into.
+ * @param bind_operations A pointer to a contiguous array of \ref ngf_resource_bind_op objects.
+ * @param nbinds The number of elements in the array pointed to by \ref bind_operations.
  */
 void ngf_cmd_bind_resources(
-    ngf_render_encoder          buf,
+    ngf_render_encoder          enc,
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) NGF_NOEXCEPT;
 
