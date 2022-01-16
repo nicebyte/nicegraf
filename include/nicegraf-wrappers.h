@@ -29,10 +29,21 @@
 #include <string.h>
 #include <utility>
 
+/**
+ * @file
+ * \defgroup ngf_wrappers C++ Wrappers
+ * 
+ * This module contains optional C++ wrappers for certain nicegraf structures and routines.
+ */
+
 namespace ngf {
 
 /**
- * Convenience macro to allow easily propagating nicegraf errors.
+ * \ingroup ngf_wrappers
+ * 
+ * A convenience macro to allow easily propagating nicegraf errors. The provided expression must evaluate to a \ref ngf_error.
+ * If the result of the expression is not \ref NGF_ERROR_OK, the value is returned from the calling function.
+ * Note: the calling function must also return an \ref ngf_error.
  */
 #define NGF_RETURN_IF_ERROR(expr)        \
   {                                      \
@@ -41,24 +52,34 @@ namespace ngf {
   }
 
 /**
- * A move-only RAII wrapper over nicegraf handles that provides
- * unique ownership semantics
+ * \ingroup ngf_wrappers
+ * 
+ * A move-only RAII wrapper over nicegraf handles that provides unique ownership semantics.
  */
 template<class T, class ObjectManagementFuncs> class ngf_handle {
   public:
+
+  /** Wraps a raw handle to a nicegraf object. */
   explicit ngf_handle(T raw) : handle_(raw) {
   }
+
+  /** Wraps a null handle. */
   ngf_handle() : handle_(nullptr) {
   }
+
   ngf_handle(const ngf_handle&) = delete;
   ngf_handle(ngf_handle&& other) : handle_(nullptr) {
     *this = std::move(other);
   }
+
+  /** Disposes of the owned handle, if it is not null. */
   ~ngf_handle() {
     destroy_if_necessary();
   }
 
   ngf_handle& operator=(const ngf_handle&) = delete;
+
+  /** Takes ownership of the handle wrapped by another object. */
   ngf_handle& operator                     =(ngf_handle&& other) noexcept {
     destroy_if_necessary();
     handle_       = other.handle_;
@@ -68,29 +89,46 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
 
   typedef typename ObjectManagementFuncs::InitType init_type;
 
+  /** Creates a new handle using the provided configuration, and takes ownership of it. */
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
     destroy_if_necessary();
     return ObjectManagementFuncs::create(&info, &handle_);
   }
 
+  /** @return The raw handle to the wrapped object. */
   T get() {
     return handle_;
   }
+
+  /** @return The raw handle to the wrapped object. */
   const T get() const {
     return handle_;
   }
+
+  /**
+   * Relinquishes ownership of the wrapped object and returns a raw handle to it. After this call
+   * completes, it is the responsibility of the calling code to dispose of the handle properly when
+   * it is no longer needed.
+   */
   T release() {
     T tmp   = handle_;
     handle_ = nullptr;
     return tmp;
   }
+
+  /** Implicit conversion to the raw handle type. */
   operator T() {
     return handle_;
   }
+
+  /** Implicit conversion to the raw handle type. */
   operator const T() const {
     return handle_;
   }
 
+  /**
+   * Wraps a raw handle to a nicegraf object.
+   */
   void reset(T new_handle) {
     destroy_if_necessary();
     handle_ = new_handle;
