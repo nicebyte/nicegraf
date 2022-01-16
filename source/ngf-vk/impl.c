@@ -136,6 +136,7 @@ typedef struct {
   VmaAllocator  parent_allocator;
   uintptr_t     obj_handle;
   VmaAllocation vma_alloc;
+  void*         mapped_data;
 } ngfvk_alloc;
 
 typedef struct {
@@ -2360,7 +2361,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       .vkCreateBuffer                      = vkCreateBuffer,
       .vkDestroyBuffer                     = vkDestroyBuffer,
       .vkCreateImage                       = vkCreateImage,
-      .vkDestroyImage                      = vkDestroyImage};
+      .vkDestroyImage                      = vkDestroyImage,
+      .vkCmdCopyBuffer                     = vkCmdCopyBuffer,};
   VmaAllocatorCreateInfo vma_info = {
       .flags                       = 0u,
       .physicalDevice              = _vk.phys_dev,
@@ -2371,7 +2373,9 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       .frameInUseCount             = 0u,
       .pHeapSizeLimit              = NULL,
       .pVulkanFunctions            = &vma_vk_fns,
-      .pRecordSettings             = NULL};
+      .pRecordSettings             = NULL,
+      .instance                    = _vk.instance,
+      .vulkanApiVersion            = 0};
   vk_err = vmaCreateAllocator(&vma_info, &ctx->allocator);
 
   // Create swapchain if necessary.
@@ -4074,16 +4078,19 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
       .pool           = VK_NULL_HANDLE,
       .pUserData      = NULL};
 
+  VmaAllocationInfo alloc_info;
+  alloc_info.pMappedData = NULL;
   VkResult vkresult = vmaCreateBuffer(
       CURRENT_CONTEXT->allocator,
       &buf_vk_info,
       &buf_alloc_info,
       (VkBuffer*)&alloc->obj_handle,
       &alloc->vma_alloc,
-      NULL);
+      &alloc_info);
   alloc->parent_allocator = CURRENT_CONTEXT->allocator;
-  err                     = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
-
+  alloc->mapped_data = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
+  err = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+  
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
   } else {
@@ -4114,10 +4121,8 @@ void ngf_destroy_buffer(ngf_buffer buffer) {
 
 void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) {
   NGFI_IGNORE_VAR(size);
-  void*    result   = NULL;
-  VkResult vkresult = vmaMapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc, &result);
-  if (vkresult == VK_SUCCESS) { buf->mapped_offset = offset; }
-  return vkresult == VK_SUCCESS ? ((uint8_t*)result + offset) : NULL;
+  buf->mapped_offset = offset;
+  return (uint8_t*)buf->alloc.mapped_data + buf->mapped_offset;
 }
 
 void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
@@ -4129,7 +4134,8 @@ void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
 }
 
 void ngf_buffer_unmap(ngf_buffer buf) {
-  vmaUnmapMemory(CURRENT_CONTEXT->allocator, buf->alloc.vma_alloc);
+  // vk buffers are persistently mapped.
+  NGFI_IGNORE_VAR(buf);
 }
 
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
