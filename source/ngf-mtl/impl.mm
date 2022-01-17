@@ -43,7 +43,7 @@ using NGFMTL_VIEW_TYPE = UIView;
 #endif
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
-// could be bound at the same time.
+// can be bound at the same time.
 // This is required to work around a discrepancy between nicegraf's and Metal's
 // buffer binding models.
 // In Metal, bindings for vertex attribute buffers share the same space of IDs
