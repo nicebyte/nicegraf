@@ -46,7 +46,7 @@ struct state {
   ngf::image                         volume;
   ngf::sampler                       sampler;
   ngf::graphics_pipeline             pipeline;
-  ngf::uniform_multibuffer<uniforms> uniforms;
+  ngf::uniform_multibuffer<uniforms> uniforms_multibuffer;
   uint16_t                           volume_voxel_dimensions[3];
 };
 
@@ -192,7 +192,7 @@ void* sample_initialize(
   /**
    * Initialize uniforms multibuffer.
    */
-  state->uniforms.initialize(3);
+  state->uniforms_multibuffer.initialize(3);
 
   return static_cast<void*>(state);
 }
@@ -212,7 +212,7 @@ void sample_draw_frame(
       nm::rotation_x(-1.620f) * nm::rotation_y(t) *
       nm::translation(nm::float3(0.0, -0.5, 0.0)),
       (float)w / (float)h };
-  state->uniforms.write(u);
+  state->uniforms_multibuffer.write(u);
   const ngf_irect2d viewport {0, 0, w, h};
   ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
@@ -221,7 +221,7 @@ void sample_draw_frame(
       main_render_pass,
       ngf::descriptor_set<0>::binding<0>::texture(state->volume),
       ngf::descriptor_set<0>::binding<1>::sampler(state->sampler),
-      state->uniforms.bind_op_at_current_offset(1, 0, 0, sizeof(volume_rendering::uniforms)));
+      state->uniforms_multibuffer.bind_op_at_current_offset(1, 0, 0, sizeof(volume_rendering::uniforms)));
   ngf_cmd_draw(main_render_pass, false, 0, 6, state->volume_voxel_dimensions[2]);
 }
 
