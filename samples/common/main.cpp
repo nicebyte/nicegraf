@@ -237,8 +237,6 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
      */
     const int old_fb_width = fb_width, old_fb_height = fb_height;
     glfwGetFramebufferSize(window, &fb_width, &fb_height);
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
     bool resize_successful = true;
     const bool need_resize = (fb_width != old_fb_width || fb_height != old_fb_height);
     if (need_resize) {
@@ -330,7 +328,13 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
           sample_opaque_data);
 
       /**
-       * Call into the sample-specific code to execute ImGui UI commands.
+       * Begin a new ImGui frame.
+       */
+      ImGui_ImplGlfw_NewFrame();
+      ImGui::NewFrame();
+
+      /**
+       * Call into the sample-specific code to execute ImGui UI commands, and end ImGui frame.
        */
       ngf_samples::sample_draw_ui(sample_opaque_data);
       ImGui::EndFrame();
@@ -346,7 +350,9 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_render_pass(main_render_pass));
       ngf_cmd_buffer submitted_cmd_bufs[] = { main_cmd_buffer.get() };
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
-      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_end_frame(frame_token));
+      if (ngf_end_frame(frame_token) != NGF_ERROR_OK) {
+      	ngf_samples::loge("failed to present image to swapchain!");
+      }
     } else {
       ngf_samples::loge("failed to handle window resize!");
     }
