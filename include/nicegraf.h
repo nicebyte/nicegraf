@@ -2734,10 +2734,18 @@ void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer idxbuf, 
     NGF_NOEXCEPT;
 
 /**
+ * \ingroup ngf
+ *
  * Executes a draw.
+ *
+ * @param enc The render encoder to record the command into.
+ * @param indexed Indicates whether the draw uses an index buffer or not.
+ * @param first_element Offset of the first vertex.
+ * @param nelements Number of vertices to process.
+ * @param ninstance Number of instances (use `1` for regular non-instanced draws).
  */
 void ngf_cmd_draw(
-    ngf_render_encoder buf,
+    ngf_render_encoder enc,
     bool               indexed,
     uint32_t           first_element,
     uint32_t           nelements,
