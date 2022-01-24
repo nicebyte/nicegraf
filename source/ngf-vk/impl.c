@@ -3774,6 +3774,25 @@ void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) {
   vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
 }
 
+void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) {
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+  vkCmdSetStencilReference(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_FRONT_BIT, front);
+  vkCmdSetStencilReference(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_BACK_BIT, back);
+}
+
+void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) {
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+  vkCmdSetStencilCompareMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_FRONT_BIT, front);
+  vkCmdSetStencilCompareMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_BACK_BIT, back);
+}
+
+
+void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) {
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+  vkCmdSetStencilWriteMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_FRONT_BIT, front);
+  vkCmdSetStencilWriteMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_BACK_BIT, back);
+}
+
 void ngf_cmd_bind_attrib_buffer(
     ngf_render_encoder enc,
     const ngf_buffer   abuf,

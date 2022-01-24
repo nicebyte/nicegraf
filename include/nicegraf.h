@@ -2666,21 +2666,21 @@ void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d* r) NGF_NOEXCEPT
  * The scissor defines a region of the framebuffer that can be affected by the rendering commands.
  * Any pixels outside of that region are not written to.
  */
-void ngf_cmd_scissor(ngf_render_encoder buf, const ngf_irect2d* r) NGF_NOEXCEPT;
+void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
  * 
  * Sets the reference value to be used in stencil tests.
  */
-void ngf_cmd_stencil_reference(ngf_render_encoder buf, uint32_t front, uint32_t back) NGF_NOEXCEPT;
+void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
  * 
  * Set the compare mask to be used in stencil tests.
  */
-void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front, uint32_t back)
+void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
     NGF_NOEXCEPT;
 
 /**
@@ -2688,7 +2688,7 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder buf, uint32_t front, uint32
  * 
  * Sets the stencil write mask.
  */
-void ngf_cmd_stencil_write_mask(ngf_render_encoder buf, uint32_t front, uint32_t back) NGF_NOEXCEPT;
+void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
