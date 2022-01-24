@@ -81,6 +81,27 @@ typedef struct ngfvk_swapchain {
   uint32_t         height;
 } ngfvk_swapchain;
 
+// A "command bundle" consists of a command buffer, a semaphore that is
+// signaled on its completion and a reference to the command buffer's parent
+// pool.
+typedef struct {
+  VkCommandBuffer vkcmdbuf;
+  VkSemaphore     vksem;
+  VkCommandPool   vkpool;
+} ngfvk_cmd_bundle;
+
+typedef struct {
+  VmaAllocator  parent_allocator;
+  uintptr_t     obj_handle;
+  VmaAllocation vma_alloc;
+  void*         mapped_data;
+} ngfvk_alloc;
+
+typedef struct {
+  VkBufferViewCreateInfo vk_info;
+  VkBufferView           vk_handle;
+} ngfvk_buffer_view_info;
+
 typedef uint32_t ngfvk_desc_count[NGF_DESCRIPTOR_TYPE_COUNT];
 
 typedef struct {
@@ -111,15 +132,6 @@ typedef struct ngfvk_desc_superpool_t {
   uint8_t                num_lists;
 } ngfvk_desc_superpool;
 
-// A "command bundle" consists of a command buffer, a semaphore that is
-// signaled on its completion and a reference to the command buffer's parent
-// pool.
-typedef struct {
-  VkCommandBuffer vkcmdbuf;
-  VkSemaphore     vksem;
-  VkCommandPool   vkpool;
-} ngfvk_cmd_bundle;
-
 typedef struct ngfvk_bind_op_chunk {
   struct ngfvk_bind_op_chunk* next;
   ngf_resource_bind_op        data[NGFVK_BIND_OP_CHUNK_SIZE];
@@ -131,28 +143,6 @@ typedef struct ngfvk_bind_op_chunk_list {
   ngfvk_bind_op_chunk* last;
   uint32_t             size;
 } ngfvk_bind_op_chunk_list;
-
-typedef struct {
-  VmaAllocator  parent_allocator;
-  uintptr_t     obj_handle;
-  VmaAllocation vma_alloc;
-  void*         mapped_data;
-} ngfvk_alloc;
-
-typedef struct {
-  VkBufferViewCreateInfo vk_info;
-  VkBufferView           vk_handle;
-} ngfvk_buffer_view_info;
-
-typedef struct ngf_buffer_t {
-  ngfvk_alloc             alloc;
-  size_t                  size;
-  size_t                  mapped_offset;
-  uint32_t                ngf_usage_mask;
-  ngf_buffer_storage_type storage_type;
-  bool                    have_associated_buffer_views;
-  NGFI_DARRAY_OF(ngfvk_buffer_view_info) associated_buffer_views;
-} ngf_buffer_t;
 
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
@@ -246,6 +236,16 @@ typedef struct ngf_cmd_buffer_t {
 typedef struct ngf_sampler_t {
   VkSampler vksampler;
 } ngf_sampler_t;
+
+typedef struct ngf_buffer_t {
+  ngfvk_alloc             alloc;
+  size_t                  size;
+  size_t                  mapped_offset;
+  uint32_t                ngf_usage_mask;
+  ngf_buffer_storage_type storage_type;
+  bool                    have_associated_buffer_views;
+  NGFI_DARRAY_OF(ngfvk_buffer_view_info) associated_buffer_views;
+} ngf_buffer_t;
 
 typedef struct ngf_image_t {
   ngfvk_alloc    alloc;
