@@ -492,8 +492,9 @@ struct ngf_shader_stage_t {
 };
 
 struct ngf_graphics_pipeline_t {
-  id<MTLRenderPipelineState> pipeline      = nil;
-  id<MTLDepthStencilState>   depth_stencil = nil;
+  id<MTLRenderPipelineState> pipeline           = nil;
+  id<MTLDepthStencilState>   depth_stencil      = nil;
+  MTLDepthStencilDescriptor* depth_stencil_desc = nil;
 
   uint32_t front_stencil_reference = 0u;
   uint32_t back_stencil_reference  = 0u;
@@ -1258,20 +1259,20 @@ ngf_error ngf_create_graphics_pipeline(
   pipeline->culling = get_mtl_culling(info->rasterization->cull_mode);
 
   // Set up depth and stencil state.
-  auto*                         mtl_depth_stencil_desc = [MTLDepthStencilDescriptor new];
-  const ngf_depth_stencil_info& depth_stencil_info     = *info->depth_stencil;
-  mtl_depth_stencil_desc.depthCompareFunction =
+  pipeline->depth_stencil_desc                     = [MTLDepthStencilDescriptor new];
+  const ngf_depth_stencil_info& depth_stencil_info = *info->depth_stencil;
+  pipeline->depth_stencil_desc.depthCompareFunction =
       depth_stencil_info.depth_test ? get_mtl_compare_function(depth_stencil_info.depth_compare)
                                     : MTLCompareFunctionAlways;
-  mtl_depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
-  mtl_depth_stencil_desc.backFaceStencil =
+  pipeline->depth_stencil_desc.depthWriteEnabled = info->depth_stencil->depth_write;
+  pipeline->depth_stencil_desc.backFaceStencil =
       ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
-  mtl_depth_stencil_desc.frontFaceStencil =
+  pipeline->depth_stencil_desc.frontFaceStencil =
       ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
   pipeline->front_stencil_reference = depth_stencil_info.front_stencil.reference;
   pipeline->back_stencil_reference  = depth_stencil_info.back_stencil.reference;
   pipeline->depth_stencil =
-      [CURRENT_CONTEXT->device newDepthStencilStateWithDescriptor:mtl_depth_stencil_desc];
+      [CURRENT_CONTEXT->device newDepthStencilStateWithDescriptor:pipeline->depth_stencil_desc];
 
   if (err) {
     NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
@@ -1889,7 +1890,29 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
   void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) { \
   }
 
-PLACEHOLDER_CMD(stencil_reference, uint32_t uint32_t)
-PLACEHOLDER_CMD(stencil_compare_mask, uint32_t uint32_t)
-PLACEHOLDER_CMD(stencil_write_mask, uint32_t uint32_t)
-PLACEHOLDER_CMD(line_width, float)
+void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  [cmd_buf->active_rce setStencilFrontReferenceValue:front backReferenceValue:back];
+}
+
+void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
+    NGF_NOEXCEPT {
+  auto cmd_buf                                                       = (ngf_cmd_buffer)enc.__handle;
+  cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.readMask = front;
+  cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.readMask  = back;
+  [cmd_buf->active_rce
+      setDepthStencilState:[CURRENT_CONTEXT->device
+                               newDepthStencilStateWithDescriptor:cmd_buf->active_pipe->
+                                                                  depth_stencil_desc]];
+}
+
+void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
+    NGF_NOEXCEPT {
+  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.writeMask = front;
+  cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.writeMask  = back;
+  [cmd_buf->active_rce
+      setDepthStencilState:[CURRENT_CONTEXT->device
+                               newDepthStencilStateWithDescriptor:cmd_buf->active_pipe->
+                                                                  depth_stencil_desc]];
+}
