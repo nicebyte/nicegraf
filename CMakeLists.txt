@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2021 nicegraf contributors
+Copyright (c) 2022 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -26,83 +26,48 @@ project(nicegraf)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
-
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+include("${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake")
 
 # These are the compiler flags that are used on all nicegraf targets.
 if(WIN32)
-    set (NICEGRAF_COMMON_COMPILE_OPTS "/W4" "/WX")
+    set (NICEMAKE_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
-	set(NICEGRAF_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
+	set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
 endif()
 
-# This function adds a new target and sets some configuration
-# common across all targets.
-function (ngf_target)
-	cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES;PUB_DEFINES;PVT_DEFINES" ${ARGN})
-  if (TGT_TYPE STREQUAL "lib")
-    add_library(${TGT_NAME} STATIC ${TGT_SRCS})
-  elseif(TGT_TYPE STREQUAL "exe")
-    add_executable(${TGT_NAME} ${TGT_SRCS})
-  else()
-    message(FATAL_ERROR "invalid target type")
-  endif()
-  if ( TGT_DEPS )
-    target_link_libraries(${TGT_NAME} ${TGT_DEPS})
-  endif()
-  target_include_directories(${TGT_NAME}
-                             PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES}
-                             PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${TGT_PVT_INCLUDES})
-  target_compile_options(${TGT_NAME} PRIVATE ${NICEGRAF_COMMON_COMPILE_OPTS})
-  target_compile_definitions(${TGT_NAME} PUBLIC ${TCT_PUB_DEFINES} PRIVATE ${TGT_PVT_DEFINES})
-  if ( TGT_COPTS )
-    target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
-  endif()
-endfunction()
-
-# Shortcut for adding a new library target.
-function (ngf_library)
-   ngf_target(TYPE lib ${ARGN})
-endfunction()
-
-# Shortcut for adding a new executable target.
-function (ngf_binary)
-   ngf_target(TYPE exe ${ARGN})
-endfunction()
-
 # A library with various utilities shared internally across different backends.
-ngf_library(NAME nicegraf-internal
-            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
+nmk_static_library(NAME nicegraf-internal
+                   SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
 
 # nicegraf utility library.
-ngf_library(NAME nicegraf-util
-            SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf-util.h
-                 ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.c
-            DEPS nicegraf-internal)
+nmk_static_library(NAME nicegraf-util
+                   SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf-util.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.c
+                   DEPS nicegraf-internal)
 
-# Common dependencies used by nicegraf on all platforms.
-set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 
 if (APPLE)
   # Nicegraf with Metal backend.
   find_library(APPLE_METAL Metal)
   find_library(APPLE_COCOA Cocoa)
   find_library(APPLE_QUARTZ Quartz)
-  ngf_library(NAME nicegraf-mtl
-              SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                   ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
-              DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
-              COPTS "-fobjc-arc")
+  nmk_static_library(NAME nicegraf-mtl
+                     SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
+                     COPTS "-fobjc-arc")
 else()
   # Try searching for Vulkan SDK.
   find_package(VulkanHeaders)
@@ -121,11 +86,11 @@ else()
     endif()
 
     # Vulkan backend.
-    ngf_library(NAME nicegraf-vk
-                SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                     ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
-                     ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
-                DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
+    nmk_static_library(NAME nicegraf-vk
+                       SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                            ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
+                            ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
+                       DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 
     # Add Vulkan header directory to nicegraf-vk include paths.
     target_include_directories(nicegraf-vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
@@ -136,7 +101,7 @@ endif()
 
 # Build tests only if explicitly requested.
 if (NGF_BUILD_TESTS STREQUAL "yes")
-    ngf_binary(NAME ngf_tests
+    nmk_binary(NAME ngf_tests
                SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block-allocator-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
@@ -144,11 +109,8 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/native-binding-map-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
-               DEPS nicegraf-internal)
-    target_include_directories(ngf_tests PRIVATE "${CMAKE_CURRENT_LIST_DIR}/deps/catch")
-    if (NOT WIN32)
-        target_link_libraries(ngf_tests pthread)
-    endif()
+               PVT_INCLUDES  "${CMAKE_CURRENT_LIST_DIR}/deps/catch"
+               DEPS nicegraf-internal "$<IF:(NOT ${WIN32}),pthread,>")
 endif()
 
 # Build samples only if explicitly requested.
@@ -241,54 +203,51 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         set(NGF_IMGUI_COPTS "-Wno-error")
     endif()
 
-    ngf_library(NAME ngf-imgui
+    nmk_static_library(NAME ngf-imgui
                 SRCS ${NGF_IMGUI_SRCS}
                 DEPS glfw
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends
-	        PVT_DEFINES "GLFW_INCLUDE_NONE"
-		COPTS ${NGF_IMGUI_COPTS})
-    ngf_library(NAME ngf-samples-common
-                SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.cpp
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.h
-                     ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
-                     ${NGF_PLATFORM_SOURCE}
-                DEPS ngf-imgui glfw
-                PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
-                             ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
+	              PVT_DEFINES "GLFW_INCLUDE_NONE"
+	            	COPTS ${NGF_IMGUI_COPTS})
+    nmk_static_library(NAME ngf-samples-common
+                       SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.cpp
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
+                            ${NGF_PLATFORM_SOURCE}
+                       DEPS ngf-imgui glfw
+                       PUB_DEFINES  ${NGF_SAMPLES_BACKEND_DEFINE}
+                       PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
+                                    ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
-    target_compile_definitions(ngf-samples-common PUBLIC ${NGF_SAMPLES_BACKEND_DEFINE})
 
     function (ngf_sample)
         cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
         file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
-        ngf_binary(NAME ${SAMPLE_NAME}
+        nmk_binary(NAME ${SAMPLE_NAME}
                    SRCS ${SAMPLE_SRCS}
-                   DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf-util  
+                   DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf-util
                    PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}
-		   PVT_DEFINES "GLFW_INCLUDE_NONE")
-        add_dependencies(${SAMPLE_NAME} sample-shaders)
+		               PVT_DEFINES "GLFW_INCLUDE_NONE"
+                   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
+        add_dependencies(${SAMPLE_NAME} sample-shaders)                   
         set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
-        set_target_properties(${SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${NGF_SAMPLES_OUTPUT_DIR}")
-        set_target_properties(${SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_DEBUG "${NGF_SAMPLES_OUTPUT_DIR}")
-        set_target_properties(${SAMPLE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY_RELEASE "${NGF_SAMPLES_OUTPUT_DIR}")
-        set_target_properties(${SAMPLE_NAME} PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${NGF_SAMPLES_OUTPUT_DIR}")
     endfunction()
     file(MAKE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/samples/binaries/shaders)
     ngf_sample(NAME 01-fullscreen-triangle)
