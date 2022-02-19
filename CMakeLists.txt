@@ -110,7 +110,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
                PVT_INCLUDES  "${CMAKE_CURRENT_LIST_DIR}/deps/catch"
-               DEPS nicegraf-internal "$<IF:(NOT ${WIN32}),pthread,>")
+               DEPS nicegraf-internal "$<IF:$<BOOL:(NOT ${WIN32})>,pthread,>")
 endif()
 
 # Build samples only if explicitly requested.
