@@ -1,5 +1,7 @@
 //T: blinn-phong vs:VSMain ps:PSMain
 
+[[vk::constant_id(0)]] const uint enableHalfLambert = 0;
+
 struct PixelShaderInput {
   float4 clipSpacePosition : SV_Position;
   float4 viewSpaceInterpNormal : ATTR0;
@@ -38,9 +40,19 @@ PixelShaderInput VSMain(VertexShaderInput vertexAttrs) {
   return result;
 }
 
+float computeCosineFactor(float3 direction, float3 normal) {
+  float cosineFactor = dot(direction, normal);
+  if (enableHalfLambert == 0) {
+    return max(0.0, cosineFactor);
+  } else {
+    cosineFactor = 0.5 * cosineFactor + 0.5;
+    cosineFactor *= cosineFactor;
+    return cosineFactor;
+  }
+}
+
 float3 computeIrradiance(float3 intensity, float3 direction, float3 normal, float distSquared) {
-  float cosineFactor = max(0.0, dot(direction, normal));
-  return intensity * cosineFactor / distSquared; 
+  return intensity * computeCosineFactor(direction, normal) / distSquared; 
 }
 
 float3 computeSpecular(float3 position, float3 lightDirection, float3 normal, float shininess) {

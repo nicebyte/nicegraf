@@ -1390,8 +1390,7 @@ typedef struct ngf_constant_specialization {
  * during execution.
  */
 typedef struct ngf_specialization_info {
-  ngf_constant_specialization* specializations; /**< List of specialization
-                                                     entries. */
+  const ngf_constant_specialization* specializations; /**< List of specialization entries. */
   uint32_t nspecializations;                    /**< Number of specialization entries. */
   void*    value_buffer; /**< Pointer to a buffer containing the values for the
                               specialization constants. */

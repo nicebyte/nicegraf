@@ -59,7 +59,8 @@ struct uniforms {
 };
 
 struct state {
-  ngf::graphics_pipeline             pipeline;
+  ngf::graphics_pipeline             vanilla_pipeline;
+  ngf::graphics_pipeline             half_lambert_pipeline;
   mesh                               bunny_mesh;
   light_data                         lights;
   material_data                      material;
@@ -67,6 +68,7 @@ struct state {
   camera_state                       camera;
   float                              dolly = 3.0f;
   float                              vfov  = 60.0f;
+  bool                               enable_half_lambert = true;
 };
 
 }  // namespace blinn_phong
@@ -158,9 +160,23 @@ void* sample_initialize(
   pipeline_data.vertex_input_info.vert_buf_bindings = vertex_buf_binding_descriptions;
 
   /**
-   * Initialize the pipeline object.
+   * Initialize the "vanilla" pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->vanilla_pipeline.initialize(pipeline_data.pipeline_info));
+
+  /**
+   * Set the appropriate specialization constant and initialize the half-lambert pipeline object.
+   */
+   const ngf_constant_specialization half_lambert_spec = {
+    .constant_id = 0,
+    .offset = 0,
+    .type = NGF_TYPE_INT32
+   };
+   int half_lambert_spec_value = 1;
+   pipeline_data.spec_info.nspecializations = 1;
+   pipeline_data.spec_info.specializations =  &half_lambert_spec;
+   pipeline_data.spec_info.value_buffer = &half_lambert_spec_value;
+   NGF_SAMPLES_CHECK_NGF_ERROR(state->half_lambert_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Load the model from a file.
@@ -194,7 +210,7 @@ void sample_draw_frame(
   auto state = reinterpret_cast<blinn_phong::state*>(userdata);
 
   ngf_irect2d viewport {0, 0, w, h};
-  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->pipeline);
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->enable_half_lambert ? state->half_lambert_pipeline : state->vanilla_pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf_cmd_bind_attrib_buffer(main_render_pass, state->bunny_mesh.vertex_data.get(), 0, 0);
@@ -223,7 +239,11 @@ void sample_draw_frame(
 void sample_draw_ui(void* userdata) {
   auto data = reinterpret_cast<blinn_phong::state*>(userdata);
   ImGui::Begin("Controls");
+  ImGui::Separator();
+  ImGui::Checkbox("enable half-lambert trick", &data->enable_half_lambert);
+  ImGui::Separator();
   camera_ui(data->camera, std::make_pair(-5.f, 5.f), .1f, std::make_pair(1.0f, 10.0f), .1f);
+  ImGui::Separator();
   ImGui::Text("point light");
   ImGui::DragFloat3("position", data->lights.obj_space_point_light_position.data, 0.1f, -2.0f, 2.0f, "%.1f", 0);
   ImGui::ColorEdit3("intensity##0", data->lights.point_light_intensity.data);
@@ -232,6 +252,7 @@ void sample_draw_ui(void* userdata) {
   ImGui::ColorEdit3("intensity##1", data->lights.directional_light_intensity.data);
   ImGui::Text("ambient light");
   ImGui::ColorEdit3("intensity##2", data->lights.ambient_light_intensity.data);
+  ImGui::Separator();
   ImGui::Text("material");
   ImGui::ColorEdit3("diffuse reflectance", data->material.diffuse_reflectance.data);
   ImGui::ColorEdit3("specular coefficient", data->material.specular_coefficient.data);
