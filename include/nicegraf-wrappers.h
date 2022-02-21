@@ -145,7 +145,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   T handle_;
 };
 
-#define NGF_DEFINE_WRAPPER_TYPE(name)                              \
+#define NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(name)                  \
   struct ngf_##name##_ManagementFuncs {                            \
     using InitType = ngf_##name##_info;                            \
     static ngf_error create(const InitType* info, ngf_##name* r) { \
@@ -154,24 +154,107 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
     static void destroy(ngf_##name handle) {                       \
       ngf_destroy_##name(handle);                                  \
     }                                                              \
-  };                                                               \
+  };     
+
+#define NGF_DEFINE_WRAPPER_TYPE(name) \
   using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(shader_stage);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(graphics_pipeline);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(image);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(sampler);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(buffer);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(context);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(cmd_buffer);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_shader_stage.
+ */
 NGF_DEFINE_WRAPPER_TYPE(shader_stage);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_graphics_pipeline.
+ */
 NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_image.
+ */
 NGF_DEFINE_WRAPPER_TYPE(image);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_sampler.
+ */
 NGF_DEFINE_WRAPPER_TYPE(sampler);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_render_target.
+ */
 NGF_DEFINE_WRAPPER_TYPE(render_target);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_buffer.
+ */
 NGF_DEFINE_WRAPPER_TYPE(buffer);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_context.
+ */
 NGF_DEFINE_WRAPPER_TYPE(context);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_cmd_buffer.
+ */
 NGF_DEFINE_WRAPPER_TYPE(cmd_buffer);
 
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * Wraps a render encoder with unique ownership semantics.
+ */
 class render_encoder {
   public:
+  /**
+   * Creates a new render encoder for the given command buffer. Has the same semantics as \ref
+   * ngf_cmd_begin_render_pass.
+   * 
+   * @param cmd_buf The command buffer to create a new render encoder for.
+   * @param pass_info Render pass description.
+   */
   explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info) {
     ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_);
   }
 
+  /**
+   * Creates a new render encoder for the given command buffer. Has the same semantics as \ref
+   * ngf_cmd_begin_render_pass_simple.
+   * 
+   * @param cmd_buf The command buffer to create a new render encoder for.
+   * @param rt The render target to render into.
+   * @param clear_color_r A floating point number between 0.0 and 1.0 specifying the red component of the clear color.
+   * @param clear_color_g A floating point number between 0.0 and 1.0 specifying the green component of the clear color.
+   * @param clear_color_b A floating point number between 0.0 and 1.0 specifying the blue component of the clear color.
+   * @param clear_color_a A floating point number between 0.0 and 1.0 specifying the alpha component of the clear color.
+   * @param clear_depth A floating point value to clear the depth attachment to (if the associated render target has one).
+   * @param clear_stencil An integer value to clear the stencil buffer to (if the assocuated render taget has one).
+   */
   explicit render_encoder(
       ngf_cmd_buffer    cmd_buf,
       ngf_render_target rt,
@@ -193,6 +276,9 @@ class render_encoder {
         &enc_);
   }
 
+  /**
+   * Finishes the wrapped render pass.
+   */
   ~render_encoder() {
     if (enc_.__handle) ngf_cmd_end_render_pass(enc_);
   }
@@ -210,6 +296,9 @@ class render_encoder {
   render_encoder(const render_encoder&) = delete;
   render_encoder& operator=(const render_encoder&) = delete;
 
+  /**
+   * Implicit conversion to \ref ngf_render_encoder.
+   */
   operator ngf_render_encoder() {
     return enc_;
   }
@@ -218,12 +307,25 @@ class render_encoder {
   ngf_render_encoder enc_ {};
 };
 
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * Wraps a transfer encoder with unique ownership semantics.
+ */
 class xfer_encoder {
   public:
+  /**
+   * Creates a new transfer encoder for the given command buffer.
+   * 
+   * @param cmd_buf The command buffer to create the transfer encoder for
+   */
   explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
     ngf_cmd_begin_xfer_pass(cmd_buf, &enc_);
   }
 
+  /**
+   * Ends the wrapped transfer pass.
+   */
   ~xfer_encoder() {
     if (enc_.__handle) ngf_cmd_end_xfer_pass(enc_);
   }
@@ -241,6 +343,9 @@ class xfer_encoder {
   xfer_encoder(const xfer_encoder&) = delete;
   xfer_encoder& operator=(const xfer_encoder&) = delete;
 
+  /**
+   * Implicit conversion to \ref ngf_xfer_encoder.
+   */
   operator ngf_xfer_encoder() {
     return enc_;
   }
@@ -249,8 +354,21 @@ class xfer_encoder {
   ngf_xfer_encoder enc_;
 };
 
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * Convenience wrapper for binding resources. See \ref cmd_bind_resources for details.
+ */
 template<uint32_t S> struct descriptor_set {
+  /**
+   * Convenience wrapper for binding resources. See \ref cmd_bind_resources for details.
+   */
   template<uint32_t B> struct binding {
+    /** 
+     * Creates a \ref ngf_resource_bind_op for a \ref ngf_image.
+     * 
+     * @param image The image to bind.
+     */
     static ngf_resource_bind_op texture(const ngf_image image) {
       ngf_resource_bind_op op;
       op.type                     = NGF_DESCRIPTOR_IMAGE;
@@ -260,6 +378,13 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /** 
+     * Creates a \ref ngf_resource_bind_op for an uniform buffer.
+     * 
+     * @param buf The buffer to bind as a uniform buffer.
+     * @param offset The offset at which to bind the buffer.
+     * @param range The extent of the bound memory.
+     */
     static ngf_resource_bind_op uniform_buffer(const ngf_buffer buf, size_t offset, size_t range) {
       ngf_resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
@@ -271,6 +396,14 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /** 
+     * Creates a \ref ngf_resource_bind_op for a texel buffer.
+     * 
+     * @param buf The buffer to bind as a texel buffer.
+     * @param offset The offset at which to bind the buffer.
+     * @param range The extent of the bound memory.
+     * @param fmt The texel format expected by the shader.
+     */
     static ngf_resource_bind_op
     texel_buffer(const ngf_buffer buf, size_t offset, size_t range, ngf_image_format fmt) {
       ngf_resource_bind_op op;
@@ -284,6 +417,11 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /** 
+     * Creates a \ref ngf_resource_bind_op for a sampler.
+     * 
+     * @param sampler The sampler to use.
+     */
     static ngf_resource_bind_op sampler(const ngf_sampler sampler) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_SAMPLER;
@@ -293,6 +431,12 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /**
+     * Creates a \ref ngf_resource_bind_op for a combined image + sampler.
+     * 
+     * @param image The image part of the combined image + sampler.
+     * @param sampler The sampler part of the combined image + sampler.
+     */
     static ngf_resource_bind_op
     texture_and_sampler(const ngf_image image, const ngf_sampler sampler) {
       ngf_resource_bind_op op;
@@ -306,33 +450,26 @@ template<uint32_t S> struct descriptor_set {
   };
 };
 
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A convenience function for binding many resource at once to the shader. Example usage:
+ * 
+ * ```
+ * ngf::cmd_bind_resources(your_render_encoder,
+ *                         ngf::descriptor_set<0>::binding<0>::image(your_image),
+ *                         ngf::descriptor_set<0>::binding<1>::sampler(your_sampler),
+ *                         ngf::descriptor_set<1>::binding<0>::uniform_buffer(your_buffer));
+ * ```
+ */
 template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {args...};
+  const ngf_resource_bind_op ops[] = {std::forward<Args>(args)...};
   ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
 
-inline ngf_image_ref image_ref(const ngf_image img) {
-  return {img, 0, 0, NGF_CUBEMAP_FACE_POSITIVE_X};
-}
-
-inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip) {
-  return {img, mip, 0, NGF_CUBEMAP_FACE_POSITIVE_X};
-}
-
-inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip, uint32_t layer) {
-  return {img, mip, layer, NGF_CUBEMAP_FACE_POSITIVE_X};
-}
-
-inline ngf_image_ref image_ref(const ngf_image img, uint32_t mip, ngf_cubemap_face face) {
-  return {img, mip, 0, face};
-}
-
-inline ngf_image_ref
-image_ref(const ngf_image img, uint32_t mip, uint32_t layer, ngf_cubemap_face face) {
-  return {img, mip, layer, face};
-}
-
 /**
+ * \ingroup ngf_wrappers
+ * 
  * A convenience class for dynamically updated structured uniform data.
  */
 template<typename T> class uniform_multibuffer {
