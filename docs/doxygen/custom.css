@@ -8,3 +8,4 @@ h3.groupheader{ border-bottom: none; }
 div.header { background-image: none; background: inherit; border-bottom: none; }
 #titlearea { padding-bottom: 18pt }
 div.header { margin-top: 8pt }
+div.fragment { padding: 8pt }
