@@ -278,9 +278,9 @@ void* sample_initialize(
   NGF_SAMPLES_CHECK_NGF_ERROR(instance_data_staging_buffer.initialize(instance_data_staging_buffer_info));
   NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data.initialize(instance_data_buffer_info));
   const ngf_texel_buffer_view_info instance_data_view_info = {
+    .buffer = state->per_instance_data.get(),
     .offset = 0u,
     .size = instance_data_buffer_info.size,
-    .buffer = state->per_instance_data.get(),
     .texel_format = NGF_IMAGE_FORMAT_RGBA32F
   };
   NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data_view.initialize(instance_data_view_info));
