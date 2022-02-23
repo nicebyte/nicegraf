@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2022 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -513,6 +513,10 @@ struct ngf_graphics_pipeline_t {
 struct ngf_buffer_t {
   id<MTLBuffer> mtl_buffer    = nil;
   size_t        mapped_offset = 0;
+};
+
+struct ngf_texel_buffer_view_t {
+  id<MTLTexture> mtl_buffer_view = nil;
 };
 
 struct ngf_sampler_t {
@@ -1319,6 +1323,30 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer, size_t offset, [[maybe_unused]] s
   return (uint8_t*)buffer.contents + offset;
 }
 
+ngf_error
+ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_buffer_view* result) {
+  NGFMTL_NURSERY(texel_buffer_view, view);
+  auto texel_buf_descriptor = [MTLTextureDescriptor new];
+  
+  texel_buf_descriptor.depth                       = 1;
+  texel_buf_descriptor.mipmapLevelCount            = 1;
+  texel_buf_descriptor.pixelFormat = get_mtl_pixel_format(info->texel_format).format;
+  texel_buf_descriptor.textureType = MTLTextureTypeTextureBuffer;
+  texel_buf_descriptor.arrayLength = 1;
+  texel_buf_descriptor.sampleCount = 1;
+  texel_buf_descriptor.usage       = MTLTextureUsageShaderRead;
+  texel_buf_descriptor.storageMode = info->buffer->mtl_buffer.storageMode;
+  texel_buf_descriptor.width  = info->size / ngfmtl_get_bytesperpel(info->texel_format);
+  texel_buf_descriptor.height = 1;
+  view->mtl_buffer_view = [info->buffer->mtl_buffer newTextureWithDescriptor:texel_buf_descriptor
+                                                                      offset:info->offset
+                                                                 bytesPerRow:info->size];
+  *result = view.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {}
+
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(buffer, buf);
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
@@ -1755,25 +1783,8 @@ void ngf_cmd_bind_resources(
     }
     switch (bind_op.type) {
     case NGF_DESCRIPTOR_TEXEL_BUFFER: {
-      const ngf_buffer_bind_info& buf_bind_op          = bind_op.info.buffer;
-      const ngf_buffer            buf                  = buf_bind_op.buffer;
-      const size_t                offset               = buf_bind_op.offset;
-      auto                        texel_buf_descriptor = [MTLTextureDescriptor new];
-      texel_buf_descriptor.depth                       = 1;
-      texel_buf_descriptor.mipmapLevelCount            = 1;
-      texel_buf_descriptor.pixelFormat = get_mtl_pixel_format(buf_bind_op.format).format;
-      texel_buf_descriptor.textureType = MTLTextureTypeTextureBuffer;
-      texel_buf_descriptor.arrayLength = 1;
-      texel_buf_descriptor.sampleCount = 1;
-      texel_buf_descriptor.usage       = MTLTextureUsageShaderRead;
-      texel_buf_descriptor.storageMode = buf->mtl_buffer.storageMode;
-      texel_buf_descriptor.width  = buf_bind_op.range / ngfmtl_get_bytesperpel(buf_bind_op.format);
-      texel_buf_descriptor.height = 1;
-      auto t                      = [buf->mtl_buffer newTextureWithDescriptor:texel_buf_descriptor
-                                                  offset:offset
-                                             bytesPerRow:buf_bind_op.range];
-      [cmd_buf->active_rce setVertexTexture:t atIndex:native_binding];
-      [cmd_buf->active_rce setFragmentTexture:t atIndex:native_binding];
+      [cmd_buf->active_rce setVertexTexture:bind_op.info.texel_buffer_view->mtl_buffer_view atIndex:native_binding];
+      [cmd_buf->active_rce setFragmentTexture:bind_op.info.texel_buffer_view->mtl_buffer_view atIndex:native_binding];
       break;
     }
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
