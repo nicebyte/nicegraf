@@ -243,9 +243,11 @@ typedef struct ngf_buffer_t {
   size_t                  mapped_offset;
   uint32_t                ngf_usage_mask;
   ngf_buffer_storage_type storage_type;
-  bool                    have_associated_buffer_views;
-  NGFI_DARRAY_OF(ngfvk_buffer_view_info) associated_buffer_views;
 } ngf_buffer_t;
+
+typedef struct ngf_texel_buffer_view_t {
+  VkBufferView vk_buf_view;
+} ngf_texel_buffer_view_t;
 
 typedef struct ngf_image_t {
   ngfvk_alloc    alloc;
@@ -1662,43 +1664,7 @@ void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         break;
       }
       case NGF_DESCRIPTOR_TEXEL_BUFFER: {
-        const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
-        const VkFormat              vk_format = get_vk_image_format(bind_info->format);
-        ngf_buffer                  buffer    = bind_info->buffer;
-        if (!buffer->have_associated_buffer_views) {
-          NGFI_DARRAY_RESET(buffer->associated_buffer_views, 1);
-          buffer->have_associated_buffer_views = true;
-        }
-        VkBufferView* view_ptr = NULL;
-        NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
-          const VkBufferViewCreateInfo* vk_info =
-              &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_info;
-          if (vk_info->offset == bind_info->offset && vk_info->range == bind_info->range &&
-              vk_info->format == vk_format) {
-            view_ptr = &NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle;
-            break;
-          }
-        }
-        if (view_ptr == NULL) {
-          ngfvk_buffer_view_info new_buffer_view_info = {
-              .vk_handle = VK_NULL_HANDLE,
-              .vk_info   = {
-                  .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
-                  .flags  = 0u,
-                  .pNext  = NULL,
-                  .format = vk_format,
-                  .offset = bind_info->offset,
-                  .range  = bind_info->range,
-                  .buffer = (VkBuffer)buffer->alloc.obj_handle}};
-          vkCreateBufferView(
-              _vk.device,
-              &new_buffer_view_info.vk_info,
-              NULL,
-              &new_buffer_view_info.vk_handle);
-          NGFI_DARRAY_APPEND(buffer->associated_buffer_views, new_buffer_view_info);
-          view_ptr = &NGFI_DARRAY_BACKPTR(buffer->associated_buffer_views)->vk_handle;
-        }
-        vk_write->pTexelBufferView = view_ptr;
+        vk_write->pTexelBufferView = &(bind_op->info.texel_buffer_view->vk_buf_view);
         break;
       }
       case NGF_DESCRIPTOR_IMAGE:
@@ -2361,7 +2327,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       .vkDestroyBuffer                     = vkDestroyBuffer,
       .vkCreateImage                       = vkCreateImage,
       .vkDestroyImage                      = vkDestroyImage,
-      .vkCmdCopyBuffer                     = vkCmdCopyBuffer,};
+      .vkCmdCopyBuffer                     = vkCmdCopyBuffer,
+  };
   VmaAllocatorCreateInfo vma_info = {
       .flags                       = 0u,
       .physicalDevice              = _vk.phys_dev,
@@ -3786,7 +3753,6 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32
   vkCmdSetStencilCompareMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_BACK_BIT, back);
 }
 
-
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   vkCmdSetStencilWriteMask(buf->active_bundle.vkcmdbuf, VK_STENCIL_FACE_FRONT_BIT, front);
@@ -4055,6 +4021,41 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   return NGF_ERROR_OK;
 }
 
+ngf_error ngf_create_texel_buffer_view(
+    const ngf_texel_buffer_view_info* info,
+    ngf_texel_buffer_view*            result) {
+  assert(info);
+  assert(result);
+
+  ngf_texel_buffer_view buf_view = NGFI_ALLOC(ngf_texel_buffer_view_t);
+  *result                        = buf_view;
+  if (buf_view == NULL) return NGF_ERROR_OUT_OF_MEM;
+
+  const VkBufferViewCreateInfo vk_buf_view_ci = {
+      .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+      .pNext  = NULL,
+      .flags  = 0u,
+      .offset = info->offset,
+      .range  = info->size,
+      .format = get_vk_image_format(info->texel_format),
+      .buffer = (VkBuffer)info->buffer->alloc.obj_handle};
+  const VkResult vk_result =
+      vkCreateBufferView(_vk.device, &vk_buf_view_ci, NULL, &buf_view->vk_buf_view);
+  if (vk_result != VK_SUCCESS) {
+    NGFI_FREE(buf_view);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
+  if (buf_view) {
+    const uint32_t fi = CURRENT_CONTEXT->frame_id;
+    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffer_views, buf_view->vk_buf_view);
+    NGFI_FREE(buf_view);
+  }
+}
+
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   assert(info);
   assert(result);
@@ -4073,9 +4074,8 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   const uint32_t vma_usage_flags             = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
-  ngf_error    err   = NGF_ERROR_OK;
-  ngfvk_alloc* alloc = &buf->alloc;
-
+  ngf_error      err                         = NGF_ERROR_OK;
+  ngfvk_alloc*   alloc                       = &buf->alloc;
 
   const VkBufferCreateInfo buf_vk_info = {
       .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -4098,7 +4098,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
 
   VmaAllocationInfo alloc_info;
   alloc_info.pMappedData = NULL;
-  VkResult vkresult = vmaCreateBuffer(
+  VkResult vkresult      = vmaCreateBuffer(
       CURRENT_CONTEXT->allocator,
       &buf_vk_info,
       &buf_alloc_info,
@@ -4106,18 +4106,17 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
       &alloc->vma_alloc,
       &alloc_info);
   alloc->parent_allocator = CURRENT_CONTEXT->allocator;
-  alloc->mapped_data = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
-  err = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
-  
+  alloc->mapped_data      = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
+  err                     = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
   } else {
     buf->size = info->size;
   }
 
-  buf->storage_type                 = info->storage_type;
-  buf->ngf_usage_mask               = info->buffer_usage;
-  buf->have_associated_buffer_views = false;
+  buf->storage_type   = info->storage_type;
+  buf->ngf_usage_mask = info->buffer_usage;
 
   return err;
 }
@@ -4126,13 +4125,6 @@ void ngf_destroy_buffer(ngf_buffer buffer) {
   if (buffer) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buffers, buffer->alloc);
-    if (buffer->have_associated_buffer_views) {
-      NGFI_DARRAY_FOREACH(buffer->associated_buffer_views, i) {
-        NGFI_DARRAY_APPEND(
-            CURRENT_CONTEXT->frame_res[fi].retire_buffer_views,
-            NGFI_DARRAY_AT(buffer->associated_buffer_views, i).vk_handle);
-      }
-    }
     NGFI_FREE(buffer);
   }
 }

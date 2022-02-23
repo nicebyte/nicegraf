@@ -49,6 +49,7 @@ struct state {
   ngf::sampler                       trilinear_sampler;
   ngf::uniform_multibuffer<uniforms> uniforms_multibuf;
   ngf::buffer                        per_instance_data;
+  ngf::texel_buffer_view             per_instance_data_view;
   ngf::buffer                        vertex_attrib_buffer;
   ngf::buffer                        index_buffer;
   float                              dolly = -130.0f;
@@ -276,6 +277,13 @@ void* sample_initialize(
   ngf::buffer instance_data_staging_buffer;
   NGF_SAMPLES_CHECK_NGF_ERROR(instance_data_staging_buffer.initialize(instance_data_staging_buffer_info));
   NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data.initialize(instance_data_buffer_info));
+  const ngf_texel_buffer_view_info instance_data_view_info = {
+    .offset = 0u,
+    .size = instance_data_buffer_info.size,
+    .buffer = state->per_instance_data.get(),
+    .texel_format = NGF_IMAGE_FORMAT_RGBA32F
+  };
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data_view.initialize(instance_data_view_info));
   auto mapped_per_instance_staging_buffer = (float*)ngf_buffer_map_range(
       instance_data_staging_buffer.get(),
       0,
@@ -418,11 +426,7 @@ void sample_draw_frame(
   ngf::cmd_bind_resources(
       main_render_pass,
       state->uniforms_multibuf.bind_op_at_current_offset(0, 0),
-      ngf::descriptor_set<0>::binding<1>::texel_buffer(
-          state->per_instance_data,
-          0,
-          vertex_attribs::INSTANCE_DATA_SIZE,
-          NGF_IMAGE_FORMAT_RGBA32F),
+      ngf::descriptor_set<0>::binding<1>::texel_buffer(state->per_instance_data_view.get()),
       ngf::descriptor_set<0>::binding<2>::texture(state->object_texture.get()),
       ngf::descriptor_set<0>::binding<3>::sampler(state->trilinear_sampler.get()));
   ngf_cmd_draw(

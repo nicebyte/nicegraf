@@ -1952,6 +1952,27 @@ typedef struct ngf_buffer_info {
 typedef struct ngf_buffer_t* ngf_buffer;
 
 /**
+ * @struct ngf_texel_buffer_view
+ * \ingroup ngf
+ * 
+ * GPU programs have to access texel buffers through special "texel buffer view" objects which
+ * specify the exact format of the data stored in the buffer.
+ */
+typedef struct ngf_texel_buffer_view_t* ngf_texel_buffer_view;
+
+/**
+ * @struct ngf_texel_buffer_view_info
+ * 
+ * Information required to create a texel buffer view object.
+ */
+typedef struct ngf_texel_buffer_view_info {
+  size_t           offset;
+  size_t           size;
+  ngf_buffer       buffer;
+  ngf_image_format texel_format;
+} ngf_texel_buffer_view_info;
+
+/**
  * @struct ngf_buffer_bind_info
  * \ingroup ngf
  * Specifies a buffer resource bind operation.
@@ -1995,6 +2016,7 @@ typedef struct ngf_resource_bind_op {
   ngf_descriptor_type type;           /**< The type of the resource being bound. */
   union {
     ngf_buffer_bind_info        buffer;
+    ngf_texel_buffer_view       texel_buffer_view;
     ngf_image_sampler_bind_info image_sampler;
   } info; /**< The details about the resource being bound, depending on type. */
 } ngf_resource_bind_op;
@@ -2493,6 +2515,25 @@ void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEX
  * @param buf The buffer that needs to be unmapped.
  */
 void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * Creates a new texel buffer view object.
+ * 
+ * @param info Information required to construct the texel buffer view object.
+ * @param result Pointer to where the handle to the newly created object will be written to.
+ */
+ngf_error
+ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_buffer_view* result);
+
+/**
+ * \ingroup ngf
+ * 
+ * Destroys the given texel buffer view object.
+ * 
+ * @param buffer The handle to the texel buffer view object to be destroyed.
+ */
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view);
 
 /**
  * \ingroup ngf

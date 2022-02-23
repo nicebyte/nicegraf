@@ -165,6 +165,7 @@ NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(image);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(sampler);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(buffer);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(texel_buffer_view);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(context);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(cmd_buffer);
 
@@ -209,6 +210,14 @@ NGF_DEFINE_WRAPPER_TYPE(render_target);
  * A RAII wrapper for \ref ngf_buffer.
  */
 NGF_DEFINE_WRAPPER_TYPE(buffer);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_texel_buffer_view.
+ */
+NGF_DEFINE_WRAPPER_TYPE(texel_buffer_view);
+
 
 /**
  * \ingroup ngf_wrappers
@@ -404,16 +413,12 @@ template<uint32_t S> struct descriptor_set {
      * @param range The extent of the bound memory.
      * @param fmt The texel format expected by the shader.
      */
-    static ngf_resource_bind_op
-    texel_buffer(const ngf_buffer buf, size_t offset, size_t range, ngf_image_format fmt) {
+    static ngf_resource_bind_op texel_buffer(const ngf_texel_buffer_view buf_view) {
       ngf_resource_bind_op op;
-      op.type               = NGF_DESCRIPTOR_TEXEL_BUFFER;
-      op.target_binding     = B;
-      op.target_set         = S;
-      op.info.buffer.buffer = buf;
-      op.info.buffer.offset = offset;
-      op.info.buffer.range  = range;
-      op.info.buffer.format = fmt;
+      op.type                   = NGF_DESCRIPTOR_TEXEL_BUFFER;
+      op.target_binding         = B;
+      op.target_set             = S;
+      op.info.texel_buffer_view = buf_view;
       return op;
     }
 
@@ -463,7 +468,7 @@ template<uint32_t S> struct descriptor_set {
  * ```
  */
 template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {std::forward<Args>(args)...};
+  const ngf_resource_bind_op ops[] = {std::forward<const Args>(args)...};
   ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
 
