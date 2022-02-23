@@ -1957,6 +1957,7 @@ typedef struct ngf_buffer_t* ngf_buffer;
  * 
  * GPU programs have to access texel buffers through special "texel buffer view" objects which
  * specify the exact format of the data stored in the buffer.
+ * See also: \ref ngf_texel_buffer_view_info, \ref ngf_create_texel_buffer_view.
  */
 typedef struct ngf_texel_buffer_view_t* ngf_texel_buffer_view;
 
@@ -1966,10 +1967,10 @@ typedef struct ngf_texel_buffer_view_t* ngf_texel_buffer_view;
  * Information required to create a texel buffer view object.
  */
 typedef struct ngf_texel_buffer_view_info {
-  size_t           offset;
-  size_t           size;
-  ngf_buffer       buffer;
-  ngf_image_format texel_format;
+  ngf_buffer       buffer;        /**< The buffer that the view covers. */
+  size_t           offset;        /**< Offset withing the buffer (in bytes) that the view covers. */
+  size_t           size;          /**< The size of the range (in byutes) that the view covers. */
+  ngf_image_format texel_format;  /**< The texel format to intepret the buffer contents as. */
 } ngf_texel_buffer_view_info;
 
 /**
