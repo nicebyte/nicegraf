@@ -175,7 +175,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${header_file_name}_binding_consts.h")
         add_custom_command(OUTPUT ${output_files_list}
                            MAIN_DEPENDENCY ${source_path}
-                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicegraf-shaderc/${NICEGRAF_SHADERC_PLATFORM}/nicegraf_shaderc ARGS ${source_path} "-t" "msl21" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
+                           COMMAND ${CMAKE_CURRENT_LIST_DIR}/samples/deps/niceshade/${NICEGRAF_SHADERC_PLATFORM}/niceshade ARGS ${source_path} "-t" "msl21" "-t" "spv" "-O" "${NGF_SAMPLES_OUTPUT_DIR}/shaders" "-h" "${header_file_name}_binding_consts.h"
                            WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/samples/shaders)
         set(generated_shaders_list "${output_files_list};${generated_shaders_list}")
       endif()
