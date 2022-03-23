@@ -205,8 +205,6 @@ void sample_draw_frame(
     uint32_t h,
     float /*time*/,
     void* userdata) {
-  static float t = .0f;
-  t += time_delta;
   auto state = reinterpret_cast<blinn_phong::state*>(userdata);
 
   ngf_irect2d viewport {0, 0, w, h};
