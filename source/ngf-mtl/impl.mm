@@ -1119,12 +1119,18 @@ id<MTLFunction> ngfmtl_get_shader_main(
     id<MTLLibrary>             func_lib,
     const char*                entry_point_name,
     MTLFunctionConstantValues* spec_consts) {
-  NSError*  err                 = nil;
-  NSString* ns_entry_point_name = [NSString stringWithUTF8String:entry_point_name];
-  return spec_consts == nil ? [func_lib newFunctionWithName:ns_entry_point_name]
-                            : [func_lib newFunctionWithName:ns_entry_point_name
-                                             constantValues:spec_consts
-                                                      error:&err];
+  NSError*        err                 = nil;
+  NSString*       ns_entry_point_name = [NSString stringWithUTF8String:entry_point_name];
+  id<MTLFunction> result = spec_consts == nil ? [func_lib newFunctionWithName:ns_entry_point_name]
+                                              : [func_lib newFunctionWithName:ns_entry_point_name
+                                                               constantValues:spec_consts
+                                                                        error:&err];
+  if (err) {
+    NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
+    return nil;
+  } else {
+    return result;
+  }
 }
 
 MTLStencilDescriptor* ngfmtl_create_stencil_descriptor(const ngf_stencil_info& info) {
@@ -1253,9 +1259,9 @@ ngf_error ngf_create_graphics_pipeline(
   pipeline->binding_map = native_binding_map;
   memcpy(pipeline->blend_color, info->blend->blend_consts, sizeof(pipeline->blend_color));
 
-  NSError* err       = nil;
-  pipeline->pipeline = [CURRENT_CONTEXT->device newRenderPipelineStateWithDescriptor:mtl_pipe_desc
-                                                                               error:&err];
+  NSError* err = nil;
+  pipeline->pipeline =
+      [CURRENT_CONTEXT->device newRenderPipelineStateWithDescriptor:mtl_pipe_desc error:&err];
   pipeline->primitive_type = get_mtl_primitive_type(info->primitive_topology);
 
   // Set winding order and culling mode.
@@ -1314,8 +1320,8 @@ id<MTLBuffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   default:
     assert(false);
   }
-  id<MTLBuffer> mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info.size
-                                                                  options:options];
+  id<MTLBuffer> mtl_buffer =
+      [CURRENT_CONTEXT->device newBufferWithLength:info.size options:options];
   return mtl_buffer;
 }
 
@@ -1323,29 +1329,31 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer, size_t offset, [[maybe_unused]] s
   return (uint8_t*)buffer.contents + offset;
 }
 
-ngf_error
-ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_buffer_view* result) {
+ngf_error ngf_create_texel_buffer_view(
+    const ngf_texel_buffer_view_info* info,
+    ngf_texel_buffer_view*            result) {
   NGFMTL_NURSERY(texel_buffer_view, view);
   auto texel_buf_descriptor = [MTLTextureDescriptor new];
-  
-  texel_buf_descriptor.depth                       = 1;
-  texel_buf_descriptor.mipmapLevelCount            = 1;
-  texel_buf_descriptor.pixelFormat = get_mtl_pixel_format(info->texel_format).format;
-  texel_buf_descriptor.textureType = MTLTextureTypeTextureBuffer;
-  texel_buf_descriptor.arrayLength = 1;
-  texel_buf_descriptor.sampleCount = 1;
-  texel_buf_descriptor.usage       = MTLTextureUsageShaderRead;
-  texel_buf_descriptor.storageMode = info->buffer->mtl_buffer.storageMode;
-  texel_buf_descriptor.width  = info->size / ngfmtl_get_bytesperpel(info->texel_format);
-  texel_buf_descriptor.height = 1;
+
+  texel_buf_descriptor.depth            = 1;
+  texel_buf_descriptor.mipmapLevelCount = 1;
+  texel_buf_descriptor.pixelFormat      = get_mtl_pixel_format(info->texel_format).format;
+  texel_buf_descriptor.textureType      = MTLTextureTypeTextureBuffer;
+  texel_buf_descriptor.arrayLength      = 1;
+  texel_buf_descriptor.sampleCount      = 1;
+  texel_buf_descriptor.usage            = MTLTextureUsageShaderRead;
+  texel_buf_descriptor.storageMode      = info->buffer->mtl_buffer.storageMode;
+  texel_buf_descriptor.width            = info->size / ngfmtl_get_bytesperpel(info->texel_format);
+  texel_buf_descriptor.height           = 1;
   view->mtl_buffer_view = [info->buffer->mtl_buffer newTextureWithDescriptor:texel_buf_descriptor
                                                                       offset:info->offset
                                                                  bytesPerRow:info->size];
-  *result = view.release();
+  *result               = view.release();
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {}
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
+}
 
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(buffer, buf);
@@ -1390,10 +1398,9 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
   sampler_desc.minFilter     = get_mtl_minmag_filter(info->min_filter);
   sampler_desc.magFilter     = get_mtl_minmag_filter(info->mag_filter);
   sampler_desc.mipFilter     = get_mtl_mip_filter(info->mip_filter);
-  sampler_desc.maxAnisotropy = (NSUInteger)info->max_anisotropy;
-  // TODO unmipped images
-  sampler_desc.lodMinClamp = info->lod_min;
-  sampler_desc.lodMaxClamp = info->lod_max;
+  sampler_desc.maxAnisotropy = info->enable_anisotropy ? (NSUInteger)info->max_anisotropy : 0;
+  sampler_desc.lodMinClamp   = info->lod_min;
+  sampler_desc.lodMaxClamp   = info->lod_max;
   NGFMTL_NURSERY(sampler, sampler);
   sampler->sampler = [CURRENT_CONTEXT->device newSamplerStateWithDescriptor:sampler_desc];
   *result          = sampler.release();
@@ -1783,8 +1790,10 @@ void ngf_cmd_bind_resources(
     }
     switch (bind_op.type) {
     case NGF_DESCRIPTOR_TEXEL_BUFFER: {
-      [cmd_buf->active_rce setVertexTexture:bind_op.info.texel_buffer_view->mtl_buffer_view atIndex:native_binding];
-      [cmd_buf->active_rce setFragmentTexture:bind_op.info.texel_buffer_view->mtl_buffer_view atIndex:native_binding];
+      [cmd_buf->active_rce setVertexTexture:bind_op.info.texel_buffer_view->mtl_buffer_view
+                                    atIndex:native_binding];
+      [cmd_buf->active_rce setFragmentTexture:bind_op.info.texel_buffer_view->mtl_buffer_view
+                                      atIndex:native_binding];
       break;
     }
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
