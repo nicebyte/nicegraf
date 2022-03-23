@@ -170,7 +170,7 @@ void* sample_initialize(
    const ngf_constant_specialization half_lambert_spec = {
     .constant_id = 0,
     .offset = 0,
-    .type = NGF_TYPE_INT32
+    .type = NGF_TYPE_UINT32
    };
    int half_lambert_spec_value = 1;
    pipeline_data.spec_info.nspecializations = 1;
