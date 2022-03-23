@@ -1,9 +1,5 @@
 *.tga;*.mesh filter=lfs diff=lfs merge=lfs -text
 samples/binaries/assets/* filter=lfs diff=lfs merge=lfs -text
-samples/deps/nicegraf-shaderc/* filter=lfs diff=lfs merge=lfs -text
 *.exe;*.dll filter=lfs diff=lfs merge=lfs -text
-samples/deps/nicegraf-shaderc/** filter=lfs diff=lfs merge=lfs -text
 samples/binaries/assets/** filter=lfs diff=lfs merge=lfs -text
-samples/deps/niceshade/win/niceshade.exe filter=lfs diff=lfs merge=lfs -text
-samples/deps/niceshade/linux/niceshade filter=lfs diff=lfs merge=lfs -text
-samples/deps/niceshade/macos/niceshade filter=lfs diff=lfs merge=lfs -text
+samples/deps/niceshade/** filter=lfs diff=lfs merge=lfs -text
