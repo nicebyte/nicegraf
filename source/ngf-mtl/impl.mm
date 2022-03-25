@@ -482,6 +482,7 @@ struct ngf_cmd_buffer_t {
   ngf_render_target           active_rt          = nullptr;
   id<MTLBuffer>               bound_index_buffer = nil;
   MTLIndexType                bound_index_buffer_type;
+  uint32_t                    bound_index_buffer_offset = 0u;
 };
 
 struct ngf_shader_stage_t {
@@ -1738,13 +1739,11 @@ void ngf_cmd_draw(
                       instanceCount:ninstances
                        baseInstance:0];
   } else {
-    MTLIndexType index_type = buf->bound_index_buffer_type;
-    size_t index_size = index_type == MTLIndexTypeUInt16 ? sizeof(uint16_t) : sizeof(uint32_t);
     [buf->active_rce drawIndexedPrimitives:prim_type
                                 indexCount:nelements
                                  indexType:buf->bound_index_buffer_type
                                indexBuffer:buf->bound_index_buffer
-                         indexBufferOffset:first_element * index_size
+                         indexBufferOffset:buf->bound_index_buffer_offset + first_element * (buf->bound_index_buffer_type == MTLIndexTypeUInt16 ? 2 : 4)
                              instanceCount:ninstances
                                 baseVertex:0
                               baseInstance:0];
@@ -1762,11 +1761,12 @@ void ngf_cmd_bind_attrib_buffer(
                                atIndex:MAX_BUFFER_BINDINGS - binding];
 }
 
-void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer buf, ngf_type type)
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer buf, uint32_t offset, ngf_type type)
     NGF_NOEXCEPT {
   auto cmd_buf                     = (ngf_cmd_buffer)enc.__handle;
   cmd_buf->bound_index_buffer      = buf->mtl_buffer;
   cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
+  cmd_buf->bound_index_buffer_offset = offset;
 }
 
 void ngf_cmd_bind_resources(
