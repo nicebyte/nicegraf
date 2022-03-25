@@ -2769,10 +2769,11 @@ void ngf_cmd_bind_attrib_buffer(
  * 
  * @param enc The handle to the render encoder.
  * @param idxbuf The handle to the index buffer to bind.
+ * @param offset The offset at which to bind the buffer (in bytes).
  * @param index_type The type of values that are stored in the index buffer. Can be either \ref
  *                   NGF_TYPE_UINT32 or \ref NGF_TYPE_UINT16.
  */
-void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer idxbuf, ngf_type index_type)
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer idxbuf, uint32_t offset, ngf_type index_type)
     NGF_NOEXCEPT;
 
 /**

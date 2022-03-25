@@ -3774,11 +3774,11 @@ void ngf_cmd_bind_attrib_buffer(
       &vkoffset);
 }
 
-void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer ibuf, ngf_type index_type) {
+void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer ibuf, uint32_t offset, ngf_type index_type) {
   ngf_cmd_buffer    buf      = NGFVK_ENC2CMDBUF(enc);
   const VkIndexType idx_type = get_vk_index_type(index_type);
   assert(idx_type == VK_INDEX_TYPE_UINT16 || idx_type == VK_INDEX_TYPE_UINT32);
-  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->alloc.obj_handle, 0u, idx_type);
+  vkCmdBindIndexBuffer(buf->active_bundle.vkcmdbuf, (VkBuffer)ibuf->alloc.obj_handle, offset, idx_type);
 }
 
 void ngf_cmd_copy_buffer(
