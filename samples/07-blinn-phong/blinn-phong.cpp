@@ -199,7 +199,7 @@ void* sample_initialize(
 
 void sample_draw_frame(
     ngf_render_encoder main_render_pass,
-    float              time_delta,
+    float              /*time_delta*/,
     ngf_frame_token /*token*/,
     uint32_t w,
     uint32_t h,
@@ -212,7 +212,7 @@ void sample_draw_frame(
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf_cmd_bind_attrib_buffer(main_render_pass, state->bunny_mesh.vertex_data.get(), 0, 0);
-  ngf_cmd_bind_index_buffer(main_render_pass, state->bunny_mesh.index_data.get(), NGF_TYPE_UINT32);
+  ngf_cmd_bind_index_buffer(main_render_pass, state->bunny_mesh.index_data.get(), 0, NGF_TYPE_UINT32);
   blinn_phong::uniforms uniforms;
   uniforms.cam_matrices = compute_camera_matrices(state->camera, 
            static_cast<float>(w) / static_cast<float>(h));

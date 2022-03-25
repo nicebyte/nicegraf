@@ -289,6 +289,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf_cmd_bind_index_buffer(
       enc,
       index_buffer,
+      0u,
       sizeof(ImDrawIdx) < 4 ? NGF_TYPE_UINT16 : NGF_TYPE_UINT32);
   ngf_cmd_bind_attrib_buffer(enc, attrib_buffer, 0u, 0u);
   for (const auto& draw : draw_data) {

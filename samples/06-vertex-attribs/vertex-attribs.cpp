@@ -411,7 +411,7 @@ void sample_draw_frame(
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
   ngf_cmd_bind_attrib_buffer(main_render_pass, state->vertex_attrib_buffer, 0, 0);
-  ngf_cmd_bind_index_buffer(main_render_pass, state->index_buffer, NGF_TYPE_UINT32);
+  ngf_cmd_bind_index_buffer(main_render_pass, state->index_buffer, 0u, NGF_TYPE_UINT32);
   state->uniforms_multibuf.write(
       {nm::perspective(
            nm::deg2rad(state->vfov),
