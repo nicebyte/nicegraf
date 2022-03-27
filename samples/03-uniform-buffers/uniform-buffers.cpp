@@ -89,12 +89,13 @@ void* sample_initialize(
   ngf_util_graphics_pipeline_data polygon_pipeline_data;
   ngf_util_create_default_graphics_pipeline_data(&polygon_pipeline_data);
   polygon_pipeline_data.multisample_info.sample_count = main_render_target_sample_count;
+  polygon_pipeline_data.rasterization_info.cull_mode  = NGF_CULL_MODE_NONE;
   ngf_graphics_pipeline_info& polygon_pipe_info       = polygon_pipeline_data.pipeline_info;
   polygon_pipe_info.nshader_stages                    = 2u;
   polygon_pipe_info.shader_stages[0]                  = polygon_vertex_stage.get();
   polygon_pipe_info.shader_stages[1]                  = polygon_fragment_stage.get();
   polygon_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  polygon_pipe_info.primitive_topology                 = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  polygon_pipe_info.primitive_topology             = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   NGF_SAMPLES_CHECK_NGF_ERROR(state->polygon_pipeline.initialize(polygon_pipe_info));
 
   /**

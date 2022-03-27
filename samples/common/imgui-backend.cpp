@@ -71,6 +71,9 @@ ngf_imgui::ngf_imgui(
   pipeline_info.shader_stages[0]            = vertex_stage_.get();
   pipeline_info.shader_stages[1]            = fragment_stage_.get();
 
+  // Disable backface culling.
+  pipeline_data.rasterization_info.cull_mode = NGF_CULL_MODE_NONE;
+
   // Configure vertex input.
   ngf_vertex_attrib_desc vertex_attribs[] = {
       {0u, 0u, offsetof(ImDrawVert, pos), NGF_TYPE_FLOAT, 2u, false},
