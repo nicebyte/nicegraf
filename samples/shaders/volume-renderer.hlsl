@@ -15,14 +15,14 @@ struct VolumeRendererUniforms {
 
 VertexShaderInput VSMain(uint vertexId: SV_VertexID, uint instanceId : SV_InstanceID) {
  const float2 vertices[] = {
-    float2(1.0, 1.0), float2(-1.0, 1.0), float2(1.0, -1.0),
-    float2(1.0, -1.0), float2(-1.0, 1.0), float2(-1.0, -1.0)
+    float2(1.0, -1.0), float2(-1.0, -1.0), float2(1.0, 1.0),
+    float2(1.0, 1.0), float2(-1.0, -1.0), float2(-1.0, 1.0)
   };
   vertexId = vertexId % 6;
   float w, h, d;
   volumeImage.GetDimensions(w, h, d);
   float3 xyz = float3(vertices[vertexId], 2.0 * (instanceId/d) - 1.0);
-  float3 uvw = xyz;
+  float3 uvw = xyz * float3(1.0, -1.0, 1.0);
   xyz.y *= shaderUniforms.aspectRatio;
   uvw = mul(shaderUniforms.transformMatrix, float4(uvw, 1.0)).xyz;
   uvw.xy = 0.5 * uvw.xy + 0.5;

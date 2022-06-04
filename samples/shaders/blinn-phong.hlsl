@@ -32,6 +32,7 @@ PixelShaderInput VSMain(VertexShaderInput vertexAttrs) {
   float4 viewSpacePosition = mul(shaderUniforms.objToViewTransform, float4(vertexAttrs.objSpacePosition, 1.0));
   float4 viewSpaceNormal =  normalize(mul(shaderUniforms.objToViewTransform, float4(vertexAttrs.objSpaceNormal, 0.0))); // TODO inverse transpose.
   float4 clipSpacePosition = mul(shaderUniforms.viewToClipTransform, viewSpacePosition);
+  clipSpacePosition.y *= -1.0;
    PixelShaderInput result = {
     clipSpacePosition,
     viewSpaceNormal,
