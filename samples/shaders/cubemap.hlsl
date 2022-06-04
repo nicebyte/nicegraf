@@ -22,10 +22,10 @@ struct ShaderUniforms {
 [[vk::binding(2, 0)]] uniform sampler imageSampler;
 
 float4 PSMain(GenericFragShaderInput vertexAttribs) : SV_Target {
-  float3 direction = mul(shaderUniforms.cameraTransform,
-                         float4(-vertexAttribs.clipSpacePosition.x * shaderUniforms.aspectRatio,
+  float3 direction = -mul(shaderUniforms.cameraTransform,
+                          float4(vertexAttribs.clipSpacePosition.x * shaderUniforms.aspectRatio,
                                  vertexAttribs.clipSpacePosition.y,
-                                -1.0,
+                                 1.0,
                                  0.0)).xyz;
 #if defined(USE_CUBEMAP_ARRAY)
   float4 cubemapSampleCoords = float4(direction, shaderUniforms.cubemapArrayIndex);

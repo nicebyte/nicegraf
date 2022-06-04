@@ -177,9 +177,9 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   const float        B                = pos.y + data->DisplaySize.y;
   const uniform_data ortho_projection = {{
       {2.0f / (R - L), 0.0f, 0.0f, 0.0f},
-      {0.0f, 2.0f / (T - B), 0.0f, 0.0f},
+      {0.0f, 2.0f / (B - T), 0.0f, 0.0f},
       {0.0f, 0.0f, -1.0f, 0.0f},
-      {(R + L) / (L - R), (T + B) / (B - T), 0.0f, 1.0f},
+      {(R + L) / (L - R), (T + B) / (T - B), 0.0f, 1.0f},
   }};
   uniform_data_.write(ortho_projection);
 
@@ -246,7 +246,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
             clip_rect.z >= 0.0f && clip_rect.w >= 0.0f) {
           const ngf_irect2d scissor_rect {
               (int32_t)clip_rect.x,
-              fb_height - (int32_t)clip_rect.w,
+              (int32_t)clip_rect.y,
               (uint32_t)(clip_rect.z - clip_rect.x),
               (uint32_t)(clip_rect.w - clip_rect.y)};
           draw_data.push_back(

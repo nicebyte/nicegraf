@@ -14,8 +14,8 @@ struct ShaderUniforms {
 
 GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
   const float2 vertices[] = {
-    float2(1.0, 1.0), float2(-1.0, 1.0), float2(1.0, -1.0),
-    float2(1.0, -1.0), float2(-1.0, 1.0), float2(-1.0, -1.0)
+    float2(1.0, -1.0), float2(-1.0, -1.0), float2(1.0, 1.0),
+    float2(1.0, 1.0), float2(-1.0, -1.0), float2(-1.0, 1.0)
   };
   const float2 uvs[] = {
     float2(1.0, 1.0), float2(0.0, 1.0), float2(1.0, 0.0),

@@ -27,8 +27,10 @@ GenericFragShaderInput VSMain(VertexShaderInput vertexAttrs, int instanceIdx : S
   float4 worldSpacePosition = rotateByQuat(float4(vertexAttrs.objSpacePosition, 1.0), rotationQuat) +
                               worldSpaceTranslation +
                               oscillationOffset;
+  float4 clipSpacePosition = mul(shaderUniforms.worldToClipTransform, worldSpacePosition);
+  clipSpacePosition.y *= -1.0;
   GenericFragShaderInput result = {
-    mul(shaderUniforms.worldToClipTransform, worldSpacePosition),
+    clipSpacePosition,
     vertexAttrs.textureUv
   };
   return result;
