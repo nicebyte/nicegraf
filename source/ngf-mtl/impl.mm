@@ -1667,16 +1667,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
   auto buf = (ngf_cmd_buffer)enc.__handle;
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
   [buf->active_rce setCullMode:pipeline->culling];
-  if (buf->active_rt->is_default) {
-    [buf->active_rce setFrontFacingWinding:pipeline->winding];
-  } else {
-    if (pipeline->winding == MTLWindingClockwise)
-      [buf->active_rce setFrontFacingWinding:MTLWindingCounterClockwise];
-    else if (pipeline->winding == MTLWindingCounterClockwise)
-      [buf->active_rce setFrontFacingWinding:MTLWindingClockwise];
-    else
-      [buf->active_rce setFrontFacingWinding:pipeline->winding];
-  }
+  [buf->active_rce setFrontFacingWinding:pipeline->winding];
 
   [buf->active_rce setBlendColorRed:pipeline->blend_color[0]
                               green:pipeline->blend_color[1]
@@ -1691,16 +1682,10 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
   auto        buf = (ngf_cmd_buffer)enc.__handle;
   MTLViewport viewport;
-  viewport.originX            = r->x;
-  const uint32_t          top = (uint32_t)r->y + r->height;
-  const ngf_render_target rt  = buf->active_rt;
-  if (rt->is_default) {
-    viewport.originY = CURRENT_CONTEXT->swapchain_info.height - top;
-  } else {
-    viewport.originY = top;
-  }
-  viewport.width  = r->width;
-  viewport.height = (rt->is_default ? 1.0 : -1.0) * r->height;
+  viewport.originX = r->x;
+  viewport.originY = r->y + (int32_t)r->height;
+  viewport.width   = r->width;
+  viewport.height  = -1.0 * r->height;
 
   // TODO: fix
   viewport.znear = 0.0f;
@@ -1712,14 +1697,8 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
   auto           buf = (ngf_cmd_buffer)enc.__handle;
   MTLScissorRect scissor;
-  scissor.x                   = (NSUInteger)r->x;
-  const uint32_t          top = (uint32_t)r->y + r->height;
-  const ngf_render_target rt  = buf->active_rt;
-  if (rt->is_default) {
-    scissor.y = CURRENT_CONTEXT->swapchain_info.height - top;
-  } else {
-    scissor.y = rt->height - top;
-  }
+  scissor.x      = (uint32_t)r->x;
+  scissor.y      = (uint32_t)r->y;
   scissor.width  = r->width;
   scissor.height = r->height;
   [buf->active_rce setScissorRect:scissor];
