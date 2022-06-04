@@ -176,17 +176,6 @@ typedef struct ngfvk_frame_resources {
   uint32_t nwait_fences;
 } ngfvk_frame_resources;
 
-// Vulkan needs to render-to-texture upside-down to maintain a semblance of
-// a consistent coordinate system across different backends. This requires to
-// flip polygon winding order as well. Since winding/culling are baked into
-// pipeline state, we need two flavors for every pipeline...
-// TODO: use VK_EXT_extended_dynamic_state to set polygon winding dynamically
-// when that extension is more widely supported.
-typedef enum {
-  NGFVK_PIPELINE_FLAVOR_VANILLA = 0u,
-  NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE,
-  NGFVK_PIPELINE_FLAVOR_COUNT
-} ngfvk_pipeline_flavor;
 
 typedef struct {
   uint16_t       ctx_id;
@@ -285,7 +274,7 @@ typedef struct ngf_shader_stage_t {
 } ngf_shader_stage_t;
 
 typedef struct ngf_graphics_pipeline_t {
-  VkPipeline vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_COUNT];
+  VkPipeline vk_pipeline;
   NGFI_DARRAY_OF(ngfvk_desc_set_layout) descriptor_set_layouts;
   VkPipelineLayout vk_pipeline_layout;
   VkRenderPass     compatible_render_pass;
@@ -3402,47 +3391,37 @@ ngf_error ngf_create_graphics_pipeline(
     goto ngf_create_graphics_pipeline_cleanup;
   }
 
-  // Create all the required pipeline flavors.
-  for (size_t f = 0u; f < NGFVK_PIPELINE_FLAVOR_COUNT; ++f) {
-    VkPipelineRasterizationStateCreateInfo actual_rasterization = rasterization;
-    if (f == NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE) {
-      // flip winding when rendering to texture.
-      actual_rasterization.frontFace = (actual_rasterization.frontFace == VK_FRONT_FACE_CLOCKWISE)
-                                           ? VK_FRONT_FACE_COUNTER_CLOCKWISE
-                                           : VK_FRONT_FACE_CLOCKWISE;
-    }
-
-    VkGraphicsPipelineCreateInfo vk_pipeline_info = {
-        .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext               = NULL,
-        .flags               = 0u,
-        .stageCount          = info->nshader_stages,
-        .pStages             = vk_shader_stages,
-        .pVertexInputState   = &vertex_input,
-        .pInputAssemblyState = &input_assembly,
-        .pTessellationState  = &tess,
-        .pViewportState      = &viewport_state,
-        .pRasterizationState = &actual_rasterization,
-        .pMultisampleState   = &multisampling,
-        .pDepthStencilState  = &depth_stencil,
-        .pColorBlendState    = &color_blend,
-        .pDynamicState       = &dynamic_state,
-        .layout              = pipeline->vk_pipeline_layout,
-        .renderPass          = pipeline->compatible_render_pass,
-        .subpass             = 0u,
-        .basePipelineHandle  = VK_NULL_HANDLE,
-        .basePipelineIndex   = -1};
-    vk_err = vkCreateGraphicsPipelines(
-        _vk.device,
-        VK_NULL_HANDLE,
-        1u,
-        &vk_pipeline_info,
-        NULL,
-        &pipeline->vk_pipeline_flavors[f]);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_graphics_pipeline_cleanup;
-    }
+  // Create required pipeline.
+  VkGraphicsPipelineCreateInfo vk_pipeline_info = {
+      .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext               = NULL,
+      .flags               = 0u,
+      .stageCount          = info->nshader_stages,
+      .pStages             = vk_shader_stages,
+      .pVertexInputState   = &vertex_input,
+      .pInputAssemblyState = &input_assembly,
+      .pTessellationState  = &tess,
+      .pViewportState      = &viewport_state,
+      .pRasterizationState = &rasterization,
+      .pMultisampleState   = &multisampling,
+      .pDepthStencilState  = &depth_stencil,
+      .pColorBlendState    = &color_blend,
+      .pDynamicState       = &dynamic_state,
+      .layout              = pipeline->vk_pipeline_layout,
+      .renderPass          = pipeline->compatible_render_pass,
+      .subpass             = 0u,
+      .basePipelineHandle  = VK_NULL_HANDLE,
+      .basePipelineIndex   = -1};
+  vk_err = vkCreateGraphicsPipelines(
+      _vk.device,
+      VK_NULL_HANDLE,
+      1u,
+      &vk_pipeline_info,
+      NULL,
+      &pipeline->vk_pipeline);
+  if (vk_err != VK_SUCCESS) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_graphics_pipeline_cleanup;
   }
 
 ngf_create_graphics_pipeline_cleanup:
@@ -3458,10 +3437,8 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   if (p != NULL) {
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     NGFI_DARRAY_APPEND(res->retire_render_passes, p->compatible_render_pass);
-    for (size_t f = 0u; f < NGFVK_PIPELINE_FLAVOR_COUNT; ++f) {
-      if (p->vk_pipeline_flavors[f] != VK_NULL_HANDLE) {
-        NGFI_DARRAY_APPEND(res->retire_pipelines, p->vk_pipeline_flavors[f]);
-      }
+    if (p->vk_pipeline != VK_NULL_HANDLE) {
+      NGFI_DARRAY_APPEND(res->retire_pipelines, p->vk_pipeline);
     }
     if (p->vk_pipeline_layout != VK_NULL_HANDLE) {
       NGFI_DARRAY_APPEND(res->retire_pipeline_layouts, p->vk_pipeline_layout);
@@ -3684,9 +3661,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
   vkCmdBindPipeline(
       buf->active_bundle.vkcmdbuf,
       VK_PIPELINE_BIND_POINT_GRAPHICS,
-      buf->active_rt->is_default
-          ? pipeline->vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_VANILLA]
-          : pipeline->vk_pipeline_flavors[NGFVK_PIPELINE_FLAVOR_RENDER_TO_TEXTURE]);
+      pipeline->vk_pipeline);
 }
 
 void ngf_cmd_bind_resources(
@@ -3719,12 +3694,11 @@ void ngf_cmd_bind_resources(
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
   ngf_cmd_buffer   buf           = NGFVK_ENC2CMDBUF(enc);
-  const bool       is_default_rt = buf->active_rt ? (buf->active_rt->is_default) : false;
   const VkViewport viewport      = {
       .x        = (float)r->x,
-      .y        = is_default_rt ? (float)r->y + (float)r->height : (float)r->y,
+      .y        = (float)r->y,
       .width    = NGFI_MAX(1, (float)r->width),
-      .height   = (is_default_rt ? -1.0f : 1.0f) * NGFI_MAX(1, (float)r->height),
+      .height   = NGFI_MAX(1, (float)r->height),
       .minDepth = 0.0f,
       .maxDepth = 1.0f};
   vkCmdSetViewport(buf->active_bundle.vkcmdbuf, 0u, 1u, &viewport);
@@ -3733,11 +3707,8 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf->active_rt);
-  const uint32_t target_height = (buf->active_rt->is_default)
-                                     ? CURRENT_CONTEXT->swapchain_info.height
-                                     : buf->active_rt->height;
   const VkRect2D scissor_rect  = {
-      .offset = {r->x, ((int32_t)target_height - r->y) - (int32_t)r->height},
+      .offset = {r->x, r->y},
       .extent = {r->width, r->height}};
   vkCmdSetScissor(buf->active_bundle.vkcmdbuf, 0u, 1u, &scissor_rect);
 }
