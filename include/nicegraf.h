@@ -31,7 +31,7 @@
  * \mainpage Reference Documentation
  * 
  * These pages contain documentation automatically generated from nicegraf's
- * code comments. The text's purpose is to concisely describe the intended
+ * source code comments. The text's purpose is to concisely describe the intended
  * behavior and failure modes of the API.
  *
  * If viewing this document in a web browser or a PDF viewer, click one of the
@@ -44,7 +44,7 @@
 
 /**
  * \defgroup ngf Core C API
- * This section contains the documentation for the core nicegraf routines,
+ * This section contains documentation for the core nicegraf routines,
  * structures and enumerations.
  *
  * \subsection core-remarks General Remarks
@@ -58,9 +58,11 @@
  * \subsection object-model Object Model
  *
  * nicegraf objects, such as images, buffers, render targets, etc., are
- * represented using opaque handles. The objects are created and destroyed
+ * represented using opaque handles. The objects are constructed and destroyed
  * explicitly by the application, and it is the responsibility of the
- * application to ensure a correct order of destruction.
+ * application to ensure that the order of destruction is correct.
+ * For applications written in C++, a set of wrappers that automate object
+ * lifetime management is available. See \ref ngf_wrappers for details.
  *
  * \subsection error-reporting Error Reporting
  *
