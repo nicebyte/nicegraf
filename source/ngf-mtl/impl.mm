@@ -442,6 +442,13 @@ static uint32_t ngfmtl_get_pitch(const uint32_t width, const ngf_image_format fo
                               : width * f.bits_per_block / 8;
 }
 
+static uint32_t ngfmtl_get_num_rows(const uint32_t height, const ngf_image_format format) {
+  const mtl_format f                    = get_mtl_pixel_format(format);
+  const bool       is_compressed_format = (f.block_width | f.block_height) > 1;
+  return is_compressed_format ? (height + f.block_height - 1) / f.block_height
+                              : height;
+}
+
 #pragma mark ngf_struct_definitions
 
 struct ngf_render_target_t {
@@ -1862,11 +1869,12 @@ void ngf_cmd_write_image(
   const uint32_t target_slice =
       (is_cubemap ? 6u : 1u) * dst.layer + (is_cubemap ? dst.cubemap_face : 0);
   const uint32_t pitch = ngfmtl_get_pitch(extent.width, dst.image->format);
+  const uint32_t num_rows = ngfmtl_get_num_rows(extent.height, dst.image->format);
   for (uint32_t l = 0; l < nlayers; ++l) {
     [buf->active_bce copyFromBuffer:src->mtl_buffer
-                       sourceOffset:src_offset + (l * pitch * extent.height)
+                       sourceOffset:src_offset + (l * pitch * num_rows)
                   sourceBytesPerRow:pitch
-                sourceBytesPerImage:pitch * extent.height
+                sourceBytesPerImage:pitch * num_rows
                          sourceSize:MTLSizeMake(extent.width, extent.height, extent.depth)
                           toTexture:dst.image->texture
                    destinationSlice:target_slice + l
