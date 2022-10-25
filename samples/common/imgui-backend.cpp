@@ -49,14 +49,18 @@ ngf_imgui::ngf_imgui(
   ngf_util_create_default_graphics_pipeline_data(&pipeline_data);
 
   // Set up blend state.
-  pipeline_data.blend_info.enable                 = true;
-  pipeline_data.blend_info.src_color_blend_factor = NGF_BLEND_FACTOR_SRC_ALPHA;
-  pipeline_data.blend_info.dst_color_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-  pipeline_data.blend_info.src_alpha_blend_factor = NGF_BLEND_FACTOR_SRC_ALPHA;
-  pipeline_data.blend_info.dst_alpha_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-  pipeline_data.blend_info.blend_op_color         = NGF_BLEND_OP_ADD;
-  pipeline_data.blend_info.blend_op_alpha         = NGF_BLEND_OP_ADD;
-  memset(pipeline_data.blend_info.blend_consts, 0, sizeof(pipeline_data.blend_info.blend_consts));
+  ngf_blend_info blend_info;
+  blend_info.enable                 = true;
+  blend_info.src_color_blend_factor = NGF_BLEND_FACTOR_SRC_ALPHA;
+  blend_info.dst_color_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  blend_info.src_alpha_blend_factor = NGF_BLEND_FACTOR_SRC_ALPHA;
+  blend_info.dst_alpha_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  blend_info.blend_op_color         = NGF_BLEND_OP_ADD;
+  blend_info.blend_op_alpha         = NGF_BLEND_OP_ADD;
+  blend_info.color_write_mask       = NGF_COLOR_MASK_WRITE_BIT_R | NGF_COLOR_MASK_WRITE_BIT_G | 
+                                NGF_COLOR_MASK_WRITE_BIT_B | NGF_COLOR_MASK_WRITE_BIT_A;
+  pipeline_data.pipeline_info.color_attachment_blend_states = &blend_info;
+  memset(pipeline_data.pipeline_info.blend_consts, 0, sizeof(pipeline_data.pipeline_info.blend_consts));
 
   // Set up depth & stencil state.
   pipeline_data.depth_stencil_info.depth_test   = false;
