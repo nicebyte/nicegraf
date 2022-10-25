@@ -23,13 +23,13 @@
 /**
  * @file
  * @brief nicegraf declarations.
- * 
+ *
  * This file contains the core nicegraf API declarations.
  */
 
 /**
  * \mainpage Reference Documentation
- * 
+ *
  * These pages contain documentation automatically generated from nicegraf's
  * source code comments. The text's purpose is to concisely describe the intended
  * behavior and failure modes of the API.
@@ -240,14 +240,14 @@ typedef struct ngf_device_capabilities {
  */
 typedef enum ngf_diagnostic_log_verbosity {
   /**
-   * \ingroup ngf 
+   * \ingroup ngf
    * Normal level, reports only severe errors. */
-  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT, 
+  NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
 
   /**
-   * \ingroup ngf 
+   * \ingroup ngf
    * Recommended for debug builds, may induce performance overhead. */
-  NGF_DIAGNOSTICS_VERBOSITY_DETAILED 
+  NGF_DIAGNOSTICS_VERBOSITY_DETAILED
 } ngf_diagnostic_log_verbosity;
 
 /**
@@ -264,7 +264,7 @@ typedef enum ngf_diagnostic_message_type {
   /**
    * \ingroup ngf
    * Message warns of a potential issue with an API call.*/
-  NGF_DIAGNOSTIC_WARNING, 
+  NGF_DIAGNOSTIC_WARNING,
 
   /**
    * \ingroup ngf
@@ -315,7 +315,7 @@ typedef struct ngf_allocation_callbacks {
 /**
  * @typedef ngf_device_handle
  * \ingroup ngf
- * 
+ *
  * A handle that uniquely identifies a rendering device.
  *
  * Note that the value of the handle corresponding to the same exact physical device may be
@@ -483,7 +483,7 @@ typedef struct ngf_offset3d {
 typedef enum ngf_stage_type {
   /** \ingroup ngf
    * Indicates the vertex processing stage. */
-  NGF_STAGE_VERTEX = 0, 
+  NGF_STAGE_VERTEX = 0,
 
   /** \ingroup ngf
    * Indicates the fragment processing stage. */
@@ -513,36 +513,36 @@ typedef struct ngf_shader_stage_info {
    *
    * Additionally, the Metal backend expects the code to contain a special comment, mapping all
    * <descriptor set, binding> pairs to the native Metal argument table slots. The comment shall
-   * be a C-style block comment - beginning with a forward slash, followed by an asterisk - 
+   * be a C-style block comment - beginning with a forward slash, followed by an asterisk -
    * containing the following word:
-   * 
+   *
    * ```
    * NGF_NATIVE_BINDING_MAP
    * ```
-   * 
-   * followed by a newline character. 
-   * 
+   *
+   * followed by a newline character.
+   *
    * Each of the following lines until the end of the comment shall have the following format:
-   * 
+   *
    * ```
    * (s b) : m
    * ```
-   * 
+   *
    * where `s` is the set number, `b` is the binding number within the set, and `m` is the index
    * of the corresponding resource in Metal's argument table.
-   * 
-   * For example, let's say the Metal shader refers to index 3 in the texture argument table. 
+   *
+   * For example, let's say the Metal shader refers to index 3 in the texture argument table.
    * Adding the following line to the binding map comment
-   * 
+   *
    * ```
    * (0 1) : 3
    * ```
-   * 
+   *
    * would tell the nicegraf metal backend to use the third slot of the texture argument table when
    * an image is bound to set 0, binding 1 using \ref ngf_cmd_bind_resources.
-   * 
-   * When compiling HLSL shaders using nicegraf-shaderc, the comment with the binding map is generated
-   * automatically.
+   *
+   * When compiling HLSL shaders using nicegraf-shaderc, the comment with the binding map is
+   * generated automatically.
    */
   const void* content;
 
@@ -555,7 +555,7 @@ typedef struct ngf_shader_stage_info {
 /**
  * @struct ngf_shader_stage
  * \ingroup ngf
- * 
+ *
  * An opaque handle to a programmable stage of the rendering pipeline.
  *
  * Programmable stages are specified using backend-specific blobs of
@@ -563,60 +563,61 @@ typedef struct ngf_shader_stage_info {
  *
  * On platforms that require a compilation step at runtime, details about
  * compile errors are reported via the debug callback mechanism.
- * 
+ *
  * Shader stage objects are necessary for creating \ref ngf_graphics_pipeline objects, but once
  * the pipelines have been created, the shader stages that had been used to create
  * them can safely be disposed of.
- * 
- * See also: \ref ngf_shader_stage_info, \ref ngf_create_shader_stage, \ref ngf_destroy_shader_stage.
+ *
+ * See also: \ref ngf_shader_stage_info, \ref ngf_create_shader_stage, \ref
+ * ngf_destroy_shader_stage.
  */
 typedef struct ngf_shader_stage_t* ngf_shader_stage;
 
 /**
  * @enum ngf_polygon_mode
  * \ingroup ngf
- * 
+ *
  * Enumerates ways to draw polygons.
  * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_polygon_mode {
   /** \ingroup ngf
    * Fill the entire polyoon.*/
-  NGF_POLYGON_MODE_FILL = 0, 
+  NGF_POLYGON_MODE_FILL = 0,
 
   /** \ingroup ngf
    * Outline only.*/
   NGF_POLYGON_MODE_LINE,
-  
+
   /** \ingroup ngf
    * Vertices only.*/
-  NGF_POLYGON_MODE_POINT,   
+  NGF_POLYGON_MODE_POINT,
   NGF_POLYGON_MODE_COUNT
 } ngf_polygon_mode;
 
 /**
  * @enum ngf_cull_mode
  * \ingroup ngf
- * 
+ *
  * Enumerates polygon culling strategies.
  * See also \ref ngf_rasterization_info.
  */
 typedef enum ngf_cull_mode {
   /** \ingroup ngf
    * Cull back-facing polygons. */
-  NGF_CULL_MODE_BACK = 0,       
+  NGF_CULL_MODE_BACK = 0,
 
   /** \ingroup ngf
    * Cull front-facing polygons. */
-  NGF_CULL_MODE_FRONT,   
-  
+  NGF_CULL_MODE_FRONT,
+
   /** \ingroup ngf
    * Cull all polygons. */
-  NGF_CULL_MODE_FRONT_AND_BACK, 
+  NGF_CULL_MODE_FRONT_AND_BACK,
 
   /** \ingroup ngf
    * Do not cull anything. */
-  NGF_CULL_MODE_NONE,           
+  NGF_CULL_MODE_NONE,
   NGF_CULL_MODE_COUNT
 } ngf_cull_mode;
 
@@ -837,7 +838,7 @@ typedef enum ngf_blend_factor {
    */
   NGF_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
 
-  /** 
+  /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies each color component by the corresponding
    * component of the "destination" color value;
@@ -893,37 +894,37 @@ typedef enum ngf_blend_factor {
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
-   * color by the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts respectively;
+   * color by the 1st, 2nd and 3rd elements of \ref ngf_pipeline_info::blend_consts respectively;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
-   * ngf_blend_info::blend_consts.
+   * ngf_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_CONSTANT_COLOR,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
-   * color by one minus the 1st, 2nd and 3rd elements of \ref ngf_blend_info::blend_consts
+   * color by one minus the 1st, 2nd and 3rd elements of \ref ngf_pipeline_info::blend_consts
    * respectively;
    * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
-   * component of \ref ngf_blend_info::blend_consts.
+   * component of \ref ngf_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by the 4th
-   * element of \ref ngf_blend_info::blend_consts;
+   * element of \ref ngf_pipeline_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
-   * ngf_blend_info::blend_consts.
+   * ngf_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_CONSTANT_ALPHA,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by one minus the
-   * 4th element of \ref ngf_blend_info::blend_consts;
+   * 4th element of \ref ngf_pipeline_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
-   * component of \ref ngf_blend_info::blend_consts.
+   * component of \ref ngf_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
 
@@ -945,26 +946,37 @@ typedef enum ngf_blend_factor {
 typedef enum ngf_blend_op {
   /** \ingroup ngf
    * The result of the blend operation shall be `S*Fs + D*Fd` */
-  NGF_BLEND_OP_ADD,     
+  NGF_BLEND_OP_ADD,
 
   /** \ingroup ngf
    * The result of the blend operation shall be `S*Fs - D*Fd` */
-  NGF_BLEND_OP_SUB,     
+  NGF_BLEND_OP_SUB,
 
   /** \ingroup ngf
    * The result of the blend operation shall be `D*Fd - S*Fs` */
-  NGF_BLEND_OP_REV_SUB, 
+  NGF_BLEND_OP_REV_SUB,
 
   /** \ingroup ngf
    * The result of the blend operation shall be `min(S, D)`   */
-  NGF_BLEND_OP_MIN,     
+  NGF_BLEND_OP_MIN,
 
   /** \ingroup ngf
    * The result of the blend operation shall be `max(S, D)`   */
-  NGF_BLEND_OP_MAX,     
+  NGF_BLEND_OP_MAX,
 
   NGF_BLEND_OP_COUNT
 } ngf_blend_op;
+
+/**
+ * Identifies a color channel for color write mask. See \ref ngf_blend_info::color_write_mask for
+ * details.
+ */
+typedef enum ngf_color_write_mask_bit {
+  NGF_COLOR_MASK_WRITE_BIT_R = 0x01,
+  NGF_COLOR_MASK_WRITE_BIT_G = 0x02,
+  NGF_COLOR_MASK_WRITE_BIT_B = 0x04,
+  NGF_COLOR_MASK_WRITE_BIT_A = 0x08
+} ngf_color_write_mask_bit;
 
 /**
  * @struct ngf_blend_info
@@ -989,12 +1001,10 @@ typedef struct ngf_blend_info {
   ngf_blend_factor dst_color_blend_factor; /**< The destination blend factor for color. */
   ngf_blend_factor src_alpha_blend_factor; /**< The source blend factor for alpha. */
   ngf_blend_factor dst_alpha_blend_factor; /**< The destination blend factor for alpha. */
-  float            blend_consts[4];        /**< Blend constants used by
-                                                \ref NGF_BLEND_FACTOR_CONSTANT_COLOR, \ref
-                                              NGF_BLEND_FACTOR_CONSTANT_ALPHA, \ref
-                                              NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR and \ref
-                                              NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA . */
-  bool enable;                             /**< Specifies whether blending is enabled.*/
+  uint32_t         color_write_mask; /**< A combination of \ref ngf_color_write_mask_bit flags that
+                                        specifies which color channels actually get written out for the
+                                        attachment corresponding to this blend state. */
+  bool enable;                       /**< Specifies whether blending is enabled.*/
 } ngf_blend_info;
 
 /**
@@ -1051,7 +1061,7 @@ typedef enum ngf_type {
 typedef enum ngf_vertex_input_rate {
   /**
    * \ingroup ngf
-   * 
+   *
    * Attributes are read per-vertex.
    * With this vertex input rate, each vertex receives its own set of attributes.
    */
@@ -1190,7 +1200,7 @@ typedef enum ngf_sample_count {
 /**
  * @struct ngf_multisample_info
  * \ingroup ngf
- * 
+ *
  * Specifies the state of multisampling.
  */
 typedef struct ngf_multisample_info {
@@ -1201,7 +1211,7 @@ typedef struct ngf_multisample_info {
 /**
  * @enum ngf_image_format
  * \ingroup ngf
- * 
+ *
  * Image formats.
  *
  * Some backends may not support all of those.
@@ -1296,15 +1306,15 @@ typedef enum ngf_image_format {
 typedef enum ngf_attachment_type {
   /** \ingroup ngf
    * For attachments containing color data. */
-  NGF_ATTACHMENT_COLOR = 0,    
+  NGF_ATTACHMENT_COLOR = 0,
 
   /** \ingroup ngf
    * For attachments containing depth data. */
-  NGF_ATTACHMENT_DEPTH,        
+  NGF_ATTACHMENT_DEPTH,
 
   /** \ingroup ngf
    * For attachments containing combined depth and stencil data. */
-  NGF_ATTACHMENT_DEPTH_STENCIL 
+  NGF_ATTACHMENT_DEPTH_STENCIL
 } ngf_attachment_type;
 
 /**
@@ -1338,7 +1348,7 @@ typedef struct ngf_attachment_descriptions {
 /**
  * @enum ngf_primitive_topology
  * \ingroup ngf
- * 
+ *
  * Enumerates the available primitive topologies (ways to group vertices into primitives).
  */
 typedef enum ngf_primitive_topology {
@@ -1379,7 +1389,7 @@ typedef enum ngf_primitive_topology {
 /**
  * @struct ngf_constant_specialization
  * \ingroup ngf
- * 
+ *
  * A constant specialization entry, sets the value for a single specialization constant.
  */
 typedef struct ngf_constant_specialization {
@@ -1398,16 +1408,16 @@ typedef struct ngf_constant_specialization {
  * during execution.
  */
 typedef struct ngf_specialization_info {
-  const ngf_constant_specialization* specializations; /**< List of specialization entries. */
-  uint32_t nspecializations;                    /**< Number of specialization entries. */
-  void*    value_buffer; /**< Pointer to a buffer containing the values for the
-                              specialization constants. */
+  const ngf_constant_specialization* specializations;  /**< List of specialization entries. */
+  uint32_t                           nspecializations; /**< Number of specialization entries. */
+  void* value_buffer; /**< Pointer to a buffer containing the values for the
+                           specialization constants. */
 } ngf_specialization_info;
 
 /**
  * @struct ngf_graphics_pipeline_info
  * \ingroup ngf
- * 
+ *
  * Contains all information necessary for creating a graphics pipeline object.
  */
 typedef struct ngf_graphics_pipeline_info {
@@ -1420,11 +1430,6 @@ typedef struct ngf_graphics_pipeline_info {
    * Specifies the parameters for depth and stencil testing.
    */
   const ngf_depth_stencil_info* depth_stencil;
-
-  /**
-   * Specifies the parameters for blending.
-   */
-  const ngf_blend_info* blend;
 
   /**
    * Specifies vertex attributes and vertex attribute buffer bindings.
@@ -1441,29 +1446,44 @@ typedef struct ngf_graphics_pipeline_info {
    * with matching type, format and sample count.
    */
   const ngf_attachment_descriptions* compatible_rt_attachment_descs;
+
+  /**
+   * A pointer to an array of \ref ngf_blend_info structures specifying the parameters for blending.
+   * The array must contain exactly the same number of elements as there are color attachments
+   * specified in \ref ngf_graphics_pipeline_info::compatible_rt_attachment_descs.
+   * If set to NULL, all color attachments will have blending disabled and fully enabled color write
+   * mask.
+   */
+  const ngf_blend_info* color_attachment_blend_states;
+
+  float blend_consts[4]; /**< Blend constants used by \ref NGF_BLEND_FACTOR_CONSTANT_COLOR, \ref
+                            NGF_BLEND_FACTOR_CONSTANT_ALPHA, \ref
+                            NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR and \ref
+                            NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA . */
 } ngf_graphics_pipeline_info;
 
 /**
  * @struct ngf_graphics_pipeline
  * \ingroup ngf
- * 
+ *
  * An opaque handle to a graphics pipeline object.
- * 
- * See also: \ref ngf_graphics_pipeline_info, \ref ngf_create_graphics_pipeline and \ref ngf_destroy_graphics_pipeline.
+ *
+ * See also: \ref ngf_graphics_pipeline_info, \ref ngf_create_graphics_pipeline and \ref
+ * ngf_destroy_graphics_pipeline.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
 
 /**
  * @enum ngf_descriptor_type
  * \ingroup ngf
- * 
+ *
  * Available descriptor types.
  * Not that some back-ends may not support all of the listed descriptor types.
  */
 typedef enum ngf_descriptor_type {
   /**
    * \ingroup ngf
-   * 
+   *
    * A uniform buffer, also known as a constant buffer, can be used to pass
    * a small to medium sized chunk of data to the shader in a structured way.
    */
@@ -1471,28 +1491,28 @@ typedef enum ngf_descriptor_type {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * An \ref ngf_image.
    */
   NGF_DESCRIPTOR_IMAGE,
 
   /**
    * \ingroup ngf
-   * 
+   *
    * An \ref ngf_sampler.
    */
   NGF_DESCRIPTOR_SAMPLER,
 
   /**
    * \ingroup ngf
-   * 
+   *
    * A combination of an image and sampler in a single object.
    */
   NGF_DESCRIPTOR_IMAGE_AND_SAMPLER,
 
   /**
    * \ingroup ngf
-   * 
+   *
    * A texel buffer can be used to pass a large amount of unstructured data
    * (i.e. a big array of `float4`s) to the shader.
    */
@@ -1504,34 +1524,34 @@ typedef enum ngf_descriptor_type {
 /**
  * @enum ngf_sampler_filter
  * \ingroup ngf
- * 
+ *
  *  Enumerates filters for texture lookups.
  */
 typedef enum ngf_sampler_filter {
-  /** 
+  /**
    * \ingroup ngf
-   * 
+   *
    * When used as the minification (\ref ngf_sampler_info::min_filter) or  magnification (\ref
    * ngf_sampler_info::mag_filter) filter, the result of the filtering operation shall be the
    * value of the texel whose center is nearest to the sample.
-   * 
+   *
    * When used as \ref ngf_sampler_info::mip_filter, makes the selected mip level snap to the one
    * that is closest to the requested mip level value.
    */
-  NGF_FILTER_NEAREST = 0, 
+  NGF_FILTER_NEAREST = 0,
 
-  /** 
+  /**
    * \ingroup ngf
-   * 
+   *
    * When used as the minification (\ref ngf_sampler_info::min_filter) or  magnification (\ref
    * ngf_sampler_info::mag_filter) filter, the result of the filtering operation shall be linearly
    * interpolated from the values of 4 (in case of 2D images) or 8 (in case of 3D images) texels
    * whose centers are nearest to the sample.
-   * 
+   *
    * When used as \ref ngf_sampler_info::mip_filter, linearly blends the values from two mip levels
    * closest to the requested mip level value.
    */
-  NGF_FILTER_LINEAR,      
+  NGF_FILTER_LINEAR,
 
   NGF_FILTER_COUNT
 } ngf_sampler_filter;
@@ -1539,21 +1559,21 @@ typedef enum ngf_sampler_filter {
 /**
  * @enum ngf_sampler_wrap_mode
  * \ingroup ngf
- * 
+ *
  * Enumerates strategies for dealing with sampling an image out-of-bounds.
  */
 typedef enum ngf_sampler_wrap_mode {
   /** \ingroup ngf
    * Clamp the texel value to what's at the edge of the image. */
-  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0, 
+  NGF_WRAP_MODE_CLAMP_TO_EDGE = 0,
 
   /** \ingroup ngf
    * Repeat the image contents. */
-  NGF_WRAP_MODE_REPEAT,            
+  NGF_WRAP_MODE_REPEAT,
 
   /** \ingroup ngf
    * Repeat the image contents, mirrored. */
-  NGF_WRAP_MODE_MIRRORED_REPEAT,   
+  NGF_WRAP_MODE_MIRRORED_REPEAT,
 
   NGF_WRAP_MODE_COUNT
 } ngf_sampler_wrap_mode;
@@ -1561,7 +1581,7 @@ typedef enum ngf_sampler_wrap_mode {
 /**
  * @struct ngf_sampler_info
  * \ingroup ngf
- * 
+ *
  * Information for creating an \ref ngf_sampler object.
  */
 typedef struct ngf_sampler_info {
@@ -1571,33 +1591,33 @@ typedef struct ngf_sampler_info {
   ngf_sampler_wrap_mode wrap_u;     /**< Wrap mode for the U coordinate. */
   ngf_sampler_wrap_mode wrap_v;     /**< Wrap mode for the V coordinate. */
   ngf_sampler_wrap_mode wrap_w;     /**< Wrap mode for the W coordinate. */
-  float lod_max;          /**< Maximum mip level that shall be used during the filtering operation.
-                           *  Note that this refers to the _level itself_ and not the dimensions of data
-                           *  residing in that level, e.g. level 0 (the smallest possible level) has
-                           *  the largest dimensions.
-                           */
-  float lod_min;          /**< Minimum mip level that shall be used during the filtering operation.
-                           *  Note that this refers to the _level itself_ and not the dimensions of data
-                           *  residing in that level, e.g. level 0 (the smallest possible level) has
-                           *  the largest dimensions.
-                           */
-  float lod_bias;         /**< A bias to add to the mip level calculated during the sample operation. */
+  float lod_max;  /**< Maximum mip level that shall be used during the filtering operation.
+                   *  Note that this refers to the _level itself_ and not the dimensions of data
+                   *  residing in that level, e.g. level 0 (the smallest possible level) has
+                   *  the largest dimensions.
+                   */
+  float lod_min;  /**< Minimum mip level that shall be used during the filtering operation.
+                   *  Note that this refers to the _level itself_ and not the dimensions of data
+                   *  residing in that level, e.g. level 0 (the smallest possible level) has
+                   *  the largest dimensions.
+                   */
+  float lod_bias; /**< A bias to add to the mip level calculated during the sample operation. */
   float max_anisotropy;   /**< Max allowed degree of anisotropy. Ignored if \ref
-                            * ngf_sampler_info::enable_anisotropy is false.
-                            */
+                           * ngf_sampler_info::enable_anisotropy is false.
+                           */
   bool enable_anisotropy; /**< Whether to allow anisotropic filtering. */
 } ngf_sampler_info;
 
 /**
  * @struct ngf_sampler
  * \ingroup ngf
- * 
- * An opaque handle for a sampler object.  
- * 
+ *
+ * An opaque handle for a sampler object.
+ *
  * Samplers encapsulate how to filter an image - what happens when an image is minified or
  * magnified, whether anisotropic filtering is enabled, etc. See \ref ngf_sampler_info for more
  * details.
- * 
+ *
  * Samplers can be bound separately from images - in which case the shader code sees them as two
  * distinct objects, and the same sampler can be ussed to sample two different images. They can also
  * be combined into a single descriptor (see \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER), in which case
@@ -1608,7 +1628,7 @@ typedef struct ngf_sampler_t* ngf_sampler;
 /**
  * @enum ngf_image_usage
  * \ingroup ngf
- * 
+ *
  * Image usage flags.
  *
  * A valid image usage mask may be formed by combining one or more of these
@@ -1617,7 +1637,7 @@ typedef struct ngf_sampler_t* ngf_sampler;
 typedef enum ngf_image_usage {
   /** \ingroup ngf
    * The image may be read from in a shader.*/
-  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01, 
+  NGF_IMAGE_USAGE_SAMPLE_FROM = 0x01,
 
   /** \ingroup ngf
    * The image may be used as an attachment for a render target.*/
@@ -1635,7 +1655,7 @@ typedef enum ngf_image_usage {
 /**
  * @enum ngf_image_type
  * \ingroup ngf
- * 
+ *
  * Enumerates the possible image types.
  */
 typedef enum ngf_image_type {
@@ -1647,7 +1667,7 @@ typedef enum ngf_image_type {
    * Three-dimensional image. */
   NGF_IMAGE_TYPE_IMAGE_3D,
 
-  /** \ingroup ngf 
+  /** \ingroup ngf
    * Cubemap. */
   NGF_IMAGE_TYPE_CUBE,
 
@@ -1657,7 +1677,7 @@ typedef enum ngf_image_type {
 /**
  * @struct ngf_image_info
  * \ingroup ngf
- * 
+ *
  * Information required to create an \ref ngf_image object.
  */
 typedef struct ngf_image_info {
@@ -1675,15 +1695,16 @@ typedef struct ngf_image_info {
 /**
  * @struct ngf_image
  * \ingroup ngf
- * 
+ *
  * An opaque handle to an image object.
- * 
+ *
  * Images are multidimensional arrays of data that can be sampled from in shaders, or rendered into.
  * The individual elements of such arrays shall be referred to as "texels". An \ref ngf_image_format
  * describes the specific type and layout of data elements within a single texel. Note that
- * compressed image formats typically don't store values of texels directly, rather they store enough
- * information that the texel values can be reconstructed (perhaps lossily) by the rendering device.
- * 
+ * compressed image formats typically don't store values of texels directly, rather they store
+ * enough information that the texel values can be reconstructed (perhaps lossily) by the rendering
+ * device.
+ *
  * Images can be one of the following types (see \ref ngf_image_type):
  *  - a two-dimensional image, identified by \ref NGF_IMAGE_TYPE_IMAGE_2D and representing a
  *    two-dimensional array of texels;
@@ -1691,14 +1712,14 @@ typedef struct ngf_image_info {
  *    three-dimensional array of texels;
  *  - a cubemap, identified by \ref NGF_IMAGE_TYPE_CUBE and representing a collection of six
  *    two-dimensional texel arrays, each corresponding to a face of a cube.
- * 
+ *
  * An image object may actually contain several images of the same type, format and dimensions.
  * Those are referred to as "layers" and images containing more than a single layer are called
  * "layered", or "image arrays". Note that a multi-layered 2D image is different from a
  * single-layered 3D image, because filtering is not performed across levels when sampling it. Also
  * note that layered cubemaps are not supported by all hardware - see \ref
  * ngf_device_capabilities::cubemap_arrays_supported.
- * 
+ *
  * Each image layer may contain mip levels. Mip level 0 is the layer itself, and each subsequent
  * level (1, 2 and so on) is 2x smaller in dimensions, and usually contains the downscaled version
  * of the preceding level for the purposes of filtering, although the application is free to upload
@@ -1709,7 +1730,7 @@ typedef struct ngf_image_t* ngf_image;
 /**
  * @enum ngf_cubemap_face
  * \ingroup ngf
- * 
+ *
  * Members of this enumeration are used to refer to the different faces of a cubemap.
  */
 typedef enum ngf_cubemap_face {
@@ -1725,7 +1746,7 @@ typedef enum ngf_cubemap_face {
 /**
  * @struct ngf_image_ref
  * \ingroup ngf
- * 
+ *
  * A reference to a part of an image.
  */
 typedef struct ngf_image_ref {
@@ -1752,21 +1773,21 @@ typedef struct ngf_render_target_info {
 /**
  * @struct ngf_render_target
  * \ingroup ngf
- * 
+ *
  * An opaque handle to a render target object.
- * 
- * Render targets are collections of images that can be rendered into. Each image in the collection is
- * referred to as an "attachment". Some attachments have special meaning, for example the depth or
- * the combined depth+stencil attachment, the contents of which are used in depth/stencil tests. A render
- * target is not allowed to have multiple depth or depth+stencil attachments, however it is allowed to
- * have multiple color attachments (up to a certain limit).
+ *
+ * Render targets are collections of images that can be rendered into. Each image in the collection
+ * is referred to as an "attachment". Some attachments have special meaning, for example the depth
+ * or the combined depth+stencil attachment, the contents of which are used in depth/stencil tests.
+ * A render target is not allowed to have multiple depth or depth+stencil attachments, however it is
+ * allowed to have multiple color attachments (up to a certain limit).
  */
 typedef struct ngf_render_target_t* ngf_render_target;
 
 /**
  * @struct ngf_clear_info
  * \ingroup ngf
- * 
+ *
  * Specifies a render target clear operation.
  */
 typedef union ngf_clear_info {
@@ -1797,15 +1818,15 @@ typedef union ngf_clear_info {
 typedef enum ngf_attachment_load_op {
   /** \ingroup ngf
    * Don't care what happens. */
-  NGF_LOAD_OP_DONTCARE = 0, 
+  NGF_LOAD_OP_DONTCARE = 0,
 
   /** \ingroup ngf
    * Preserve the prior contents of the attachment. */
-  NGF_LOAD_OP_KEEP,         
-  
+  NGF_LOAD_OP_KEEP,
+
   /** \ingroup ngf
    * Clear the attachment. */
-  NGF_LOAD_OP_CLEAR,        
+  NGF_LOAD_OP_CLEAR,
   NGF_LOAD_OP_COUNT
 } ngf_attachment_load_op;
 
@@ -1817,7 +1838,7 @@ typedef enum ngf_attachment_load_op {
 typedef enum ngf_attachment_store_op {
   /**
    * \ingroup ngf
-   * 
+   *
    * Don't care what happens. Use this if you don't plan on reading back the
    * contents of the attachment in any shaders, or presenting it to screen.
    */
@@ -1825,7 +1846,7 @@ typedef enum ngf_attachment_store_op {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * Use this if you plan on reading the contents of the attachment in any shaders or
    * presenting it to screen. The contents of the attachment shall be written out to system memory.
    */
@@ -1899,7 +1920,7 @@ typedef enum ngf_buffer_storage_type {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * Private memory that cannot be accessed by the host directly. The contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * \ref ngf_cmd_copy_buffer.
@@ -1916,27 +1937,27 @@ typedef enum ngf_buffer_storage_type {
 typedef enum ngf_buffer_usage {
   /** \ingroup ngf
    * The buffer may be used as a source for transfer operations. */
-  NGF_BUFFER_USAGE_XFER_SRC = 0x01,       
-  
+  NGF_BUFFER_USAGE_XFER_SRC = 0x01,
+
   /** \ingroup ngf
    * The buffer may be used as a destination for transfer operations. */
-  NGF_BUFFER_USAGE_XFER_DST = 0x02,       
+  NGF_BUFFER_USAGE_XFER_DST = 0x02,
 
   /** \ingroup ngf
    * The buffer may be bound as a uniform buffer. */
-  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04, 
+  NGF_BUFFER_USAGE_UNIFORM_BUFFER = 0x04,
 
   /** \ingroup ngf
-  * The buffer may be used as the source of index data for indexed draws. */
-  NGF_BUFFER_USAGE_INDEX_BUFFER   = 0x08, 
-  
+   * The buffer may be used as the source of index data for indexed draws. */
+  NGF_BUFFER_USAGE_INDEX_BUFFER = 0x08,
+
   /** \ingroup ngf
    * The buffer may be used as a source of vertex attribute data. */
-  NGF_BUFFER_USAGE_VERTEX_BUFFER = 0x10,  
+  NGF_BUFFER_USAGE_VERTEX_BUFFER = 0x10,
 
   /** \ingroup ngf
    * The buffer may be bound as a uniform texel buffer. */
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20    
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20
 } ngf_buffer_usage;
 
 /**
@@ -1953,7 +1974,7 @@ typedef struct ngf_buffer_info {
 /**
  * @struct ngf_buffer
  * \ingroup ngf
- * 
+ *
  * An opaque handle to a buffer object.
  */
 typedef struct ngf_buffer_t* ngf_buffer;
@@ -1961,7 +1982,7 @@ typedef struct ngf_buffer_t* ngf_buffer;
 /**
  * @struct ngf_texel_buffer_view
  * \ingroup ngf
- * 
+ *
  * GPU programs have to access texel buffers through special "texel buffer view" objects which
  * specify the exact format of the data stored in the buffer.
  * See also: \ref ngf_texel_buffer_view_info, \ref ngf_create_texel_buffer_view.
@@ -1970,14 +1991,14 @@ typedef struct ngf_texel_buffer_view_t* ngf_texel_buffer_view;
 
 /**
  * @struct ngf_texel_buffer_view_info
- * 
+ *
  * Information required to create a texel buffer view object.
  */
 typedef struct ngf_texel_buffer_view_info {
-  ngf_buffer       buffer;        /**< The buffer that the view covers. */
-  size_t           offset;        /**< Offset withing the buffer (in bytes) that the view covers. */
-  size_t           size;          /**< The size of the range (in byutes) that the view covers. */
-  ngf_image_format texel_format;  /**< The texel format to intepret the buffer contents as. */
+  ngf_buffer       buffer;       /**< The buffer that the view covers. */
+  size_t           offset;       /**< Offset withing the buffer (in bytes) that the view covers. */
+  size_t           size;         /**< The size of the range (in byutes) that the view covers. */
+  ngf_image_format texel_format; /**< The texel format to intepret the buffer contents as. */
 } ngf_texel_buffer_view_info;
 
 /**
@@ -2006,17 +2027,17 @@ typedef struct ngf_image_sampler_bind_info {
 /**
  * @struct ngf_resource_bind_op
  * \ingroup ngf
- * 
+ *
  * Specifies a resource binding operation.
- * 
+ *
  * The resource binding model in nicegraf is similar to that of Vulkan. Shaders group their
  * resources into "sets", and individual slot within thosse sets are referred to as "bindings".
- * The main difference in nicegraf is that one does not have to explicitly allocate descriptor pools like in Vulkan.
- * Instead, the application code simply says which set and binding to assign a particular resource to. Internally,
- * some optimization may be performed to avoid redundant binds.
- * For backends that don't have a similar resource binding model (e.g. Metal), a special comment musst be added to the
- * shader code that maps the backend's "native" binding model onto this one. See \ref ngf_shader_stage_info::content for
- * more details on that.
+ * The main difference in nicegraf is that one does not have to explicitly allocate descriptor pools
+ * like in Vulkan. Instead, the application code simply says which set and binding to assign a
+ * particular resource to. Internally, some optimization may be performed to avoid redundant binds.
+ * For backends that don't have a similar resource binding model (e.g. Metal), a special comment
+ * musst be added to the shader code that maps the backend's "native" binding model onto this one.
+ * See \ref ngf_shader_stage_info::content for more details on that.
  */
 typedef struct ngf_resource_bind_op {
   uint32_t            target_set;     /**< Target set ID. */
@@ -2041,7 +2062,7 @@ typedef struct ngf_resource_bind_op {
 typedef enum ngf_present_mode {
   /**
    * \ingroup ngf
-   * 
+   *
    * This is the only presentation mode that is guaranteed to be supported.
    * In this mode, the presentation requests are queued internally, and the
    * presentation engine waits for the vertical blanking signal to present
@@ -2052,7 +2073,7 @@ typedef enum ngf_present_mode {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * In this mode, the presentation engine does not wait for the vertical blanking signal, instead
    * presenting an image immediately. This mode results in lower latency but may induce frame
    * tearing. It is not recommended to use this mode on mobile targets.
@@ -2105,7 +2126,7 @@ typedef struct ngf_swapchain_info {
  * A context mainatins exclusive ownership of its swapchain (if it has one),
  * and even shared contexts cannot acquire, present or render to images from
  * that swapchain.
- * 
+ *
  * See also: \ref ngf_context_info and \ref ngf_create_context.
  */
 typedef struct ngf_context_t* ngf_context;
@@ -2201,7 +2222,7 @@ typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 /**
  * @struct ngf_render_encoder
  * \ingroup ngf
- * 
+ *
  * A render encoder records rendering commands (such as draw calls) into its
  * corresponding command buffer.
  */
@@ -2212,7 +2233,7 @@ typedef struct {
 /**
  * @struct ngf_xfer_encoder
  * \ingroup ngf
- * 
+ *
  * A transfer encoder records transfer commands (i.e. copying buffer contents)
  * into its corresponding command buffer.
  */
@@ -2236,7 +2257,7 @@ typedef uint32_t ngf_frame_token;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Obtains a list of rendering devices available to nicegraf.
  *
  * This function is not thread-safe.
@@ -2253,7 +2274,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
 
 /**
  * \ingroup ngf
- * 
+ *
  * Initializes nicegraf.
  *
  * The client should call this function only once during the
@@ -2264,31 +2285,31 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new \ref ngf_context.
- * 
+ *
  * @param info The context configuration.
  */
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given \ref ngf_context.
- * 
+ *
  * @param ctx The context to destroy.
  */
 void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Adjust the images associated with the given context's swapchain.
- 
+
  * This function must be called every time that the window the context's presenting to is resized.
  * It is up to the client application to detect the resize events and call this function.
  * Not calling this function on resize results in undefined behavior.
- * 
+ *
  * @param ctx The context to operate on
  * @param new_width New window client area width in pixels
  * @param new_height New window client area height in pixels
@@ -2297,9 +2318,9 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
 
 /**
  * \ingroup ngf
- * 
+ *
  * Set the given nicegraf context as current for the calling thread.
- * 
+ *
  * All subsequent rendering operations invoked from the calling thread shall affect
  * the given context.
  *
@@ -2312,28 +2333,30 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Begin a frame of rendering.
- * 
+ *
  * This function starts a frame of rendering in the calling thread's current context.
  * It generates a special token associated with the frame, which is required for recording
  * command buffers (see \ref ngf_start_cmd_buffer).
- * @param token A pointer to a \ref ngf_frame_token. The generated frame token shall be returned here.
+ * @param token A pointer to a \ref ngf_frame_token. The generated frame token shall be returned
+ * here.
  */
 ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * End the current frame of rendering on the calling thread's context.
- * 
- * @param token The frame token generated by the corresponding preceding call to \ref ngf_begin_frame.
+ *
+ * @param token The frame token generated by the corresponding preceding call to \ref
+ * ngf_begin_frame.
  */
 ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * @return A pointer to an \ref ngf_device_capabilities instance, or NULL, if no context is present
  *         on the calling thread.
  */
@@ -2341,7 +2364,7 @@ const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new shader stage object.
  *
  * @param stages Information required to construct the shader stage object.
@@ -2352,18 +2375,18 @@ ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* res
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given shader stage.
- * 
+ *
  * @param stage The handle to the shader stage object to be destroyed.
  */
 void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new graphics pipeline object.
- * 
+ *
  * @param info Information required to construct the graphics pipeline object.
  * @param result Pointer to where the handle to the newly created object will be returned.
  */
@@ -2373,18 +2396,18 @@ ngf_error ngf_create_graphics_pipeline(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given graphics pipeline object.
- * 
+ *
  * @param pipeline The handle to the pipeline object to be destroyed.
  */
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new image object.
- * 
+ *
  * @param info Information required to construct the image object.
  * @param result Pointer to where the handle to the newly created object will be returned.
  */
@@ -2392,18 +2415,18 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NO
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given image object.
- * 
+ *
  * @param image The handle to the image object to be destroyed.
  */
 void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new sampler object.
- * 
+ *
  * @param info Information required to construct the sampler object.
  * @param result Pointer to where the handle to the newly created object will be returned.
  */
@@ -2411,18 +2434,18 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given sampler object.
- * 
+ *
  * @param ssampler The handle to the sampler object to be destroyed.
  */
 void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Create a new rendertarget object.
- * 
+ *
  * @param info Information required to construct the rendertarget object.
  * @param result Pointer to where the handle to the newly created object will be returned.
  */
@@ -2431,16 +2454,16 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given render target.
- * 
+ *
  * @param rendertarget The handle to the rendertarget object to be destroyed.
  */
 void ngf_destroy_render_target(ngf_render_target rendertarget) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Returns the handle to the \ref ngf_render_target associated with the the current context's
  * swapchain (aka the default render target). If the current context does not have a swapchain, the
  * result shall be null. Otherwise, it shall be a render target that has a color attachment
@@ -2454,7 +2477,7 @@ ngf_render_target ngf_default_render_target() NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Returns the attachment descriptions for the default render target. The caller should not attempt
  * to free the returned pointer or modify the contents of the memory it points to.
  */
@@ -2462,9 +2485,9 @@ const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() 
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new buffer object.
- * 
+ *
  * @param info Information required to construct the buffer object.
  * @param result Pointer to where the handle to the newly created object will be written to.
  */
@@ -2472,23 +2495,24 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given buffer object.
- * 
+ *
  * @param buffer The handle to the buffer object to be destroyed.
  */
 void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Maps a region of a given buffer to host memory.
- * 
+ *
  * It is an error to bind a buffer that is currently mapped using any command. If a buffer that
  * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure any new data in the
  * mapped range becomes visible to the subsequent commands, then call \ref ngf_buffer_unmap. Writing
- * into any region that could be in use by previously submitted commands results in undefined behavior.
- * 
+ * into any region that could be in use by previously submitted commands results in undefined
+ * behavior.
+ *
  * @param buf The handle to the buffer to be mapped.
  * @param offset The offset at which the mapped region starts, in bytes. It must
  *               satisfy platform-specific alignment requirements. See, for example, \ref
@@ -2502,7 +2526,7 @@ void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXC
 
 /**
  * \ingroup ngf
- * 
+ *
  * Ensures that any writes performed by the CPU into the mapped range are be visible to subsequently
  * submitted rendering commands executed by the rendering device.
  * @param ptr The handle to the buffer that needs to be flushed.
@@ -2514,12 +2538,12 @@ void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEX
 
 /**
  * \ingroup ngf
- * 
+ *
  * Unmaps a previously mapped buffer.
  *
  * If multiple regions were mapped, all of them are unmapped. Any pointers returned by prior calls
  * to \ref ngf_buffer_map_range are invalidated.
- * 
+ *
  * @param buf The buffer that needs to be unmapped.
  */
 void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
@@ -2527,7 +2551,7 @@ void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
 /**
  * \ingroup ngf
  * Creates a new texel buffer view object.
- * 
+ *
  * @param info Information required to construct the texel buffer view object.
  * @param result Pointer to where the handle to the newly created object will be written to.
  */
@@ -2536,9 +2560,9 @@ ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_b
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given texel buffer view object.
- * 
+ *
  * @param buffer The handle to the texel buffer view object to be destroyed.
  */
 void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view);
@@ -2547,7 +2571,7 @@ void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view);
  * \ingroup ngf
  *
  * Waits for all pending rendering commands to complete.
- * 
+ *
  * Do not use this function lightly. It is expensive because it introduces a sync point between the
  * CPU and the rendering device.
  */
@@ -2555,9 +2579,9 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Creates a new command buffer.
- * 
+ *
  * @param info The information required to create the new command buffer.
  * @param result Pointer to where the handle to the newly created command buffer will be returned.
  */
@@ -2566,29 +2590,29 @@ ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) N
 
 /**
  * \ingroup ngf
- * 
+ *
  * Destroys the given command buffer.
- * 
+ *
  * If there is any work submitted via the given command buffer still pending on the rendering
  * device, it shall be executed asynchronously. Therefore, application code doesn't need to wait for
  * the commands associated with the command buffer to finish before it can safely dispose of the
  * command buffer.
- * 
+ *
  * @param buffer The handle to the command buffer object to be destroyed.
  */
 void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Resets the command buffer.
- * 
+ *
  * Erases all the commands previously recorded into the given command buffer,
  * and prepares it for recording commands to be submitted within the frame
  * identified by the specified token.
- * 
+ *
  * The command buffer is required to be in the "ready" state.
- * 
+ *
  * @param buf The handle to the command buffer to operate on
  * @param token The token for the frame within which the recorded commands are going to be
  *              submitted.
@@ -2597,11 +2621,11 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer buf, ngf_frame_token token) NGF_NO
 
 /**
  * \ingroup ngf
- * 
+ *
  * Submits the commands recorded in the given command buffers for execution.
  * All command buffers must be in the "awaiting submission" state, and shall be transitioned to the
  * "submitted" state.
- * 
+ *
  * @param nbuffers The number of command buffers being submitted for execution.
  * @param bufs A pointer to a contiguous array of \ref nbuffers handles to command buffer objects to
  *             be submitted for execution.
@@ -2610,14 +2634,18 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
 
 /**
  * \ingroup ngf
- * 
+ *
  * Begins a new render pass.
- 
+
  * A render pass can be thought of as a sequence of rendering commands associated with a particular
- * render target. At the start of the pass, an "load operation" is performed for each attachment. The application code
- * may specify exactly what load operations to perform for each individual attachment. After that, all the
- * rendering commands are executed. Finally, at the end of the pass, a "store operation" is performed for each attachment.
- * Again, the application code may specify exactly which store operations to perform for each individual attachment. 
+ * render target. At the start of the pass, an "load operation" is performed for each attachment.
+ The application code
+ * may specify exactly what load operations to perform for each individual attachment. After that,
+ all the
+ * rendering commands are executed. Finally, at the end of the pass, a "store operation" is
+ performed for each attachment.
+ * Again, the application code may specify exactly which store operations to perform for each
+ individual attachment.
  * @param buf The command buffer to operate on. Must be in the "ready" state, shall be transitioned
  *            to the "recording" state.
  * @param pass_info Specifies the renderpass parameters, such as load and store operations.
@@ -2631,10 +2659,11 @@ ngf_error ngf_cmd_begin_render_pass(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Similar to \ref ngf_cmd_begin_render_pass, but with some choices pre-made:
  *   - All color attachments of the render target are cleared to the specified color.
- *   - Depth and stencil attachments are cleared to the specified respective values (if they are present).
+ *   - Depth and stencil attachments are cleared to the specified respective values (if they are
+ * present).
  *   - The store action for any attachment that is not marked as "sampled from" (see \ref
  *     ngf_attachment_description::is_sampled), is set to NGF_STORE_OP_DONTCARE.
  *   - The store action for attachments marked as "sampled from", is set to NGF_STORE_OP_STORE.
@@ -2664,9 +2693,9 @@ ngf_error ngf_cmd_begin_render_pass_simple(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Ends a render pass.
- * 
+ *
  * Disposes of the given render command encoder, transitioning its corresponding
  * command buffer to the "ready" state.
  */
@@ -2674,11 +2703,11 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Begins a transfer pass.
- * 
+ *
  * A transfer pass is a sequence of commands that copy data.
- * 
+ *
  * @param buf The handle to the command buffer to operate on. Must be in the "ready"
  *            state, will be transitioned to the "recording" state.
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
@@ -2688,9 +2717,9 @@ ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, ngf_xfer_encoder* enc) NGF
 
 /**
  * \ingroup ngf
- * 
+ *
  * Ends a transfer pass.
- * 
+ *
  * Disposes of the given transfer cmd encoder, transitioning its corresponding
  * command buffer to the "ready" state.
  */
@@ -2701,7 +2730,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, const ngf_graphics_pipeli
 
 /**
  * \ingroup ngf
- * 
+ *
  * Sets the viewport to be used in subsequent rendering commands.
  * The viewport defines a region of the destination framebuffer that the resulting rendering
  * is scaled to fit into.
@@ -2710,7 +2739,7 @@ void ngf_cmd_viewport(ngf_render_encoder buf, const ngf_irect2d* r) NGF_NOEXCEPT
 
 /**
  * \ingroup ngf
- * 
+ *
  * Sets the scissor region to be used in the subsequent rendering commands.
  * The scissor defines a region of the framebuffer that can be affected by the rendering commands.
  * Any pixels outside of that region are not written to.
@@ -2719,14 +2748,14 @@ void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Sets the reference value to be used in stencil tests.
  */
 void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Set the compare mask to be used in stencil tests.
  */
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
@@ -2734,16 +2763,16 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32
 
 /**
  * \ingroup ngf
- * 
+ *
  * Sets the stencil write mask.
  */
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ *
  * Bind resources for the shader to read. See ngf_resource_bind_op for more information.
- * 
+ *
  * @param enc The handle to the render encoder object to record the command into.
  * @param bind_operations A pointer to a contiguous array of \ref ngf_resource_bind_op objects.
  * @param nbinds The number of elements in the array pointed to by \ref bind_operations.
@@ -2755,9 +2784,9 @@ void ngf_cmd_bind_resources(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Binds a vertex attribute buffer to be used in the next draw.
- * 
+ *
  * @param enc The handle to the render encoder.
  * @param vbuf The handle to the vertex buffer to bind.
  * @param binding The vertex buffer binding ID to bind the buffer to.
@@ -2771,17 +2800,20 @@ void ngf_cmd_bind_attrib_buffer(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Binds an index buffer to be used in the next draw.
- * 
+ *
  * @param enc The handle to the render encoder.
  * @param idxbuf The handle to the index buffer to bind.
  * @param offset The offset at which to bind the buffer (in bytes).
  * @param index_type The type of values that are stored in the index buffer. Can be either \ref
  *                   NGF_TYPE_UINT32 or \ref NGF_TYPE_UINT16.
  */
-void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer idxbuf, uint32_t offset, ngf_type index_type)
-    NGF_NOEXCEPT;
+void ngf_cmd_bind_index_buffer(
+    ngf_render_encoder enc,
+    const ngf_buffer   idxbuf,
+    uint32_t           offset,
+    ngf_type           index_type) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2803,9 +2835,9 @@ void ngf_cmd_draw(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Copies data between buffers.
- * 
+ *
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
  * @param dst The handle to the budder object to be copied into.
@@ -2823,15 +2855,15 @@ void ngf_cmd_copy_buffer(
 
 /**
  * \ingroup ngf
- * 
+ *
  * Copies data from a buffer into an image.
- * 
+ *
  * For non-compressed formats, the source data is assumed to be arranged in a simple linear layout.
- * Cubemap faces and layers are assumed to be stored successively in the source buffer, from first to last.
- * For each layer, the first texel corresponds to the lower left corner of the image, and the
- * subsequent texels progress from left to right, through the remainder of the bottom row, and from
- * then on, through higher rows.
- * 
+ * Cubemap faces and layers are assumed to be stored successively in the source buffer, from first
+ * to last. For each layer, the first texel corresponds to the lower left corner of the image, and
+ * the subsequent texels progress from left to right, through the remainder of the bottom row, and
+ * from then on, through higher rows.
+ *
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
  * @param src_offset The offset in the source buffer from which to start copying.
@@ -2852,11 +2884,11 @@ void ngf_cmd_write_image(
 /**
  * \ingroup ngf
  * Generates mipmaps automatically.
- * 
+ *
  * Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level
  * specified when creating the image, using the data from the preceding level as the source. Level 0
  * of each layer is expected to be populated by the application code prior to calling this function.
- * 
+ *
  * @param xfenc A transfer command encoder.
  * @param img The handle to the image to operate on.
  */
