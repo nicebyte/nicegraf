@@ -1169,23 +1169,31 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = attachment_descs.descs[i];
     if (attachment_desc.type == NGF_ATTACHMENT_COLOR) {
+      const ngf_blend_info blend = info->color_attachment_blend_states ? info->color_attachment_blend_states[ncolor_attachments] : ngf_blend_info {};
       MTLRenderPipelineColorAttachmentDescriptor* mtl_attachment_desc =
           mtl_pipe_desc.colorAttachments[ncolor_attachments++];
       mtl_attachment_desc.pixelFormat     = get_mtl_pixel_format(attachment_desc.format).format;
-      mtl_attachment_desc.blendingEnabled = info->blend->enable;
-      if (info->blend->enable) {
+      mtl_attachment_desc.blendingEnabled = blend.enable;
+      if (blend.enable) {
         mtl_attachment_desc.sourceRGBBlendFactor =
-            get_mtl_blend_factor(info->blend->src_color_blend_factor);
+            get_mtl_blend_factor(blend.src_color_blend_factor);
         mtl_attachment_desc.destinationRGBBlendFactor =
-            get_mtl_blend_factor(info->blend->dst_color_blend_factor);
+            get_mtl_blend_factor(blend.dst_color_blend_factor);
         mtl_attachment_desc.sourceAlphaBlendFactor =
-            get_mtl_blend_factor(info->blend->src_alpha_blend_factor);
+            get_mtl_blend_factor(blend.src_alpha_blend_factor);
         mtl_attachment_desc.destinationAlphaBlendFactor =
-            get_mtl_blend_factor(info->blend->dst_alpha_blend_factor);
+            get_mtl_blend_factor(blend.dst_alpha_blend_factor);
         mtl_attachment_desc.rgbBlendOperation =
-            get_mtl_blend_operation(info->blend->blend_op_color);
+            get_mtl_blend_operation(blend.blend_op_color);
         mtl_attachment_desc.alphaBlendOperation =
-            get_mtl_blend_operation(info->blend->blend_op_alpha);
+            get_mtl_blend_operation(blend.blend_op_alpha);
+      }
+      if (info->color_attachment_blend_states) {
+        mtl_attachment_desc.writeMask =
+          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R ? MTLColorWriteMaskRed : 0) |
+          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G ? MTLColorWriteMaskGreen : 0) |
+          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B ? MTLColorWriteMaskBlue : 0)  |
+          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A ? MTLColorWriteMaskAlpha : 0) ;
       }
     } else if (attachment_desc.type == NGF_ATTACHMENT_DEPTH) {
       mtl_pipe_desc.depthAttachmentPixelFormat =
@@ -1270,7 +1278,7 @@ ngf_error ngf_create_graphics_pipeline(
 
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
   pipeline->binding_map = native_binding_map;
-  memcpy(pipeline->blend_color, info->blend->blend_consts, sizeof(pipeline->blend_color));
+  memcpy(pipeline->blend_color, info->blend_consts, sizeof(pipeline->blend_color));
 
   NSError* err = nil;
   pipeline->pipeline =
