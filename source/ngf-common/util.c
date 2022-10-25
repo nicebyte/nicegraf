@@ -34,10 +34,6 @@
 #endif
 
 void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_data* result) {
-  ngf_blend_info bi;
-  bi.enable          = false;
-  result->blend_info = bi;
-
   ngf_stencil_info default_stencil = {
       .fail_op       = NGF_STENCIL_OP_KEEP,
       .pass_op       = NGF_STENCIL_OP_KEEP,
@@ -75,15 +71,15 @@ void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_d
   result->spec_info = spi;
 
   ngf_graphics_pipeline_info gpi = {
-      .blend          = &result->blend_info,
-      .depth_stencil  = &result->depth_stencil_info,
-      .input_info     = &result->vertex_input_info,
-      .primitive_topology = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-      .multisample    = &result->multisample_info,
-      .shader_stages  = {NULL},
-      .nshader_stages = 0u,
-      .rasterization  = &result->rasterization_info,
-      .spec_info      = &result->spec_info};
+      .color_attachment_blend_states = NULL,
+      .depth_stencil           = &result->depth_stencil_info,
+      .input_info              = &result->vertex_input_info,
+      .primitive_topology      = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      .multisample             = &result->multisample_info,
+      .shader_stages           = {NULL},
+      .nshader_stages          = 0u,
+      .rasterization           = &result->rasterization_info,
+      .spec_info               = &result->spec_info};
   result->pipeline_info = gpi;
 }
 

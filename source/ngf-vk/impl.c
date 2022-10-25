@@ -3195,36 +3195,48 @@ ngf_error ngf_create_graphics_pipeline(
       .minDepthBounds = 0.0f,
       .maxDepthBounds = 1.0f};
 
-  // Prepare blend state.
-  const VkPipelineColorBlendAttachmentState attachment_blend_state = {
-      .blendEnable         = info->blend->enable,
-      .srcColorBlendFactor = info->blend->enable
-                                 ? get_vk_blend_factor(info->blend->src_color_blend_factor)
-                                 : VK_BLEND_FACTOR_ONE,
-      .dstColorBlendFactor = info->blend->enable
-                                 ? get_vk_blend_factor(info->blend->dst_color_blend_factor)
-                                 : VK_BLEND_FACTOR_ZERO,
-      .colorBlendOp =
-          info->blend->enable ? get_vk_blend_op(info->blend->blend_op_color) : VK_BLEND_OP_ADD,
-      .srcAlphaBlendFactor = info->blend->enable
-                                 ? get_vk_blend_factor(info->blend->src_alpha_blend_factor)
-                                 : VK_BLEND_FACTOR_ONE,
-      .dstAlphaBlendFactor = info->blend->enable
-                                 ? get_vk_blend_factor(info->blend->dst_alpha_blend_factor)
-                                 : VK_BLEND_FACTOR_ZERO,
-      .alphaBlendOp =
-          info->blend->enable ? get_vk_blend_op(info->blend->blend_op_alpha) : VK_BLEND_OP_ADD,
-      .colorWriteMask = VK_COLOR_COMPONENT_R_BIT |  // TODO: set color write mask
-                        VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-                        VK_COLOR_COMPONENT_A_BIT};
 
   uint32_t ncolor_attachments = 0u;
   for (uint32_t i = 0; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
     if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR)
       ++ncolor_attachments;
   }
+
+  // Prepare blend state.
   VkPipelineColorBlendAttachmentState blend_states[16];
-  for (size_t i = 0u; i < 16u; ++i) { blend_states[i] = attachment_blend_state; }
+  memset(blend_states, 0, sizeof(blend_states));
+  for (size_t i = 0u; i < ncolor_attachments; ++i) {
+    if (info->color_attachment_blend_states) {
+      const ngf_blend_info* blend = &info->color_attachment_blend_states[i];
+
+      const VkPipelineColorBlendAttachmentState attachment_blend_state = {
+          .blendEnable         = blend->enable,
+          .srcColorBlendFactor = blend->enable ? get_vk_blend_factor(blend->src_color_blend_factor)
+                                               : VK_BLEND_FACTOR_ONE,
+          .dstColorBlendFactor = blend->enable ? get_vk_blend_factor(blend->dst_color_blend_factor)
+                                               : VK_BLEND_FACTOR_ZERO,
+          .colorBlendOp = blend->enable ? get_vk_blend_op(blend->blend_op_color) : VK_BLEND_OP_ADD,
+          .srcAlphaBlendFactor = blend->enable ? get_vk_blend_factor(blend->src_alpha_blend_factor)
+                                               : VK_BLEND_FACTOR_ONE,
+          .dstAlphaBlendFactor = blend->enable ? get_vk_blend_factor(blend->dst_alpha_blend_factor)
+                                               : VK_BLEND_FACTOR_ZERO,
+          .alphaBlendOp = blend->enable ? get_vk_blend_op(blend->blend_op_alpha) : VK_BLEND_OP_ADD,
+          .colorWriteMask =
+              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R) ? VK_COLOR_COMPONENT_R_BIT
+                                                                      : 0) |
+              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G) ? VK_COLOR_COMPONENT_G_BIT
+                                                                      : 0) |
+              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B) ? VK_COLOR_COMPONENT_B_BIT
+                                                                      : 0) |
+              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A) ? VK_COLOR_COMPONENT_A_BIT
+                                                                      : 0)};
+      blend_states[i] = attachment_blend_state;
+    } else {
+      blend_states[i].blendEnable = VK_FALSE;
+      blend_states[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                       VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    }
+  }
 
   if (ncolor_attachments >= NGFI_ARRAYSIZE(blend_states)) {
     NGFI_DIAG_ERROR("too many attachments specified");
@@ -3241,10 +3253,10 @@ ngf_error ngf_create_graphics_pipeline(
       .attachmentCount = ncolor_attachments,
       .pAttachments    = blend_states,
       .blendConstants  = {
-          info->blend->blend_consts[0],
-          info->blend->blend_consts[1],
-          info->blend->blend_consts[2],
-          info->blend->blend_consts[3]}};
+          info->blend_consts[0],
+          info->blend_consts[1],
+          info->blend_consts[2],
+          info->blend_consts[3]}};
 
   // Dynamic state.
   const VkDynamicState dynamic_states[] = {

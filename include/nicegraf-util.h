@@ -48,7 +48,6 @@ extern "C" {
  */
 typedef struct ngf_util_graphics_pipeline_data {
   ngf_graphics_pipeline_info pipeline_info; /**< Can be used to initialize a new pipeline object. */
-  ngf_blend_info             blend_info;
   ngf_depth_stencil_info     depth_stencil_info;
   ngf_vertex_input_info      vertex_input_info;
   ngf_multisample_info       multisample_info;
