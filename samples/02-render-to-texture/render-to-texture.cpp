@@ -154,7 +154,7 @@ void sample_draw_frame(
   ngf_irect2d         offsc_viewport {0, 0, 512, 512};
   ngf_irect2d         onsc_viewport {0, 0, w, h};
   ngf_cmd_buffer      offscr_cmd_buf = nullptr;
-  ngf_cmd_buffer_info cmd_info;
+  ngf_cmd_buffer_info cmd_info       = {};
   ngf_create_cmd_buffer(&cmd_info, &offscr_cmd_buf);
   ngf_start_cmd_buffer(offscr_cmd_buf, frame_token);
   {
@@ -177,8 +177,15 @@ void sample_draw_frame(
   ngf_cmd_draw(main_render_pass, false, 0u, 3u, 1u);
 }
 
-void sample_draw_ui(void*) {
+void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op*, void*) {
 }
+
+void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
+}
+
+void sample_draw_ui(void*) {}
+
+void sample_post_submit(void*){}
 
 void sample_shutdown(void* userdata) {
   auto data = static_cast<render_to_texture_data*>(userdata);

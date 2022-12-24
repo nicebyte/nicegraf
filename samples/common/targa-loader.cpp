@@ -141,7 +141,7 @@ void load_targa(
 
   /* read and decode image data, writing result to output. */
   const char*  img_data       = in_bytes + sizeof(tga::header) + hdr->id_length;
-  size_t       written_pixels = 0;
+  size_t written_pixels = 0;
   const size_t bytes_per_pel  = has_alpha ? 4 : 3;
   while (written_pixels < hdr->img.width * hdr->img.height &&
          img_data - in_bytes < (ptrdiff_t)in_buf_size) {

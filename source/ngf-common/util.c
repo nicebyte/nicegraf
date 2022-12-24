@@ -70,12 +70,17 @@ void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_d
       .value_buffer     = NULL};
   result->spec_info = spi;
 
+  ngf_input_assembly_info iai = {
+      .enable_primitive_restart = false,
+      .primitive_topology        = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
+  result->input_assembly_info    = iai;
+
   ngf_graphics_pipeline_info gpi = {
       .color_attachment_blend_states = NULL,
       .depth_stencil           = &result->depth_stencil_info,
       .input_info              = &result->vertex_input_info,
-      .primitive_topology      = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
       .multisample             = &result->multisample_info,
+      .input_assembly_info     = &result->input_assembly_info,
       .shader_stages           = {NULL},
       .nshader_stages          = 0u,
       .rasterization           = &result->rasterization_info,

@@ -63,6 +63,11 @@ void ngfi_sa_destroy(ngfi_sa* allocator);
  */
 ngfi_sa* ngfi_tmp_store(void);
 
+/**
+ * Helper macro to allocate N objects from per-thread stack allocator.
+ */
+#define NGFI_SALLOC(type, n) (ngfi_sa_alloc(ngfi_tmp_store(), sizeof(type) * (n)))
+
 #ifdef __cplusplus
 }
 #endif

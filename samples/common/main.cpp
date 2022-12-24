@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -31,17 +31,16 @@
 #else
 #define GLFW_EXPOSE_NATIVE_X11
 #endif
-#include <GLFW/glfw3native.h>
-
+#include "check.h"
 #include "diagnostic-callback.h"
 #include "imgui-backend.h"
 #include "imgui_impl_glfw.h"
-#include "check.h"
+#include "logging.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 #include "sample-interface.h"
-#include "logging.h"
 
+#include <GLFW/glfw3native.h>
 #include <chrono>
 #include <optional>
 #include <stdio.h>
@@ -71,23 +70,30 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * Select a rendering device to be used by nicegraf.
    */
-  uint32_t ndevices = 0u;
-  const ngf_device* devices = NULL;
+  uint32_t          ndevices = 0u;
+  const ngf_device* devices  = NULL;
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_get_device_list(&devices, &ndevices));
-  const char* device_perf_tier_names[NGF_DEVICE_PERFORMANCE_TIER_COUNT] = {"high", "low", "unknown"};
+  const char* device_perf_tier_names[NGF_DEVICE_PERFORMANCE_TIER_COUNT] = {
+      "high",
+      "low",
+      "unknown"};
   /**
-   * For the sample code, we try to select a high-perf tier device. If one isn't available, we just fall back
-   * on the first device in the list.
-   * You may want to choose a different strategy for your specific application, or allow the user to pick.
+   * For the sample code, we try to select a high-perf tier device. If one isn't available, we just
+   * fall back on the first device in the list. You may want to choose a different strategy for your
+   * specific application, or allow the user to pick.
    */
   size_t high_power_device_idx = (~0u);
   ngf_samples::logi("available rendering devices: ");
   for (uint32_t i = 0; i < ndevices; ++i) {
-    /** 
-     * If no preferred index has been selected yet, and the current device is high-power, pick it as preferred.
-     * otherwise, just log the device details.
+    /**
+     * If no preferred index has been selected yet, and the current device is high-power, pick it as
+     * preferred. otherwise, just log the device details.
      */
-    ngf_samples::logi(" device %d : %s (perf tier : `%s`)", i, devices[i].name, device_perf_tier_names[devices[i].performance_tier]);
+    ngf_samples::logi(
+        " device %d : %s (perf tier : `%s`)",
+        i,
+        devices[i].name,
+        device_perf_tier_names[devices[i].performance_tier]);
     if (high_power_device_idx == (~0u) &&
         devices[i].performance_tier == NGF_DEVICE_PERFORMANCE_TIER_HIGH) {
       high_power_device_idx = i;
@@ -104,14 +110,13 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * and install a diagnostic callback.
    */
   const ngf_diagnostic_info diagnostic_info {
-    .verbosity = diagnostics_verbosity,
-    .userdata  = nullptr,
-    .callback  = ngf_samples::sample_diagnostic_callback
-  };
+      .verbosity = diagnostics_verbosity,
+      .userdata  = nullptr,
+      .callback  = ngf_samples::sample_diagnostic_callback};
   const ngf_init_info init_info {
-      .diag_info   = &diagnostic_info,
+      .diag_info            = &diagnostic_info,
       .allocation_callbacks = NULL,
-      .device = device_handle};
+      .device               = device_handle};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
@@ -129,7 +134,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * Initialize glfw.
    */
-   glfwInit();
+  glfwInit();
 
   /**
    * Create a window.
@@ -143,20 +148,17 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Also note that we set special window hint to make sure GLFW does _not_ attempt to create
    * an OpenGL (or other API) context for us - this is nicegraf's job.
    */
-   constexpr uint32_t window_width_hint = 800, window_height_hint = 600;
-   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-   GLFWwindow*        window =
-       glfwCreateWindow(window_width_hint, window_height_hint, "nicegraf sample", nullptr, nullptr);
-   if (window == nullptr) {
+  constexpr uint32_t window_width_hint = 800, window_height_hint = 600;
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  GLFWwindow* window =
+      glfwCreateWindow(window_width_hint, window_height_hint, "nicegraf sample", nullptr, nullptr);
+  if (window == nullptr) {
     ngf_samples::loge("Failed to create a window, exiting.");
     return 0;
-   }
-   int fb_width, fb_height;
-   glfwGetFramebufferSize(window, &fb_width, &fb_height);
-   ngf_samples::logi(
-       "created a window with client area of size size %d x %d.",
-       fb_width,
-       fb_height);
+  }
+  int fb_width, fb_height;
+  glfwGetFramebufferSize(window, &fb_width, &fb_height);
+  ngf_samples::logi("created a window with client area of size size %d x %d.", fb_width, fb_height);
 
   /**
    * Make sure keyboard/mouse work with imgui.
@@ -166,7 +168,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * Retrieve the native window handle to pass on to nicegraf.
    */
-   uintptr_t native_window_handle = 0;
+  uintptr_t native_window_handle = 0;
 #if defined(_WIN32) || defined(_WIN64)
   native_window_handle = (uintptr_t)glfwGetWin32Window(window);
 #elif defined(__APPLE__)
@@ -182,14 +184,14 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    */
   const ngf_sample_count   main_render_target_sample_count = NGF_SAMPLE_COUNT_8;
   const ngf_swapchain_info swapchain_info                  = {
-      .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
-      .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
-      .sample_count  = main_render_target_sample_count,
-      .capacity_hint = 3u,
-      .width         = (uint32_t)fb_width,
-      .height        = (uint32_t)fb_height,
-      .native_handle = native_window_handle,
-      .present_mode  = NGF_PRESENTATION_MODE_FIFO};
+                       .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+                       .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
+                       .sample_count  = main_render_target_sample_count,
+                       .capacity_hint = 3u,
+                       .width         = (uint32_t)fb_width,
+                       .height        = (uint32_t)fb_height,
+                       .native_handle = native_window_handle,
+                       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
   const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
   ngf::context           context;
   NGF_SAMPLES_CHECK_NGF_ERROR(context.initialize(ctx_info));
@@ -223,27 +225,32 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Main loop. Exit when either the window closes or `poll_events` returns false, indicating that
    * the application has received a request to exit.
    */
-  bool first_frame = true;
+  bool first_frame      = true;
   auto prev_frame_start = std::chrono::system_clock::now();
   while (!glfwWindowShouldClose(window)) {
     glfwPollEvents();
-    auto frame_start = std::chrono::system_clock::now();
-    const std::chrono::duration<float> time_delta = frame_start - prev_frame_start;
-    float time_delta_f = time_delta.count();
-    prev_frame_start = frame_start;
+    auto                               frame_start  = std::chrono::system_clock::now();
+    const std::chrono::duration<float> time_delta   = frame_start - prev_frame_start;
+    float                              time_delta_f = time_delta.count();
+    prev_frame_start                                = frame_start;
 
     /**
      * Query the updated size of the window and handle resize events.
      */
     const int old_fb_width = fb_width, old_fb_height = fb_height;
     glfwGetFramebufferSize(window, &fb_width, &fb_height);
-    bool resize_successful = true;
-    const bool need_resize = (fb_width != old_fb_width || fb_height != old_fb_height);
+    bool       resize_successful = true;
+    const bool need_resize       = (fb_width != old_fb_width || fb_height != old_fb_height);
     if (need_resize) {
-      ngf_samples::logd("window resizing detected, calling ngf_resize context. "
-                        "old size: %d x %d; new size: %d x %d",
-			old_fb_width, old_fb_height, fb_width, fb_height);
-      resize_successful &= (NGF_ERROR_OK == ngf_resize_context(context, (uint32_t)fb_width, (uint32_t)fb_height));
+      ngf_samples::logd(
+          "window resizing detected, calling ngf_resize context. "
+          "old size: %d x %d; new size: %d x %d",
+          old_fb_width,
+          old_fb_height,
+          fb_width,
+          fb_height);
+      resize_successful &=
+          (NGF_ERROR_OK == ngf_resize_context(context, (uint32_t)fb_width, (uint32_t)fb_height));
     }
 
     if (resize_successful) {
@@ -262,7 +269,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          * Start a new transfer command encoder for uploading resources to the GPU.
          */
         ngf_xfer_encoder xfer_encoder {};
-        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_encoder));
+        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, NULL, &xfer_encoder));
 
         /**
          * Initialize the sample, and save the opaque data pointer.
@@ -273,15 +280,15 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
             (uint32_t)fb_height,
             main_render_target_sample_count,
             xfer_encoder);
-        
+
         /**
          * Exit if sample failed to initialize.
          */
-         if (sample_opaque_data == nullptr) {
+        if (sample_opaque_data == nullptr) {
           ngf_samples::loge("Sample failed to initialize");
           break;
-         }
-         ngf_samples::logi("Sample initialized");
+        }
+        ngf_samples::logi("Sample initialized");
 
         /**
          * Initialize the ImGui rendering backend.
@@ -297,10 +304,19 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          * Finish the transfer encoder.
          */
         NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_xfer_pass(xfer_encoder));
-
-        first_frame = false;
       }
 
+      ngf_sync_op main_pass_sync_op {};
+
+      /**
+       * Let the sample code record any commands prior to the main render pass.
+       */
+      ngf_samples::sample_pre_draw_frame(main_cmd_buffer, &main_pass_sync_op, sample_opaque_data);
+
+      const bool main_pass_needs_sync = main_pass_sync_op.nwait_render_encoders > 0u ||
+                                        main_pass_sync_op.nwait_xfer_encoders > 0u ||
+                                        main_pass_sync_op.nwait_compute_encoders > 0u;
+      const ngf_sync_op* main_pass_sync_op_ptr = main_pass_needs_sync ? &main_pass_sync_op : nullptr;
       /**
        * Begin the main render pass.
        */
@@ -314,19 +330,22 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
           0.0f,
           1.0f,
           0,
+          main_pass_sync_op_ptr,
           &main_render_pass);
 
       /**
        * Call into the sample code to draw a single frame.
        */
+      static float t = 0.0;
       ngf_samples::sample_draw_frame(
           main_render_pass,
           time_delta_f,
           frame_token,
           (uint32_t)fb_width,
           (uint32_t)fb_height,
-          .0,
+          t,
           sample_opaque_data);
+      t += 0.008f;
 
       /**
        * Begin a new ImGui frame.
@@ -346,17 +365,28 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       imgui_backend->record_rendering_commands(main_render_pass);
 
       /**
-       * Finish the main render pass, submit the command buffer and end the frame.
+       * Finish the main render pass.
        */
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_render_pass(main_render_pass));
-      ngf_cmd_buffer submitted_cmd_bufs[] = { main_cmd_buffer.get() };
+
+      /**
+       * Let the sample record commands after the main render pass.
+       */
+      ngf_samples::sample_post_draw_frame(main_cmd_buffer, main_render_pass, sample_opaque_data);
+
+      /**
+       * Submit the main command buffer and end the frame.
+       */
+      ngf_cmd_buffer submitted_cmd_bufs[] = {main_cmd_buffer.get()};
       NGF_SAMPLES_CHECK_NGF_ERROR(ngf_submit_cmd_buffers(1, submitted_cmd_bufs));
+      ngf_samples::sample_post_submit(sample_opaque_data);
       if (ngf_end_frame(frame_token) != NGF_ERROR_OK) {
-      	ngf_samples::loge("failed to present image to swapchain!");
+        ngf_samples::loge("failed to present image to swapchain!");
       }
     } else {
       ngf_samples::loge("failed to handle window resize!");
     }
+    first_frame = false;
   }
 
   /**

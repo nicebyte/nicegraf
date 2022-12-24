@@ -447,8 +447,7 @@ static uint32_t ngfmtl_get_pitch(const uint32_t width, const ngf_image_format fo
 static uint32_t ngfmtl_get_num_rows(const uint32_t height, const ngf_image_format format) {
   const mtl_format f                    = get_mtl_pixel_format(format);
   const bool       is_compressed_format = (f.block_width | f.block_height) > 1;
-  return is_compressed_format ? (height + f.block_height - 1) / f.block_height
-                              : height;
+  return is_compressed_format ? (height + f.block_height - 1) / f.block_height : height;
 }
 
 #pragma mark ngf_struct_definitions
@@ -498,6 +497,7 @@ struct ngf_cmd_buffer_t {
   MTLIndexType                bound_index_buffer_type;
   uint32_t                    bound_index_buffer_offset = 0u;
 };
+#define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
 struct ngf_shader_stage_t {
   id<MTLLibrary> func_lib = nil;
@@ -1171,7 +1171,9 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = attachment_descs.descs[i];
     if (attachment_desc.type == NGF_ATTACHMENT_COLOR) {
-      const ngf_blend_info blend = info->color_attachment_blend_states ? info->color_attachment_blend_states[ncolor_attachments] : ngf_blend_info {};
+      const ngf_blend_info                        blend = info->color_attachment_blend_states
+                                                              ? info->color_attachment_blend_states[ncolor_attachments]
+                                                              : ngf_blend_info {};
       MTLRenderPipelineColorAttachmentDescriptor* mtl_attachment_desc =
           mtl_pipe_desc.colorAttachments[ncolor_attachments++];
       mtl_attachment_desc.pixelFormat     = get_mtl_pixel_format(attachment_desc.format).format;
@@ -1185,17 +1187,15 @@ ngf_error ngf_create_graphics_pipeline(
             get_mtl_blend_factor(blend.src_alpha_blend_factor);
         mtl_attachment_desc.destinationAlphaBlendFactor =
             get_mtl_blend_factor(blend.dst_alpha_blend_factor);
-        mtl_attachment_desc.rgbBlendOperation =
-            get_mtl_blend_operation(blend.blend_op_color);
-        mtl_attachment_desc.alphaBlendOperation =
-            get_mtl_blend_operation(blend.blend_op_alpha);
+        mtl_attachment_desc.rgbBlendOperation   = get_mtl_blend_operation(blend.blend_op_color);
+        mtl_attachment_desc.alphaBlendOperation = get_mtl_blend_operation(blend.blend_op_alpha);
       }
       if (info->color_attachment_blend_states) {
         mtl_attachment_desc.writeMask =
-          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R ? MTLColorWriteMaskRed : 0) |
-          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G ? MTLColorWriteMaskGreen : 0) |
-          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B ? MTLColorWriteMaskBlue : 0)  |
-          (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A ? MTLColorWriteMaskAlpha : 0) ;
+            (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R ? MTLColorWriteMaskRed : 0) |
+            (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G ? MTLColorWriteMaskGreen : 0) |
+            (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B ? MTLColorWriteMaskBlue : 0) |
+            (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A ? MTLColorWriteMaskAlpha : 0);
       }
     } else if (attachment_desc.type == NGF_ATTACHMENT_DEPTH) {
       mtl_pipe_desc.depthAttachmentPixelFormat =
@@ -1273,7 +1273,8 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Set primitive topology.
-  mtl_pipe_desc.inputPrimitiveTopology = get_mtl_primitive_topology_class(info->primitive_topology);
+  mtl_pipe_desc.inputPrimitiveTopology = get_mtl_primitive_topology_class(info->input_assembly_info->primitive_topology);
+  if (!info->input_assembly_info->enable_primitive_restart) { NGFI_DIAG_WARNING("Cannot disable primitive restart on Metal"); }
   if (mtl_pipe_desc.inputPrimitiveTopology == MTLPrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
@@ -1286,10 +1287,10 @@ ngf_error ngf_create_graphics_pipeline(
     mtl_pipe_desc.label = [NSString stringWithUTF8String:info->debug_name];
   }
 
-  NSError* err = nil;
-  pipeline->pipeline =
-      [CURRENT_CONTEXT->device newRenderPipelineStateWithDescriptor:mtl_pipe_desc error:&err];
-  pipeline->primitive_type = get_mtl_primitive_type(info->primitive_topology);
+  NSError* err       = nil;
+  pipeline->pipeline = [CURRENT_CONTEXT->device newRenderPipelineStateWithDescriptor:mtl_pipe_desc
+                                                                               error:&err];
+  pipeline->primitive_type = get_mtl_primitive_type(info->input_assembly_info->primitive_topology);
 
   // Set winding order and culling mode.
   pipeline->winding = get_mtl_winding(info->rasterization->front_face);
@@ -1347,8 +1348,8 @@ id<MTLBuffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   default:
     assert(false);
   }
-  id<MTLBuffer> mtl_buffer =
-      [CURRENT_CONTEXT->device newBufferWithLength:info.size options:options];
+  id<MTLBuffer> mtl_buffer = [CURRENT_CONTEXT->device newBufferWithLength:info.size
+                                                                  options:options];
   return mtl_buffer;
 }
 
@@ -1535,6 +1536,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
+    const ngf_sync_op*  sync_op,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi_sa_reset(ngfi_tmp_store());
   const uint32_t nattachments = rt->attachment_descs.ndescs;
@@ -1564,16 +1566,15 @@ ngf_error ngf_cmd_begin_render_pass_simple(
   }
   const ngf_pass_info pass_info =
       {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
-  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, sync_op, enc);
 }
 
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       cmd_buffer,
     const ngf_pass_info* pass_info,
+    const ngf_sync_op*   sync_op,
     ngf_render_encoder*  enc) NGF_NOEXCEPT {
-  enc->__handle = 0u;
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
-  enc->__handle = (uintptr_t)cmd_buffer;
   assert(pass_info);
   const ngf_render_target rt = pass_info->render_target;
   assert(rt);
@@ -1653,11 +1654,13 @@ ngf_error ngf_cmd_begin_render_pass(
   cmd_buffer->active_rce =
       [cmd_buffer->mtl_cmd_buffer renderCommandEncoderWithDescriptor:pass_descriptor];
   cmd_buffer->active_rt = rt;
+      
+  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buffer;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buffer               = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buffer               = NGFMTL_ENC2CMDBUF(enc);
   cmd_buffer->renderpass_active = false;
   [cmd_buffer->active_rce endEncoding];
   cmd_buffer->active_rce  = nil;
@@ -1670,15 +1673,14 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, ngf_xfer_encoder* enc) NGF_NOEXCEPT {
-  enc->__handle = 0u;
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_xfer_encoder* enc) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  enc->__handle = (uintptr_t)cmd_buf;
+  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   if (cmd_buf->active_bce) {
     [cmd_buf->active_bce endEncoding];
@@ -1689,7 +1691,7 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeline pipeline)
     NGF_NOEXCEPT {
-  auto buf = (ngf_cmd_buffer)enc.__handle;
+  auto buf = NGFMTL_ENC2CMDBUF(enc);
   [buf->active_rce setRenderPipelineState:pipeline->pipeline];
   [buf->active_rce setCullMode:pipeline->culling];
   [buf->active_rce setFrontFacingWinding:pipeline->winding];
@@ -1705,7 +1707,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
-  auto        buf = (ngf_cmd_buffer)enc.__handle;
+  auto        buf = NGFMTL_ENC2CMDBUF(enc);
   MTLViewport viewport;
   viewport.originX = r->x;
   viewport.originY = r->y + (int32_t)r->height;
@@ -1720,7 +1722,7 @@ void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT
 }
 
 void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
-  auto           buf = (ngf_cmd_buffer)enc.__handle;
+  auto           buf = NGFMTL_ENC2CMDBUF(enc);
   MTLScissorRect scissor;
   scissor.x      = (uint32_t)r->x;
   scissor.y      = (uint32_t)r->y;
@@ -1735,7 +1737,7 @@ void ngf_cmd_draw(
     uint32_t           first_element,
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT {
-  auto             buf       = (ngf_cmd_buffer)enc.__handle;
+  auto             buf       = NGFMTL_ENC2CMDBUF(enc);
   MTLPrimitiveType prim_type = buf->active_pipe->primitive_type;
   if (!indexed) {
     [buf->active_rce drawPrimitives:prim_type
@@ -1744,14 +1746,17 @@ void ngf_cmd_draw(
                       instanceCount:ninstances
                        baseInstance:0];
   } else {
-    [buf->active_rce drawIndexedPrimitives:prim_type
-                                indexCount:nelements
-                                 indexType:buf->bound_index_buffer_type
-                               indexBuffer:buf->bound_index_buffer
-                         indexBufferOffset:buf->bound_index_buffer_offset + first_element * (buf->bound_index_buffer_type == MTLIndexTypeUInt16 ? 2 : 4)
-                             instanceCount:ninstances
-                                baseVertex:0
-                              baseInstance:0];
+    [buf->active_rce
+        drawIndexedPrimitives:prim_type
+                   indexCount:nelements
+                    indexType:buf->bound_index_buffer_type
+                  indexBuffer:buf->bound_index_buffer
+            indexBufferOffset:buf->bound_index_buffer_offset +
+                              first_element *
+                                  (buf->bound_index_buffer_type == MTLIndexTypeUInt16 ? 2 : 4)
+                instanceCount:ninstances
+                   baseVertex:0
+                 baseInstance:0];
   }
 }
 
@@ -1760,17 +1765,20 @@ void ngf_cmd_bind_attrib_buffer(
     const ngf_buffer   buf,
     uint32_t           binding,
     uint32_t           offset) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   [cmd_buf->active_rce setVertexBuffer:buf->mtl_buffer
                                 offset:offset
                                atIndex:MAX_BUFFER_BINDINGS - binding];
 }
 
-void ngf_cmd_bind_index_buffer(ngf_render_encoder enc, const ngf_buffer buf, uint32_t offset, ngf_type type)
-    NGF_NOEXCEPT {
-  auto cmd_buf                     = (ngf_cmd_buffer)enc.__handle;
-  cmd_buf->bound_index_buffer      = buf->mtl_buffer;
-  cmd_buf->bound_index_buffer_type = get_mtl_index_type(type);
+void ngf_cmd_bind_index_buffer(
+    ngf_render_encoder enc,
+    const ngf_buffer   buf,
+    uint32_t           offset,
+    ngf_type           type) NGF_NOEXCEPT {
+  auto cmd_buf                       = NGFMTL_ENC2CMDBUF(enc);
+  cmd_buf->bound_index_buffer        = buf->mtl_buffer;
+  cmd_buf->bound_index_buffer_type   = get_mtl_index_type(type);
   cmd_buf->bound_index_buffer_offset = offset;
 }
 
@@ -1778,7 +1786,7 @@ void ngf_cmd_bind_resources(
     ngf_render_encoder          enc,
     const ngf_resource_bind_op* bind_ops,
     uint32_t                    nbind_ops) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op& bind_op = bind_ops[o];
     assert(cmd_buf->active_pipe);
@@ -1826,13 +1834,16 @@ void ngf_cmd_bind_resources(
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
-      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      [cmd_buf->active_rce setVertexSamplerState:img_bind_op.sampler->sampler
-                                         atIndex:native_binding];
-      [cmd_buf->active_rce setFragmentSamplerState:img_bind_op.sampler->sampler
+        const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+        [cmd_buf->active_rce setVertexSamplerState:img_bind_op.sampler->sampler
                                            atIndex:native_binding];
-      break;
+        [cmd_buf->active_rce setFragmentSamplerState:img_bind_op.sampler->sampler
+                                             atIndex:native_binding];
+        break;
     }
+    case NGF_DESCRIPTOR_STORAGE_BUFFER:
+    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+      break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
     }
@@ -1846,7 +1857,7 @@ void ngfmtl_cmd_copy_buffer(
     size_t           size,
     size_t           src_offset,
     size_t           dst_offset) {
-  auto buf = (ngf_cmd_buffer)enc.__handle;
+  auto buf = NGFMTL_ENC2CMDBUF(enc);
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   [buf->active_bce copyFromBuffer:src
@@ -1874,7 +1885,7 @@ void ngf_cmd_write_image(
     ngf_offset3d     offset,
     ngf_extent3d     extent,
     uint32_t         nlayers) NGF_NOEXCEPT {
-  auto buf = (ngf_cmd_buffer)enc.__handle;
+  auto buf = NGFMTL_ENC2CMDBUF(enc);
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   const MTLTextureType texture_type = dst.image->texture.textureType;
@@ -1882,7 +1893,7 @@ void ngf_cmd_write_image(
       texture_type == MTLTextureTypeCube || texture_type == MTLTextureTypeCubeArray;
   const uint32_t target_slice =
       (is_cubemap ? 6u : 1u) * dst.layer + (is_cubemap ? dst.cubemap_face : 0);
-  const uint32_t pitch = ngfmtl_get_pitch(extent.width, dst.image->format);
+  const uint32_t pitch    = ngfmtl_get_pitch(extent.width, dst.image->format);
   const uint32_t num_rows = ngfmtl_get_num_rows(extent.height, dst.image->format);
   for (uint32_t l = 0; l < nlayers; ++l) {
     [buf->active_bce copyFromBuffer:src->mtl_buffer
@@ -1906,7 +1917,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
                     "without the NGF_IMAGE_USAGE_MIPMAP_GENERATION flag");
     return NGF_ERROR_INVALID_OPERATION;
   }
-  auto buf = (ngf_cmd_buffer)xfenc.__handle;
+  auto buf = NGFMTL_ENC2CMDBUF(xfenc);
   assert(buf->active_rce == nil);
   if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   [buf->active_bce generateMipmapsForTexture:img->texture];
@@ -1917,13 +1928,13 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
   }
 
 void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   [cmd_buf->active_rce setStencilFrontReferenceValue:front backReferenceValue:back];
 }
 
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
     NGF_NOEXCEPT {
-  auto cmd_buf                                                       = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf                                                       = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.readMask = front;
   cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.readMask  = back;
   [cmd_buf->active_rce
@@ -1934,7 +1945,7 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32
 
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
     NGF_NOEXCEPT {
-  auto cmd_buf = (ngf_cmd_buffer)enc.__handle;
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.writeMask = front;
   cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.writeMask  = back;
   [cmd_buf->active_rce

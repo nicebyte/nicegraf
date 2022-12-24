@@ -50,6 +50,13 @@ void* sample_initialize(
     ngf_xfer_encoder xfer_encoder);
 
 /**
+ * This function gets called every frame before beginning the main render pass.
+ * It receives the command buffer that the main render pass will eventually be
+ * recorded into.
+ */
+void sample_pre_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_sync_op* sync_op, void* userdata);
+
+/**
  * This function gets called every frame, to render the frame contents.
  * It gets passed a token identifying the frame, the current window dimensions, and a (monotonically
  * increasing) timestamp. Window resizes are generally handled in the common code, but it's up to
@@ -64,6 +71,16 @@ void sample_draw_frame(
     uint32_t           height,
     float              time,
     void*              userdata);
+
+/**
+ * This function gets called every frame after finishing the main render pass.
+ * It receives the command buffer that the main render pass was previously
+ * recorded into.
+ */
+void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_render_encoder prev_render_encoder, void* userdata);
+
+void sample_post_submit(void* userdata);
+
 
 /**
  * This function gets called every frame, to render the UI of the sample. It should mostly consist
