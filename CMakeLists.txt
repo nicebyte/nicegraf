@@ -102,7 +102,7 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
                SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block-allocator-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/frame_token_test.cpp
+                    ${CMAKE_CURRENT_LIST_DIR}/tests/frame-token-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/native-binding-map-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
                     ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
@@ -166,7 +166,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         endforeach(tech_line)
         set(output_files_list "")
         get_filename_component(header_file_name ${source_path} NAME_WE)
-        if(NOT ${header_file_name} STREQUAL "compute-demo")
+        if(NOT ${header_file_name} MATCHES "compute-*")
           foreach(tech ${tech_names})
             list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.vs.21.msl")
             list(APPEND output_files_list "${NGF_SAMPLES_OUTPUT_DIR}/shaders/${tech}.ps.21.msl")
@@ -268,6 +268,6 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     ngf_sample(NAME 07-blinn-phong)    
     ngf_sample(NAME 08-image-arrays)    
     ngf_sample(NAME 09-volume-rendering)
-    ngf_sample(NAME 0a-compute-demo)
+    ngf_sample(NAME 0a-compute-mandelbrot)
     ngf_sample(NAME 0b-compute-vertices)
 endif()
