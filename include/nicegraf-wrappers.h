@@ -161,6 +161,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
 
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(shader_stage);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(graphics_pipeline);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(compute_pipeline);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(image);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(sampler);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
@@ -182,6 +183,13 @@ NGF_DEFINE_WRAPPER_TYPE(shader_stage);
  * A RAII wrapper for \ref ngf_graphics_pipeline.
  */
 NGF_DEFINE_WRAPPER_TYPE(graphics_pipeline);
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A RAII wrapper for \ref ngf_compute_pipeline.
+ */
+NGF_DEFINE_WRAPPER_TYPE(compute_pipeline);
 
 /**
  * \ingroup ngf_wrappers
@@ -247,8 +255,8 @@ class render_encoder {
    * @param cmd_buf The command buffer to create a new render encoder for.
    * @param pass_info Render pass description.
    */
-  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info) {
-    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_);
+  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info, const ngf_sync_op* sync_op) {
+    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, sync_op, &enc_);
   }
 
   /**
@@ -282,6 +290,7 @@ class render_encoder {
         clear_color_a,
         clear_depth,
         clear_stencil,
+        NULL,
         &enc_);
   }
 
@@ -289,7 +298,7 @@ class render_encoder {
    * Finishes the wrapped render pass.
    */
   ~render_encoder() {
-    if (enc_.__handle) ngf_cmd_end_render_pass(enc_);
+    if (enc_.pvt_data_donotuse.d0) ngf_cmd_end_render_pass(enc_);
   }
 
   render_encoder(render_encoder&& other) noexcept {
@@ -298,7 +307,8 @@ class render_encoder {
 
   render_encoder& operator=(render_encoder&& other) noexcept {
     enc_                = other.enc_;
-    other.enc_.__handle = 0u;
+    enc_.pvt_data_donotuse.d0 = 0u;
+    enc_.pvt_data_donotuse.d1 = 0u;
     return *this;
   }
 
@@ -328,15 +338,15 @@ class xfer_encoder {
    * 
    * @param cmd_buf The command buffer to create the transfer encoder for
    */
-  explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
-    ngf_cmd_begin_xfer_pass(cmd_buf, &enc_);
+  explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
+    if(enc_.pvt_data_donotuse.d0) ngf_cmd_begin_xfer_pass(cmd_buf, sync_op, &enc_);
   }
 
   /**
    * Ends the wrapped transfer pass.
    */
   ~xfer_encoder() {
-    if (enc_.__handle) ngf_cmd_end_xfer_pass(enc_);
+    ngf_cmd_end_xfer_pass(enc_);
   }
 
   xfer_encoder(xfer_encoder&& other) noexcept {
@@ -345,7 +355,8 @@ class xfer_encoder {
 
   xfer_encoder& operator=(xfer_encoder&& other) noexcept {
     enc_                = other.enc_;
-    other.enc_.__handle = 0u;
+    other.enc_.pvt_data_donotuse.d0 = 0u;
+    other.enc_.pvt_data_donotuse.d1 = 0u;
     return *this;
   }
 
@@ -458,7 +469,7 @@ template<uint32_t S> struct descriptor_set {
 /**
  * \ingroup ngf_wrappers
  * 
- * A convenience function for binding many resource at once to the shader. Example usage:
+ * A convenience function for binding many resources at once to the shader. Example usage:
  * 
  * ```
  * ngf::cmd_bind_resources(your_render_encoder,
@@ -471,6 +482,25 @@ template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Ar
   const ngf_resource_bind_op ops[] = {std::forward<const Args>(args)...};
   ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
+
+/**
+ * \ingroup ngf_wrappers
+ * 
+ * A convenience function for binding many resources at once to the shader. Example usage:
+ * 
+ * ```
+ * ngf::cmd_bind_resources(your_compute_encoder,
+ *                         ngf::descriptor_set<0>::binding<0>::image(your_image),
+ *                         ngf::descriptor_set<0>::binding<1>::sampler(your_sampler),
+ *                         ngf::descriptor_set<1>::binding<0>::uniform_buffer(your_buffer));
+ * ```
+ * 
+ */
+template<class... Args> void cmd_bind_resources(ngf_compute_encoder enc, const Args&&... args) {
+  const ngf_resource_bind_op ops[] = {std::forward<const Args>(args)...};
+  ngf_cmd_bind_compute_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
+}
+
 
 /**
  * \ingroup ngf_wrappers

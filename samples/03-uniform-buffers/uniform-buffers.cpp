@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -95,7 +95,7 @@ void* sample_initialize(
   polygon_pipe_info.shader_stages[0]                  = polygon_vertex_stage.get();
   polygon_pipe_info.shader_stages[1]                  = polygon_fragment_stage.get();
   polygon_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  polygon_pipe_info.primitive_topology             = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  polygon_pipeline_data.input_assembly_info.primitive_topology = NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
   NGF_SAMPLES_CHECK_NGF_ERROR(state->polygon_pipeline.initialize(polygon_pipe_info));
 
   /**
@@ -198,7 +198,16 @@ void sample_draw_frame(
                                  (3 * state->aligned_uniform_data_size);
 }
 
+void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op*, void*) {
+}
+
+void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
+}
+
 void sample_draw_ui(void*) {
+}
+
+void sample_post_submit(void*) {
 }
 
 void sample_shutdown(void* userdata) {

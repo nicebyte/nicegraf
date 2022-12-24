@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -233,6 +233,14 @@ void sample_draw_frame(
       (uint32_t)state->bunny_mesh.num_indices,
       1u);
 }
+
+void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op*, void*) {
+}
+
+void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
+}
+
+void sample_post_submit(void*) {}
 
 void sample_draw_ui(void* userdata) {
   auto data = reinterpret_cast<blinn_phong::state*>(userdata);

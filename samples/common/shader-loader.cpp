@@ -41,7 +41,7 @@ namespace ngf_samples {
 ngf::shader_stage
 load_shader_stage(const char* shader_file_name, const char* entry_point_name, ngf_stage_type type) {
   constexpr const char* shaders_root_dir        = "shaders" NGF_SAMPLES_PATH_SEPARATOR;
-  constexpr const char* stage_to_file_ext_map[] = {"vs", "ps"};
+  constexpr const char* stage_to_file_ext_map[] = {"vs", "ps", "cs"};
 
   const std::string file_name = shaders_root_dir + std::string(shader_file_name) + "." +
                                 stage_to_file_ext_map[type] + SHADER_EXTENSION;

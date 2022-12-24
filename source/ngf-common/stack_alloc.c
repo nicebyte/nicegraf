@@ -67,3 +67,4 @@ ngfi_sa* ngfi_tmp_store(void) {
   }
   return temp_storage;
 }
+

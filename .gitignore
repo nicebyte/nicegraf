@@ -11,3 +11,6 @@ samples/binaries/*
 /.vs
 samples-build-files/*
 .gitmodules
+.idea
+cmake-build-debug-visual-studio
+docs/doxygen

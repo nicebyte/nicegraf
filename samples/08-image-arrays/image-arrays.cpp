@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -303,6 +303,15 @@ void sample_draw_frame(
       ngf::descriptor_set<0>::binding<1>::sampler(state->image_sampler),
       ngf::descriptor_set<1>::binding<0>::texture(state->image_array));
   ngf_cmd_draw(main_render_pass, false, 0, 6, 1);
+}
+
+void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op*, void*) {
+}
+
+void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
+}
+
+void sample_post_submit(void*) {
 }
 
 void sample_draw_ui(void* userdata) {

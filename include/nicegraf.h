@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -440,6 +440,11 @@ typedef enum ngf_error {
   /*..add new errors above this line */
 } ngf_error;
 
+typedef enum ngf_sync_scope {
+    NGF_SYNC_SCOPE_GFX,
+    NGF_SYNC_SCOPE_COMPUTE
+} ngf_sync_scope;
+
 /**
  * @struct ngf_irect2d
  * \ingroup ngf
@@ -488,7 +493,12 @@ typedef enum ngf_stage_type {
   /** \ingroup ngf
    * Indicates the fragment processing stage. */
   NGF_STAGE_FRAGMENT,
-  // TODO: compute pipelines
+
+  /** \ingroup ngf
+   * Indicates the compute stage.
+   */
+  NGF_STAGE_COMPUTE,
+
   NGF_STAGE_COUNT
 } ngf_stage_type;
 
@@ -894,37 +904,38 @@ typedef enum ngf_blend_factor {
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
-   * color by the 1st, 2nd and 3rd elements of \ref ngf_pipeline_info::blend_consts respectively;
+   * color by the 1st, 2nd and 3rd elements of \ref ngf_graphics_pipeline_info::blend_consts
+   * respectively;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
-   * ngf_pipeline_info::blend_consts.
+   * ngf_graphics_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_CONSTANT_COLOR,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the red, green and blue components of the
-   * color by one minus the 1st, 2nd and 3rd elements of \ref ngf_pipeline_info::blend_consts
-   * respectively;
+   * color by one minus the 1st, 2nd and 3rd elements of \ref
+   * ngf_graphics_pipeline_info::blend_consts respectively;
    * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
-   * component of \ref ngf_pipeline_info::blend_consts.
+   * component of \ref ngf_graphics_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by the 4th
-   * element of \ref ngf_pipeline_info::blend_consts;
+   * element of \ref ngf_graphics_pipeline_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by the 4th component of \ref
-   * ngf_pipeline_info::blend_consts.
+   * ngf_graphics_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_CONSTANT_ALPHA,
 
   /**
    * \ingroup ngf
    * - If used as a blend factor for color: multiplies the components of the color by one minus the
-   * 4th element of \ref ngf_pipeline_info::blend_consts;
+   * 4th element of \ref ngf_graphics_pipeline_info::blend_consts;
    * - if used as a blend factor for alpha: multiplies the alpha value by one minus the 4th
-   * component of \ref ngf_pipeline_info::blend_consts.
+   * component of \ref ngf_graphics_pipeline_info::blend_consts.
    */
   NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA,
 
@@ -1416,6 +1427,11 @@ typedef struct ngf_specialization_info {
                            specialization constants. */
 } ngf_specialization_info;
 
+typedef struct ngf_input_assembly_info {
+  ngf_primitive_topology primitive_topology;
+  bool                   enable_primitive_restart;
+} ngf_input_assembly_info;
+
 /**
  * @struct ngf_graphics_pipeline_info
  * \ingroup ngf
@@ -1438,7 +1454,11 @@ typedef struct ngf_graphics_pipeline_info {
    */
   const ngf_vertex_input_info* input_info;
 
-  ngf_primitive_topology primitive_topology; /**< The primitive topology used by this pipeline. */
+  /**
+   * Specifies how primitives are assembled from vertices.
+   */
+  const ngf_input_assembly_info* input_assembly_info;
+
   const ngf_specialization_info* spec_info;  /**< Specifies the values for specialization constants
                                                 (if any) used by the programmable stages. */
 
@@ -1476,6 +1496,29 @@ typedef struct ngf_graphics_pipeline_info {
  * ngf_destroy_graphics_pipeline.
  */
 typedef struct ngf_graphics_pipeline_t* ngf_graphics_pipeline;
+
+/**
+ * @struct ngf_compute_pipeline_info
+ * \ingroup  ngf
+ *
+ * Contains all information necessary for creating a compute pipeline object.
+ */
+typedef struct ngf_compute_pipeline_info {
+  ngf_shader_stage shader_stage; /**< The (only) stage for this pipeline. */
+  const ngf_specialization_info*
+      spec_info; /**< Specifies the value of  specialization consts used by this pipeline. */
+} ngf_compute_pipeline_info;
+
+/**
+ * @struct ngf_compute_pipeline
+ * \ingroup ngf
+ *
+ * An opaque handle to a compute pipeline object.
+ *
+ * See also: \ref ngf_compute_pipeline_info, \ref ngf_create_compute_pipeline and \ref
+ * ngf_destroy_compute_pipeline.
+ */
+typedef struct ngf_compute_pipeline_t* ngf_compute_pipeline;
 
 /**
  * @enum ngf_descriptor_type
@@ -1521,6 +1564,18 @@ typedef enum ngf_descriptor_type {
    * (i.e. a big array of `float4`s) to the shader.
    */
   NGF_DESCRIPTOR_TEXEL_BUFFER,
+
+  /**
+   * \ingroup ngf
+   *
+   * A storage buffer is a large buffer that can be both read and written in shaders.
+   */
+  NGF_DESCRIPTOR_STORAGE_BUFFER,
+
+  /**
+   * An image that can be both read and written to in a shader.
+   */
+  NGF_DESCRIPTOR_STORAGE_IMAGE,
 
   NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
@@ -1653,7 +1708,11 @@ typedef enum ngf_image_usage {
 
   /** \ingroup ngf
    * Mipmaps may be generated for the image with \ref ngf_cmd_generate_mipmaps. */
-  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08
+  NGF_IMAGE_USAGE_MIPMAP_GENERATION = 0x08,
+
+  /** \ingroup ngf
+   * The image may be read or written to by a shader. */
+  NGF_IMAGE_USAGE_STORAGE = 0x10
 } ngf_image_usage;
 
 /**
@@ -1961,7 +2020,12 @@ typedef enum ngf_buffer_usage {
 
   /** \ingroup ngf
    * The buffer may be bound as a uniform texel buffer. */
-  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20
+  NGF_BUFFER_USAGE_TEXEL_BUFFER = 0x20,
+
+  /**
+   * \ingroup ngf
+   * The buffer may be bound as a storage buffer. */
+  NGF_BUFFER_USAGE_STORAGE_BUFFER = 0x40
 } ngf_buffer_usage;
 
 /**
@@ -1982,6 +2046,18 @@ typedef struct ngf_buffer_info {
  * An opaque handle to a buffer object.
  */
 typedef struct ngf_buffer_t* ngf_buffer;
+
+/**
+ * @struct ngf_buffer_slice
+ * \ingroup ngf
+ *
+ * A reference to a subregion of a buffer.
+ */
+typedef struct ngf_buffer_slice {
+  ngf_buffer buffer; /**< The handle of the buffer being referred to. */
+  size_t     offset; /**< Starting offset of the subregion. */
+  size_t     range;  /**< Size of the subregion. */
+} ngf_buffer_slice;
 
 /**
  * @struct ngf_texel_buffer_view
@@ -2155,13 +2231,14 @@ typedef struct ngf_context_info {
   const ngf_context shared_context;
 } ngf_context_info;
 
+
 /**
  * @struct ngf_cmd_buffer_info
  * \ingroup ngf
  * Information about a command buffer.
  */
 typedef struct ngf_cmd_buffer_info {
-  uint32_t flags; /**< Reserved for future use. */
+  uint32_t reserved;
 } ngf_cmd_buffer_info;
 
 /**
@@ -2223,6 +2300,11 @@ typedef struct ngf_cmd_buffer_info {
  */
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
+struct ngfi_private_encoder_data {
+  uintptr_t d0;
+  uintptr_t d1;
+};
+
 /**
  * @struct ngf_render_encoder
  * \ingroup ngf
@@ -2230,8 +2312,8 @@ typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
  * A render encoder records rendering commands (such as draw calls) into its
  * corresponding command buffer.
  */
-typedef struct {
-  uintptr_t __handle;
+typedef struct ngf_render_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
 } ngf_render_encoder;
 
 /**
@@ -2241,9 +2323,33 @@ typedef struct {
  * A transfer encoder records transfer commands (i.e. copying buffer contents)
  * into its corresponding command buffer.
  */
-typedef struct {
-  uintptr_t __handle;
+typedef struct ngf_xfer_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
 } ngf_xfer_encoder;
+
+/**
+ * @struct ngf_compute_encoder
+ * \ingroup ngf
+ *
+ * A compute encoder records compute dispatches into its corresponding command buffer.
+ */
+typedef struct ngf_compute_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
+} ngf_compute_encoder;
+
+typedef struct ngf_sync_op {
+  uint32_t                   nwait_render_encoders;
+  const ngf_render_encoder*  wait_render_encoders;
+  uint32_t                   nwait_xfer_encoders;
+  const ngf_xfer_encoder*    wait_xfer_encoders;
+  uint32_t                   nwait_compute_encoders;
+  const ngf_compute_encoder* wait_compute_encoders;
+  uint32_t                   nbuffer_slices;
+  const ngf_buffer_slice*    buffer_slices;
+  uint32_t                   nimage_refs;
+  const ngf_image_ref*       image_refs;
+} ngf_sync_op;
+
 
 /**
  * @typedef ngf_frame_token
@@ -2406,6 +2512,27 @@ ngf_error ngf_create_graphics_pipeline(
  * @param pipeline The handle to the pipeline object to be destroyed.
  */
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Creates a new compute pipeline object.
+ *
+ * @param info Information required to construct the compute pipeline object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
+ */
+ngf_error ngf_create_compute_pipeline(
+    const ngf_compute_pipeline_info* info,
+    ngf_compute_pipeline*            result) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Destroys the given compute pipeline object.
+ *
+ * @param pipeline The handle to the pipeline object to be destroyed.
+ */
+void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2659,6 +2786,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       buf,
     const ngf_pass_info* pass_info,
+    const ngf_sync_op* sync_op,
     ngf_render_encoder*  enc) NGF_NOEXCEPT;
 
 /**
@@ -2693,6 +2821,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
+    const ngf_sync_op*  sync_op,
     ngf_render_encoder* enc) NGF_NOEXCEPT;
 
 /**
@@ -2717,7 +2846,7 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, ngf_xfer_encoder* enc) NGF_NOEXCEPT;
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_xfer_encoder* enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2729,7 +2858,42 @@ ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, ngf_xfer_encoder* enc) NGF
  */
 ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ *
+ * Begins a compute pass.
+ *
+ * @param buf The handle of the command buffer to operate on. Must be in the "ready"
+ *             state, will be transitioned to the "recording" state.
+ * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
+ *            associated with the transfer pass must be recorded using that encoder.
+ */
+ngf_error ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_compute_encoder* enc) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Ends a compute pass.
+ *
+ * Disposes of the given compute cmd encoder, transitioning its corresponding
+ * command buffer to the "ready" state.
+ */
+ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Binds a graphics pipeline.
+ */
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, const ngf_graphics_pipeline pipeline)
+    NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Binds a compute pipeline.
+ */
+void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder buf, const ngf_compute_pipeline pipeline)
     NGF_NOEXCEPT;
 
 /**
@@ -2775,7 +2939,7 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 /**
  * \ingroup ngf
  *
- * Bind resources for the shader to read. See ngf_resource_bind_op for more information.
+ * Bind resources for shaders to access. See ngf_resource_bind_op for more information.
  *
  * @param enc The handle to the render encoder object to record the command into.
  * @param bind_operations A pointer to a contiguous array of \ref ngf_resource_bind_op objects.
@@ -2783,6 +2947,20 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
  */
 void ngf_cmd_bind_resources(
     ngf_render_encoder          enc,
+    const ngf_resource_bind_op* bind_operations,
+    uint32_t                    nbind_operations) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Bind resources for shaders to access. See ngf_resource_bind_op for more information.
+ *
+ * @param enc The handle to the render encoder object to record the command into.
+ * @param bind_operations A pointer to a contiguous array of \ref ngf_resource_bind_op objects.
+ * @param nbinds The number of elements in the array pointed to by \ref bind_operations.
+ */
+void ngf_cmd_bind_compute_resources(
+    ngf_compute_encoder         enc,
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) NGF_NOEXCEPT;
 
@@ -2823,6 +3001,7 @@ void ngf_cmd_bind_index_buffer(
  * \ingroup ngf
  *
  * Executes a draw.
+ * This command is not supported by compute-type command buffers.
  *
  * @param enc The render encoder to record the command into.
  * @param indexed Indicates whether the draw uses an index buffer or not.
@@ -2836,6 +3015,23 @@ void ngf_cmd_draw(
     uint32_t           first_element,
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Encodes a compute shader dispatch.
+ * This command is not supported by draw-type buffers.
+ *
+ * @param enc The encoder to record the command into.
+ * @param x_threadgroups Number of threadgroups along the X dimension of the grid.
+ * @param y_threadgroups Number of threadgroups along the Y dimension of the grid.
+ * @param z_threadgroups Number of threadgroups along the Z dimension of the grid.
+ */
+void ngf_cmd_dispatch(
+    ngf_compute_encoder enc,
+    uint32_t            x_threadgroups,
+    uint32_t            y_threadgroups,
+    uint32_t            z_threadgroups) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
