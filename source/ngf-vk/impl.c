@@ -24,7 +24,7 @@
 #include "ngf-common/block-alloc.h"
 #include "ngf-common/cmdbuf_state.h"
 #include "ngf-common/dynamic_array.h"
-#include "ngf-common/frame_token.h"
+#include "ngf-common/frame-token.h"
 #include "ngf-common/macros.h"
 #include "ngf-common/stack_alloc.h"
 #include "nicegraf.h"
@@ -3625,7 +3625,7 @@ ngf_error ngf_create_graphics_pipeline(
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
-      .topology               = get_vk_primitive_type(info->input_assembly_info->primitive_topolgy),
+      .topology               = get_vk_primitive_type(info->input_assembly_info->primitive_topology),
       .primitiveRestartEnable = info->input_assembly_info->enable_primitive_restart};
 
   // Prepare tessellation state.

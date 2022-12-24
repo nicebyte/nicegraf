@@ -21,7 +21,7 @@
  */
 
 #include "catch.hpp"
-#include "ngf-common/frame_token.h"
+#include "ngf-common/frame-token.h"
 
 TEST_CASE("encode-decode frame token works") {
   const uint16_t  test_ctx_id = 65534u, test_max_inflight_frames = 3u, test_frame_id = 255u;
