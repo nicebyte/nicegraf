@@ -29,7 +29,7 @@
 #endif
 
 #define VK_NO_PROTOTYPES
-#include <vulkan.h>
+#include <vulkan/vulkan.h>
 #include <stdbool.h>
 
 #ifdef __cplusplus
