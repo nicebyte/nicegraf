@@ -768,10 +768,10 @@ constexpr MTLGPUFamily NGFMTL_GPU_FAMILIES[] = {
     MTLGPUFamilyApple5,
     MTLGPUFamilyApple6,
     MTLGPUFamilyApple7,
-    MTLGPUFamilyMac1,
     MTLGPUFamilyMac2,
-    MTLGPUFamilyMacCatalyst1,
-    MTLGPUFamilyMacCatalyst2,
+    MTLGPUFamilyMac2,
+    MTLGPUFamilyMac2,
+    MTLGPUFamilyMac2,
 };
 
 constexpr size_t NGFMTL_NUM_GPU_FAMILIES = sizeof(NGFMTL_GPU_FAMILIES) / sizeof(MTLGPUFamily);
@@ -831,7 +831,7 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<M
     caps.max_fragment_inputs = 60;
   }
 
-  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyMac1)) {
+  if (gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyMac2)) {
     caps.uniform_buffer_offset_alignment = 256;
     caps.texel_buffer_offset_alignment   = 256;
   } else {

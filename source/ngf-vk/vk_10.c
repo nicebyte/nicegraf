@@ -10,7 +10,11 @@
 #define LoadLibraryA(name) dlopen(name, RTLD_NOW)
 #define GetProcAddress(h, n) dlsym(h, n)
 #define ModuleHandle void*
+#if defined(__APPLE__)
+#define VK_LOADER_LIB "libMoltenVK.dylib"
+#else
 #define VK_LOADER_LIB "libvulkan.so.1"
+#endif
 #endif
 
 PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
@@ -30,7 +34,9 @@ PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperties;
 PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
 PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties;
 PFN_vkGetPhysicalDeviceSparseImageFormatProperties vkGetPhysicalDeviceSparseImageFormatProperties;
+#if !defined(__APPLE__)
 VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+#endif
 VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
 PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;
@@ -184,8 +190,9 @@ bool vkl_init_loader(void) {
         "vkEnumerateInstanceLayerProperties");
   return true;
 }
-
+#if !defined(__APPLE__)
 extern VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+#endif
 extern VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 void vkl_init_instance(VkInstance inst) {
   vkCreateDevice = (PFN_vkCreateDevice)vkGetInstanceProcAddr(inst, "vkCreateDevice");
@@ -201,7 +208,9 @@ void vkl_init_instance(VkInstance inst) {
   vkGetPhysicalDeviceProperties = (PFN_vkGetPhysicalDeviceProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceProperties");
   vkGetPhysicalDeviceQueueFamilyProperties = (PFN_vkGetPhysicalDeviceQueueFamilyProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceQueueFamilyProperties");
   vkGetPhysicalDeviceSparseImageFormatProperties = (PFN_vkGetPhysicalDeviceSparseImageFormatProperties)vkGetInstanceProcAddr(inst, "vkGetPhysicalDeviceSparseImageFormatProperties");
+#if !defined(__APPLE__)
   VK_GET_DEVICE_PRES_FN = (VK_GET_DEVICE_PRES_FN_TYPE)vkGetInstanceProcAddr(inst, STRINGIFY(VK_GET_DEVICE_PRES_FN));
+#endif
   VK_CREATE_SURFACE_FN = (VK_CREATE_SURFACE_FN_TYPE)vkGetInstanceProcAddr(inst, STRINGIFY(VK_CREATE_SURFACE_FN));
   vkDestroySurfaceKHR = (PFN_vkDestroySurfaceKHR)vkGetInstanceProcAddr(inst, "vkDestroySurfaceKHR");
   vkGetPhysicalDeviceSurfaceSupportKHR =

@@ -17,5 +17,5 @@ else
   NGF_GENERATOR=
 fi
 
-cmake .. -DNGF_BUILD_SAMPLES="yes" ${NGF_GENERATOR}
+cmake .. -DNGF_BUILD_SAMPLES="yes" ${NGF_GENERATOR} $@
 cd ..

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -740,6 +740,8 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
   return vkGetPhysicalDeviceWin32PresentationSupportKHR(phys_dev, queue_family_index);
 #elif defined(__ANDROID__)
   return true;  // All Android queues surfaces support present.
+#elif defined(__APPLE__)
+  return true;
 #else
 
   if (_vk.xcb_connection == NULL) {
@@ -1159,7 +1161,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     }
   }
 
-  NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, s) {
+  NGFI_DARRAY_FOREACH(frame_res->cmd_buf_sems, s) {
     vkDestroySemaphore(_vk.device, NGFI_DARRAY_AT(frame_res->cmd_buf_sems, s), NULL);
   }
 
@@ -2286,6 +2288,10 @@ const ngf_device_capabilities* ngf_get_device_capabilities(void) {
   return &DEVICE_CAPS;
 }
 
+#if defined(__APPLE__)
+void* ngfvk_create_ca_metal_layer(const ngf_swapchain_info*);
+#endif
+
 ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) {
   assert(info);
   assert(result);
@@ -2354,6 +2360,13 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
         .pNext  = NULL,
         .flags  = 0,
         .window = swapchain_info->native_handle};
+#elif defined(__APPLE__)
+    const VkMetalSurfaceCreateInfoEXT surface_info = {
+      .sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
+      .pNext = NULL,
+      .flags = 0,
+      .pLayer = (const CAMetalLayer*)ngfvk_create_ca_metal_layer(swapchain_info)
+    };
 #else
     const VkXcbSurfaceCreateInfoKHR surface_info = {
         .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
@@ -2830,7 +2843,7 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
         CURRENT_CONTEXT->swapchain.image_semaphores[fi],
         VK_NULL_HANDLE,
         &CURRENT_CONTEXT->swapchain.image_idx);
-    if (acquire_result != VK_SUCCESS) { return NGF_ERROR_INVALID_OPERATION; }
+    if (acquire_result != VK_SUCCESS && acquire_result != VK_SUBOPTIMAL_KHR) { return NGF_ERROR_INVALID_OPERATION; }
   }
 
   CURRENT_CONTEXT->current_frame_token = ngfi_encode_frame_token(

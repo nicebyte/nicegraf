@@ -16,6 +16,12 @@
   #define   VK_CREATE_SURFACE_FN        vkCreateAndroidSurfaceKHR
   #define   VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateAndroidSurfaceKHR
   #define   VK_USE_PLATFORM_ANDROID_KHR
+#elif defined(__APPLE__)
+#include <dlfcn.h>
+#define     VK_SURFACE_EXT              "VK_EXT_metal_surface"
+#define     VK_CREATE_SURFACE_FN        vkCreateMetalSurfaceEXT
+#define     VK_CREATE_SURFACE_FN_TYPE   PFN_vkCreateMetalSurfaceEXT
+#define     VK_USE_PLATFORM_METAL_EXT
 #else
   #include <xcb/xcb.h>
   #include <dlfcn.h>
@@ -53,7 +59,9 @@ extern PFN_vkGetPhysicalDeviceMemoryProperties vkGetPhysicalDeviceMemoryProperti
 extern PFN_vkGetPhysicalDeviceProperties vkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceQueueFamilyProperties vkGetPhysicalDeviceQueueFamilyProperties;
 extern PFN_vkGetPhysicalDeviceSparseImageFormatProperties vkGetPhysicalDeviceSparseImageFormatProperties;
+#if !defined(__APPLE__)
 extern VK_GET_DEVICE_PRES_FN_TYPE VK_GET_DEVICE_PRES_FN;
+#endif
 extern VK_CREATE_SURFACE_FN_TYPE VK_CREATE_SURFACE_FN;
 extern PFN_vkDestroySurfaceKHR vkDestroySurfaceKHR;
 extern PFN_vkGetPhysicalDeviceSurfaceSupportKHR vkGetPhysicalDeviceSurfaceSupportKHR;

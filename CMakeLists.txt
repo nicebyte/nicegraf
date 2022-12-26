@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2022 nicegraf contributors
+Copyright (c) 2023 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -58,13 +58,16 @@ nmk_static_library(NAME nicegraf-util
 
 
 if (APPLE)
-  # Nicegraf with Metal backend.
   find_library(APPLE_METAL Metal)
   find_library(APPLE_COCOA Cocoa)
   find_library(APPLE_QUARTZ Quartz)
+endif()
+
+if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes")) 
+  # Nicegraf with native Metal backend.
   nmk_static_library(NAME nicegraf-mtl
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
                      COPTS "-fobjc-arc")
 else()
@@ -78,8 +81,10 @@ else()
 
   # Some vulkan-specific dependencies.
   set(NICEGRAF_VK_DEPS vma spvreflect nicegraf-vk-headers)
-  if (NOT WIN32)
+  if (NOT WIN32 AND NOT APPLE)
     set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} xcb)
+  elseif (APPLE)
+    set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} ${APPLE_QUARTZ})
   endif()
 
   # Vulkan backend.
@@ -87,6 +92,7 @@ else()
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm
                      DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 endif()
 
@@ -123,7 +129,11 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         set(NGF_SAMPLES_BACKEND nicegraf-vk)
     elseif(APPLE)
         set(NICEGRAF_SHADERC_PLATFORM macos)
-        set(NGF_SAMPLES_BACKEND nicegraf-mtl)
+        if (NGF_USE_MVK STREQUAL "yes")
+          set(NGF_SAMPLES_BACKEND nicegraf-vk)
+        else()
+          set(NGF_SAMPLES_BACKEND nicegraf-mtl)
+        endif()
         set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
