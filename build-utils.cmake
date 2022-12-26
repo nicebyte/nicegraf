@@ -50,14 +50,17 @@ function (nmk_target)
   if ( TGT_TYPE STREQUAL "hdr")
     target_include_directories(${TGT_NAME}
                                INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})
+    target_compile_options(${TGT_NAME} INTERFACE ${NICEMAKE_COMMON_COMPILE_OPTS})
+    target_compile_definitions(${TGT_NAME} INTERFACE ${TGT_PUB_DEFINES} ${TGT_PVT_DEFINES})
   else()
     target_include_directories(${TGT_NAME}
                                PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${TGT_PVT_INCLUDES})  
     target_include_directories(${TGT_NAME}
-                               PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})  
+                               PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})
+    target_compile_options(${TGT_NAME} PRIVATE ${NICEMAKE_COMMON_COMPILE_OPTS})
+    target_compile_definitions(${TGT_NAME} PUBLIC ${TGT_PUB_DEFINES} PRIVATE ${TGT_PVT_DEFINES})                           
   endif()
-  target_compile_options(${TGT_NAME} PRIVATE ${NICEMAKE_COMMON_COMPILE_OPTS})
-  target_compile_definitions(${TGT_NAME} PUBLIC ${TGT_PUB_DEFINES} PRIVATE ${TGT_PVT_DEFINES})
+  
   if ( TGT_COPTS )
     target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
   endif()

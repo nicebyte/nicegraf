@@ -69,34 +69,26 @@ if (APPLE)
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
                      COPTS "-fobjc-arc")
 else()
-  # Try searching for Vulkan SDK.
-  find_package(VulkanHeaders)
+  nmk_header_library(NAME nicegraf-vk-headers
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/vulkan-headers)
 
-  # Only build the Vulkan backend if the Vulkan SDK is present.
-  if ( ${VulkanHeaders_FOUND} )
-    # Import VMA for handling vulkan memory allocation.
-    add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/vma)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/SPIRV-reflect)
+  # Import VMA for handling vulkan memory allocation.
+  add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/vma)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/SPIRV-reflect)
 
-    # Some vulkan-specific dependencies.
-    set(NICEGRAF_VK_DEPS vma spvreflect)
-    if (NOT WIN32)
-      set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} xcb)
-    endif()
-
-    # Vulkan backend.
-    nmk_static_library(NAME nicegraf-vk
-                       SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                            ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
-                            ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
-                       DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
-
-    # Add Vulkan header directory to nicegraf-vk include paths.
-    target_include_directories(nicegraf-vk PRIVATE ${VulkanHeaders_INCLUDE_DIR})
-  else()
-    message(WARNING "Vulkan headers not found - will not build nicegraf-vk.")
+  # Some vulkan-specific dependencies.
+  set(NICEGRAF_VK_DEPS vma spvreflect nicegraf-vk-headers)
+  if (NOT WIN32)
+    set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} xcb)
   endif()
+
+  # Vulkan backend.
+  nmk_static_library(NAME nicegraf-vk
+                     SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
 endif()
 
 # Build tests only if explicitly requested.
