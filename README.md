@@ -9,6 +9,23 @@ An abstraction layer for low-level platform-specific graphics APIs.
 * Reference documentation: http://wiki.gpfault.net/docs/nicegraf
 * Sample code: https://github.com/nicebyte/nicegraf/tree/master/samples
 
+# prerequisites
+
+- CMake
+- C99 and C++14-capable compiler
+
+*Optional*:
+- [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/) (for debug purposes)
+
+# running the samples
+
+## Windows
+
+- Make sure CMake is within system path
+- Run <b>build-samples.sh</b> script
+- Open the **.sln** file from **samples-build-files** and build the solution
+- Open **samples/binaries** and run the samples
+
 # credits
 
 ## current maintainers
