@@ -22,7 +22,7 @@ An abstraction layer for low-level platform-specific graphics APIs.
 ## Windows
 
 - Make sure CMake is within system path
-- Run <b>build-samples.sh</b> script
+- Run <b>build-samples.bat</b>
 - Open the **.sln** file from **samples-build-files** and build the solution
 - Open **samples/binaries** and run the samples
 
