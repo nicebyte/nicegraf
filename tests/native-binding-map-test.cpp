@@ -64,12 +64,12 @@ TEST_CASE("First occurrence of NBM magic is found") {
 TEST_CASE("Parse simple NBM") {
   const char test_string[] = "( 0 1 \n) : 2\n(2 0) : 3\naaaa";
   ngfi_native_binding_map* map = ngfi_parse_serialized_native_binding_map(test_string);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 0, 1) == 2);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 2, 0) == 3);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 2, 1) == ~0);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 0, 0) == ~0);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 3, 0) == ~0);
-  REQUIRE(ngfi_native_binding_map_lookup(map, 3, 2) == ~0);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 0, 1) == 2u);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 2, 0) == 3u);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 2, 1) == ~0u);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 0, 0) == ~0u);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 3, 0) == ~0u);
+  REQUIRE(ngfi_native_binding_map_lookup(map, 3, 2) == ~0u);
   ngfi_destroy_native_binding_map(map);
 }
 
@@ -83,8 +83,8 @@ TEST_CASE("Parsing stops at error") {
   const char test_string2[] = "(0 1 ): 2\n2 0) : 3\naaaa";
   ngfi_native_binding_map* map2 = ngfi_parse_serialized_native_binding_map(test_string2);
   REQUIRE(map2 != NULL);
-  REQUIRE(ngfi_native_binding_map_lookup(map2, 0, 1) == 2);
-  REQUIRE(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0);
+  REQUIRE(ngfi_native_binding_map_lookup(map2, 0, 1) == 2u);
+  REQUIRE(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0u);
   ngfi_destroy_native_binding_map(map2);
 }
 
@@ -92,7 +92,7 @@ TEST_CASE("Parsing stops at (-1 -1 -1)") {
   const char test_string2[] = "(0 1): 2\n(-1 -1):-1 (2 0) : 3\naaaa";
   ngfi_native_binding_map* map2 = ngfi_parse_serialized_native_binding_map(test_string2);
   REQUIRE(map2 != NULL);
-  REQUIRE(ngfi_native_binding_map_lookup(map2, 0, 1) == 2);
-  REQUIRE(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0);
+  REQUIRE(ngfi_native_binding_map_lookup(map2, 0, 1) == 2u);
+  REQUIRE(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0u);
   ngfi_destroy_native_binding_map(map2);
 }
