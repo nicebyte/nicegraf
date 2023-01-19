@@ -33,6 +33,7 @@
 #include "targa-loader.h"
 
 #include <stdio.h>
+#include <string>
 
 namespace ngf_samples {
 
@@ -62,15 +63,14 @@ void* sample_initialize(
   auto state = new cubemap::state {};
 
   /* Load contents of cubemap faces into a staging buffer. */
-  char        file_name[] = "assets/cube0fx.tga";
   uint32_t    face_width = 0, face_height = 0;
   ngf::buffer staging_buffer;
   char*       mapped_staging_buffer = nullptr;
   uint32_t    staging_buffer_size   = 0u;
   uint32_t    bytes_per_face        = 0u;
   for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; face++) {
-    sprintf(file_name, "assets/cube0f%d.tga", face);
-    std::vector<char> cubemap_face_tga_data = load_file(file_name);
+    const std::string file_name = std::string("assets/cube0f") + std::to_string(face) + ".tga";
+    std::vector<char> cubemap_face_tga_data = load_file(file_name.c_str());
     uint32_t          width, height;
     load_targa(
         cubemap_face_tga_data.data(),
