@@ -488,6 +488,8 @@ static VkFormat get_vk_image_format(ngf_image_format f) {
       VK_FORMAT_R16G16_SNORM,
       VK_FORMAT_R16G16B16A16_UNORM,
       VK_FORMAT_R16G16B16A16_SNORM,
+      VK_FORMAT_R8_UINT,
+      VK_FORMAT_R8_SINT,
       VK_FORMAT_R16_UINT,
       VK_FORMAT_R16_SINT,
       VK_FORMAT_R16G16_UINT,
