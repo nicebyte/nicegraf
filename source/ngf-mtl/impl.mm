@@ -135,6 +135,8 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTLPixelFormatRG16Snorm, 32},
     {MTLPixelFormatRGBA16Unorm, 64},
     {MTLPixelFormatRGBA16Snorm, 64},
+    {MTLPixelFormatR8Uint, 8},
+    {MTLPixelFormatR8Sint, 8},
     {MTLPixelFormatR16Uint, 16},
     {MTLPixelFormatR16Sint, 16},
     {MTLPixelFormatRG16Uint, 32},
