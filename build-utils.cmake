@@ -50,7 +50,6 @@ function (nmk_target)
   if ( TGT_TYPE STREQUAL "hdr")
     target_include_directories(${TGT_NAME}
                                INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})
-    target_compile_options(${TGT_NAME} INTERFACE ${NICEMAKE_COMMON_COMPILE_OPTS})
     target_compile_definitions(${TGT_NAME} INTERFACE ${TGT_PUB_DEFINES} ${TGT_PVT_DEFINES})
   else()
     target_include_directories(${TGT_NAME}
