@@ -79,7 +79,8 @@ void ngf_util_create_default_graphics_pipeline_data(ngf_util_graphics_pipeline_d
       .shader_stages           = {NULL},
       .nshader_stages          = 0u,
       .rasterization           = &result->rasterization_info,
-      .spec_info               = &result->spec_info};
+      .spec_info               = &result->spec_info,
+      .debug_name              = NULL};
   result->pipeline_info = gpi;
 }
 

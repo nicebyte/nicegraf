@@ -1282,6 +1282,10 @@ ngf_error ngf_create_graphics_pipeline(
   pipeline->binding_map = native_binding_map;
   memcpy(pipeline->blend_color, info->blend_consts, sizeof(pipeline->blend_color));
 
+  if (info->debug_name != nullptr) {
+    mtl_pipe_desc.label = [NSString stringWithUTF8String:info->debug_name];
+  }
+
   NSError* err = nil;
   pipeline->pipeline =
       [CURRENT_CONTEXT->device newRenderPipelineStateWithDescriptor:mtl_pipe_desc error:&err];
