@@ -1462,6 +1462,8 @@ typedef struct ngf_graphics_pipeline_info {
                             NGF_BLEND_FACTOR_CONSTANT_ALPHA, \ref
                             NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_COLOR and \ref
                             NGF_BLEND_FACTOR_ONE_MINUS_CONSTANT_ALPHA . */
+
+  const char* debug_name;
 } ngf_graphics_pipeline_info;
 
 /**
