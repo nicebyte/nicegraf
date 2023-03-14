@@ -288,6 +288,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          */
         imgui_backend.emplace(
             xfer_encoder,
+            main_render_target_sample_count,
             imgui_font_atlas_bytes,
             imgui_font_atlas_width,
             imgui_font_atlas_height);

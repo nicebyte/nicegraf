@@ -1725,6 +1725,7 @@ VkResult ngfvk_renderpass_from_attachment_descs(
   VkAttachmentReference depth_stencil_attachment_ref;
   bool                  have_depth_stencil_attachment = false;
   bool                  have_sampled_attachments      = false;
+  bool                  have_color_attachment         = false;
 
   for (uint32_t a = 0u; a < nattachments; ++a) {
     const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
@@ -1766,7 +1767,10 @@ VkResult ngfvk_renderpass_from_attachment_descs(
         depth_stencil_attachment_ref.attachment = a;
         depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
       }
+    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
+      have_color_attachment = true;
     }
+
     have_sampled_attachments |= ngf_attachment_desc->is_sampled;
   }
   if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
@@ -1787,22 +1791,54 @@ VkResult ngfvk_renderpass_from_attachment_descs(
       .preserveAttachmentCount = 0u,
       .pPreserveAttachments    = NULL};
 
-  const VkPipelineStageFlags source_stage_flags =
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-      (have_depth_stencil_attachment ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT : 0u);
-  const VkAccessFlags source_access_flags =
-      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-      (have_depth_stencil_attachment ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT : 0u);
+  VkSubpassDependency subpass_deps[3];
+  uint32_t            nsubpass_deps = 0u;
 
-  // Specify subpass dependencies.
-  VkSubpassDependency subpass_dep = {
-      .srcSubpass    = 0u,
-      .dstSubpass    = VK_SUBPASS_EXTERNAL,
-      .srcStageMask  = source_stage_flags,
-      .dstStageMask  = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-      .srcAccessMask = source_access_flags,
-      .dstAccessMask = VK_ACCESS_SHADER_READ_BIT};
+  if (have_depth_stencil_attachment) {
+    VkSubpassDependency* dependency_for_depth_stencil = &subpass_deps[nsubpass_deps++];
+    dependency_for_depth_stencil->srcSubpass          = VK_SUBPASS_EXTERNAL;
+    dependency_for_depth_stencil->dstSubpass          = 0;
+    dependency_for_depth_stencil->srcStageMask =
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency_for_depth_stencil->srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency_for_depth_stencil->dstStageMask =
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency_for_depth_stencil->dstAccessMask =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency_for_depth_stencil->dependencyFlags = 0u;
+  }
 
+  if (have_color_attachment) {
+    VkSubpassDependency* dependency_for_color = &subpass_deps[nsubpass_deps++];
+    dependency_for_color->srcSubpass          = VK_SUBPASS_EXTERNAL;
+    dependency_for_color->dstSubpass          = 0u;
+    dependency_for_color->srcStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency_for_color->srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency_for_color->dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency_for_color->dstAccessMask =
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency_for_color->dependencyFlags = 0u;
+  }
+
+  if (have_sampled_attachments) {
+    VkSubpassDependency*          dependency_for_readers = &subpass_deps[nsubpass_deps++];
+    const VkPipelineStageFlagBits depth_stages =
+        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    const VkAccessFlagBits depth_accesses =
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    dependency_for_readers->srcSubpass   = 0u;
+    dependency_for_readers->dstSubpass   = VK_SUBPASS_EXTERNAL;
+    dependency_for_readers->srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                           (have_depth_stencil_attachment ? depth_stages : 0u);
+    dependency_for_readers->srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                            (have_depth_stencil_attachment ? depth_accesses : 0u);
+    dependency_for_readers->dstStageMask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+                                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    dependency_for_readers->dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    dependency_for_readers->dependencyFlags = 0u;
+  }
+  
   const VkRenderPassCreateInfo renderpass_ci = {
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
       .pNext           = NULL,
@@ -1811,8 +1847,8 @@ VkResult ngfvk_renderpass_from_attachment_descs(
       .pAttachments    = vk_attachment_descs,
       .subpassCount    = 1u,
       .pSubpasses      = &subpass_desc,
-      .dependencyCount = have_sampled_attachments ? 1u : 0u,
-      .pDependencies   = have_sampled_attachments ? &subpass_dep : NULL};
+      .dependencyCount = nsubpass_deps,
+      .pDependencies   = subpass_deps};
 
   return vkCreateRenderPass(_vk.device, &renderpass_ci, NULL, result);
 }

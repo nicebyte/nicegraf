@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,9 +22,9 @@
 
 #include "imgui-backend.h"
 
+#include "check.h"
 #include "nicegraf-util.h"
 #include "shader-loader.h"
-#include "check.h"
 
 #include <vector>
 
@@ -32,6 +32,7 @@ namespace ngf_samples {
 
 ngf_imgui::ngf_imgui(
     ngf_xfer_encoder     enc,
+    ngf_sample_count     main_render_target_sample_count,
     const unsigned char* font_atlas_bytes,
     uint32_t             font_atlas_width,
     uint32_t             font_atlas_height) {
@@ -57,17 +58,20 @@ ngf_imgui::ngf_imgui(
   blend_info.dst_alpha_blend_factor = NGF_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
   blend_info.blend_op_color         = NGF_BLEND_OP_ADD;
   blend_info.blend_op_alpha         = NGF_BLEND_OP_ADD;
-  blend_info.color_write_mask       = NGF_COLOR_MASK_WRITE_BIT_R | NGF_COLOR_MASK_WRITE_BIT_G | 
+  blend_info.color_write_mask       = NGF_COLOR_MASK_WRITE_BIT_R | NGF_COLOR_MASK_WRITE_BIT_G |
                                 NGF_COLOR_MASK_WRITE_BIT_B | NGF_COLOR_MASK_WRITE_BIT_A;
   pipeline_data.pipeline_info.color_attachment_blend_states = &blend_info;
-  memset(pipeline_data.pipeline_info.blend_consts, 0, sizeof(pipeline_data.pipeline_info.blend_consts));
+  memset(
+      pipeline_data.pipeline_info.blend_consts,
+      0,
+      sizeof(pipeline_data.pipeline_info.blend_consts));
 
   // Set up depth & stencil state.
   pipeline_data.depth_stencil_info.depth_test   = false;
   pipeline_data.depth_stencil_info.stencil_test = false;
 
   // Set up multisampling.
-  pipeline_data.multisample_info.sample_count = NGF_SAMPLE_COUNT_8;
+  pipeline_data.multisample_info.sample_count = main_render_target_sample_count;
 
   // Assign programmable stages.
   ngf_graphics_pipeline_info& pipeline_info = pipeline_data.pipeline_info;
@@ -139,8 +143,9 @@ ngf_imgui::ngf_imgui(
       texture_data_.get(),
       0,
       font_texture_ref,
-      ngf_offset3d{},
-      ngf_extent3d{(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u}, 1u);
+      ngf_offset3d {},
+      ngf_extent3d {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u},
+      1u);
 
   // Create a sampler for the font texture.
   ngf_sampler_info sampler_info {
@@ -270,10 +275,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf_buffer attrib_buffer = nullptr;
   ngf_create_buffer(&attrib_buffer_info, &attrib_buffer);
   attrib_buffer_.reset(attrib_buffer);
-  void* mapped_attrib_buffer = ngf_buffer_map_range(
-      attrib_buffer,
-      0,
-      attrib_buffer_info.size);
+  void* mapped_attrib_buffer = ngf_buffer_map_range(attrib_buffer, 0, attrib_buffer_info.size);
   NGF_SAMPLES_ASSERT(mapped_attrib_buffer != nullptr);
   memcpy(mapped_attrib_buffer, vertex_data.data(), attrib_buffer_info.size);
   ngf_buffer_flush_range(attrib_buffer, 0, attrib_buffer_info.size);
@@ -286,8 +288,7 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf_buffer index_buffer = nullptr;
   ngf_create_buffer(&index_buffer_info, &index_buffer);
   index_buffer_.reset(index_buffer);
-  void* mapped_index_buffer =
-      ngf_buffer_map_range(index_buffer, 0, index_buffer_info.size);
+  void* mapped_index_buffer = ngf_buffer_map_range(index_buffer, 0, index_buffer_info.size);
   NGF_SAMPLES_ASSERT(mapped_index_buffer != nullptr);
   memcpy(mapped_index_buffer, index_data.data(), index_buffer_info.size);
   ngf_buffer_flush_range(index_buffer, 0, index_buffer_info.size);

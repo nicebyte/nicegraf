@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -41,6 +41,7 @@ class ngf_imgui {
    */
   ngf_imgui(
       ngf_xfer_encoder     font_xfer_encoder,
+      ngf_sample_count     main_render_target_sample_count,
       const unsigned char* font_atlast_bytes,
       uint32_t             font_atlas_width,
       uint32_t             font_atlas_height);
@@ -71,4 +72,3 @@ class ngf_imgui {
 };
 
 }  // namespace ngf_samples
-
