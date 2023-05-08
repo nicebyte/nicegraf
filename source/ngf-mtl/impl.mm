@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2022 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -486,18 +486,25 @@ struct ngf_render_target_t {
 };
 
 struct ngf_cmd_buffer_t {
-  ngfi_cmd_buffer_state       state              = NGFI_CMD_BUFFER_NEW;
-  bool                        renderpass_active  = false;
-  id<MTLCommandBuffer>        mtl_cmd_buffer     = nil;
-  id<MTLRenderCommandEncoder> active_rce         = nil;
-  id<MTLBlitCommandEncoder>   active_bce         = nil;
-  ngf_graphics_pipeline       active_pipe        = nullptr;
-  ngf_render_target           active_rt          = nullptr;
-  id<MTLBuffer>               bound_index_buffer = nil;
-  MTLIndexType                bound_index_buffer_type;
-  uint32_t                    bound_index_buffer_offset = 0u;
+  ngfi_cmd_buffer_state        state               = NGFI_CMD_BUFFER_NEW;
+  bool                         renderpass_active   = false;
+  id<MTLCommandBuffer>         mtl_cmd_buffer      = nil;
+  id<MTLRenderCommandEncoder>  active_rce          = nil;
+  id<MTLBlitCommandEncoder>    active_bce          = nil;
+  id<MTLComputeCommandEncoder> active_cce          = nil;
+  ngf_graphics_pipeline        active_gfx_pipe     = nullptr;
+  ngf_compute_pipeline         active_compute_pipe = nullptr;
+  ngf_render_target            active_rt           = nullptr;
+  id<MTLBuffer>                bound_index_buffer  = nil;
+  MTLIndexType                 bound_index_buffer_type;
+  uint32_t                     bound_index_buffer_offset = 0u;
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
+
+struct ngfmtl_niceshade_metadata {
+  std::vector<std::vector<uint32_t>> native_binding_map;
+  uint32_t                           threadgroup_size[3];
+};
 
 struct ngf_shader_stage_t {
   id<MTLLibrary> func_lib = nil;
@@ -519,10 +526,12 @@ struct ngf_graphics_pipeline_t {
   MTLCullMode      culling        = MTLCullModeBack;
   float            blend_color[4] {0};
 
-  ngfi_native_binding_map* binding_map = nullptr;
-  ~ngf_graphics_pipeline_t() {
-    if (binding_map) { ngfi_destroy_native_binding_map(binding_map); }
-  }
+  ngfmtl_niceshade_metadata niceshade_metadata;
+};
+
+struct ngf_compute_pipeline_t {
+  id<MTLComputePipelineState> pipeline = nil;
+  ngfmtl_niceshade_metadata   niceshade_metadata;
 };
 
 struct ngf_buffer_t {
@@ -922,13 +931,19 @@ const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT {
   return &DEVICE_CAPS;
 }
 
-ngf_error ngf_begin_frame(ngf_frame_token*) NGF_NOEXCEPT {
+extern "C" {
+void* NSPushAutoreleasePool(NSUInteger capacity);
+void  NSPopAutoreleasePool(void* token);
+}
+
+ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
+  *token = (uintptr_t)NSPushAutoreleasePool(0);
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
   return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
 }
 
-ngf_error ngf_end_frame(ngf_frame_token) NGF_NOEXCEPT {
+ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
   ngf_context ctx = CURRENT_CONTEXT;
   if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
     [CURRENT_CONTEXT->pending_cmd_buffer addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
@@ -942,6 +957,7 @@ ngf_error ngf_end_frame(ngf_frame_token) NGF_NOEXCEPT {
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
+  NSPopAutoreleasePool((void*)token);
   return NGF_ERROR_OK;
 }
 
@@ -1070,10 +1086,7 @@ ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* res
   } else {
     std::string tmp         = [[stage->func_lib functionNames].firstObject UTF8String];
     stage->entry_point_name = tmp;
-  } /*
-   stage->entry_point_name = info->entry_point_name ?
-     info->entry_point_name :
-     [[stage->func_lib functionNames].firstObject UTF8String];*/
+  }
 
   *result = stage.release();
   return NGF_ERROR_OK;
@@ -1136,10 +1149,9 @@ id<MTLFunction> ngfmtl_get_shader_main(
     MTLFunctionConstantValues* spec_consts) {
   NSError*        err                 = nil;
   NSString*       ns_entry_point_name = [NSString stringWithUTF8String:entry_point_name];
-  id<MTLFunction> result = spec_consts == nil ? [func_lib newFunctionWithName:ns_entry_point_name]
-                                              : [func_lib newFunctionWithName:ns_entry_point_name
-                                                               constantValues:spec_consts
-                                                                        error:&err];
+  id<MTLFunction> result              = [func_lib newFunctionWithName:ns_entry_point_name
+                                          constantValues:spec_consts
+                                                   error:&err];
   if (err) {
     NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
     return nil;
@@ -1157,6 +1169,151 @@ MTLStencilDescriptor* ngfmtl_create_stencil_descriptor(const ngf_stencil_info& i
   result.writeMask                 = info.write_mask;
   result.readMask                  = info.compare_mask;
   return result;
+}
+
+ngf_error ngfmtl_parse_niceshade_metadata(
+    const char*                input,
+    bool                       need_threadgroup_size,
+    ngfmtl_niceshade_metadata* output) {
+  static const char binding_map_tag[]           = "NGF_NATIVE_BINDING_MAP";
+  static const char threadgroup_size_tag[]      = "NGF_THREADGROUP_SIZE";
+  const char*       serialized_binding_map      = NULL;
+  const char*       serialized_threadgroup_size = NULL;
+  bool              in_comment                  = false;
+
+  for (; *input != '\0' && (serialized_binding_map == NULL ||
+                            (!need_threadgroup_size || serialized_threadgroup_size == NULL));
+       ++input) {
+    if (!in_comment && *input == '/' && *(input + 1) == '*') {
+      in_comment = true;
+      input++;
+      continue;
+    }
+    if (in_comment && *input == '*' && *(input + 1) == '/') {
+      in_comment = false;
+      input++;
+      continue;
+    }
+    if (!in_comment) continue;
+
+    if (serialized_binding_map == NULL &&
+        strncmp(input, binding_map_tag, sizeof(binding_map_tag) - 1) == 0) {
+      serialized_binding_map = input + sizeof(binding_map_tag) - 1;
+    }
+    if (need_threadgroup_size && serialized_threadgroup_size == NULL &&
+        strncmp(input, threadgroup_size_tag, sizeof(threadgroup_size_tag) - 1) == 0) {
+      serialized_threadgroup_size = input + sizeof(threadgroup_size_tag) - 1;
+    }
+  }
+  if (!serialized_binding_map) {
+    NGFI_DIAG_ERROR("Failed to find a serialized binding map");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  if (need_threadgroup_size && !serialized_threadgroup_size) {
+    NGFI_DIAG_ERROR("Failed to find a serialized threadgroup size");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  // Parse the native binding map.
+  struct ngfmtl_binding_map_entry {
+    uint32_t set;
+    uint32_t binding;
+    uint32_t native_binding;
+  };
+  ngfi_sa_reset(ngfi_tmp_store());
+  auto tmp_binding_map_entries =
+      (ngfmtl_binding_map_entry*)ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngfmtl_binding_map_entry));
+  ngfmtl_binding_map_entry* current_binding_map_entry = tmp_binding_map_entries;
+  uint32_t                  num_entries               = 0u;
+  uint32_t                  consumed_input_bytes;
+  uint32_t                  max_set     = 0u;
+  uint32_t                  max_binding = 0u;
+  while (sscanf(
+             serialized_binding_map,
+             " ( %d %d ) : %d%n",
+             &current_binding_map_entry->set,
+             &current_binding_map_entry->binding,
+             &current_binding_map_entry->native_binding,
+             &consumed_input_bytes) == 3 &&
+         current_binding_map_entry->set != -1 && current_binding_map_entry->binding != -1 &&
+         current_binding_map_entry->native_binding != -1) {
+    serialized_binding_map += consumed_input_bytes;
+    max_set                   = std::max(max_set, current_binding_map_entry->set);
+    max_binding               = std::max(max_binding, current_binding_map_entry->binding);
+    current_binding_map_entry = (ngfmtl_binding_map_entry*)ngfi_sa_alloc(
+        ngfi_tmp_store(),
+        sizeof(ngfmtl_binding_map_entry));
+    ++num_entries;
+  }
+
+  std::vector<std::vector<uint32_t>> native_binding_map(
+      max_set + 1,
+      std::vector<uint32_t>(max_binding + 1, ~0u));
+  for (uint32_t e = 0u; e < num_entries; ++e) {
+    native_binding_map[tmp_binding_map_entries[e].set][tmp_binding_map_entries[e].binding] =
+        tmp_binding_map_entries[e].native_binding;
+  }
+  output->native_binding_map = std::move(native_binding_map);
+
+  if (need_threadgroup_size && serialized_threadgroup_size) {
+    if (sscanf(
+            serialized_threadgroup_size,
+            "%d %d %d",
+            &output->threadgroup_size[0],
+            &output->threadgroup_size[1],
+            &output->threadgroup_size[2]) != 3) {
+      NGFI_DIAG_ERROR("Failed to parse threadgroup size");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+  }
+
+  return NGF_ERROR_OK;
+}
+
+MTLFunctionConstantValues* ngfmtl_function_consts(const ngf_specialization_info* spec_info) {
+  // Populate specialization constant values.
+  MTLFunctionConstantValues* spec_consts = [MTLFunctionConstantValues new];
+  if (spec_info != nullptr) {
+    for (uint32_t s = 0u; s < spec_info->nspecializations; ++s) {
+      const ngf_constant_specialization* spec = &spec_info->specializations[s];
+      MTLDataType                        type = get_mtl_type(spec->type);
+      if (type == MTLDataTypeNone) { return nil; }
+      void* write_ptr = ((uint8_t*)spec_info->value_buffer + spec->offset);
+      [spec_consts setConstantValue:write_ptr type:type atIndex:spec->constant_id];
+    }
+  }
+  return spec_consts;
+}
+
+ngf_error ngf_create_compute_pipeline(
+    const ngf_compute_pipeline_info* info,
+    ngf_compute_pipeline*            result) NGF_NOEXCEPT {
+  assert(info);
+  assert(result);
+
+  ngfmtl_niceshade_metadata metadata;
+  const ngf_error           metadata_parse_error =
+      ngfmtl_parse_niceshade_metadata(info->shader_stage->source_code.c_str(), true, &metadata);
+  if (metadata_parse_error != NGF_ERROR_OK) return metadata_parse_error;
+
+  MTLFunctionConstantValues* func_const_values = ngfmtl_function_consts(info->spec_info);
+  id<MTLFunction>            function          = ngfmtl_get_shader_main(
+      info->shader_stage->func_lib,
+      info->shader_stage->entry_point_name.c_str(),
+      func_const_values);
+  if (!function) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  NSError*                    err = nil;
+  id<MTLComputePipelineState> computePSO =
+      [CURRENT_CONTEXT->device newComputePipelineStateWithFunction:function error:&err];
+  if (err) {
+    NGFI_DIAG_ERROR([err.localizedDescription UTF8String]);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+  NGFMTL_NURSERY(compute_pipeline, compute_pipeline);
+  compute_pipeline->pipeline           = computePSO;
+  compute_pipeline->niceshade_metadata = std::move(metadata);
+  *result                              = compute_pipeline.release();
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_create_graphics_pipeline(
@@ -1213,28 +1370,19 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Populate specialization constant values.
-  MTLFunctionConstantValues* spec_consts = nil;
-  if (info->spec_info != nullptr) {
-    spec_consts = [MTLFunctionConstantValues new];
-    for (uint32_t s = 0u; s < info->spec_info->nspecializations; ++s) {
-      const ngf_constant_specialization* spec = &info->spec_info->specializations[s];
-      MTLDataType                        type = get_mtl_type(spec->type);
-      if (type == MTLDataTypeNone) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-      void* write_ptr = ((uint8_t*)info->spec_info->value_buffer + spec->offset);
-      [spec_consts setConstantValue:write_ptr type:type atIndex:spec->constant_id];
-    }
-  }
+  MTLFunctionConstantValues* spec_consts = ngfmtl_function_consts(info->spec_info);
 
   // Set stage functions.
-  ngfi_native_binding_map* native_binding_map = nullptr;
+  bool                      have_niceshade_metadata = false;
+  ngfmtl_niceshade_metadata metadata;
   for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
     const ngf_shader_stage stage = info->shader_stages[s];
-    const char*            serialized_map =
-        ngfi_find_serialized_native_binding_map(stage->source_code.c_str());
-    if (!native_binding_map && serialized_map) {
-      native_binding_map = ngfi_parse_serialized_native_binding_map(serialized_map);
-    } else if (native_binding_map && serialized_map) {
-      NGFI_DIAG_WARNING("more than a single instance of serialized native binding map found");
+    if (!have_niceshade_metadata) {
+      const ngf_error metadata_parse_result = ngfmtl_parse_niceshade_metadata(
+          stage->source_code.c_str(),
+          stage->type == NGF_STAGE_COMPUTE,
+          &metadata);
+      have_niceshade_metadata = (metadata_parse_result == NGF_ERROR_OK);
     }
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc.vertexFunction);
@@ -1246,7 +1394,7 @@ ngf_error ngf_create_graphics_pipeline(
           ngfmtl_get_shader_main(stage->func_lib, stage->entry_point_name.c_str(), spec_consts);
     }
   }
-  if (native_binding_map == nullptr) {
+  if (!have_niceshade_metadata) {
     NGFI_DIAG_ERROR("Native binding map not found.");
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
@@ -1273,14 +1421,17 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Set primitive topology.
-  mtl_pipe_desc.inputPrimitiveTopology = get_mtl_primitive_topology_class(info->input_assembly_info->primitive_topology);
-  if (!info->input_assembly_info->enable_primitive_restart) { NGFI_DIAG_WARNING("Cannot disable primitive restart on Metal"); }
+  mtl_pipe_desc.inputPrimitiveTopology =
+      get_mtl_primitive_topology_class(info->input_assembly_info->primitive_topology);
+  if (!info->input_assembly_info->enable_primitive_restart) {
+    NGFI_DIAG_WARNING("Cannot disable primitive restart on Metal");
+  }
   if (mtl_pipe_desc.inputPrimitiveTopology == MTLPrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
 
   NGFMTL_NURSERY(graphics_pipeline, pipeline);
-  pipeline->binding_map = native_binding_map;
+  pipeline->niceshade_metadata = std::move(metadata);
   memcpy(pipeline->blend_color, info->blend_consts, sizeof(pipeline->blend_color));
 
   if (info->debug_name != nullptr) {
@@ -1328,6 +1479,13 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) NGF_NOEXCEPT {
   }
 }
 
+void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipe) NGF_NOEXCEPT {
+  if (pipe != nullptr) {
+    pipe->~ngf_compute_pipeline_t();
+    NGFI_FREE(pipe);
+  }
+}
+
 id<MTLBuffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   MTLResourceOptions options         = 0u;
   MTLResourceOptions managed_storage = 0u;
@@ -1359,7 +1517,7 @@ uint8_t* _ngf_map_buffer(id<MTLBuffer> buffer, size_t offset, [[maybe_unused]] s
 
 ngf_error ngf_create_texel_buffer_view(
     const ngf_texel_buffer_view_info* info,
-    ngf_texel_buffer_view*            result) {
+    ngf_texel_buffer_view*            result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(texel_buffer_view, view);
   auto texel_buf_descriptor = [MTLTextureDescriptor new];
 
@@ -1380,7 +1538,11 @@ ngf_error ngf_create_texel_buffer_view(
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT {
+  if (buf_view) {
+    buf_view->~ngf_texel_buffer_view_t();
+    NGFI_FREE(buf_view);
+  }
 }
 
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
@@ -1411,7 +1573,7 @@ void ngf_buffer_flush_range(
 #endif
 }
 
-void ngf_buffer_unmap([[maybe_unused]] ngf_buffer buf) NGF_NOEXCEPT {
+void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT {
@@ -1478,6 +1640,9 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NO
   if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
     mtl_img_desc.usage |= MTLTextureUsageShaderRead;
   }
+  if (info->usage_hint & NGF_IMAGE_USAGE_STORAGE) {
+    mtl_img_desc.usage |= MTLTextureUsageShaderWrite;
+  }
   NGFMTL_NURSERY(image, image);
   image->texture     = [MTL_DEVICE newTextureWithDescriptor:mtl_img_desc];
   image->usage_flags = info->usage_hint;
@@ -1525,6 +1690,20 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer* cmd_buffers) NGF_NO
     cmd_buffers[b]->mtl_cmd_buffer = nil;
   }
   return NGF_ERROR_OK;
+}
+
+void ngfmtl_finish_pending_encoders(ngf_cmd_buffer cmd_buffer) {
+  /* End any current Metal encoders.*/
+  if (cmd_buffer->active_rce) {
+    [cmd_buffer->active_rce endEncoding];
+    cmd_buffer->active_rce = nil;
+  } else if (cmd_buffer->active_bce) {
+    [cmd_buffer->active_bce endEncoding];
+    cmd_buffer->active_bce = nil;
+  } else if (cmd_buffer->active_cce) {
+    [cmd_buffer->active_cce endEncoding];
+    cmd_buffer->active_cce = nil;
+  }
 }
 
 ngf_error ngf_cmd_begin_render_pass_simple(
@@ -1580,16 +1759,9 @@ ngf_error ngf_cmd_begin_render_pass(
   assert(rt);
   assert(cmd_buffer);
 
+  ngfmtl_finish_pending_encoders(cmd_buffer);
   cmd_buffer->renderpass_active = true;
 
-  /* End any current Metal render/blit encoders.*/
-  if (cmd_buffer->active_rce) {
-    [cmd_buffer->active_rce endEncoding];
-    cmd_buffer->active_rce = nil;
-  } else if (cmd_buffer->active_bce) {
-    [cmd_buffer->active_bce endEncoding];
-    cmd_buffer->active_bce = nil;
-  }
   uint32_t color_attachment_idx      = 0u;
   auto     pass_descriptor           = [MTLRenderPassDescriptor new];
   pass_descriptor.renderTargetWidth  = rt->width;
@@ -1654,28 +1826,30 @@ ngf_error ngf_cmd_begin_render_pass(
   cmd_buffer->active_rce =
       [cmd_buffer->mtl_cmd_buffer renderCommandEncoderWithDescriptor:pass_descriptor];
   cmd_buffer->active_rt = rt;
-      
+
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buffer;
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buffer               = NGFMTL_ENC2CMDBUF(enc);
-  cmd_buffer->renderpass_active = false;
-  [cmd_buffer->active_rce endEncoding];
-  cmd_buffer->active_rce  = nil;
-  cmd_buffer->active_pipe = nullptr;
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  auto cmd_buffer = NGFMTL_ENC2CMDBUF(enc);
   if (cmd_buffer->active_rce) {
     [cmd_buffer->active_rce endEncoding];
-    cmd_buffer->active_rce = nil;
+    cmd_buffer->active_rce      = nil;
+    cmd_buffer->active_gfx_pipe = nullptr;
   }
+  cmd_buffer->renderpass_active = false;
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_xfer_encoder* enc) NGF_NOEXCEPT {
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_xfer_encoder* enc)
+    NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+  ngfmtl_finish_pending_encoders(cmd_buf);
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
+  cmd_buf->active_bce       = [cmd_buf->mtl_cmd_buffer blitCommandEncoder];
   return NGF_ERROR_OK;
 }
 
@@ -1687,6 +1861,66 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
     cmd_buf->active_bce = nil;
   }
   return NGF_ERROR_OK;
+}
+
+ngf_error
+ngf_cmd_begin_compute_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_compute_encoder* enc)
+    NGF_NOEXCEPT {
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
+  cmd_buf->active_cce       = [cmd_buf->mtl_cmd_buffer computeCommandEncoder];
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(cmd_buf);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  if (cmd_buf->active_cce) {
+    [cmd_buf->active_cce endEncoding];
+    cmd_buf->active_cce          = nil;
+    cmd_buf->active_compute_pipe = nullptr;
+  }
+  return NGF_ERROR_OK;
+}
+
+void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline)
+    NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(cmd_buf);
+  assert(cmd_buf->active_cce);
+  if (!cmd_buf->active_cce) {
+    NGFI_DIAG_ERROR("Attempt to bind compute pipeline without an active compute encoder");
+    return;
+  }
+  [cmd_buf->active_cce setComputePipelineState:pipeline->pipeline];
+  cmd_buf->active_compute_pipe = pipeline;
+}
+
+void ngf_cmd_dispatch(
+    ngf_compute_encoder enc,
+    uint32_t            x_threadgroups,
+    uint32_t            y_threadgroups,
+    uint32_t            z_threadgroups) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(cmd_buf->active_cce);
+  if (!cmd_buf->active_cce) {
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without an active compute encoder.");
+    return;
+  }
+  assert(cmd_buf->active_compute_pipe);
+  if (!cmd_buf->active_compute_pipe) {
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without a bound compute pipeline.");
+    return;
+  }
+  const uint32_t* threadgroup_size =
+      cmd_buf->active_compute_pipe->niceshade_metadata.threadgroup_size;
+  [cmd_buf->active_cce
+       dispatchThreadgroups:MTLSizeMake(x_threadgroups, y_threadgroups, z_threadgroups)
+      threadsPerThreadgroup:MTLSizeMake(
+                                threadgroup_size[0],
+                                threadgroup_size[1],
+                                threadgroup_size[2])];
 }
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeline pipeline)
@@ -1703,7 +1937,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
   if (pipeline->depth_stencil) { [buf->active_rce setDepthStencilState:pipeline->depth_stencil]; }
   [buf->active_rce setStencilFrontReferenceValue:pipeline->front_stencil_reference
                               backReferenceValue:pipeline->back_stencil_reference];
-  buf->active_pipe = pipeline;
+  buf->active_gfx_pipe = pipeline;
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
@@ -1738,7 +1972,7 @@ void ngf_cmd_draw(
     uint32_t           nelements,
     uint32_t           ninstances) NGF_NOEXCEPT {
   auto             buf       = NGFMTL_ENC2CMDBUF(enc);
-  MTLPrimitiveType prim_type = buf->active_pipe->primitive_type;
+  MTLPrimitiveType prim_type = buf->active_gfx_pipe->primitive_type;
   if (!indexed) {
     [buf->active_rce drawPrimitives:prim_type
                         vertexStart:first_element
@@ -1787,13 +2021,22 @@ void ngf_cmd_bind_resources(
     const ngf_resource_bind_op* bind_ops,
     uint32_t                    nbind_ops) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(cmd_buf);
   for (uint32_t o = 0u; o < nbind_ops; ++o) {
     const ngf_resource_bind_op& bind_op = bind_ops[o];
-    assert(cmd_buf->active_pipe);
-    const uint32_t native_binding = ngfi_native_binding_map_lookup(
-        cmd_buf->active_pipe->binding_map,
-        bind_op.target_set,
-        bind_op.target_binding);
+    assert(cmd_buf->active_gfx_pipe);
+    if (!cmd_buf->active_gfx_pipe) {
+      NGFI_DIAG_ERROR("Attempt to bind resources without a bound graphics pipeline.");
+      return;
+    }
+    assert(cmd_buf->active_rce);
+    if (!cmd_buf->active_rce) {
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active render command encoder.");
+      return;
+    }
+    const uint32_t native_binding =
+        cmd_buf->active_gfx_pipe->niceshade_metadata
+            .native_binding_map[bind_op.target_set][bind_op.target_binding];
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
@@ -1809,6 +2052,7 @@ void ngf_cmd_bind_resources(
                                       atIndex:native_binding];
       break;
     }
+    case NGF_DESCRIPTOR_STORAGE_BUFFER:
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const ngf_buffer_bind_info& buf_bind_op = bind_op.info.buffer;
       const ngf_buffer            buf         = buf_bind_op.buffer;
@@ -1834,16 +2078,81 @@ void ngf_cmd_bind_resources(
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
-        const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-        [cmd_buf->active_rce setVertexSamplerState:img_bind_op.sampler->sampler
+      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+      [cmd_buf->active_rce setVertexSamplerState:img_bind_op.sampler->sampler
+                                         atIndex:native_binding];
+      [cmd_buf->active_rce setFragmentSamplerState:img_bind_op.sampler->sampler
                                            atIndex:native_binding];
-        [cmd_buf->active_rce setFragmentSamplerState:img_bind_op.sampler->sampler
-                                             atIndex:native_binding];
-        break;
+      break;
+    }
+    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
+      break;
+    case NGF_DESCRIPTOR_TYPE_COUNT:
+      assert(false);
+    }
+  }
+}
+
+void ngf_cmd_bind_compute_resources(
+    ngf_compute_encoder         enc,
+    const ngf_resource_bind_op* bind_ops,
+    uint32_t                    nbind_ops) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(cmd_buf);
+  for (uint32_t o = 0u; o < nbind_ops; ++o) {
+    const ngf_resource_bind_op& bind_op = bind_ops[o];
+    assert(cmd_buf->active_compute_pipe);
+    if (!cmd_buf->active_compute_pipe) {
+      NGFI_DIAG_ERROR("Attempt to bind resources without a bound compute pipeline.");
+      return;
+    }
+    assert(cmd_buf->active_cce);
+    if (!cmd_buf->active_cce) {
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active compute command encoder.");
+      return;
+    }
+    const uint32_t native_binding =
+        cmd_buf->active_compute_pipe->niceshade_metadata
+            .native_binding_map[bind_op.target_set][bind_op.target_binding];
+    if (native_binding == ~0) {
+      NGFI_DIAG_ERROR(
+          "Failed to  find  native binding for set %d binding %d",
+          bind_op.target_set,
+          bind_op.target_binding);
+      continue;
+    }
+    switch (bind_op.type) {
+    case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+      [cmd_buf->active_cce setTexture:bind_op.info.texel_buffer_view->mtl_buffer_view
+                              atIndex:native_binding];
+      break;
     }
     case NGF_DESCRIPTOR_STORAGE_BUFFER:
-    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+      const ngf_buffer_bind_info& buf_bind_op = bind_op.info.buffer;
+      const ngf_buffer            buf         = buf_bind_op.buffer;
+      size_t                      offset      = buf_bind_op.offset;
+      [cmd_buf->active_cce setBuffer:buf->mtl_buffer offset:offset atIndex:native_binding];
       break;
+    }
+    case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
+      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+      [cmd_buf->active_cce setTexture:img_bind_op.image->texture atIndex:native_binding];
+      [cmd_buf->active_cce setSamplerState:img_bind_op.sampler->sampler atIndex:native_binding];
+      break;
+    }
+    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+    case NGF_DESCRIPTOR_IMAGE: {
+      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+      [cmd_buf->active_cce setTexture:img_bind_op.image->texture atIndex:native_binding];
+      break;
+    }
+    case NGF_DESCRIPTOR_SAMPLER: {
+      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+      [cmd_buf->active_cce setSamplerState:img_bind_op.sampler->sampler atIndex:native_binding];
+      break;
+    }
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
     }
@@ -1859,7 +2168,6 @@ void ngfmtl_cmd_copy_buffer(
     size_t           dst_offset) {
   auto buf = NGFMTL_ENC2CMDBUF(enc);
   assert(buf->active_rce == nil);
-  if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   [buf->active_bce copyFromBuffer:src
                      sourceOffset:src_offset
                          toBuffer:dst
@@ -1887,7 +2195,6 @@ void ngf_cmd_write_image(
     uint32_t         nlayers) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(enc);
   assert(buf->active_rce == nil);
-  if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   const MTLTextureType texture_type = dst.image->texture.textureType;
   const bool           is_cubemap =
       texture_type == MTLTextureTypeCube || texture_type == MTLTextureTypeCubeArray;
@@ -1919,7 +2226,6 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
   }
   auto buf = NGFMTL_ENC2CMDBUF(xfenc);
   assert(buf->active_rce == nil);
-  if (buf->active_bce == nil) { buf->active_bce = [buf->mtl_cmd_buffer blitCommandEncoder]; }
   [buf->active_bce generateMipmapsForTexture:img->texture];
   return NGF_ERROR_OK;
 }
@@ -1934,22 +2240,22 @@ void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t 
 
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
     NGF_NOEXCEPT {
-  auto cmd_buf                                                       = NGFMTL_ENC2CMDBUF(enc);
-  cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.readMask = front;
-  cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.readMask  = back;
+  auto cmd_buf                                                           = NGFMTL_ENC2CMDBUF(enc);
+  cmd_buf->active_gfx_pipe->depth_stencil_desc.frontFaceStencil.readMask = front;
+  cmd_buf->active_gfx_pipe->depth_stencil_desc.backFaceStencil.readMask  = back;
   [cmd_buf->active_rce
       setDepthStencilState:[CURRENT_CONTEXT->device
-                               newDepthStencilStateWithDescriptor:cmd_buf->active_pipe->
+                               newDepthStencilStateWithDescriptor:cmd_buf->active_gfx_pipe->
                                                                   depth_stencil_desc]];
 }
 
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
     NGF_NOEXCEPT {
-  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  cmd_buf->active_pipe->depth_stencil_desc.frontFaceStencil.writeMask = front;
-  cmd_buf->active_pipe->depth_stencil_desc.backFaceStencil.writeMask  = back;
+  auto cmd_buf                                                            = NGFMTL_ENC2CMDBUF(enc);
+  cmd_buf->active_gfx_pipe->depth_stencil_desc.frontFaceStencil.writeMask = front;
+  cmd_buf->active_gfx_pipe->depth_stencil_desc.backFaceStencil.writeMask  = back;
   [cmd_buf->active_rce
       setDepthStencilState:[CURRENT_CONTEXT->device
-                               newDepthStencilStateWithDescriptor:cmd_buf->active_pipe->
+                               newDepthStencilStateWithDescriptor:cmd_buf->active_gfx_pipe->
                                                                   depth_stencil_desc]];
 }

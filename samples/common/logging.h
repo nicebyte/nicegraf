@@ -22,8 +22,8 @@
 
 #pragma once
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 namespace ngf_samples {
 
@@ -66,10 +66,8 @@ inline void logd(const char* fmt, ...) {
   vlogd(fmt, args);
   va_end(args);
 #else
-  fmt;
+  (void)fmt;
 #endif
 }
 
-
-}
-
+}  // namespace ngf_samples

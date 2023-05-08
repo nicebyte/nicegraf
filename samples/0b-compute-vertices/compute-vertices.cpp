@@ -115,7 +115,7 @@ void* sample_initialize(
   ngf_util_create_default_graphics_pipeline_data(&render_pipeline_data);
   render_pipeline_data.multisample_info.sample_count = main_render_target_sample_count;
   render_pipeline_data.input_assembly_info.enable_primitive_restart = true;
-  render_pipeline_data.input_assembly_info.primitive_topolgy =
+  render_pipeline_data.input_assembly_info.primitive_topology =
       NGF_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
   render_pipeline_data.depth_stencil_info.depth_test        = true;
   render_pipeline_data.depth_stencil_info.depth_write       = true;
@@ -199,7 +199,7 @@ void sample_draw_frame(
     uint32_t h,
     float /* time */,
     void* userdata) {
-  auto        state       = reinterpret_cast<compute_verts::state*>(userdata);
+  auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
   const uint32_t f_prev = (state->frame + 1u) % 2;
   if (state->frame > 0u) {
     compute_verts::render_uniforms render_uniforms;
@@ -215,25 +215,31 @@ void sample_draw_frame(
     ngf_cmd_viewport(main_render_pass, &onsc_viewport);
     ngf_cmd_scissor(main_render_pass, &onsc_viewport);
     ngf_cmd_bind_index_buffer(main_render_pass, state->index_buffer, 0u, NGF_TYPE_UINT32);
-    ngf_cmd_bind_attrib_buffer(main_render_pass, state->vertex_buffer, 0u, f_prev * sizeof(float) * 4u * compute_verts::ntotal_verts);
+    ngf_cmd_bind_attrib_buffer(
+        main_render_pass,
+        state->vertex_buffer,
+        0u,
+        f_prev * sizeof(float) * 4u * compute_verts::ntotal_verts);
     ngf_cmd_draw(main_render_pass, true, 0u, compute_verts::ntotal_indices, 1u);
   }
-
 }
 
 void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op* sync_op, void* userdata) {
-  auto           state       = reinterpret_cast<compute_verts::state*>(userdata);
-  const uint32_t f_prev      = (state->frame + 1) % 2;
+  auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
+  const uint32_t f_prev = (state->frame + 1) % 2;
   if (state->frame > 0) {
     state->compute_buffer_slice.offset = f_prev * sizeof(float) * 4u * compute_verts::ntotal_verts;
-    sync_op->nwait_compute_encoders = 1u;
-    sync_op->wait_compute_encoders  = &state->prev_compute_encoder;
-    sync_op->nbuffer_slices         = 1u;
-    sync_op->buffer_slices          = &state->compute_buffer_slice;
+    sync_op->nwait_compute_encoders    = 1u;
+    sync_op->wait_compute_encoders     = &state->prev_compute_encoder;
+    sync_op->nbuffer_slices            = 1u;
+    sync_op->buffer_slices             = &state->compute_buffer_slice;
   }
 }
 
-void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_render_encoder prev_render_enc, void* userdata) {
+void sample_post_draw_frame(
+    ngf_cmd_buffer     cmd_buffer,
+    ngf_render_encoder prev_render_enc,
+    void*              userdata) {
   static float   time   = 0.f;
   auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
   const uint32_t f_curr = (state->frame) % 2;
@@ -244,10 +250,10 @@ void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_render_encoder prev_r
 
   ngf_buffer_slice buf_slice {};
   ngf_sync_op      sync_op {
-           .nwait_render_encoders = 1u,
-           .wait_render_encoders  = &prev_render_enc,
-           .nbuffer_slices        = 1u,
-           .buffer_slices         = &buf_slice};
+      .nwait_render_encoders = 1u,
+      .wait_render_encoders  = &prev_render_enc,
+      .nbuffer_slices        = 1u,
+      .buffer_slices         = &buf_slice};
   const ngf_sync_op* sync_op_ptr = nullptr;
   if (state->frame > 1) {
     sync_op_ptr      = &sync_op;
@@ -268,10 +274,10 @@ void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_render_encoder prev_r
           .target_binding = 0u,
           .type           = NGF_DESCRIPTOR_STORAGE_BUFFER,
           .info           = {
-                        .buffer = {
-                            .buffer = state->vertex_buffer.get(),
-                            .offset = f_curr * 4u * sizeof(float) * compute_verts::ntotal_verts,
-                            .range  = compute_verts::ntotal_verts * (4u * sizeof(float))}}});
+              .buffer = {
+                  .buffer = state->vertex_buffer.get(),
+                  .offset = f_curr * 4u * sizeof(float) * compute_verts::ntotal_verts,
+                  .range  = compute_verts::ntotal_verts * (4u * sizeof(float))}}});
   ngf_cmd_dispatch(
       compute_enc,
       compute_verts::nverts_per_side / 2,
