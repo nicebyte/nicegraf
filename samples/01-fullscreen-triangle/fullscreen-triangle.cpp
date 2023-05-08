@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 
+#include "check.h"
 #include "nicegraf-util.h"
 #include "nicegraf-wrappers.h"
 #include "sample-interface.h"
@@ -33,7 +34,7 @@ namespace fullscreen_triangle {
 struct state {
   ngf::graphics_pipeline pipeline;
 };
-}
+}  // namespace fullscreen_triangle
 
 void* sample_initialize(
     uint32_t,
@@ -80,7 +81,7 @@ void* sample_initialize(
   /**
    * Initialize the pipeline object.
    */
-  state->pipeline.initialize(pipeline_data.pipeline_info);
+  NGF_SAMPLES_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
 
   return static_cast<void*>(state);
 }
@@ -113,7 +114,6 @@ void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
 }
 void sample_post_submit(void*) {
 }
-
 
 void sample_draw_ui(void*) {
 }

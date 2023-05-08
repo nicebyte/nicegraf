@@ -440,11 +440,6 @@ typedef enum ngf_error {
   /*..add new errors above this line */
 } ngf_error;
 
-typedef enum ngf_sync_scope {
-    NGF_SYNC_SCOPE_GFX,
-    NGF_SYNC_SCOPE_COMPUTE
-} ngf_sync_scope;
-
 /**
  * @struct ngf_irect2d
  * \ingroup ngf
@@ -1459,8 +1454,8 @@ typedef struct ngf_graphics_pipeline_info {
    */
   const ngf_input_assembly_info* input_assembly_info;
 
-  const ngf_specialization_info* spec_info;  /**< Specifies the values for specialization constants
-                                                (if any) used by the programmable stages. */
+  const ngf_specialization_info* spec_info; /**< Specifies the values for specialization constants
+                                               (if any) used by the programmable stages. */
 
   /**
    * Describes which render targets compatible with this pipeline.
@@ -2231,7 +2226,6 @@ typedef struct ngf_context_info {
   const ngf_context shared_context;
 } ngf_context_info;
 
-
 /**
  * @struct ngf_cmd_buffer_info
  * \ingroup ngf
@@ -2350,14 +2344,13 @@ typedef struct ngf_sync_op {
   const ngf_image_ref*       image_refs;
 } ngf_sync_op;
 
-
 /**
  * @typedef ngf_frame_token
  * \ingroup ngf
  * A token identifying a frame of rendering. See \ref ngf_begin_frame and \ref ngf_end_frame for
  * details.
  */
-typedef uint32_t ngf_frame_token;
+typedef uintptr_t ngf_frame_token;
 
 #ifdef _MSC_VER
 #pragma endregion
@@ -2686,8 +2679,9 @@ void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
  * @param info Information required to construct the texel buffer view object.
  * @param result Pointer to where the handle to the newly created object will be written to.
  */
-ngf_error
-ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_buffer_view* result);
+ngf_error ngf_create_texel_buffer_view(
+    const ngf_texel_buffer_view_info* info,
+    ngf_texel_buffer_view*            result) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2696,7 +2690,7 @@ ngf_create_texel_buffer_view(const ngf_texel_buffer_view_info* info, ngf_texel_b
  *
  * @param buffer The handle to the texel buffer view object to be destroyed.
  */
-void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view);
+void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2786,7 +2780,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       buf,
     const ngf_pass_info* pass_info,
-    const ngf_sync_op* sync_op,
+    const ngf_sync_op*   sync_op,
     ngf_render_encoder*  enc) NGF_NOEXCEPT;
 
 /**
@@ -2846,7 +2840,9 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_xfer_encoder* enc) NGF_NOEXCEPT;
+ngf_error
+ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_xfer_encoder* enc)
+    NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2868,7 +2864,9 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
-ngf_error ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_compute_encoder* enc) NGF_NOEXCEPT;
+ngf_error
+ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_compute_encoder* enc)
+    NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
