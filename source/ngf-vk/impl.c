@@ -1320,29 +1320,6 @@ static ngf_error ngfvk_encoder_end(
   return NGF_ERROR_OK;
 }
 
-static void ngfvk_submit_commands(
-    VkQueue                     queue,
-    const VkCommandBuffer*      cmd_bufs,
-    uint32_t                    ncmd_bufs,
-    const VkPipelineStageFlags* wait_stage_flags,
-    const VkSemaphore*          wait_sems,
-    uint32_t                    nwait_sems,
-    const VkSemaphore*          signal_sems,
-    uint32_t                    nsignal_sems,
-    VkFence                     fence) {
-  const VkSubmitInfo submit_info = {
-      .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext                = NULL,
-      .waitSemaphoreCount   = nwait_sems,
-      .pWaitSemaphores      = wait_sems,
-      .pWaitDstStageMask    = wait_stage_flags,
-      .commandBufferCount   = ncmd_bufs,
-      .pCommandBuffers      = cmd_bufs,
-      .signalSemaphoreCount = ncmd_bufs > 0u ? nsignal_sems : 0u,
-      .pSignalSemaphores    = signal_sems};
-  vkQueueSubmit(queue, 1, &submit_info, fence);
-}
-
 static void ngfvk_cmd_copy_buffer(
     VkCommandBuffer      vkcmdbuf,
     VkBuffer             src,
