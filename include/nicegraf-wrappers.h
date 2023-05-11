@@ -307,8 +307,8 @@ class render_encoder {
 
   render_encoder& operator=(render_encoder&& other) noexcept {
     enc_                = other.enc_;
-    enc_.pvt_data_donotuse.d0 = 0u;
-    enc_.pvt_data_donotuse.d1 = 0u;
+    other.enc_.pvt_data_donotuse.d0 = 0u;
+    other.enc_.pvt_data_donotuse.d1 = 0u;
     return *this;
   }
 
@@ -339,14 +339,14 @@ class xfer_encoder {
    * @param cmd_buf The command buffer to create the transfer encoder for
    */
   explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
-    if(enc_.pvt_data_donotuse.d0) ngf_cmd_begin_xfer_pass(cmd_buf, sync_op, &enc_);
+    ngf_cmd_begin_xfer_pass(cmd_buf, sync_op, &enc_);
   }
 
   /**
    * Ends the wrapped transfer pass.
    */
   ~xfer_encoder() {
-    ngf_cmd_end_xfer_pass(enc_);
+    if(enc_.pvt_data_donotuse.d0) ngf_cmd_end_xfer_pass(enc_);
   }
 
   xfer_encoder(xfer_encoder&& other) noexcept {
