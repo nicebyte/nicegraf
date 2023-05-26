@@ -260,6 +260,16 @@ class render_encoder {
   }
 
   /**
+   * Creates a new render encoder for the given command buffer that doesn't execute any synchronization.
+   *
+   * @param cmd_buf The command buffer to create a new render encoder for.
+   * @param pass_info Render pass description.
+   */
+  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info) {
+    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, nullptr, &enc_);
+  }
+
+  /**
    * Creates a new render encoder for the given command buffer. Has the same semantics as \ref
    * ngf_cmd_begin_render_pass_simple.
    * 
@@ -336,10 +346,19 @@ class xfer_encoder {
   /**
    * Creates a new transfer encoder for the given command buffer.
    * 
-   * @param cmd_buf The command buffer to create the transfer encoder for
+   * @param cmd_buf The command buffer to create the transfer encoder for.
    */
   explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
     ngf_cmd_begin_xfer_pass(cmd_buf, sync_op, &enc_);
+  }
+
+  /**
+   * Creates a new transfer encoder for the given command buffer that doesn't execute any synchronization.
+   *
+   * @param cmd_buf The command buffer to create the transfer encoder for.
+   */
+  explicit xfer_encoder(ngf_cmd_buffer cmd_buf) {
+    ngf_cmd_begin_xfer_pass(cmd_buf, nullptr, &enc_);
   }
 
   /**
@@ -372,6 +391,64 @@ class xfer_encoder {
 
   private:
   ngf_xfer_encoder enc_;
+};
+
+/**
+ * \ingroup ngf_wrappers
+ *
+ * Wraps a compute encoder with unique ownership semantics.
+ */
+class compute_encoder {
+  public:
+  /**
+   * Creates a new compute encoder for the given command buffer. Has the same semantics as \ref
+   * ngf_cmd_begin_compute_pass.
+   *
+   * @param cmd_buf The command buffer to create a new compute encoder for.
+   */
+  explicit compute_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
+    ngf_cmd_begin_compute_pass(cmd_buf, sync_op, &enc_);
+  }
+
+  /**
+   * Creates a new compute encoder for the given command buffer that doesn't execute any synchronization
+   *
+   * @param cmd_buf The command buffer to create a new compute encoder for.
+   */
+  explicit compute_encoder(ngf_cmd_buffer cmd_buf) {
+    ngf_cmd_begin_compute_pass(cmd_buf, nullptr, &enc_);
+  }
+
+  /**
+   * Finishes the wrapped compute pass.
+   */
+  ~compute_encoder() {
+    if (enc_.pvt_data_donotuse.d0) ngf_cmd_end_compute_pass(enc_);
+  }
+
+  compute_encoder(compute_encoder&& other) noexcept {
+    *this = std::move(other);
+  }
+
+  compute_encoder& operator=(compute_encoder&& other) noexcept {
+    enc_                = other.enc_;
+    other.enc_.pvt_data_donotuse.d0 = 0u;
+    other.enc_.pvt_data_donotuse.d1 = 0u;
+    return *this;
+  }
+
+  compute_encoder(const compute_encoder&) = delete;
+  compute_encoder& operator=(const compute_encoder&) = delete;
+
+  /**
+   * Implicit conversion to \ref ngf_compute_encoder.
+   */
+  operator ngf_compute_encoder() {
+    return enc_;
+  }
+
+  private:
+  ngf_compute_encoder enc_ {};
 };
 
 /**
