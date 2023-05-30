@@ -475,6 +475,20 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /**
+     * Creates a \ref ngf_resource_bind_op for an \ref ngf_image that is to be used as a storage image
+     *
+     * @param image The image to bind.
+     */
+    static ngf_resource_bind_op storage_image(const ngf_image image) {
+      ngf_resource_bind_op op;
+      op.type                     = NGF_DESCRIPTOR_STORAGE_IMAGE;
+      op.target_binding           = B;
+      op.target_set               = S;
+      op.info.image_sampler.image = image;
+      return op;
+    }
+
     /** 
      * Creates a \ref ngf_resource_bind_op for an uniform buffer.
      * 
