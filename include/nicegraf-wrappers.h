@@ -255,8 +255,8 @@ class render_encoder {
    * @param cmd_buf The command buffer to create a new render encoder for.
    * @param pass_info Render pass description.
    */
-  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info, const ngf_sync_op* sync_op) {
-    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, sync_op, &enc_);
+  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_pass_info& pass_info, const ngf_sync_op& sync_op) {
+    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &sync_op, &enc_);
   }
 
   /**
@@ -348,8 +348,8 @@ class xfer_encoder {
    * 
    * @param cmd_buf The command buffer to create the transfer encoder for.
    */
-  explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
-    ngf_cmd_begin_xfer_pass(cmd_buf, sync_op, &enc_);
+  explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op& sync_op) {
+    ngf_cmd_begin_xfer_pass(cmd_buf, &sync_op, &enc_);
   }
 
   /**
@@ -406,8 +406,8 @@ class compute_encoder {
    *
    * @param cmd_buf The command buffer to create a new compute encoder for.
    */
-  explicit compute_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op) {
-    ngf_cmd_begin_compute_pass(cmd_buf, sync_op, &enc_);
+  explicit compute_encoder(ngf_cmd_buffer cmd_buf, const ngf_sync_op& sync_op) {
+    ngf_cmd_begin_compute_pass(cmd_buf, &sync_op, &enc_);
   }
 
   /**
