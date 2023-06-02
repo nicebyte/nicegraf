@@ -1751,9 +1751,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
             bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
           vk_bind_info->imageView   = bind_info->image->vkview;
           const bool is_storage_image = bind_info->image->usage_flags & NGF_IMAGE_USAGE_STORAGE;
-          vk_bind_info->imageLayout = (cmd_buf->compute_pass_active && is_storage_image)
-                                            ? VK_IMAGE_LAYOUT_GENERAL
-                                            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+          vk_bind_info->imageLayout = (is_storage_image) ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         } else if (bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE) {
           vk_bind_info->imageView   = bind_info->image->vkview;
           vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -2461,17 +2459,10 @@ static ngf_error ngfvk_execute_sync_op(
       const bool is_storage_image =
           sync_op->image_refs[i].image->usage_flags & NGF_IMAGE_USAGE_STORAGE;
 
-      const bool src_has_compute = sync_op->nwait_compute_encoders > 0u;
-      const bool dst_has_compute = dst_stage_mask & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-      b->oldLayout               = !src_has_compute ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                               : (src_has_compute && is_storage_image
-                                                      ? VK_IMAGE_LAYOUT_GENERAL
-                                                      : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-      b->newLayout               = !dst_has_compute ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                               : (dst_has_compute && is_storage_image
-                                                      ? VK_IMAGE_LAYOUT_GENERAL
-                                                      : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
+      b->oldLayout =
+          is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      b->newLayout =
+          is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       const VkFormat image_format = sync_op->image_refs[i].image->vkformat;
       const bool     is_depth     = ngfvk_format_is_depth(image_format);
       const bool     is_stencil   = ngfvk_format_is_stencil(image_format);
@@ -3941,13 +3932,16 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     const ngf_image_ref* attachment_img_ref = &info->attachment_image_refs[a];
     const ngf_image      attachment_img     = attachment_img_ref->image;
     const bool is_attachment_sampled = attachment_img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM;
+    const bool is_attachment_storage  = attachment_img->usage_flags & NGF_IMAGE_USAGE_STORAGE;
     attachment_pass_desc->is_resolve = false;
-    attachment_pass_desc->initial_layout = is_attachment_sampled
-                                               ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                               : attachment_pass_desc->layout;
-    attachment_pass_desc->final_layout   = is_attachment_sampled
-                                               ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-                                               : attachment_pass_desc->layout;
+    attachment_pass_desc->initial_layout =
+        is_attachment_storage ? VK_IMAGE_LAYOUT_GENERAL
+                              : (is_attachment_sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                                       : attachment_pass_desc->layout);
+    attachment_pass_desc->final_layout =
+        is_attachment_storage ? VK_IMAGE_LAYOUT_GENERAL
+                              : (is_attachment_sampled ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                                                       : attachment_pass_desc->layout);
     const VkImageAspectFlags subresource_aspect_flags =
         (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0u) |
         (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
@@ -4278,7 +4272,9 @@ void ngf_cmd_write_image(
       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       1u,
       &copy_op);
-  const VkImageLayout        target_layout     = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  const VkImageLayout        target_layout     = (dst.image->usage_flags & NGF_IMAGE_USAGE_STORAGE)
+                                                     ? VK_IMAGE_LAYOUT_GENERAL
+                                                     : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
   const VkImageMemoryBarrier post_xfer_barrier = {
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext               = NULL,
@@ -4675,11 +4671,11 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
                        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_MEMORY_READ_BIT |
                        VK_ACCESS_MEMORY_WRITE_BIT,
       .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
-      .newLayout           = is_sampled_from
+      .newLayout           = is_storage ? VK_IMAGE_LAYOUT_GENERAL : (is_sampled_from
                                  ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
                                  : (is_depth_stencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
                                     : is_attachment ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-                                                    : VK_IMAGE_LAYOUT_GENERAL),
+                                                    : VK_IMAGE_LAYOUT_GENERAL)),
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
       .image               = (VkImage)img->alloc.obj_handle,
