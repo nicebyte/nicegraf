@@ -1750,7 +1750,10 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
             bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
           vk_bind_info->imageView   = bind_info->image->vkview;
-          vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+          const bool is_storage_image = bind_info->image->usage_flags & NGF_IMAGE_USAGE_STORAGE;
+          vk_bind_info->imageLayout = (cmd_buf->compute_pass_active && is_storage_image)
+                                            ? VK_IMAGE_LAYOUT_GENERAL
+                                            : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         } else if (bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE) {
           vk_bind_info->imageView   = bind_info->image->vkview;
           vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
