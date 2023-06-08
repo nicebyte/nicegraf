@@ -1316,6 +1316,8 @@ static ngf_error ngfvk_encoder_end(
     VkPipelineStageFlags stage_mask) {
   vkCmdSetEvent(cmd_buf->vk_cmd_buffer, (VkEvent)generic_enc->d1, stage_mask);
   ngfvk_cleanup_pending_binds(cmd_buf);
+  const size_t fi = CURRENT_CONTEXT->frame_id;
+  NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_events, (VkEvent)generic_enc->d1);
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
   return NGF_ERROR_OK;
 }
@@ -2365,7 +2367,6 @@ static ngf_error ngfvk_execute_sync_op(
     return NGF_ERROR_INVALID_OPERATION;
   }
  
-  const uint32_t fi = CURRENT_CONTEXT->frame_id;
   const uint32_t ntotal_wait_events = sync_op->nwait_render_encoders +
                                       sync_op->nwait_xfer_encoders +
                                       sync_op->nwait_compute_encoders;
@@ -2377,19 +2378,16 @@ static ngf_error ngfvk_execute_sync_op(
       assert(e < ntotal_wait_events);
       VkEvent event    = (VkEvent)sync_op->wait_render_encoders[re].pvt_data_donotuse.d1;
       wait_events[e++] = event;
-      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_events, event);
     }
     for (uint32_t xe = 0u; xe < sync_op->nwait_xfer_encoders; ++xe) {
       assert(e < ntotal_wait_events);
       VkEvent event    = (VkEvent)sync_op->wait_xfer_encoders[xe].pvt_data_donotuse.d1;
       wait_events[e++] = event;
-      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_events, event);
     }
     for (uint32_t ce = 0u; ce < sync_op->nwait_compute_encoders; ++ce) {
       assert(e < ntotal_wait_events);
       VkEvent event    = (VkEvent)sync_op->wait_compute_encoders[ce].pvt_data_donotuse.d1;
       wait_events[e++] = event;
-      NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_events, event);
     }
 
     const VkAccessFlagBits possible_common_access_flag_bits =
