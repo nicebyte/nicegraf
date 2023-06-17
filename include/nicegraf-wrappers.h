@@ -489,6 +489,24 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    /**
+     * Creates a \ref ngf_resource_bind_op for an storage buffer.
+     *
+     * @param buf The buffer to bind as a storage buffer.
+     * @param offset The offset at which to bind the buffer.
+     * @param range The extent of the bound memory.
+     */
+    static ngf_resource_bind_op storage_buffer(const ngf_buffer buf, size_t offset, size_t range) {
+      ngf_resource_bind_op op;
+      op.type                     = NGF_DESCRIPTOR_STORAGE_BUFFER;
+      op.target_binding           = B;
+      op.target_set               = S;
+      op.info.buffer.buffer       = buf;
+      op.info.buffer.offset       = offset;
+      op.info.buffer.range        = range;
+      return op;
+    }
+
     /** 
      * Creates a \ref ngf_resource_bind_op for an uniform buffer.
      * 
