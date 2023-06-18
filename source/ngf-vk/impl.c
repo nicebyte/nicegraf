@@ -2232,12 +2232,12 @@ ngf_error ngfvk_create_pipeline_layout(
   // Create descriptor set layouts.
   VkDescriptorSetLayout* vk_set_layouts =
       ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorSetLayout) * (max_set_id + 1));
-  uint32_t last_set_id = 0;
+  uint32_t last_set_id = ~0u;
   for (uint32_t cur = 0u; cur < nunique_bindings;) {
     ngfvk_desc_set_layout set_layout;
     memset(&set_layout, 0, sizeof(set_layout));
     const uint32_t current_set_id = bindings[cur].set;
-    if (current_set_id - last_set_id > 1u) {
+    if ((last_set_id > current_set_id) || (current_set_id - last_set_id > 1u)) {
       // there is a gap in descriptor sets, fill it in with empty layouts;
       for (uint32_t i = last_set_id + 1; i < current_set_id; ++i) {
         const VkDescriptorSetLayoutCreateInfo vk_ds_info = {

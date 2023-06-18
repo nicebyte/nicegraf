@@ -40,8 +40,8 @@ struct ComputeShaderUniforms {
   float4 time;
 };
 
-[[vk::binding(0, 0)]] RWStructuredBuffer<float4>            outputBuffer;
-[[vk::binding(1, 0)]] ConstantBuffer<ComputeShaderUniforms> computeShaderUniforms;
+[[vk::binding(0, 1)]] RWStructuredBuffer<float4>            outputBuffer;
+[[vk::binding(1, 1)]] ConstantBuffer<ComputeShaderUniforms> computeShaderUniforms;
 
 [numthreads(2, 2, 1)] void CSMain(uint3 tid
                                   : SV_DispatchThreadID) {

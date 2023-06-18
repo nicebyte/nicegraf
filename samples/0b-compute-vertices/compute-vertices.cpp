@@ -267,10 +267,10 @@ void sample_post_draw_frame(
   ngf_cmd_bind_compute_pipeline(compute_enc, state->compute_pipeline);
   ngf::cmd_bind_resources(
       compute_enc,
-      state->compute_uniforms_multibuf.bind_op_at_current_offset(0, 1),
+      state->compute_uniforms_multibuf.bind_op_at_current_offset(1, 1),
       ngf_resource_bind_op {
 
-          .target_set     = 0u,
+          .target_set     = 1u,
           .target_binding = 0u,
           .type           = NGF_DESCRIPTOR_STORAGE_BUFFER,
           .info           = {
