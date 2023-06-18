@@ -157,6 +157,7 @@ typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(VkImageView) retire_image_views;
   NGFI_DARRAY_OF(VkBufferView) retire_buffer_views;
   NGFI_DARRAY_OF(VkEvent) retire_events;
+  NGFI_DARRAY_OF(VkEvent) real_retire_events;
   NGFI_DARRAY_OF(ngfvk_alloc) retire_images;
   NGFI_DARRAY_OF(ngfvk_alloc) retire_buffers;
   NGFI_DARRAY_OF(ngfvk_desc_pools_list*) reset_desc_pools_lists;
@@ -1227,9 +1228,15 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     vkDestroyBufferView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_buffer_views, s), NULL);
   }
 
-  NGFI_DARRAY_FOREACH(frame_res->retire_events, s) {
-    vkDestroyEvent(_vk.device, NGFI_DARRAY_AT(frame_res->retire_events, s), NULL);
+  NGFI_DARRAY_FOREACH(frame_res->real_retire_events, s) {
+    vkDestroyEvent(_vk.device, NGFI_DARRAY_AT(frame_res->real_retire_events, s), NULL);
   }
+  NGFI_DARRAY_CLEAR(frame_res->real_retire_events);
+  NGFI_DARRAY_FOREACH(frame_res->retire_events, s) {
+    NGFI_DARRAY_APPEND(frame_res->real_retire_events, NGFI_DARRAY_AT(frame_res->retire_events, s));
+  }
+
+
 
   NGFI_DARRAY_FOREACH(frame_res->retire_buffers, a) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
@@ -3003,6 +3010,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_image_views, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffer_views, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_events, 8);
+    NGFI_DARRAY_RESET(ctx->frame_res[f].real_retire_events, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_images, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buffers, 8);
     NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_pools_lists, 8);
@@ -3090,6 +3098,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_image_views);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffer_views);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_events);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].real_retire_events);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_images);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_bufs);
