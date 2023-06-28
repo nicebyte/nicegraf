@@ -23,9 +23,8 @@ GenericFragShaderInput VSMain(uint vertexId : SV_VertexID) {
   };
   vertexId = vertexId % 6;
   GenericFragShaderInput result = {
-    mul(shaderUniforms.transformMatrix,
-        float4(vertices[vertexId], 0.0, 1.0)),
-    2 * uvs[vertexId]
+    mul(shaderUniforms.transformMatrix, float4(vertices[vertexId], 0.0, 1.0)) * float4(1.0, -1.0, 1.0, 1.0),
+    float2(uvs[vertexId].x, uvs[vertexId].y)
   };
   return result;
 }

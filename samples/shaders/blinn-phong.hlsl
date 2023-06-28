@@ -1,4 +1,5 @@
 //T: blinn-phong vs:VSMain ps:PSMain
+//T: mesh-normals vs:VSMain ps:PSNormalsOnly define:NORMALS_ONLY=1
 
 [[vk::constant_id(0)]] const uint enableHalfLambert = 0;
 
@@ -16,6 +17,7 @@ struct VertexShaderInput {
 struct ShaderUniforms {
   float4x4 objToViewTransform;
   float4x4 viewToClipTransform;
+#if !defined(NORMALS_ONLY)
   float4   ambientLightIntensity;
   float4   viewSpacePointLightPosition;
   float4   pointLightIntensity;
@@ -24,6 +26,7 @@ struct ShaderUniforms {
   float4   diffuseReflectance;
   float4   specularCoefficient;
   float    shininess;
+#endif
 };
 
 [[vk::binding(0, 0)]] ConstantBuffer<ShaderUniforms> shaderUniforms;
@@ -41,6 +44,7 @@ PixelShaderInput VSMain(VertexShaderInput vertexAttrs) {
   return result;
 }
 
+#if !defined(NORMALS_ONLY)
 float computeCosineFactor(float3 direction, float3 normal) {
   float cosineFactor = dot(direction, normal);
   if (enableHalfLambert == 0) {
@@ -98,4 +102,9 @@ float4 PSMain(PixelShaderInput fragmentAttribs) : SV_Target {
     float3 directionalLightContribution = (shaderUniforms.diffuseReflectance.rgb + specularReflectanceFromDirectionalLight) * directionalLightIrradiance;
     
     return float4(pointLightContribution + directionalLightContribution + shaderUniforms.ambientLightIntensity.rgb, 1.0);
+}
+#endif
+
+float4 PSNormalsOnly(PixelShaderInput fragmentAttribs) : SV_Target {
+    return float4(fragmentAttribs.viewSpaceInterpNormal.xyz * 0.5f + float3(0.5f, .5f, .5f), 1.f);
 }
