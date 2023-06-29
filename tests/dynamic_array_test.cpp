@@ -89,3 +89,28 @@ TEST_CASE("FOREACH visits each element") {
   }
   REQUIRE(check_array.size() == 0u);
 }
+
+TEST_CASE("Expand and shrink a dynamic array") {
+  NGFI_DARRAY_OF(point) pt_array;
+  constexpr size_t array_size = 10;
+  NGFI_DARRAY_RESET(pt_array, array_size);
+  for (size_t i = 0; i < array_size; ++i) {
+    NGFI_DARRAY_APPEND(pt_array, random_point());
+  }
+  REQUIRE(pt_array.capacity == 10u);
+  REQUIRE(NGFI_DARRAY_SIZE(pt_array) == 10u);
+
+  uint32_t oldSize = NGFI_DARRAY_SIZE(pt_array);
+  NGFI_DARRAY_RESIZE(pt_array, 15u);
+  REQUIRE(pt_array.capacity == 15u);
+  REQUIRE(NGFI_DARRAY_SIZE(pt_array) == 10u);
+  REQUIRE(NGFI_DARRAY_SIZE(pt_array) == oldSize);
+
+  oldSize = NGFI_DARRAY_SIZE(pt_array);
+  NGFI_DARRAY_RESIZE(pt_array, 5u);
+  REQUIRE(pt_array.capacity == 15u);
+  REQUIRE(NGFI_DARRAY_SIZE(pt_array) == 5u);
+  REQUIRE(NGFI_DARRAY_SIZE(pt_array) != oldSize);
+
+  NGFI_DARRAY_DESTROY(pt_array);
+}

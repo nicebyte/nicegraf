@@ -41,11 +41,15 @@ SOFTWARE.
 #define NGFI_DARRAY_RESIZE(a, s) { \
   uint32_t size = (s); \
   if (a.capacity < size) { \
+    ptrdiff_t cur_size = a.endptr - a.data; \
     a.data = (decltype(a.data))realloc(a.data, sizeof(a.data[0]) * size); \
     a.capacity = size; \
+    a.endptr = &a.data[cur_size]; \
   } \
-  a.endptr = a.data + size; \
-} 
+  else { \
+    a.endptr = a.data + size; \
+  } \
+}
 
 #define NGFI_DARRAY_DESTROY(a) if(a.data != NULL) { \
   free(a.data); \
