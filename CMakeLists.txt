@@ -92,8 +92,10 @@ else()
 
   set(NICEGRAF_VK_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
-                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
-                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)
+                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c)
+  if (NGF_USE_MVK STREQUAL "yes")
+    set(NICEGRAF_VK_SRCS ${NICEGRAF_VK_SRCS} ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)
+  endif()
 
   # Vulkan backend.
   nmk_static_library(NAME nicegraf-vk

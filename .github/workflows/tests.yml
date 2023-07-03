@@ -13,11 +13,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install_deps
+      run: sudo apt install libx11-xcb-dev
     - name: make_build_dir
       run: mkdir -p build
     - name: run_cmake
       run: cd ./build && cmake .. -DNGF_BUILD_TESTS=yes
     - name: make
-      run:  cd ./build && make ngf_tests
+      run:  cd ./build && make ngf_tests && make vk-backend-tests
     - name: test
-      run: ./build/ngf_tests
+      run: ./build/ngf_tests && ./build/vk-backend-tests
