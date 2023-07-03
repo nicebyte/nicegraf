@@ -151,13 +151,13 @@ void sample_draw_frame(
   }
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op* sync_op, void* userdata) {
+void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info* sync_info, void* userdata) {
   auto state = reinterpret_cast<compute_demo::state*>(userdata);
   if (state->frame > 0u) {
-    sync_op->nwait_compute_encoders = 1u;
-    sync_op->wait_compute_encoders  = &state->prev_compute_enc;
-    sync_op->nimage_refs            = 1u;
-    sync_op->image_refs             = &state->image_ref;
+    sync_info->nsync_compute_resources = 1u;
+    sync_info->sync_compute_resources->encoder        = state->prev_compute_enc;
+    sync_info->sync_compute_resources->resource.resource.image_ref = state->image_ref;
+    sync_info->sync_compute_resources->resource.sync_resource_type = NGF_SYNC_RESOURCE_IMAGE;
   }
 }
 
@@ -166,15 +166,21 @@ void sample_post_draw_frame(
     ngf_render_encoder prev_render_encoder,
     void*              userdata) {
   auto              state = reinterpret_cast<compute_demo::state*>(userdata);
-  const ngf_sync_op compute_sync_op {
-      .nwait_render_encoders = 1u,
-      .wait_render_encoders  = &prev_render_encoder,
-      .nimage_refs           = 1u,
-      .image_refs            = &state->image_ref};
+  const ngf_sync_render_resource sync_render_resource = {
+      .encoder = prev_render_encoder,
+      .resource =
+          {.sync_resource_type = NGF_SYNC_RESOURCE_IMAGE,
+           .resource           = {.image_ref = state->image_ref}},
+  };
+      
+  const ngf_compute_pass_info pass_info {
+      .sync_render_resources = {
+          .nsync_resources = 1u,
+          .sync_resources  = &sync_render_resource}};
 
   ngf_compute_encoder compute_enc;
   NGF_SAMPLES_CHECK_NGF_ERROR(
-      ngf_cmd_begin_compute_pass(cmd_buffer, &compute_sync_op, &compute_enc));
+      ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc));
   ngf_resource_bind_op bind_op;
   bind_op.info.image_sampler.image = state->image;
   bind_op.target_set               = 0;

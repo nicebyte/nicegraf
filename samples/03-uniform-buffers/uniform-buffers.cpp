@@ -198,7 +198,7 @@ void sample_draw_frame(
                                  (3 * state->aligned_uniform_data_size);
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op*, void*) {
+void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info*, void*) {
 }
 
 void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {

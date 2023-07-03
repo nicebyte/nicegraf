@@ -35,6 +35,7 @@ if(WIN32)
 else()
 	set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
 endif()
+set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 
 # A library with various utilities shared internally across different backends.
 nmk_static_library(NAME nicegraf-internal
@@ -87,13 +88,25 @@ else()
     set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} ${APPLE_QUARTZ})
   endif()
 
+  set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} ${NICEGRAF_COMMON_DEPS})
+
+  set(NICEGRAF_VK_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
+                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
+                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)
+
   # Vulkan backend.
   nmk_static_library(NAME nicegraf-vk
-                     SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm
-                     DEPS ${NICEGRAF_COMMON_DEPS} ${NICEGRAF_VK_DEPS})
+                     SRCS ${NICEGRAF_VK_SRCS}
+                     DEPS ${NICEGRAF_VK_DEPS})
+  nmk_static_library(NAME nicegraf-vk-for-tests 
+                     SRCS ${NICEGRAF_VK_SRCS}
+                     DEPS ${NICEGRAF_VK_DEPS}
+                     PVT_DEFINES NGFVK_TEST_MODE)
+                     
+  nmk_binary(NAME vk-backend-tests
+             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
+             DEPS nicegraf-vk-for-tests)
 endif()
 
 # Build tests only if explicitly requested.

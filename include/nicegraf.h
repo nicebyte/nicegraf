@@ -55,7 +55,7 @@
  *   within them are automatically declared to have C linkage. Additionally,
  *   they are declared to be noexcept.
  *
- * \subsection object-model Object Model
+ * \subsection object-model Objects 
  *
  * nicegraf objects, such as images, buffers, render targets, etc., are
  * represented using opaque handles. The objects are constructed and destroyed
@@ -1913,12 +1913,102 @@ typedef enum ngf_attachment_store_op {
   NGF_STORE_OP_COUNT
 } ngf_attachment_store_op;
 
+struct ngfi_private_encoder_data {
+  uintptr_t d0;
+  uintptr_t d1;
+};
+
 /**
- * @struct ngf_pass_info
+ * @struct ngf_render_encoder
+ * \ingroup ngf
+ *
+ * A render encoder records rendering commands (such as draw calls) into its
+ * corresponding command buffer.
+ */
+typedef struct ngf_render_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
+} ngf_render_encoder;
+
+/**
+ * @struct ngf_xfer_encoder
+ * \ingroup ngf
+ *
+ * A transfer encoder records transfer commands (i.e. copying buffer contents)
+ * into its corresponding command buffer.
+ */
+typedef struct ngf_xfer_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
+} ngf_xfer_encoder;
+
+/**
+ * @struct ngf_compute_encoder
+ * \ingroup ngf
+ *
+ * A compute encoder records compute dispatches into its corresponding command buffer.
+ */
+typedef struct ngf_compute_encoder {
+  struct ngfi_private_encoder_data pvt_data_donotuse;
+} ngf_compute_encoder;
+
+typedef struct ngf_sync_compute_resource ngf_sync_compute_resource;
+typedef struct ngf_sync_render_resource  ngf_sync_render_resource;
+typedef struct ngf_sync_xfer_resource    ngf_sync_xfer_resource;
+
+/**
+ * @struct ngf_sync_compute_resources
+ * \ingroup ngf
+ * 
+ * A list of resources to synchronize with compute encoders on.
+ */
+typedef struct ngf_sync_compute_resources {
+  uint32_t nsync_resources; /** < Number of elements in the list. */
+
+  /**
+   * Pointer to a continuous array of \ref ngf_sync_compute_resources::nsync_resources objects
+   * specifying the encoders and resources to synchronize on.
+   */
+  const ngf_sync_compute_resource* sync_resources;
+} ngf_sync_compute_resources;
+
+/**
+ * @struct ngf_sync_render_resources
+ * \ingroup ngf
+ * 
+ * A list of resources to synchronize with render encoders on.
+ */
+typedef struct ngf_sync_render_resources {
+  uint32_t nsync_resources; /** < Number of elements in the list. */
+
+  /**
+   * Pointer to a continuous array of \ref ngf_sync_render_resources::nsync_resources objects
+   * specifying the encoders and resources to synchronize on.
+   */
+  const ngf_sync_render_resource* sync_resources;
+} ngf_sync_render_resources;
+
+/**
+ * @struct ngf_sync_xfer_resources
+ * \ingroup ngf
+ * 
+ * A list of resources to synchronize with transfer encoders on.
+ */
+typedef struct ngf_sync_xfer_resources {
+  uint32_t nsync_resources; /** < Number of elements in the list. */
+
+  /**
+   * Pointer to a continuous array of \ref ngf_sync_xfer_resources::nsync_resources objects
+   * specifying the encoders and resources to synchronize on.
+   */
+  const ngf_sync_xfer_resource* sync_resources;
+} ngf_sync_xfer_resources;
+
+
+/**
+ * @struct ngf_render_pass_info
  * \ingroup ngf
  * Information required to begin a render pass.
  */
-typedef struct ngf_pass_info {
+typedef struct ngf_render_pass_info {
   /**
    * A render target that shall be rendered to during this pass.
    */
@@ -1926,7 +2016,7 @@ typedef struct ngf_pass_info {
 
   /**
    * A pointer to a buffer of \ref ngf_load_op enumerators specifying the operation to perform at
-   * the start of the render pass for each attachment of \ref ngf_pass_info::render_target. The
+   * the start of the render pass for each attachment of \ref ngf_render_pass_info::render_target. The
    * buffer must have at least the same number of elements as there are attachments in the render
    * target. The `i`th element of the buffer corresponds to the `i`th attachment.
    */
@@ -1934,7 +2024,7 @@ typedef struct ngf_pass_info {
 
   /**
    * A pointer to a buffer of \ref ngf_store_op enumerators specifying the operation to perform at
-   * the end of the render pass for each attachment of \ref ngf_pass_info::render_target. The
+   * the end of the render pass for each attachment of \ref ngf_render_pass_info::render_target. The
    * buffer must have at least the same number of elements as there are attachments in the render
    * target. The `i`th element of the buffer corresponds to the `i`th attachment.
    */
@@ -1949,7 +2039,50 @@ typedef struct ngf_pass_info {
    * The rest of the buffer's elements are ignored.
    */
   const ngf_clear* clears;
-} ngf_pass_info;
+
+  /**
+   * List of resources to synchronize on with compute encoders, before beginning this pass.
+   */
+  ngf_sync_compute_resources sync_compute_resources;
+} ngf_render_pass_info;
+
+/**
+ * @struct ngf_xfer_pass_info
+ * \ingroup ngf
+ * 
+ * Information required to begin a transfer pass.
+ */
+
+typedef struct ngf_xfer_pass_info {
+  /**
+   * List of resources to synchronize on with compute encoders, before beginning this pass.
+   */
+  ngf_sync_compute_resources sync_compute_resources;
+
+} ngf_xfer_pass_info;
+
+/**
+ * @struct ngf_compute_pass_info
+ * \ingroup ngf
+ * 
+ * Information required to begin a compute pass.
+ */
+typedef struct ngf_compute_pass_info {
+  /**
+   * List of resources to synchronize on with compute encoders, before beginning this pass.
+   */
+  ngf_sync_compute_resources sync_compute_resources;
+
+  /**
+   * List of resources to synchronize on with render encoders, before beginning this pass.
+   */
+  ngf_sync_render_resources  sync_render_resources;
+
+  /**
+   * List of resources to synchronize on with transfer encoders, before beginning this pass.
+   */
+  ngf_sync_xfer_resources    sync_xfer_resources;
+} ngf_compute_pass_info;
 
 /**
  * @enum ngf_buffer_storage_type
@@ -2294,56 +2427,6 @@ typedef struct ngf_cmd_buffer_info {
  */
 typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
 
-struct ngfi_private_encoder_data {
-  uintptr_t d0;
-  uintptr_t d1;
-};
-
-/**
- * @struct ngf_render_encoder
- * \ingroup ngf
- *
- * A render encoder records rendering commands (such as draw calls) into its
- * corresponding command buffer.
- */
-typedef struct ngf_render_encoder {
-  struct ngfi_private_encoder_data pvt_data_donotuse;
-} ngf_render_encoder;
-
-/**
- * @struct ngf_xfer_encoder
- * \ingroup ngf
- *
- * A transfer encoder records transfer commands (i.e. copying buffer contents)
- * into its corresponding command buffer.
- */
-typedef struct ngf_xfer_encoder {
-  struct ngfi_private_encoder_data pvt_data_donotuse;
-} ngf_xfer_encoder;
-
-/**
- * @struct ngf_compute_encoder
- * \ingroup ngf
- *
- * A compute encoder records compute dispatches into its corresponding command buffer.
- */
-typedef struct ngf_compute_encoder {
-  struct ngfi_private_encoder_data pvt_data_donotuse;
-} ngf_compute_encoder;
-
-typedef struct ngf_sync_op {
-  uint32_t                   nwait_render_encoders;
-  const ngf_render_encoder*  wait_render_encoders;
-  uint32_t                   nwait_xfer_encoders;
-  const ngf_xfer_encoder*    wait_xfer_encoders;
-  uint32_t                   nwait_compute_encoders;
-  const ngf_compute_encoder* wait_compute_encoders;
-  uint32_t                   nbuffer_slices;
-  const ngf_buffer_slice*    buffer_slices;
-  uint32_t                   nimage_refs;
-  const ngf_image_ref*       image_refs;
-} ngf_sync_op;
-
 /**
  * @typedef ngf_frame_token
  * \ingroup ngf
@@ -2351,6 +2434,70 @@ typedef struct ngf_sync_op {
  * details.
  */
 typedef uintptr_t ngf_frame_token;
+
+/**
+ * @enum ngf_sync_resource_type
+ * \ingroup ngf
+ * 
+ * Type of resource to synchronize on.
+ */
+typedef enum ngf_sync_resource_type {
+    NGF_SYNC_RESOURCE_BUFFER,
+    NGF_SYNC_RESOURCE_IMAGE
+} ngf_sync_resource_type;
+
+/**
+ * @struct ngf_sync_resource_ref
+ * \ingroup ngf
+ * 
+ * Reference to a resource participating in a synchronization operation.
+ */
+typedef struct ngf_sync_resource_ref {
+  ngf_sync_resource_type sync_resource_type; /**< The type of resource being accessed. */
+  union {
+    ngf_buffer_slice buffer_slice;
+    ngf_image_ref    image_ref;
+  } resource; /** < The subregion of the resource being accessed. */
+} ngf_sync_resource_ref;
+
+/**
+ * @struct ngf_sync_compute_resource
+ * \ingroup ngf
+ * 
+ * Synchronization operation on a resource accessed by a compute encoder.
+ * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
+ * starting execution until another given encoder completes all read/write accesses to the given resource.
+ */
+struct ngf_sync_compute_resource {
+  ngf_compute_encoder   encoder; /** < The encoder to wait on. */
+  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
+};
+
+/**
+ * @struct ngf_sync_render_resource
+ * \ingroup ngf
+ * 
+ * Synchronization operation on a resource accessed by a render encoder.
+ * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
+ * starting execution until another given encoder completes all read/write accesses to the given resource.
+ */
+struct ngf_sync_render_resource {
+  ngf_render_encoder   encoder; /** < The encoder to wait on. */
+  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
+};
+
+/**
+ * @struct ngf_sync_xfer_resource
+ * \ingroup ngf
+ * 
+ * Synchronization operation on a resource accessed by a transfer encoder.
+ * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
+ * starting execution until another given encoder completes all read/write accesses to the given resource.
+ */
+struct ngf_sync_xfer_resource {
+  ngf_xfer_encoder   encoder; /** < The encoder to wait on. */
+  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
+};
 
 #ifdef _MSC_VER
 #pragma endregion
@@ -2779,8 +2926,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
  */
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       buf,
-    const ngf_pass_info* pass_info,
-    const ngf_sync_op*   sync_op,
+    const ngf_render_pass_info* pass_info,
     ngf_render_encoder*  enc) NGF_NOEXCEPT;
 
 /**
@@ -2815,8 +2961,26 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
-    const ngf_sync_op*  sync_op,
     ngf_render_encoder* enc) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Same as \ref ngf_cmd_begin_render_pass_simple, but adds the ability to synchronize with compute
+ * encoders.
+ */
+ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
+    ngf_cmd_buffer                   buf,
+    ngf_render_target                rt,
+    float                            clear_color_r,
+    float                            clear_color_g,
+    float                            clear_color_b,
+    float                            clear_color_a,
+    float                            clear_depth,
+    uint32_t                         clear_stencil,
+    uint32_t                         nsync_compute_resources,
+    const ngf_sync_compute_resource* sync_compute_resources,
+    ngf_render_encoder*              enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2837,11 +3001,12 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
  *
  * @param buf The handle to the command buffer to operate on. Must be in the "ready"
  *            state, will be transitioned to the "recording" state.
+ * @param pass_info Pointer to \ref ngf_xfer_pass_info specifying details about this transfer pass.
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
 ngf_error
-ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_xfer_encoder* enc)
+ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_xfer_pass_info* pass_info, ngf_xfer_encoder* enc)
     NGF_NOEXCEPT;
 
 /**
@@ -2861,11 +3026,12 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
  *
  * @param buf The handle of the command buffer to operate on. Must be in the "ready"
  *             state, will be transitioned to the "recording" state.
+ * @param pass_info A pointer to \ref ngf_compute_pass_info specifying details about this compute pass.
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
 ngf_error
-ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_sync_op* sync_op, ngf_compute_encoder* enc)
+ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_compute_pass_info* pass_info, ngf_compute_encoder* enc)
     NGF_NOEXCEPT;
 
 /**

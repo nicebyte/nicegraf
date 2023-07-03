@@ -1706,7 +1706,19 @@ void ngfmtl_finish_pending_encoders(ngf_cmd_buffer cmd_buffer) {
   }
 }
 
-ngf_error ngf_cmd_begin_render_pass_simple(
+ngf_error ngf_cmd_begin_render_pass_simple(ngf_cmd_buffer      cmd_buf,
+                                           ngf_render_target   rt,
+                                           float               clear_color_r,
+                                           float               clear_color_g,
+                                           float               clear_color_b,
+                                           float               clear_color_a,
+                                           float               clear_depth,
+                                           uint32_t            clear_stencil,
+                                           ngf_render_encoder* enc) NGF_NOEXCEPT {
+  return ngf_cmd_begin_render_pass_simple_with_sync(cmd_buf, rt, clear_color_r, clear_color_g, clear_color_b, clear_color_a, clear_depth, clear_stencil, 0, nullptr, enc);
+}
+
+ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     ngf_cmd_buffer      cmd_buf,
     ngf_render_target   rt,
     float               clear_color_r,
@@ -1715,7 +1727,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
-    const ngf_sync_op*  sync_op,
+    uint32_t, const ngf_sync_compute_resource*,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi_sa_reset(ngfi_tmp_store());
   const uint32_t nattachments = rt->attachment_descs.ndescs;
@@ -1743,15 +1755,14 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     store_ops[i] =
         rt->attachment_descs.descs[i].is_sampled ? NGF_STORE_OP_STORE : NGF_STORE_OP_DONTCARE;
   }
-  const ngf_pass_info pass_info =
+  const ngf_render_pass_info pass_info =
       {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
-  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, sync_op, enc);
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
 }
 
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       cmd_buffer,
-    const ngf_pass_info* pass_info,
-    const ngf_sync_op*   sync_op,
+    const ngf_render_pass_info* pass_info,
     ngf_render_encoder*  enc) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
   assert(pass_info);
@@ -1844,7 +1855,7 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_xfer_encoder* enc)
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info*, ngf_xfer_encoder* enc)
     NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   ngfmtl_finish_pending_encoders(cmd_buf);
@@ -1864,7 +1875,7 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 }
 
 ngf_error
-ngf_cmd_begin_compute_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op*, ngf_compute_encoder* enc)
+ngf_cmd_begin_compute_pass(ngf_cmd_buffer cmd_buf, const ngf_compute_pass_info*, ngf_compute_encoder* enc)
     NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;

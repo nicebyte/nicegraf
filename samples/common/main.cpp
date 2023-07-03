@@ -105,7 +105,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   ngf_samples::logi("selected device %d", preferred_device_idx);
 
   /*
-   * Begin by initializing nicegraf.
+   * Initialize nicegraf.
    * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
    * and install a diagnostic callback.
    */
@@ -145,7 +145,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Note that we deliberately create the window before setting up the nicegraf context. This is
    * done so that when the destructors are invoked, the context is destroyed before the window -
    * changing this sequence of events might lead to misbehavior.
-   * Also note that we set special window hint to make sure GLFW does _not_ attempt to create
+   * Also note that we set a special window hint to make sure GLFW does _not_ attempt to create
    * an OpenGL (or other API) context for us - this is nicegraf's job.
    */
   constexpr uint32_t window_width_hint = 800, window_height_hint = 600;
@@ -198,8 +198,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
 
   /**
    * Make the newly created context current on this thread.
-   * Once a context has been made current on a thread, it cannot be switched * to another thread,
-   * and another context cannot be made current on that * thread.
+   * Once a context has been made current on a thread, it cannot be switched to another thread,
+   * and another context cannot be made current on that thread.
    */
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_set_context(context));
 
@@ -269,7 +269,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
          * Start a new transfer command encoder for uploading resources to the GPU.
          */
         ngf_xfer_encoder xfer_encoder {};
-        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, NULL, &xfer_encoder));
+        ngf_xfer_pass_info xfer_pass_info {};
+        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_pass_info, &xfer_encoder));
 
         /**
          * Initialize the sample, and save the opaque data pointer.
@@ -306,73 +307,82 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
         NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_xfer_pass(xfer_encoder));
       }
 
-      ngf_sync_op main_pass_sync_op {};
+      /**
+       * Let the sample code record any commands prior to the main render pass, and specify which compute passes to
+       * wait on (if any).
+       */
+      ngf_sync_compute_resource main_render_pass_sync_resources[64u] = {};
+      ngf_samples::main_render_pass_sync_info main_pass_sync_info {
+          .nsync_compute_resources = 0u,
+          .sync_compute_resources  = main_render_pass_sync_resources};
+      ngf_samples::sample_pre_draw_frame(main_cmd_buffer, &main_pass_sync_info, sample_opaque_data);
+      assert(main_pass_sync_info.nsync_compute_resources < 64u);
+      ngf_render_encoder main_render_encoder_handle;
 
       /**
-       * Let the sample code record any commands prior to the main render pass.
+       * Record the commands for the main render pass.
        */
-      ngf_samples::sample_pre_draw_frame(main_cmd_buffer, &main_pass_sync_op, sample_opaque_data);
+      {
+        /**
+         * Begin the main render pass.
+         */
+        ngf::render_encoder main_render_pass_encoder(
+            main_cmd_buffer,
+            ngf_default_render_target(),
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            0,
+            main_pass_sync_info.nsync_compute_resources,
+            main_pass_sync_info.sync_compute_resources);
 
-      const bool main_pass_needs_sync = main_pass_sync_op.nwait_render_encoders > 0u ||
-                                        main_pass_sync_op.nwait_xfer_encoders > 0u ||
-                                        main_pass_sync_op.nwait_compute_encoders > 0u;
-      const ngf_sync_op* main_pass_sync_op_ptr = main_pass_needs_sync ? &main_pass_sync_op : nullptr;
-      /**
-       * Begin the main render pass.
-       */
-      ngf_render_encoder main_render_pass;
-      ngf_cmd_begin_render_pass_simple(
-          main_cmd_buffer,
-          ngf_default_render_target(),
-          0.0f,
-          0.0f,
-          0.0f,
-          0.0f,
-          1.0f,
-          0,
-          main_pass_sync_op_ptr,
-          &main_render_pass);
+        /**
+         * Call into the sample code to draw a single frame.
+         */
+        static float t = 0.0;
+        ngf_samples::sample_draw_frame(
+            main_render_pass_encoder,
+            time_delta_f,
+            frame_token,
+            (uint32_t)fb_width,
+            (uint32_t)fb_height,
+            t,
+            sample_opaque_data);
+        t += 0.008f;
 
-      /**
-       * Call into the sample code to draw a single frame.
-       */
-      static float t = 0.0;
-      ngf_samples::sample_draw_frame(
-          main_render_pass,
-          time_delta_f,
-          frame_token,
-          (uint32_t)fb_width,
-          (uint32_t)fb_height,
-          t,
-          sample_opaque_data);
-      t += 0.008f;
+        /**
+         * Begin a new ImGui frame.
+         */
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
 
-      /**
-       * Begin a new ImGui frame.
-       */
-      ImGui_ImplGlfw_NewFrame();
-      ImGui::NewFrame();
+        /**
+         * Call into the sample-specific code to execute ImGui UI commands, and end ImGui frame.
+         */
+        ngf_samples::sample_draw_ui(sample_opaque_data);
+        ImGui::EndFrame();
 
-      /**
-       * Call into the sample-specific code to execute ImGui UI commands, and end ImGui frame.
-       */
-      ngf_samples::sample_draw_ui(sample_opaque_data);
-      ImGui::EndFrame();
+        /**
+         * Draw the UI on top of everything else.
+         */
+        imgui_backend->record_rendering_commands(main_render_pass_encoder);
 
-      /**
-       * Draw the UI on top of everything else.
-       */
-      imgui_backend->record_rendering_commands(main_render_pass);
-
-      /**
-       * Finish the main render pass.
-       */
-      NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_end_render_pass(main_render_pass));
+        /**
+         * The C++ wrappers for command encoders end the pass automatically when the wrapper object goes out of scope.
+         * However, the raw handle remains valid to use for synchronization purposes.
+         */
+        main_render_encoder_handle = main_render_pass_encoder;
+      }
 
       /**
        * Let the sample record commands after the main render pass.
        */
-      ngf_samples::sample_post_draw_frame(main_cmd_buffer, main_render_pass, sample_opaque_data);
+      ngf_samples::sample_post_draw_frame(
+          main_cmd_buffer,
+          main_render_encoder_handle,
+          sample_opaque_data);
 
       /**
        * Submit the main command buffer and end the frame.

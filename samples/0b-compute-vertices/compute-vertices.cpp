@@ -224,15 +224,15 @@ void sample_draw_frame(
   }
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, ngf_sync_op* sync_op, void* userdata) {
+void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info* sync_info, void* userdata) {
   auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
   const uint32_t f_prev = (state->frame + 1) % 2;
   if (state->frame > 0) {
     state->compute_buffer_slice.offset = f_prev * sizeof(float) * 4u * compute_verts::ntotal_verts;
-    sync_op->nwait_compute_encoders    = 1u;
-    sync_op->wait_compute_encoders     = &state->prev_compute_encoder;
-    sync_op->nbuffer_slices            = 1u;
-    sync_op->buffer_slices             = &state->compute_buffer_slice;
+    sync_info->nsync_compute_resources = 1u;
+    sync_info->sync_compute_resources->encoder = state->prev_compute_encoder;
+    sync_info->sync_compute_resources->resource.resource.buffer_slice = state->compute_buffer_slice;
+    sync_info->sync_compute_resources->resource.sync_resource_type    = NGF_SYNC_RESOURCE_BUFFER;
   }
 }
 
@@ -248,22 +248,22 @@ void sample_post_draw_frame(
   compute_uniforms.time = time;
   state->compute_uniforms_multibuf.write(compute_uniforms);
 
-  ngf_buffer_slice buf_slice {};
-  ngf_sync_op      sync_op {
-      .nwait_render_encoders = 1u,
-      .wait_render_encoders  = &prev_render_enc,
-      .nbuffer_slices        = 1u,
-      .buffer_slices         = &buf_slice};
-  const ngf_sync_op* sync_op_ptr = nullptr;
+  ngf_sync_render_resource sync_render_resource {};
+  ngf_compute_pass_info pass_info {};
   if (state->frame > 1) {
-    sync_op_ptr      = &sync_op;
-    buf_slice.buffer = state->vertex_buffer.get();
-    buf_slice.offset = f_curr * sizeof(float) * 4u * compute_verts::ntotal_verts;
-    buf_slice.range  = compute_verts::ntotal_verts * (4u * sizeof(float));
+    sync_render_resource.encoder         = prev_render_enc;
+    sync_render_resource.resource.sync_resource_type = NGF_SYNC_RESOURCE_BUFFER;
+    sync_render_resource.resource.resource.buffer_slice.buffer = state->vertex_buffer.get();
+    sync_render_resource.resource.resource.buffer_slice.offset =
+        f_curr * sizeof(float) * 4u * compute_verts::ntotal_verts;
+    sync_render_resource.resource.resource.buffer_slice.range =
+        compute_verts::ntotal_verts * (4u * sizeof(float));
+    pass_info.sync_render_resources.nsync_resources = 1u;
+    pass_info.sync_render_resources.sync_resources  = &sync_render_resource;
   }
 
   ngf_compute_encoder compute_enc;
-  ngf_cmd_begin_compute_pass(cmd_buffer, sync_op_ptr, &compute_enc);
+  ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc);
   ngf_cmd_bind_compute_pipeline(compute_enc, state->compute_pipeline);
   ngf::cmd_bind_resources(
       compute_enc,

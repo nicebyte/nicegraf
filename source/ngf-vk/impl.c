@@ -52,8 +52,7 @@
 
 #pragma region internal_struct_definitions
 
-// Singleton for holding vulkan instance, device and
-// queue handles.
+// Singleton for holding vulkan instance, device and queue handles.
 // This is shared by all contexts.
 struct {
   VkInstance       instance;
@@ -231,7 +230,7 @@ typedef struct ngf_buffer_t {
   ngfvk_alloc             alloc;
   size_t                  size;
   size_t                  mapped_offset;
-  uint32_t                ngf_usage_mask;
+  uint32_t                usage_flags;
   ngf_buffer_storage_type storage_type;
 } ngf_buffer_t;
 
@@ -687,15 +686,15 @@ static VkIndexType get_vk_index_type(ngf_type t) {
 
 static VkAccessFlags get_vk_buffer_access_flags(ngf_buffer buf) {
   VkAccessFlags result = 0x00;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER)
+  if (buf->usage_flags & NGF_BUFFER_USAGE_VERTEX_BUFFER)
     result |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER) result |= VK_ACCESS_INDEX_READ_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER) result |= VK_ACCESS_UNIFORM_READ_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER) result |= VK_ACCESS_SHADER_READ_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_STORAGE_BUFFER)
+  if (buf->usage_flags & NGF_BUFFER_USAGE_INDEX_BUFFER) result |= VK_ACCESS_INDEX_READ_BIT;
+  if (buf->usage_flags & NGF_BUFFER_USAGE_UNIFORM_BUFFER) result |= VK_ACCESS_UNIFORM_READ_BIT;
+  if (buf->usage_flags & NGF_BUFFER_USAGE_TEXEL_BUFFER) result |= VK_ACCESS_SHADER_READ_BIT;
+  if (buf->usage_flags & NGF_BUFFER_USAGE_STORAGE_BUFFER)
     result |= (VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_DST) result |= VK_ACCESS_TRANSFER_WRITE_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_SRC) result |= VK_ACCESS_TRANSFER_READ_BIT;
+  if (buf->usage_flags & NGF_BUFFER_USAGE_XFER_DST) result |= VK_ACCESS_TRANSFER_WRITE_BIT;
+  if (buf->usage_flags & NGF_BUFFER_USAGE_XFER_SRC) result |= VK_ACCESS_TRANSFER_READ_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE) result |= VK_ACCESS_HOST_READ_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_WRITEABLE) result |= VK_ACCESS_HOST_WRITE_BIT;
   if (buf->storage_type == NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE)
@@ -726,22 +725,23 @@ static VkAccessFlags get_vk_image_access_flags(ngf_image img) {
   }
   if (img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM) { result |= VK_ACCESS_SHADER_READ_BIT; }
   if (img->usage_flags & NGF_IMAGE_USAGE_STORAGE) { result |= VK_ACCESS_SHADER_WRITE_BIT; }
+  if (img->usage_flags & NGF_IMAGE_USAGE_XFER_DST) { result |= VK_ACCESS_TRANSFER_WRITE_BIT; }
   return result;
 }
 
 static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
   VkPipelineStageFlags result = 0x00;
-  if ((buf->ngf_usage_mask & NGF_BUFFER_USAGE_VERTEX_BUFFER) ||
-      (buf->ngf_usage_mask & NGF_BUFFER_USAGE_INDEX_BUFFER))
+  if ((buf->usage_flags & NGF_BUFFER_USAGE_VERTEX_BUFFER) ||
+      (buf->usage_flags & NGF_BUFFER_USAGE_INDEX_BUFFER))
     result |= VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_UNIFORM_BUFFER ||
-      buf->ngf_usage_mask & NGF_BUFFER_USAGE_TEXEL_BUFFER ||
-      buf->ngf_usage_mask & NGF_BUFFER_USAGE_STORAGE_BUFFER)
+  if (buf->usage_flags & NGF_BUFFER_USAGE_UNIFORM_BUFFER ||
+      buf->usage_flags & NGF_BUFFER_USAGE_TEXEL_BUFFER ||
+      buf->usage_flags & NGF_BUFFER_USAGE_STORAGE_BUFFER)
     result |=
         (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-  if (buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_DST ||
-      buf->ngf_usage_mask & NGF_BUFFER_USAGE_XFER_SRC)
+  if (buf->usage_flags & NGF_BUFFER_USAGE_XFER_DST ||
+      buf->usage_flags & NGF_BUFFER_USAGE_XFER_SRC)
     result |= VK_PIPELINE_STAGE_TRANSFER_BIT;
   return result;
 }
@@ -2073,7 +2073,12 @@ ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
 
 static void ngfvk_init_loader_if_necessary() {
   if (!vkGetInstanceProcAddr) {
-    vkl_init_loader();  // Initialize the vulkan loader if it wasn't initialized before.
+    NGFI_DIAG_INFO("Initializing Vulkan loader.")
+    if (!vkl_init_loader()) {
+      // Initialize the vulkan loader if it wasn't initialized before.
+      NGFI_DIAG_ERROR("Failed to initialize Vulkan loader.")    
+    }
+    NGFI_DIAG_INFO("Vulkan loader initialized successfully.");
   }
 }
 
@@ -2364,141 +2369,243 @@ static void ngfvk_cmd_bind_resources(
   }
 }
 
+struct ngfvk_wait_events_params {
+  VkEvent*               wait_events;
+  VkImageMemoryBarrier*  image_memory_barriers;
+  VkBufferMemoryBarrier* buffer_memory_barriers;
+  uint32_t               max_image_memory_barriers;
+  uint32_t               max_buffer_memory_barriers;
+  uint32_t               max_wait_events;
+  uint32_t               nimage_memory_barriers;
+  uint32_t               nbuffer_memory_barriers;
+  uint32_t               nwait_events;
+};
+
+union ngfvk_sync_resources {
+  const ngf_sync_compute_resource* sync_compute_resources;
+  const ngf_sync_render_resource* sync_render_resources;
+  const ngf_sync_xfer_resource*    sync_xfer_resources;
+};
+
+enum ngfvk_sync_encoder_type {
+    NGFVK_SYNC_COMPUTE_ENCODER,
+    NGFVK_SYNC_RENDER_ENCODER,
+    NGFVK_SYNC_XFER_ENCODER
+};
+
+static void ngfvk_generate_sync_op_barriers(
+    uint32_t                         nsync_resources,
+    union ngfvk_sync_resources       sync_resources,
+    enum ngfvk_sync_encoder_type     sync_encoder_type,
+    VkAccessFlags                    possible_src_access_flag_bits,
+    VkAccessFlags                    possible_dst_access_flag_bits,
+    struct ngfvk_wait_events_params* temp_data) {
+  if (nsync_resources <= 0u) { return; }
+  for (uint32_t i = 0u; i < nsync_resources; ++i) {
+    ngf_sync_resource_ref sync_resource = {
+        .resource.buffer_slice = { .buffer = NULL, .offset = 0u, .range = 0u},
+        .sync_resource_type    = NGF_SYNC_RESOURCE_BUFFER};
+    VkEvent wait_event = VK_NULL_HANDLE;
+    switch (sync_encoder_type) {
+    case NGFVK_SYNC_COMPUTE_ENCODER:
+      sync_resource = sync_resources.sync_compute_resources[i].resource;
+      wait_event    = (VkEvent)sync_resources.sync_compute_resources[i].encoder.pvt_data_donotuse.d1;
+      break;
+    case NGFVK_SYNC_RENDER_ENCODER:
+      sync_resource = sync_resources.sync_render_resources[i].resource;
+      wait_event    = (VkEvent)sync_resources.sync_render_resources[i].encoder.pvt_data_donotuse.d1;
+      break;
+    case NGFVK_SYNC_XFER_ENCODER:
+      sync_resource = sync_resources.sync_xfer_resources[i].resource;
+      wait_event    = (VkEvent)sync_resources.sync_xfer_resources[i].encoder.pvt_data_donotuse.d1;
+      break;
+    default:
+      assert(false);
+    }
+
+    // TODO: use hashset to dedupe events.
+    bool dupe_event = false;
+    for (int32_t j = temp_data->nwait_events - 1u;
+         temp_data->nwait_events > 0 && j >= 0 && !dupe_event;
+         --j) {
+      dupe_event = (temp_data->wait_events[j] == wait_event);
+    }
+    if (!dupe_event) { temp_data->wait_events[temp_data->nwait_events++] = wait_event; }
+
+    if (sync_resource.sync_resource_type == NGF_SYNC_RESOURCE_BUFFER) {
+      const ngf_buffer_slice* buf_slice           = &sync_resource.resource.buffer_slice;
+      const VkAccessFlags     buffer_access_flags = get_vk_buffer_access_flags(buf_slice->buffer);
+      VkBufferMemoryBarrier*  barrier =
+          &temp_data->buffer_memory_barriers[temp_data->nbuffer_memory_barriers++];
+      barrier->sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+      barrier->pNext               = NULL;
+      barrier->srcAccessMask       = buffer_access_flags & possible_src_access_flag_bits;
+      barrier->dstAccessMask       = buffer_access_flags & possible_dst_access_flag_bits;
+      barrier->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier->buffer              = (VkBuffer)buf_slice->buffer->alloc.obj_handle;
+      barrier->offset              = buf_slice->offset;
+      barrier->size                = buf_slice->range;
+    } else if (sync_resource.sync_resource_type == NGF_SYNC_RESOURCE_IMAGE) {
+      const ngf_image_ref*  img_ref            = &sync_resource.resource.image_ref;
+      VkAccessFlags         image_access_flags = get_vk_image_access_flags(img_ref->image);
+      VkImageMemoryBarrier* barrier =
+          &temp_data->image_memory_barriers[temp_data->nimage_memory_barriers++];
+      barrier->sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      barrier->pNext                           = NULL;
+      barrier->srcAccessMask                   = image_access_flags & possible_src_access_flag_bits;
+      barrier->dstAccessMask                   = image_access_flags & possible_dst_access_flag_bits;
+      barrier->srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      barrier->dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      barrier->image                           = (VkImage)img_ref->image->alloc.obj_handle;
+      barrier->subresourceRange.baseArrayLayer = img_ref->layer;
+      barrier->subresourceRange.layerCount     = 1u;
+      barrier->subresourceRange.baseMipLevel   = img_ref->mip_level;
+      barrier->subresourceRange.levelCount     = 1u;
+
+      const bool is_storage_image = img_ref->image->usage_flags & NGF_IMAGE_USAGE_STORAGE;
+
+      barrier->oldLayout =
+          is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      barrier->newLayout =
+          is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      const VkFormat image_format = img_ref->image->vkformat;
+      const bool     is_depth     = ngfvk_format_is_depth(image_format);
+      const bool     is_stencil   = ngfvk_format_is_stencil(image_format);
+
+      barrier->subresourceRange.aspectMask =
+          is_depth ? (VK_IMAGE_ASPECT_DEPTH_BIT | (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0))
+                   : VK_IMAGE_ASPECT_COLOR_BIT;
+    } else {
+      assert(false);
+    }
+  }
+}
+
 static ngf_error ngfvk_execute_sync_op(
-    ngf_cmd_buffer       cmd_buf,
-    const ngf_sync_op*   sync_op,
-    VkPipelineStageFlags dst_stage_mask) {
+    ngf_cmd_buffer                   cmd_buf,
+    uint32_t                         nsync_compute_resources,
+    const ngf_sync_compute_resource* sync_compute_resources,
+    uint32_t                         nsync_render_resources,
+    const ngf_sync_render_resource*  sync_render_resources,
+    uint32_t                         nsync_xfer_resources,
+    const ngf_sync_xfer_resource*    sync_xfer_resources,
+    VkPipelineStageFlags             dst_stage_mask) {
   assert(cmd_buf != NULL);
+  assert(sync_compute_resources != NULL || nsync_compute_resources == 0u);
+  assert(sync_render_resources != NULL || nsync_render_resources == 0u);
+  assert(sync_xfer_resources != NULL || nsync_xfer_resources == 0u);
+
+  // Verify the command buffer state. Synchronization operations may not be recorded into a given
+  // command buffer if it has an encoder active.
   if (cmd_buf->state != NGFI_CMD_BUFFER_READY &&
       cmd_buf->state != NGFI_CMD_BUFFER_AWAITING_SUBMIT) {
     return NGF_ERROR_INVALID_OPERATION;
   }
- 
-  const uint32_t ntotal_wait_events = sync_op->nwait_render_encoders +
-                                      sync_op->nwait_xfer_encoders +
-                                      sync_op->nwait_compute_encoders;
-  if (ntotal_wait_events > 0) {
-    VkEvent* wait_events = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkEvent) * ntotal_wait_events);
-    if (wait_events == NULL) return NGF_ERROR_OUT_OF_MEM;
-    uint32_t e = 0u;
-    for (uint32_t re = 0u; re < sync_op->nwait_render_encoders; ++re) {
-      assert(e < ntotal_wait_events);
-      VkEvent event    = (VkEvent)sync_op->wait_render_encoders[re].pvt_data_donotuse.d1;
-      wait_events[e++] = event;
-    }
-    for (uint32_t xe = 0u; xe < sync_op->nwait_xfer_encoders; ++xe) {
-      assert(e < ntotal_wait_events);
-      VkEvent event    = (VkEvent)sync_op->wait_xfer_encoders[xe].pvt_data_donotuse.d1;
-      wait_events[e++] = event;
-    }
-    for (uint32_t ce = 0u; ce < sync_op->nwait_compute_encoders; ++ce) {
-      assert(e < ntotal_wait_events);
-      VkEvent event    = (VkEvent)sync_op->wait_compute_encoders[ce].pvt_data_donotuse.d1;
-      wait_events[e++] = event;
-    }
 
-    const VkAccessFlagBits possible_common_access_flag_bits =
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_HOST_READ_BIT |
-        VK_ACCESS_HOST_WRITE_BIT;
+  // Holds pointers to temporarily allocated memory used to store parameters for vkCmdWaitEvents.
+  struct ngfvk_wait_events_params temp_data;
+  memset(&temp_data, 0, sizeof(temp_data));
 
-    const VkAccessFlagBits possible_xfer_access_flag_bits =
-        VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+  // Conservative estimate of necessary buffer size.
+  const uint32_t max_buffer_size =
+      nsync_compute_resources + nsync_render_resources + nsync_xfer_resources;
 
-    const VkAccessFlagBits possible_gfx_access_flag_bits =
-        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
-        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-        possible_common_access_flag_bits;
+  // Early-out if no events to wait on have been specified.
+  if (max_buffer_size <= 0u) { return NGF_ERROR_OK; }
 
-    const VkAccessFlags possible_src_access_flag_bits =
-        possible_common_access_flag_bits |
-        (sync_op->nwait_render_encoders > 0u ? possible_gfx_access_flag_bits : 0u) |
-        (sync_op->nwait_xfer_encoders > 0u ? possible_xfer_access_flag_bits : 0u);
+  // Allocate memory for vkCmdWaitEvents parameters.
+  temp_data.max_buffer_memory_barriers = max_buffer_size;
+  temp_data.max_image_memory_barriers  = max_buffer_size;
+  temp_data.max_wait_events            = max_buffer_size;
+  if (temp_data.max_wait_events > 0u) {
+    temp_data.wait_events =
+        ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkEvent) * temp_data.max_wait_events);
+    if (temp_data.wait_events == NULL) { return NGF_ERROR_OUT_OF_MEM; }
+  }
+  if (temp_data.max_image_memory_barriers > 0u) {
+    temp_data.image_memory_barriers = ngfi_sa_alloc(
+        ngfi_tmp_store(),
+        sizeof(VkImageMemoryBarrier) * temp_data.max_image_memory_barriers);
+    if (temp_data.image_memory_barriers == NULL) { return NGF_ERROR_OUT_OF_MEM; }
+  }
+  if (temp_data.max_buffer_memory_barriers > 0u) {
+    temp_data.buffer_memory_barriers = ngfi_sa_alloc(
+        ngfi_tmp_store(),
+        sizeof(VkBufferMemoryBarrier) * temp_data.max_buffer_memory_barriers);
+    if (temp_data.buffer_memory_barriers == NULL) { return NGF_ERROR_OUT_OF_MEM; }
+  }
 
-    const VkAccessFlags possible_dst_access_flag_bits =
-        possible_common_access_flag_bits |
-        ((dst_stage_mask & NGFVK_GFX_PIPELINE_STAGE_MASK) ? possible_gfx_access_flag_bits : 0u) |
-        ((dst_stage_mask & VK_PIPELINE_STAGE_TRANSFER_BIT) ? possible_xfer_access_flag_bits : 0u);
+  // Compute source and destination access flags for memory barriers.
+  const VkAccessFlagBits possible_compute_access_flag_bits =
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_UNIFORM_READ_BIT;
 
-    VkBufferMemoryBarrier* buffer_mem_barriers = NULL;
-    if (sync_op->nbuffer_slices > 0) {
-      buffer_mem_barriers =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkBufferMemoryBarrier) * sync_op->nbuffer_slices);
-      if (buffer_mem_barriers == NULL) { return NGF_ERROR_OUT_OF_MEM; }
-      for (uint32_t i = 0; i < sync_op->nbuffer_slices; ++i) {
-        const VkAccessFlags buffer_access_flags =
-            get_vk_buffer_access_flags(sync_op->buffer_slices[i].buffer);
-        buffer_mem_barriers[i].sType         = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-        buffer_mem_barriers[i].pNext         = NULL;
-        buffer_mem_barriers[i].srcAccessMask = buffer_access_flags & possible_src_access_flag_bits;
-        buffer_mem_barriers[i].dstAccessMask = buffer_access_flags & possible_dst_access_flag_bits;
-        buffer_mem_barriers[i].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        buffer_mem_barriers[i].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        buffer_mem_barriers[i].buffer =
-            (VkBuffer)sync_op->buffer_slices[i].buffer->alloc.obj_handle;
-        buffer_mem_barriers[i].offset = sync_op->buffer_slices[i].offset;
-        buffer_mem_barriers[i].size   = sync_op->buffer_slices[i].range;
-      }
-    }
+  const VkAccessFlagBits possible_xfer_access_flag_bits =
+      VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT;
 
-    VkImageMemoryBarrier* img_mem_barriers = NULL;
-    if (sync_op->nimage_refs > 0u) {
-      img_mem_barriers =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkImageMemoryBarrier) * sync_op->nimage_refs);
-      if (img_mem_barriers == NULL) { return NGF_ERROR_OUT_OF_MEM; }
-      for (uint32_t i = 0; i < sync_op->nimage_refs; ++i) {
-        VkImageMemoryBarrier* b = &img_mem_barriers[i];
-        const VkAccessFlags   image_access_flags =
-            get_vk_image_access_flags(sync_op->image_refs[i].image);
+  const VkAccessFlagBits possible_gfx_access_flag_bits =
+      VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+      VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+      VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT;
 
-        b->sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        b->pNext               = NULL;
-        b->srcAccessMask       = image_access_flags & possible_src_access_flag_bits;
-        b->dstAccessMask       = image_access_flags & possible_dst_access_flag_bits;
-        b->srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b->dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        b->image               = (VkImage)sync_op->image_refs[i].image->alloc.obj_handle;
-        b->subresourceRange.baseArrayLayer = sync_op->image_refs[i].layer;
-        b->subresourceRange.layerCount     = 1u;
-        b->subresourceRange.baseMipLevel   = sync_op->image_refs[i].mip_level;
-        b->subresourceRange.levelCount     = 1u;
+  const VkAccessFlags possible_dst_access_flag_bits =
+      ((dst_stage_mask & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT) ? possible_compute_access_flag_bits
+                                                               : 0u) |
+      ((dst_stage_mask & NGFVK_GFX_PIPELINE_STAGE_MASK) ? possible_gfx_access_flag_bits : 0u) |
+      ((dst_stage_mask & VK_PIPELINE_STAGE_TRANSFER_BIT) ? possible_xfer_access_flag_bits : 0u);
 
-        const bool is_storage_image =
-            sync_op->image_refs[i].image->usage_flags & NGF_IMAGE_USAGE_STORAGE;
+  // Generate barrier structs.
+  union ngfvk_sync_resources sync_res_union = {.sync_compute_resources = sync_compute_resources};
+  ngfvk_generate_sync_op_barriers(
+      nsync_compute_resources,
+      sync_res_union,
+      NGFVK_SYNC_COMPUTE_ENCODER,
+      possible_compute_access_flag_bits,
+      possible_dst_access_flag_bits,
+      &temp_data);
 
-        b->oldLayout =
-            is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        b->newLayout =
-            is_storage_image ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        const VkFormat image_format = sync_op->image_refs[i].image->vkformat;
-        const bool     is_depth     = ngfvk_format_is_depth(image_format);
-        const bool     is_stencil   = ngfvk_format_is_stencil(image_format);
+  // It only makes sense for compute encoders to sync with render / transfer encoders.
+  const bool dst_is_compute = dst_stage_mask & VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+  if (dst_is_compute) {
+    sync_res_union.sync_render_resources = sync_render_resources;
+    ngfvk_generate_sync_op_barriers(
+        nsync_render_resources,
+        sync_res_union,
+        NGFVK_SYNC_RENDER_ENCODER,
+        possible_gfx_access_flag_bits,
+        possible_dst_access_flag_bits,
+        &temp_data);
 
-        b->subresourceRange.aspectMask =
-            is_depth ? (VK_IMAGE_ASPECT_DEPTH_BIT | (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0))
-                     : VK_IMAGE_ASPECT_COLOR_BIT;
-      }
-    }
+    sync_res_union.sync_xfer_resources = sync_xfer_resources;
+    ngfvk_generate_sync_op_barriers(
+        nsync_xfer_resources,
+        sync_res_union,
+        NGFVK_SYNC_XFER_ENCODER,
+        possible_xfer_access_flag_bits,
+        possible_dst_access_flag_bits,
+        &temp_data);
+  }
 
-    const VkPipelineStageFlags src_stage_mask =
-        (sync_op->nwait_render_encoders > 0u ? NGFVK_GFX_PIPELINE_STAGE_MASK : 0u) |
-        (sync_op->nwait_xfer_encoders > 0u ? VK_PIPELINE_STAGE_TRANSFER_BIT : 0u) |
-        (sync_op->nwait_compute_encoders > 0u ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : 0u);
+  const VkPipelineStageFlags src_stage_mask =
+      ((nsync_render_resources > 0u && dst_is_compute) ? NGFVK_GFX_PIPELINE_STAGE_MASK : 0u) |
+      ((nsync_xfer_resources > 0u && dst_is_compute) ? VK_PIPELINE_STAGE_TRANSFER_BIT : 0u) |
+      (nsync_compute_resources > 0u ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : 0u);
 
+  if (temp_data.nbuffer_memory_barriers > 0u || temp_data.nimage_memory_barriers > 0u) {
     vkCmdWaitEvents(
         cmd_buf->vk_cmd_buffer,
-        ntotal_wait_events,
-        wait_events,
+        temp_data.nwait_events,
+        temp_data.wait_events,
         src_stage_mask,
         dst_stage_mask,
         0u,
         NULL,
-        sync_op->nbuffer_slices,
-        buffer_mem_barriers,
-        sync_op->nimage_refs,
-        img_mem_barriers);
+        temp_data.nbuffer_memory_barriers,
+        temp_data.buffer_memory_barriers,
+        temp_data.nimage_memory_barriers,
+        temp_data.image_memory_barriers);
   }
-
   return NGF_ERROR_OK;
 }
 
@@ -2601,11 +2708,9 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
   if (_vk.instance != VK_NULL_HANDLE) {
     // Disallow double initialization.
+    NGFI_DIAG_ERROR("double-initialization detected. `ngf_initialize` may only be called once.")
     return NGF_ERROR_INVALID_OPERATION;
   }
-
-  // Load vk entrypoints.
-  ngfvk_init_loader_if_necessary();
 
   // Install user-provided diagnostic callbacks and set preferred log verbosity.
   if (init_info->diag_info != NULL) {
@@ -2615,7 +2720,13 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     ngfi_diag_info.userdata  = NULL;
     ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
   }
+  NGFI_DIAG_INFO("Initializing nicegraf.");
+
+  // Install user-provided allocation callbacks.
   ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
+
+  // Load vk entrypoints.
+  ngfvk_init_loader_if_necessary();
 
   // Create vk instance, attempting to enable api validation according to user preference.
   bool       validation_enabled = false;
@@ -3164,7 +3275,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_render_pass_simple(
+ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     ngf_cmd_buffer      cmd_buf,
     ngf_render_target   rt,
     float               clear_color_r,
@@ -3173,8 +3284,9 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
-    const ngf_sync_op*  sync_op,
-    ngf_render_encoder* enc) {
+    uint32_t            nsync_compute_resources,
+    const ngf_sync_compute_resource*  sync_compute_resources,
+    ngf_render_encoder*              enc) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_attachment_load_op* load_ops =
       ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_load_op) * rt->nattachments);
@@ -3198,27 +3310,52 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     const bool is_multisampled = (rt->attachment_descs[i].sample_count > 1u);
     store_ops[i]               = is_multisampled ? NGF_STORE_OP_DONTCARE : NGF_STORE_OP_STORE;
   }
-  const ngf_pass_info pass_info =
-      {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
-  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, sync_op, enc);
+  const ngf_render_pass_info pass_info = {
+      .render_target = rt,
+      .load_ops      = load_ops,
+      .store_ops     = store_ops,
+      .clears        = clears,
+      .sync_compute_resources = {
+          .nsync_resources = nsync_compute_resources,
+          .sync_resources  = sync_compute_resources}};
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+}
+
+ngf_error ngf_cmd_begin_render_pass_simple(
+    ngf_cmd_buffer      cmd_buf,
+    ngf_render_target   rt,
+    float               clear_color_r,
+    float               clear_color_g,
+    float               clear_color_b,
+    float               clear_color_a,
+    float               clear_depth,
+    uint32_t            clear_stencil,
+    ngf_render_encoder* enc) {
+  return ngf_cmd_begin_render_pass_simple_with_sync(
+      cmd_buf,
+      rt,
+      clear_color_r,
+      clear_color_g,
+      clear_color_b,
+      clear_color_a,
+      clear_depth,
+      clear_stencil,
+      0u,
+      NULL,
+      enc);
 }
 
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer       cmd_buf,
-    const ngf_pass_info* pass_info,
-    const ngf_sync_op*   sync_op,
+    const ngf_render_pass_info* pass_info,
     ngf_render_encoder*  enc) {
   ngf_error err = NGF_ERROR_OK;
-  if (sync_op) {
-    err = ngfvk_execute_sync_op(cmd_buf, sync_op, NGFVK_GFX_PIPELINE_STAGE_MASK);
-    if (err != NGF_ERROR_OK) return err;
-  }
-
-  ngfvk_encoder_start(cmd_buf);
-  if (err != NGF_ERROR_OK) return err;
-
-  err = ngfvk_initialize_generic_encoder(cmd_buf, &enc->pvt_data_donotuse);
-  if (err != NGF_ERROR_OK) { return err; }
+  const VkRenderPass render_pass = ngfvk_lookup_renderpass(
+      pass_info->render_target,
+      ngfvk_renderpass_ops_key(
+          pass_info->render_target,
+          pass_info->load_ops,
+          pass_info->store_ops));
 
   const ngfvk_swapchain*  swapchain = &CURRENT_CONTEXT->swapchain;
   const ngf_render_target target    = pass_info->render_target;
@@ -3253,12 +3390,6 @@ ngf_error ngf_cmd_begin_render_pass(
       }
     }
   }
-  const VkRenderPass render_pass = ngfvk_lookup_renderpass(
-      pass_info->render_target,
-      ngfvk_renderpass_ops_key(
-          pass_info->render_target,
-          pass_info->load_ops,
-          pass_info->store_ops));
   const VkRenderPassBeginInfo begin_info = {
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
       .pNext           = NULL,
@@ -3267,17 +3398,41 @@ ngf_error ngf_cmd_begin_render_pass(
       .pClearValues    = vk_clears,
       .renderPass      = render_pass,
       .renderArea      = {.offset = {0u, 0u}, .extent = render_extent}};
+  if (pass_info->sync_compute_resources.nsync_resources > 0u) {
+    err = ngfvk_execute_sync_op(
+        cmd_buf,
+        pass_info->sync_compute_resources.nsync_resources,
+        pass_info->sync_compute_resources.sync_resources,
+        0u, NULL,
+        0u, NULL,
+        NGFVK_GFX_PIPELINE_STAGE_MASK);
+    if (err != NGF_ERROR_OK) return err;
+  }
+
+  ngfvk_encoder_start(cmd_buf);
+  if (err != NGF_ERROR_OK) return err;
+
+  err = ngfvk_initialize_generic_encoder(cmd_buf, &enc->pvt_data_donotuse);
+  if (err != NGF_ERROR_OK) { return err; }
+
   cmd_buf->active_rt         = target;
   cmd_buf->renderpass_active = true;
   vkCmdBeginRenderPass(cmd_buf->vk_cmd_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
+  ngfi_sa_reset(ngfi_tmp_store());
 
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op, ngf_xfer_encoder* enc) {
+ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info* pass_info, ngf_xfer_encoder* enc) {
   ngf_error err;
-  if (sync_op) {
-    err = ngfvk_execute_sync_op(cmd_buf, sync_op, VK_PIPELINE_STAGE_TRANSFER_BIT);
+  if (pass_info->sync_compute_resources.nsync_resources > 0u) {
+    err = ngfvk_execute_sync_op(
+        cmd_buf,
+        pass_info->sync_compute_resources.nsync_resources,
+        pass_info->sync_compute_resources.sync_resources,
+        0u, NULL,
+        0u, NULL,
+        VK_PIPELINE_STAGE_TRANSFER_BIT);
     if (err != NGF_ERROR_OK) return err;
   }
 
@@ -3290,12 +3445,21 @@ ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op* syn
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_compute_pass(ngf_cmd_buffer cmd_buf, const ngf_sync_op* sync_op, ngf_compute_encoder* enc) {
+ngf_error ngf_cmd_begin_compute_pass(
+    ngf_cmd_buffer               cmd_buf,
+    const ngf_compute_pass_info* pass_info,
+    ngf_compute_encoder*         enc) {
   ngf_error err;
-  if (sync_op) {
-    err = ngfvk_execute_sync_op(cmd_buf, sync_op, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
-    if (err != NGF_ERROR_OK) return err;
-  }
+  err = ngfvk_execute_sync_op(
+      cmd_buf,
+      pass_info->sync_compute_resources.nsync_resources,
+      pass_info->sync_compute_resources.sync_resources,
+      pass_info->sync_render_resources.nsync_resources,
+      pass_info->sync_render_resources.sync_resources,
+      pass_info->sync_xfer_resources.nsync_resources,
+      pass_info->sync_xfer_resources.sync_resources,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  if (err != NGF_ERROR_OK) return err;
 
   err = ngfvk_encoder_start(cmd_buf);
   if (err != NGF_ERROR_OK) return err;
@@ -4239,7 +4403,7 @@ void ngf_cmd_write_image(
   const VkImageMemoryBarrier pre_xfer_barrier   = {
         .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext               = NULL,
-        .srcAccessMask       = image_access_flags,
+        .srcAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_WRITE_BIT,
         .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
         .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
         .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -4289,7 +4453,7 @@ void ngf_cmd_write_image(
       .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
       .pNext               = NULL,
       .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-      .dstAccessMask       = image_access_flags,
+      .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_WRITE_BIT,
       .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
       .newLayout           = target_layout,
       .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -4544,7 +4708,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   }
 
   buf->storage_type   = info->storage_type;
-  buf->ngf_usage_mask = info->buffer_usage;
+  buf->usage_flags = info->buffer_usage;
 
   return err;
 }
@@ -4771,3 +4935,7 @@ void ngf_finish(void) {
 }
 
 #pragma endregion
+
+#if defined(NGFVK_TEST_MODE)
+#include "../tests/vk-backend-tests.c"
+#endif
