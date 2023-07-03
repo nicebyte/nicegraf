@@ -108,7 +108,7 @@ else()
                      
   nmk_binary(NAME vk-backend-tests
              SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-             DEPS nicegraf-vk-for-tests "$<IF:$<BOOL:(NOT ${WIN32})>,dl,>")
+             DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
 endif()
 
 # Build tests only if explicitly requested.
