@@ -227,6 +227,7 @@ NT_TESTSUITE {
                   }}},
     };
     ngf_render_encoder       fake_render_encoder;
+    memset(&fake_render_encoder, 0, sizeof(fake_render_encoder));
     ngf_sync_render_resource sync_render_resource = {
       .encoder  = fake_render_encoder,
        .resource = {
@@ -321,6 +322,7 @@ NT_TESTSUITE {
                   }}},
     };
     ngf_render_encoder       fake_render_encoder;
+    memset(&fake_render_encoder, 0, sizeof(fake_render_encoder));
     ngf_sync_render_resource sync_render_resource = {
       .encoder  = fake_render_encoder,
        .resource = {

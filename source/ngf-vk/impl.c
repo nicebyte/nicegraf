@@ -2005,10 +2005,10 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
 
   if (result == VK_NULL_HANDLE) {
     const uint32_t nattachments               = rt->nattachments;
-    const uint32_t attachment_pass_descs_size = sizeof(ngfvk_attachment_pass_desc) * nattachments;
+    const size_t attachment_pass_descs_size = sizeof(ngfvk_attachment_pass_desc) * nattachments;
     ngfvk_attachment_pass_desc* attachment_compat_pass_descs =
         ngfi_sa_alloc(ngfi_tmp_store(), attachment_pass_descs_size);
-    const uint32_t rt_attachment_pass_descs_size =
+    const size_t rt_attachment_pass_descs_size =
         rt->nattachments * sizeof(ngfvk_attachment_pass_desc);
     memcpy(
         attachment_compat_pass_descs,
@@ -2125,7 +2125,7 @@ ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* v
       .pApplicationInfo        = &app_info,
       .enabledLayerCount       = enable_validation ? 1u : 0u,
       .ppEnabledLayerNames     = enabled_layers,
-      .enabledExtensionCount   = NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
+      .enabledExtensionCount   = (uint32_t)NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
       .ppEnabledExtensionNames = ext_names};
   VkResult vk_err = vkCreateInstance(&inst_info, NULL, instance_ptr);
   if (vk_err != VK_SUCCESS) {
@@ -2425,7 +2425,7 @@ static void ngfvk_generate_sync_op_barriers(
 
     // TODO: use hashset to dedupe events.
     bool dupe_event = false;
-    for (int32_t j = temp_data->nwait_events - 1u;
+    for (int32_t j = (int32_t)temp_data->nwait_events - 1;
          temp_data->nwait_events > 0 && j >= 0 && !dupe_event;
          --j) {
       dupe_event = (temp_data->wait_events[j] == wait_event);

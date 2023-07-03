@@ -74,6 +74,7 @@ typedef struct nt_internal_test_suite_context {
   uint32_t total_test_cases;
 } nt_internal_test_suite_context;
 
+#if !defined(NT_IMPL)
 static int nt_internal_handle_test_failure(
     const char*                     test_case_name,
     nt_internal_test_suite_context* test_suite_context) {
@@ -89,6 +90,7 @@ static int nt_internal_handle_test_start(
   test_suite_context->total_test_cases++;
   return 1;
 }
+#endif
 
 extern NT_THREADLOCAL bool nt_internal_mainthread_flag;
 extern jmp_buf             nt_internal_jmpbuf;
