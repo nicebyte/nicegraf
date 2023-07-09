@@ -39,32 +39,40 @@
 #if defined(NT_BREAK_ON_ASSERT_FAIL)
 #if !defined(_WIN32) && !defined(_WIN64)
 #include <signal.h>
-#define NT_ASSERT(condition) if (!(condition)) { raise(SIGTRAP); }
+#define NT_ASSERT(condition)              \
+  do {                                    \
+    if (!(condition)) { raise(SIGTRAP); } \
+    }while (0)
 #else
-#define NT_ASSERT(condition) if (!(condition)) { __debugbreak(); }
+#define NT_ASSERT(condition)              \
+  do {                                    \
+    if (!(condition)) { __debugbreak(); } \
+  } while (0)
 #endif
 #else
 #define NT_ASSERT(condition)                                                 \
-  if (!(condition)) {                                                        \
-    fprintf(                                                                 \
-        stderr,                                                              \
-        "assertion failed\n\tcode:\t\"%s\"\n\tfile:\t\"%s\"\n\tline:\t%d\n", \
-        #condition,                                                          \
-        __FILE__,                                                            \
-        __LINE__);                                                           \
-    if (nt_internal_mainthread_flag) {                                       \
-      longjmp(nt_internal_jmpbuf, 1);                                        \
-    } else {                                                                 \
-      fprintf(stderr, "Assertion failure on non-main thread. Aborting.\n");  \
-      abort();                                                               \
-    }                                                                        \
-  }
+  do {                                                                         \
+    if (!(condition)) {                                                        \
+      fprintf(                                                                 \
+          stderr,                                                              \
+          "assertion failed\n\tcode:\t\"%s\"\n\tfile:\t\"%s\"\n\tline:\t%d\n", \
+          #condition,                                                          \
+          __FILE__,                                                            \
+          __LINE__);                                                           \
+      if (nt_internal_mainthread_flag) {                                       \
+        longjmp(nt_internal_jmpbuf, 1);                                        \
+      } else {                                                                 \
+        fprintf(stderr, "Assertion failure on non-main thread. Aborting.\n");  \
+        abort();                                                               \
+      }                                                                        \
+    }                                                                          \
+  } while (0)
 #endif
 
-#define NT_TESTCASE(name)                                           \
-  if ((setjmp(nt_internal_jmpbuf) == 0 &&                           \
-       nt_internal_handle_test_start(#name, test_suite_context)) || \
-      nt_internal_handle_test_failure(#name, test_suite_context))
+#define NT_TESTCASE(name)                                             \
+    if ((setjmp(nt_internal_jmpbuf) == 0 &&                           \
+         nt_internal_handle_test_start(#name, test_suite_context)) || \
+        nt_internal_handle_test_failure(#name, test_suite_context))   \
 
 #define NT_TESTSUITE \
   void nt_internal_test_suite_main(nt_internal_test_suite_context* test_suite_context)

@@ -42,12 +42,13 @@ nmk_static_library(NAME nicegraf-internal
                    SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dynamic-array.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack_alloc.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf_state.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
 
@@ -113,16 +114,10 @@ endif()
 
 # Build tests only if explicitly requested.
 if (NGF_BUILD_TESTS STREQUAL "yes")
-    nmk_binary(NAME ngf_tests
-               SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/block-allocator-test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/stack_allocator_test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/dynamic_array_test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/frame-token-test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/native-binding-map-test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/list-test.cpp
-                    ${CMAKE_CURRENT_LIST_DIR}/tests/main.cpp
-               PVT_INCLUDES  "${CMAKE_CURRENT_LIST_DIR}/deps/catch"
-               DEPS nicegraf-internal "$<IF:$<BOOL:(NOT ${WIN32})>,pthread,>")
+    nmk_binary(NAME internal-utils-tests
+           SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/internal-utils-tests.c
+           SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
+                    DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
 endif()
 
 # Build samples only if explicitly requested.

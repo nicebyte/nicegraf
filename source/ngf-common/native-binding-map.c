@@ -22,7 +22,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "ngf-common/native-binding-map.h"
 
-#include "ngf-common/dynamic_array.h"
+#include "ngf-common/dynamic-array.h"
 #include "ngf-common/macros.h"
 
 #include <stdio.h>

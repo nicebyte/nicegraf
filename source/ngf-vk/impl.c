@@ -22,11 +22,11 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 #include "ngf-common/block-alloc.h"
-#include "ngf-common/cmdbuf_state.h"
-#include "ngf-common/dynamic_array.h"
+#include "ngf-common/cmdbuf-state.h"
+#include "ngf-common/dynamic-array.h"
 #include "ngf-common/frame-token.h"
 #include "ngf-common/macros.h"
-#include "ngf-common/stack_alloc.h"
+#include "ngf-common/stack-alloc.h"
 #include "nicegraf.h"
 #include "vk_10.h"
 

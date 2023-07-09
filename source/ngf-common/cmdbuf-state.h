@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,16 +20,35 @@
  * IN THE SOFTWARE.
  */
 
-#include "catch.hpp"
-#include "ngf-common/frame-token.h"
+#pragma once
 
-TEST_CASE("encode-decode frame token works") {
-  const uint16_t  test_ctx_id = 65534u, test_max_inflight_frames = 3u, test_frame_id = 255u;
-  const uintptr_t test_token =
-      ngfi_encode_frame_token(test_ctx_id, test_max_inflight_frames, test_frame_id);
-  REQUIRE(test_ctx_id == ngfi_frame_ctx_id(test_token));
-  REQUIRE(test_max_inflight_frames == ngfi_frame_max_inflight_frames(test_token));
-  REQUIRE(test_frame_id == ngfi_frame_id(test_token));
+#include "nicegraf.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum {
+  NGFI_CMD_BUFFER_NEW,
+  NGFI_CMD_BUFFER_READY,
+  NGFI_CMD_BUFFER_RECORDING,
+  NGFI_CMD_BUFFER_AWAITING_SUBMIT,
+  NGFI_CMD_BUFFER_SUBMITTED
+} ngfi_cmd_buffer_state;
+
+#define NGFI_CMD_BUF_RECORDABLE(s) \
+  (s == NGFI_CMD_BUFFER_READY || s == NGFI_CMD_BUFFER_AWAITING_SUBMIT)
+
+ngf_error ngfi_transition_cmd_buf(
+    ngfi_cmd_buffer_state* cur_state,
+    bool                   has_active_renderpass,
+    ngfi_cmd_buffer_state  new_state);
+
+#define NGFI_TRANSITION_CMD_BUF(b, new_state)                                                    \
+  if (ngfi_transition_cmd_buf(&(b)->state, (b)->renderpass_active, new_state) != NGF_ERROR_OK) { \
+    return NGF_ERROR_INVALID_OPERATION;                                                          \
+  }
+
+#ifdef __cplusplus
 }
-
-
+#endif

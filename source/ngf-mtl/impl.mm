@@ -20,10 +20,10 @@
  * IN THE SOFTWARE.
  */
 
-#include "ngf-common/cmdbuf_state.h"
+#include "ngf-common/cmdbuf-state.h"
 #include "ngf-common/macros.h"
 #include "ngf-common/native-binding-map.h"
-#include "ngf-common/stack_alloc.h"
+#include "ngf-common/stack-alloc.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 

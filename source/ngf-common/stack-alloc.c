@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,7 +20,7 @@
  * IN THE SOFTWARE.
  */
 
-#include "stack_alloc.h"
+#include "stack-alloc.h"
 
 #include "macros.h"
 

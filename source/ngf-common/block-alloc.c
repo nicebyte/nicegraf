@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,7 +22,7 @@
 
 #include "block-alloc.h"
 
-#include "dynamic_array.h"
+#include "dynamic-array.h"
 #include "list.h"
 #include "macros.h"
 
