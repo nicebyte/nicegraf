@@ -51,3 +51,11 @@ void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks) {
     NGF_ALLOC_CB = callbacks;
   }
 }
+
+ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap) {
+    size_t res = (size_t) NGF_SAMPLE_COUNT_64;
+    while ((res & counts_bitmap) == 0 && res > 1) {
+        res >>= 1;
+    }
+    return (ngf_sample_count) res;
+}

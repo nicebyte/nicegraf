@@ -799,6 +799,11 @@ static size_t ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
   return 0;
 }
 
+extern "C" {
+void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
+}
+
 static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<MTLDevice> mtldev) {
   ngfdev.handle = handle;
 #if TARGET_OS_OSX
@@ -870,18 +875,21 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<M
                                   gpu_family_idx == ngfmtl_gpufam_idx(MTLGPUFamilyCommon3) ||
                                   gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple3);
 
-  caps.texture_color_sample_counts = ([mtldev supportsTextureSampleCount:1] ? 1 : 0) |
-                                     ([mtldev supportsTextureSampleCount:2] ? 2 : 0) |
-                                     ([mtldev supportsTextureSampleCount:4] ? 4 : 0) |
-                                     ([mtldev supportsTextureSampleCount:8] ? 8 : 0);
+  size_t supports_samples_bitmap = ([mtldev supportsTextureSampleCount:1] ? 1 : 0) |
+                                   ([mtldev supportsTextureSampleCount:2] ? 2 : 0) |
+                                   ([mtldev supportsTextureSampleCount:4] ? 4 : 0) |
+                                   ([mtldev supportsTextureSampleCount:8] ? 8 : 0);
 
-  caps.texture_depth_sample_counts = caps.texture_color_sample_counts;
-  caps.framebuffer_color_sample_counts = caps.texture_color_sample_counts;
-  caps.framebuffer_depth_sample_counts = caps.texture_color_sample_counts;
-}
+  ngf_sample_count max_supported_sample_count = ngfi_get_highest_sample_count(supports_samples_bitmap);
 
-extern "C" {
-void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+  caps.texture_color_sample_counts = supports_samples_bitmap;
+  caps.max_supported_texture_color_sample_count = max_supported_sample_count;
+  caps.texture_depth_sample_counts = supports_samples_bitmap;
+  caps.max_supported_texture_depth_sample_count = max_supported_sample_count;
+  caps.framebuffer_color_sample_counts = supports_samples_bitmap;
+  caps.max_supported_framebuffer_color_sample_count = max_supported_sample_count;
+  caps.framebuffer_depth_sample_counts = supports_samples_bitmap;
+  caps.max_supported_framebuffer_depth_sample_count = max_supported_sample_count;
 }
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
