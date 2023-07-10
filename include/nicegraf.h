@@ -231,6 +231,30 @@ typedef struct ngf_device_capabilities {
    * This flag is set to true if the device supports cubemap arrays.
    */
   bool cubemap_arrays_supported;
+
+  /**
+   * Bitmap representing multisample count support for framebuffer color attachments
+   * For example, (framebuffer_color_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t framebuffer_color_sample_counts;
+
+  /**
+   * Bitmap representing multisample count support for framebuffer depth attachments
+   * For example, (framebuffer_depth_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t framebuffer_depth_sample_counts;
+
+  /**
+   * Bitmap representing multisample count support for color textures
+   * For example, (texture_color_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t texture_color_sample_counts;
+
+  /**
+   * Bitmap representing multisample count support for depth textures
+   * For example, (texture_depth_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t texture_depth_sample_counts;
 } ngf_device_capabilities;
 
 /**

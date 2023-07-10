@@ -2681,16 +2681,20 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_fragment_input_components = vkdevlimits->maxFragmentInputComponents;
       devcaps->max_fragment_inputs =
           (devcaps->max_fragment_input_components) / 4; /* as per vk spec. */
-      devcaps->max_1d_image_dimension         = vkdevlimits->maxImageDimension1D;
-      devcaps->max_2d_image_dimension         = vkdevlimits->maxImageDimension2D;
-      devcaps->max_3d_image_dimension         = vkdevlimits->maxImageDimension3D;
-      devcaps->max_cube_image_dimension       = vkdevlimits->maxImageDimensionCube;
-      devcaps->max_image_layers               = vkdevlimits->maxImageArrayLayers;
-      devcaps->max_color_attachments_per_pass = vkdevlimits->maxColorAttachments;
-      devcaps->max_uniform_buffers_per_stage  = vkdevlimits->maxPerStageDescriptorUniformBuffers;
-      devcaps->max_sampler_anisotropy         = vkdevlimits->maxSamplerAnisotropy;
-      devcaps->max_uniform_buffer_range       = vkdevlimits->maxUniformBufferRange;
-      devcaps->cubemap_arrays_supported       = dev_features.imageCubeArray;
+      devcaps->max_1d_image_dimension          = vkdevlimits->maxImageDimension1D;
+      devcaps->max_2d_image_dimension          = vkdevlimits->maxImageDimension2D;
+      devcaps->max_3d_image_dimension          = vkdevlimits->maxImageDimension3D;
+      devcaps->max_cube_image_dimension        = vkdevlimits->maxImageDimensionCube;
+      devcaps->max_image_layers                = vkdevlimits->maxImageArrayLayers;
+      devcaps->max_color_attachments_per_pass  = vkdevlimits->maxColorAttachments;
+      devcaps->max_uniform_buffers_per_stage   = vkdevlimits->maxPerStageDescriptorUniformBuffers;
+      devcaps->max_sampler_anisotropy          = vkdevlimits->maxSamplerAnisotropy;
+      devcaps->max_uniform_buffer_range        = vkdevlimits->maxUniformBufferRange;
+      devcaps->cubemap_arrays_supported        = dev_features.imageCubeArray;
+      devcaps->framebuffer_color_sample_counts = vkdevlimits->framebufferColorSampleCounts;
+      devcaps->framebuffer_depth_sample_counts = vkdevlimits->framebufferDepthSampleCounts;
+      devcaps->texture_color_sample_counts     = vkdevlimits->sampledImageColorSampleCounts;
+      devcaps->texture_depth_sample_counts     = vkdevlimits->sampledImageDepthSampleCounts;
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
