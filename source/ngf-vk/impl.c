@@ -751,6 +751,7 @@ static VkPipelineStageFlags get_vk_buffer_pipeline_stage_flags(ngf_buffer buf) {
 #pragma region internal_funcs
 
 void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
 // Handler for messages from validation layers, etc.
 // All messages are forwarded to the user-provided debug callback.

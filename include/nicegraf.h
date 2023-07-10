@@ -112,152 +112,6 @@ extern "C" {
 #endif
 
 /**
- * This is a special value used within the \ref ngf_device_capabilities structure
- * to indicate that a limit value (i.e. max texture size) is not known or not
- * relevant for the current backend.
- */
-#define NGF_DEVICE_LIMIT_UNKNOWN (~0u)
-
-/**
- * @struct ngf_device_capabilities
- * \ingroup ngf
- * Contains information about various device features, limits, etc. Clients
- * shouldn't instantiate this structure. See \ref ngf_get_device_capabilities.
- */
-typedef struct ngf_device_capabilities {
-  /**
-   * When binding uniform buffers, the specified offset must be
-   * a multiple of this number.
-   */
-  size_t uniform_buffer_offset_alignment;
-
-  /**
-   * When binding a uniform buffer, the specified range must not exceed
-   * this value.
-   */
-  size_t max_uniform_buffer_range;
-
-  /**
-   * When binding texel buffers, the specified offset must be
-   * a multiple of this number.
-   */
-  size_t texel_buffer_offset_alignment;
-
-  /**
-   * The maximum allowed number of vertex attributes per pipeline.
-   */
-  size_t max_vertex_input_attributes_per_pipeline;
-
-  /**
-   * The maximum allowed number of sampled images (textures) per single
-   * shader stage. Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER
-   * and \ref NGF_DESCRIPTOR_TEXEL_BUFFER do count against this limit.
-   */
-  size_t max_sampled_images_per_stage;
-
-  /**
-   * The maximum allowed number of sampler objects per single shader stage.
-   * Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER do count against
-   * this limit.
-   */
-  size_t max_samplers_per_stage;
-
-  /**
-   * The maximum allowed number of uniform buffers per single shader stage.
-   */
-  size_t max_uniform_buffers_per_stage;
-
-  /**
-   * This is the maximum number of _components_, across all inputs, for the fragment
-   * stage. "Input component" refers to the individual components of an input vector.
-   * For example, if the fragment stage has a single float4 input (vector of 4 floats),
-   * then it has 4 input components.
-   */
-  size_t max_fragment_input_components;
-
-  /**
-   * This is the maximum number of inputs for the fragment stage.
-   */
-  size_t max_fragment_inputs;
-
-  /**
-   * Maximum allowed width of a 1D image.
-   */
-  size_t max_1d_image_dimension;
-
-  /**
-   * Maximum allowed width, or height of a 2D image.
-   */
-  size_t max_2d_image_dimension;
-
-  /**
-   * Maximum allowed width, height, or depth of a 3D image.
-   */
-
-  size_t max_3d_image_dimension;
-
-  /**
-   * Maximum allowed width, or height of a cubemap.
-   */
-  size_t max_cube_image_dimension;
-
-  /**
-   * Maximum allowed number of layers in an image.
-   */
-  size_t max_image_layers;
-
-  /**
-   * Maximum number of color attachments that can be written to
-   * during a render pass.
-   */
-  size_t max_color_attachments_per_pass;
-
-  /**
-   * The maximum degree of sampler anisotropy.
-   */
-  float max_sampler_anisotropy;
-
-  /**
-   * This flag is set to `true` if the platform supports [0; 1]
-   * range for the clip-space z coordinate. nicegraf enforces clip-space
-   * z to be in this range on all backends that support it. This ensures
-   * better precision for near-field objects.
-   * See the following for an in-depth explanation:
-   * http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
-   */
-  bool clipspace_z_zero_to_one;
-
-  /**
-   * This flag is set to true if the device supports cubemap arrays.
-   */
-  bool cubemap_arrays_supported;
-
-  /**
-   * Bitmap representing multisample count support for framebuffer color attachments
-   * For example, (framebuffer_color_sample_counts & 16) indicates support for 16 samples
-   */
-  size_t framebuffer_color_sample_counts;
-
-  /**
-   * Bitmap representing multisample count support for framebuffer depth attachments
-   * For example, (framebuffer_depth_sample_counts & 16) indicates support for 16 samples
-   */
-  size_t framebuffer_depth_sample_counts;
-
-  /**
-   * Bitmap representing multisample count support for color textures
-   * For example, (texture_color_sample_counts & 16) indicates support for 16 samples
-   */
-  size_t texture_color_sample_counts;
-
-  /**
-   * Bitmap representing multisample count support for depth textures
-   * For example, (texture_depth_sample_counts & 16) indicates support for 16 samples
-   */
-  size_t texture_depth_sample_counts;
-} ngf_device_capabilities;
-
-/**
  * @enum ngf_diagnostic_log_verbosity
  * \ingroup ngf
  * Verbosity levels for the diagnostic message log.
@@ -369,30 +223,6 @@ typedef enum ngf_device_performance_tier {
 
   NGF_DEVICE_PERFORMANCE_TIER_COUNT
 } ngf_device_performance_tier;
-
-/**
- * Maximum length of a device's name.
- * \ingroup ngf
- */
-#define NGF_DEVICE_NAME_MAX_LENGTH (256u)
-
-/**
- * @struct ngf_device
- * Information about a rendering device.
- * See also: \ref ngf_get_device_list
- * \ingroup ngf
- */
-typedef struct ngf_device {
-  ngf_device_performance_tier performance_tier; /**< Device's performance tier. */
-  ngf_device_handle           handle; /**< A handle to be passed to \ref ngf_initialize. */
-
-  /**
-   * A string associated with the device. This is _not_ guaranteed to be unique per device.
-   */
-  char name[NGF_DEVICE_NAME_MAX_LENGTH];
-
-  ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
-} ngf_device;
 
 /**
  * @struct ngf_init_info
@@ -2522,6 +2352,200 @@ struct ngf_sync_xfer_resource {
   ngf_xfer_encoder   encoder; /** < The encoder to wait on. */
   ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
 };
+
+/**
+ * This is a special value used within the \ref ngf_device_capabilities structure
+ * to indicate that a limit value (i.e. max texture size) is not known or not
+ * relevant for the current backend.
+ */
+#define NGF_DEVICE_LIMIT_UNKNOWN (~0u)
+
+/**
+ * @struct ngf_device_capabilities
+ * \ingroup ngf
+ * Contains information about various device features, limits, etc. Clients
+ * shouldn't instantiate this structure. See \ref ngf_get_device_capabilities.
+ */
+typedef struct ngf_device_capabilities {
+  /**
+   * When binding uniform buffers, the specified offset must be
+   * a multiple of this number.
+   */
+  size_t uniform_buffer_offset_alignment;
+
+  /**
+   * When binding a uniform buffer, the specified range must not exceed
+   * this value.
+   */
+  size_t max_uniform_buffer_range;
+
+  /**
+   * When binding texel buffers, the specified offset must be
+   * a multiple of this number.
+   */
+  size_t texel_buffer_offset_alignment;
+
+  /**
+   * The maximum allowed number of vertex attributes per pipeline.
+   */
+  size_t max_vertex_input_attributes_per_pipeline;
+
+  /**
+   * The maximum allowed number of sampled images (textures) per single
+   * shader stage. Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER
+   * and \ref NGF_DESCRIPTOR_TEXEL_BUFFER do count against this limit.
+   */
+  size_t max_sampled_images_per_stage;
+
+  /**
+   * The maximum allowed number of sampler objects per single shader stage.
+   * Descriptors with type \ref NGF_DESCRIPTOR_IMAGE_AND_SAMPLER do count against
+   * this limit.
+   */
+  size_t max_samplers_per_stage;
+
+  /**
+   * The maximum allowed number of uniform buffers per single shader stage.
+   */
+  size_t max_uniform_buffers_per_stage;
+
+  /**
+   * This is the maximum number of _components_, across all inputs, for the fragment
+   * stage. "Input component" refers to the individual components of an input vector.
+   * For example, if the fragment stage has a single float4 input (vector of 4 floats),
+   * then it has 4 input components.
+   */
+  size_t max_fragment_input_components;
+
+  /**
+   * This is the maximum number of inputs for the fragment stage.
+   */
+  size_t max_fragment_inputs;
+
+  /**
+   * Maximum allowed width of a 1D image.
+   */
+  size_t max_1d_image_dimension;
+
+  /**
+   * Maximum allowed width, or height of a 2D image.
+   */
+  size_t max_2d_image_dimension;
+
+  /**
+   * Maximum allowed width, height, or depth of a 3D image.
+   */
+
+  size_t max_3d_image_dimension;
+
+  /**
+   * Maximum allowed width, or height of a cubemap.
+   */
+  size_t max_cube_image_dimension;
+
+  /**
+   * Maximum allowed number of layers in an image.
+   */
+  size_t max_image_layers;
+
+  /**
+   * Maximum number of color attachments that can be written to
+   * during a render pass.
+   */
+  size_t max_color_attachments_per_pass;
+
+  /**
+   * The maximum degree of sampler anisotropy.
+   */
+  float max_sampler_anisotropy;
+
+  /**
+   * This flag is set to `true` if the platform supports [0; 1]
+   * range for the clip-space z coordinate. nicegraf enforces clip-space
+   * z to be in this range on all backends that support it. This ensures
+   * better precision for near-field objects.
+   * See the following for an in-depth explanation:
+   * http://web.archive.org/web/20210829130722/https://developer.nvidia.com/content/depth-precision-visualized
+   */
+  bool clipspace_z_zero_to_one;
+
+  /**
+   * This flag is set to true if the device supports cubemap arrays.
+   */
+  bool cubemap_arrays_supported;
+
+  /**
+   * Bitmap representing multisample count support for framebuffer color attachments
+   * For example, (framebuffer_color_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t framebuffer_color_sample_counts;
+
+  /**
+   * The highest supported sample count for framebuffer color attachments.
+   * This value is derived from \ref framebuffer_color_sample_counts.
+   */
+  ngf_sample_count max_supported_framebuffer_color_sample_count;
+
+  /**
+   * Bitmap representing multisample count support for framebuffer depth attachments
+   * For example, (framebuffer_depth_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t framebuffer_depth_sample_counts;
+
+  /**
+   * The highest supported sample count for framebuffer depth attachments.
+   * This value is derived from \ref framebuffer_depth_sample_counts.
+   */
+  ngf_sample_count max_supported_framebuffer_depth_sample_count;
+
+  /**
+   * Bitmap representing multisample count support for color textures
+   * For example, (texture_color_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t texture_color_sample_counts;
+
+  /**
+   * The highest supported sample count for color textures.
+   * This value is derived from \ref texture_color_sample_counts.
+   */
+  ngf_sample_count max_supported_texture_color_sample_count;
+
+  /**
+   * Bitmap representing multisample count support for depth textures
+   * For example, (texture_depth_sample_counts & 16) indicates support for 16 samples
+   */
+  size_t texture_depth_sample_counts;
+
+  /**
+   * The highest supported sample count for depth textures.
+   * This value is derived from \ref texture_depth_sample_counts.
+   */
+  ngf_sample_count max_supported_texture_depth_sample_count;
+} ngf_device_capabilities;
+
+/**
+ * Maximum length of a device's name.
+ * \ingroup ngf
+ */
+#define NGF_DEVICE_NAME_MAX_LENGTH (256u)
+
+/**
+ * @struct ngf_device
+ * Information about a rendering device.
+ * See also: \ref ngf_get_device_list
+ * \ingroup ngf
+ */
+typedef struct ngf_device {
+  ngf_device_performance_tier performance_tier; /**< Device's performance tier. */
+  ngf_device_handle           handle; /**< A handle to be passed to \ref ngf_initialize. */
+
+  /**
+   * A string associated with the device. This is _not_ guaranteed to be unique per device.
+   */
+  char name[NGF_DEVICE_NAME_MAX_LENGTH];
+
+  ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
+} ngf_device;
 
 #ifdef _MSC_VER
 #pragma endregion

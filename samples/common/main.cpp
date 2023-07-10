@@ -182,8 +182,7 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with
    * the highest supported framebuffer sample count.
    */
-  const size_t samples_bitmap = ngf_get_device_capabilities()->framebuffer_color_sample_counts;
-  const ngf_sample_count main_render_target_sample_count = ngf_util_get_highest_sample_count(samples_bitmap);
+  const ngf_sample_count main_render_target_sample_count = ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
   const ngf_swapchain_info swapchain_info                  = {
                        .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
                        .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
