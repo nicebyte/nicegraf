@@ -93,6 +93,19 @@ static inline size_t ngf_util_align_size(size_t value, size_t alignment) {
     return value + (m > 0 ? (alignment - m) : 0u);
 }
 
+/**
+ * \ingroup ngf_util
+ *
+ * Returns the largest sample count in a sample count bitmap
+ */
+static inline ngf_sample_count ngf_util_get_highest_sample_count(size_t counts_bitmap) {
+    size_t res = (size_t) NGF_SAMPLE_COUNT_64;
+    while ((res & counts_bitmap) == 0 && res > 1) {
+        res >>= 1;
+    }
+    return (ngf_sample_count) res;
+}
+
 #ifdef __cplusplus
 }
 #endif
