@@ -180,9 +180,11 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   /**
    * Configure the swapchain and create a nicegraf context.
    * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with 8 samples
-   * per pixel.
+   * per pixel if supported; otherwise 4 samples is supported on all MacOS devices.
    */
-  const ngf_sample_count   main_render_target_sample_count = NGF_SAMPLE_COUNT_8;
+  const ngf_sample_count   main_render_target_sample_count =
+    (ngf_get_device_capabilities()->texture_color_sample_counts & 8) ?
+    NGF_SAMPLE_COUNT_8 : NGF_SAMPLE_COUNT_4;
   const ngf_swapchain_info swapchain_info                  = {
                        .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
                        .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,

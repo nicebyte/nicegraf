@@ -869,6 +869,15 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<M
   caps.cubemap_arrays_supported = gpu_family_idx == ngfmtl_gpufam_idx(MTLGPUFamilyCommon2) ||
                                   gpu_family_idx == ngfmtl_gpufam_idx(MTLGPUFamilyCommon3) ||
                                   gpu_family_idx >= ngfmtl_gpufam_idx(MTLGPUFamilyApple3);
+
+  caps.texture_color_sample_counts = ([mtldev supportsTextureSampleCount:1] ? 1 : 0) |
+                                     ([mtldev supportsTextureSampleCount:2] ? 2 : 0) |
+                                     ([mtldev supportsTextureSampleCount:4] ? 4 : 0) |
+                                     ([mtldev supportsTextureSampleCount:8] ? 8 : 0);
+
+  caps.texture_depth_sample_counts = caps.texture_color_sample_counts;
+  caps.framebuffer_color_sample_counts = caps.texture_color_sample_counts;
+  caps.framebuffer_depth_sample_counts = caps.texture_color_sample_counts;
 }
 
 extern "C" {
