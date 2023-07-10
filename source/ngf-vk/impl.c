@@ -2696,6 +2696,15 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->framebuffer_depth_sample_counts = vkdevlimits->framebufferDepthSampleCounts;
       devcaps->texture_color_sample_counts     = vkdevlimits->sampledImageColorSampleCounts;
       devcaps->texture_depth_sample_counts     = vkdevlimits->sampledImageDepthSampleCounts;
+      
+      devcaps->max_supported_framebuffer_color_sample_count =
+        ngfi_get_highest_sample_count(devcaps->framebuffer_color_sample_counts);
+      devcaps->max_supported_framebuffer_depth_sample_count =
+        ngfi_get_highest_sample_count(devcaps->framebuffer_depth_sample_counts);
+      devcaps->max_supported_texture_color_sample_count =
+        ngfi_get_highest_sample_count(devcaps->texture_color_sample_counts);
+      devcaps->max_supported_texture_depth_sample_count =
+        ngfi_get_highest_sample_count(devcaps->texture_depth_sample_counts);
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
