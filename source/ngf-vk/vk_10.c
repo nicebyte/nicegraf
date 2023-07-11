@@ -1,15 +1,12 @@
 #include "vk_10.h"
+#include "ngf-common/macros.h"
 
 #define TO_STRING(str) #str
 #define STRINGIFY(str) TO_STRING(str)
 
 #if defined(_WIN32) || defined(_WIN64)
-#define ModuleHandle HMODULE
 #define VK_LOADER_LIB "vulkan-1.dll"
 #else
-#define LoadLibraryA(name) dlopen(name, RTLD_NOW)
-#define GetProcAddress(h, n) dlsym(h, n)
-#define ModuleHandle void*
 #if defined(__APPLE__)
 #define VK_LOADER_LIB "libMoltenVK.dylib"
 #else
