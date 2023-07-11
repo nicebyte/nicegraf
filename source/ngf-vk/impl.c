@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <stdint.h>
 #define _CRT_SECURE_NO_WARNINGS
 #include "ngf-common/block-alloc.h"
 #include "ngf-common/cmdbuf-state.h"
@@ -34,6 +35,8 @@
 #include <spirv_reflect.h>
 #include <string.h>
 #include <vk_mem_alloc.h>
+
+#include "renderdoc_app.h"
 
 #pragma region constants
 
@@ -4946,6 +4949,45 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 
 void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
+}
+
+typedef struct ngf_rdoc_api_t {
+    NGF_RENDERDOC_API* api;
+} ngf_rdoc_api_t;
+
+ngf_error ngf_rdoc_init(ngf_rdoc_api result, char* lib_path) {
+    ngf_error err = NGF_ERROR_OK;
+    ModuleHandle rdoc_get_api_mod = LoadLibraryA(lib_path);
+    if (rdoc_get_api_mod) {
+        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(rdoc_get_api_mod, "RENDERDOC_GetAPI");
+        int ret = RENDERDOC_GetAPI(NGF_RENDERDOC_VERSION, (void**) &result->api);
+        assert(ret);
+    }
+    else {
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    }
+    return err;
+}
+
+void ngf_rdoc_set_capture_destination_template(const ngf_rdoc_api rdoc, const char* template) {
+    rdoc->api->SetCaptureFilePathTemplate(template);
+}
+
+void ngf_rdoc_set_capture_title(const ngf_rdoc_api rdoc, const char* title) {
+    assert(rdoc->api->IsFrameCapturing());
+    rdoc->api->SetCaptureTitle(title);
+}
+
+void ngf_rdoc_capture_begin(const ngf_rdoc_api rdoc, uintptr_t window_handle) {
+    rdoc->api->StartFrameCapture(RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), (RENDERDOC_WindowHandle) window_handle);
+}
+
+void ngf_rdoc_capture_end(const ngf_rdoc_api rdoc, uintptr_t window_handle) {
+    rdoc->api->EndFrameCapture(RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), (RENDERDOC_WindowHandle) window_handle);
+}
+
+void ngf_rdoc_capture_next_frame(const ngf_rdoc_api rdoc) {
+    rdoc->api->TriggerCapture();
 }
 
 #pragma endregion

@@ -14,14 +14,24 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_mutex_unlock(m)  (LeaveCriticalSection(m), 0)
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m), 0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m), 0)
+// dynamic module loading
+#define ModuleHandle HMODULE
 #else
 #define NGFI_THREADLOCAL __thread
 #include <pthread.h>
+// dynamic module loading (emulate win32 api)
+#define LoadLibraryA(name) dlopen(name, RTLD_NOW)
+#define GetProcAddress(h, n) dlsym(h, n)
+#define ModuleHandle void*
 #endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+// Macros for writing macros
+#define NGFI_PASTE(x,y) x ## y
+#define NGFI_EVAL_AND_PASTE(x,y) NGFI_PASTE(x,y)
 
 // Custom allocation callbacks.
 extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
