@@ -36,7 +36,7 @@
 #include <string.h>
 #include <vk_mem_alloc.h>
 
-#include "renderdoc_app.h"
+#include <renderdoc_app.h>
 
 #pragma region constants
 
@@ -252,6 +252,16 @@ typedef struct ngf_image_t {
   uint32_t       nlayers;
 } ngf_image_t;
 
+// Macros for obtaining proper RenderDoc Version
+#define NGF_RENDERDOC_API_VERSION 1_6_0
+#define NGF_RENDERDOC_VERSION NGFI_EVAL_AND_PASTE(eRENDERDOC_API_Version_, NGF_RENDERDOC_API_VERSION)
+#define NGF_RENDERDOC_API NGFI_EVAL_AND_PASTE(RENDERDOC_API_, NGF_RENDERDOC_API_VERSION)
+
+typedef struct ngf_rdoc_api_t {
+    NGF_RENDERDOC_API* api;
+    bool is_capturing_frame;
+} ngf_rdoc_api_t;
+
 typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
   ngfvk_swapchain             swapchain;
@@ -268,6 +278,7 @@ typedef struct ngf_context_t {
   NGFI_DARRAY_OF(ngfvk_command_superpool) command_superpools;
   NGFI_DARRAY_OF(ngfvk_desc_superpool) desc_superpools;
   NGFI_DARRAY_OF(ngfvk_renderpass_cache_entry) renderpass_cache;
+  ngf_rdoc_api rdoc;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -3186,6 +3197,24 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   ctx->cmd_buffer_counter = 0u;
 
+  // initialize RenderDoc API
+  if (info->rdoc_info != NULL) {
+      ModuleHandle rdoc_get_api_mod = LoadLibraryA(info->rdoc_info->renderdoc_lib_path);
+      if (rdoc_get_api_mod == NULL) {
+          err = NGF_ERROR_OBJECT_CREATION_FAILED;
+          goto ngf_create_context_cleanup;
+      }
+
+      pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(rdoc_get_api_mod, "RENDERDOC_GetAPI");
+      if (!RENDERDOC_GetAPI(NGF_RENDERDOC_VERSION, (void**) &ctx->rdoc)) {
+          err = NGF_ERROR_OBJECT_CREATION_FAILED;
+          goto ngf_create_context_cleanup;
+      }
+
+      ctx->rdoc->api->SetCaptureFilePathTemplate(info->rdoc_info->renderdoc_destination_template);
+      ctx->rdoc->is_capturing_frame = false;
+  }
+
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
   return err;
@@ -3558,6 +3587,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngf_error      err = NGF_ERROR_OK;
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
+    
+  // setup frame capture
+  const ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
+  if (rdoc && rdoc->is_capturing_frame) {
+      rdoc->api->StartFrameCapture(
+              RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
+              (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
+  }
 
   // reset stack allocator.
   ngfi_sa_reset(ngfi_tmp_store());
@@ -3675,6 +3712,15 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
         .pResults           = NULL};
     const VkResult present_result = vkQueuePresentKHR(_vk.present_queue, &present_info);
     if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
+  }
+
+  // end frame capture
+  const ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
+  if (rdoc && rdoc->is_capturing_frame) {
+      rdoc->api->EndFrameCapture(
+              RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
+              (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
+      rdoc->is_capturing_frame = false;
   }
 
   return err;
@@ -4951,43 +4997,8 @@ void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
 }
 
-typedef struct ngf_rdoc_api_t {
-    NGF_RENDERDOC_API* api;
-} ngf_rdoc_api_t;
-
-ngf_error ngf_rdoc_init(ngf_rdoc_api result, char* lib_path) {
-    ngf_error err = NGF_ERROR_OK;
-    ModuleHandle rdoc_get_api_mod = LoadLibraryA(lib_path);
-    if (rdoc_get_api_mod) {
-        pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(rdoc_get_api_mod, "RENDERDOC_GetAPI");
-        int ret = RENDERDOC_GetAPI(NGF_RENDERDOC_VERSION, (void**) &result->api);
-        assert(ret);
-    }
-    else {
-        err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    }
-    return err;
-}
-
-void ngf_rdoc_set_capture_destination_template(const ngf_rdoc_api rdoc, const char* template) {
-    rdoc->api->SetCaptureFilePathTemplate(template);
-}
-
-void ngf_rdoc_set_capture_title(const ngf_rdoc_api rdoc, const char* title) {
-    assert(rdoc->api->IsFrameCapturing());
-    rdoc->api->SetCaptureTitle(title);
-}
-
-void ngf_rdoc_capture_begin(const ngf_rdoc_api rdoc, uintptr_t window_handle) {
-    rdoc->api->StartFrameCapture(RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), (RENDERDOC_WindowHandle) window_handle);
-}
-
-void ngf_rdoc_capture_end(const ngf_rdoc_api rdoc, uintptr_t window_handle) {
-    rdoc->api->EndFrameCapture(RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), (RENDERDOC_WindowHandle) window_handle);
-}
-
-void ngf_rdoc_capture_next_frame(const ngf_rdoc_api rdoc) {
-    rdoc->api->TriggerCapture();
+void ngf_rdoc_capture_next_frame() {
+    if(CURRENT_CONTEXT->rdoc) CURRENT_CONTEXT->rdoc->is_capturing_frame = true;
 }
 
 #pragma endregion
