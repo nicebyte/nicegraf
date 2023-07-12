@@ -20,7 +20,6 @@
  * IN THE SOFTWARE.
  */
 
-#include <stdint.h>
 #define _CRT_SECURE_NO_WARNINGS
 #include "ngf-common/block-alloc.h"
 #include "ngf-common/cmdbuf-state.h"
