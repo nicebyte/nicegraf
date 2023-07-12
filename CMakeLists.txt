@@ -75,6 +75,8 @@ if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
 else()
   nmk_header_library(NAME nicegraf-vk-headers
                      PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/vulkan-headers)
+  nmk_header_library(NAME nicegraf-renderdoc
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/renderdoc)
 
   # Import VMA for handling vulkan memory allocation.
   add_definitions("-DVMA_STATIC_VULKAN_FUNCTIONS=0")
@@ -82,7 +84,7 @@ else()
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/deps/SPIRV-reflect)
 
   # Some vulkan-specific dependencies.
-  set(NICEGRAF_VK_DEPS vma spvreflect nicegraf-vk-headers)
+  set(NICEGRAF_VK_DEPS vma spvreflect nicegraf-vk-headers nicegraf-renderdoc)
   if (NOT WIN32 AND NOT APPLE)
     set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} xcb)
   elseif (APPLE)

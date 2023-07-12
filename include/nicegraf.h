@@ -151,6 +151,54 @@ typedef enum ngf_diagnostic_message_type {
 } ngf_diagnostic_message_type;
 
 /**
+ * @struct ngf_rdoc_info
+ * 
+ * Information for initializing the RenderDoc API.
+ */
+typedef struct ngf_rdoc_info {
+  /**
+   * Relaitve (to process) or absolute path to RenderDoc library. If this string is NUL,
+   * RenderDoc will not be initialized.
+   */
+   char* renderdoc_lib_path;
+
+  /**
+   * Template for how RenderDoc captures are saved. If template is "example/capture", captures will be saved as
+   * "example/capture_1234.rdc".
+   */
+   char* renderdoc_destination_template;
+} ngf_rdoc_info;
+
+/**
+ * @struct ngf_rdoc_api
+ * \ingroup ngf
+ *
+ * A wrapper over a RenderDoc API instance.
+ *
+ * RenderDoc can be used to debug graphical programs. This interface
+ * allows you to perform frame captures programatically, rather than
+ * from the RenderDoc GUI.
+ *
+ * Through the RenderDoc API you can:
+ *  - Begin capturing a frame
+ *  - End capturing a frame
+ *  - Change the location of where captures are written to
+ *  - Change the title of an in-progress capture
+ *  - Capture the next frame
+ *
+ * See also: \ref ngf_rdoc_init, \ref ngf_rdoc_capture_begin, \ref ngf_rdoc_capture_end
+ * */
+typedef struct ngf_rdoc_api_t* ngf_rdoc_api; 
+
+/**
+ * \ingroup ngf
+ * Triggers RenderDoc Capture.
+ *
+ * Captures the next frame from the active window in the current context.
+ */
+void ngf_rdoc_capture_next_frame();
+
+/**
  * The diagnostic callback function type.
  */
 typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, const char*, ...);
@@ -242,6 +290,7 @@ typedef struct ngf_init_info {
    * If this pointer is set to `NULL`, standard malloc and free are used.
    */
   const ngf_allocation_callbacks* allocation_callbacks;
+
 
   /**
    * Handle for the rendering device that nicegraf shall execute rendering commands on.
@@ -2207,6 +2256,12 @@ typedef struct ngf_context_info {
   const ngf_swapchain_info* swapchain_info;
 
   /**
+   * Pointer to a structure containing RenderDoc API configuration.
+   * If this pointer is set to `NULL`, the RenderDoc API will not be initialized.
+   */
+  const ngf_rdoc_info* rdoc_info;
+
+  /**
    * A reference to another context; the newly created context shall be able to use the resources
    * (such as buffers and images) created within the given context, and vice versa Can be NULL.
    */
@@ -3306,113 +3361,6 @@ void ngf_cmd_write_image(
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
 
-/**
- * \ingroup ngf
- * The RenderDoc API version to be used
- */
-#define NGF_RENDERDOC_API_VERSION 1_6_0
-
-/**
- * \ingroup ngf
- * Helper to obtain a RenderDoc API interface with \ref NGF_RENDERDOC_API_VERSION. 
- */
-#define NGF_RENDERDOC_API NGFI_EVAL_AND_PASTE(RENDERDOC_API_, NGF_RENDERDOC_API_VERSION)
-
-/**
- * \ingroup ngf
- * Helper to obtain a RenderDoc API enum with \ref NGF_RENDERDOC_API_VERSION. 
- */
-#define NGF_RENDERDOC_VERSION NGFI_EVAL_AND_PASTE(eRENDERDOC_API_Version_, NGF_RENDERDOC_API_VERSION)
-
-/**
- * @struct ngf_rdoc_api
- * \ingroup ngf
- *
- * A wrapper over a RenderDoc API instance.
- *
- * RenderDoc can be used to debug graphical programs. This interface
- * allows you to perform frame captures programatically, rather than
- * from the RenderDoc GUI.
- *
- * Through the RenderDoc API you can:
- *  - Begin capturing a frame
- *  - End capturing a frame
- *  - Change the location of where captures are written to
- *  - Change the title of an in-progress capture
- *  - Capture the next frame
- *
- * See also: \ref ngf_rdoc_init, \ref ngf_rdoc_capture_begin, \ref ngf_rdoc_capture_end
- * */
-typedef struct ngf_rdoc_api_t* ngf_rdoc_api; 
-
-/**
- * \ingroup ngf
- * Initializes RenderDoc API.
- *
- * Dynamically loads the RenderDoc RENDERDOC_GetAPI function and returns a 
- * ngf_doc_api_t wrapper. 
- *
- * @param result ngf_doc_api_t handle to write to.
- * @param lib_path the relative (to process) or absolute path to the RenderDoc library.
- */
-ngf_error ngf_rdoc_init(ngf_rdoc_api result, char* lib_path);
-
-/**
- * \ingroup ngf
- * Sets Capture Destination Template.
- *
- * Sets the template for how RenderDoc captures are saved. If template is "exmaple/capture", captures will be saved as
- * "example/capture_1234.rdc".
- *
- * @param rdoc a pointer to the RenderDoc API instance.
- * @param template the filepath templat to be used.
- */
-void ngf_rdoc_set_capture_destination_template(const ngf_rdoc_api rdoc, const char* template);
-
-/**
- * \ingroup ngf
- * Sets Title of Current RenderDoc Capture.
- *
- * Capture must be started before call.
- *
- * @param rdoc a pointer to the RenderDoc API instance.
- * @param title title of capture.
- */
-void ngf_rdoc_set_capture_title(const ngf_rdoc_api rdoc, const char* title);
-
-/**
- * \ingroup ngf
- * Begins RenderDoc Capture.
- *
- * Begins capture on device for given window. If window_handle is NULL, 
- * RenderDoc will wildcard match for first active window.
- * 
- * @param rdoc a pointer to the RenderDoc API instance.
- * @param window_handle window to start capture on.
- */
-void ngf_rdoc_capture_begin(const ngf_rdoc_api rdoc, uintptr_t window_handle);
-
-/**
- * \ingroup ngf
- * Ends RenderDoc Capture.
- *
- * Ends capture on device for given window. 
- * If window_handle is NULL, RenderDoc will wildcard match for first active window.
- * 
- * @param rdoc a pointer to the RenderDoc API instance.
- * @param window_handle window to end capture on.
- */
-void ngf_rdoc_capture_end(const ngf_rdoc_api rdoc, uintptr_t window_handle);
-
-/**
- * \ingroup ngf
- * Triggers RenderDoc Capture.
- *
- * Captures the next frame from the active window
- * 
- * @param rdoc a pointer to the RenderDoc API instance.
- */
-void ngf_rdoc_capture_next_frame(const ngf_rdoc_api rdoc);
 
 #ifdef _MSC_VER
 #pragma endregion
