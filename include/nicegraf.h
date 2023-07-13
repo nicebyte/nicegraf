@@ -160,13 +160,13 @@ typedef struct ngf_rdoc_info {
    * Relaitve (to process) or absolute path to RenderDoc library. If this string is NULL,
    * RenderDoc will not be initialized.
    */
-   char* renderdoc_lib_path;
+   const char* renderdoc_lib_path;
 
   /**
    * Template for how RenderDoc captures are saved. If template is "example/capture", captures will be saved as
    * "example/capture_1234.rdc".
    */
-   char* renderdoc_destination_template;
+   const char* renderdoc_destination_template;
 } ngf_rdoc_info;
 
 /**
