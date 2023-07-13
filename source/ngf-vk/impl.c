@@ -2715,7 +2715,7 @@ ngf_enumerate_devices_cleanup:
   return NGF_ERROR_OK;
 }
 
-static bool device_extension_supporeted(const VkPhysicalDevice phys_dev, const char* ext_name) {
+static bool device_extension_supported(const VkPhysicalDevice phys_dev, const char* ext_name) {
   VkExtensionProperties* supported_dev_exts;
   uint32_t supported_dev_exts_count;
   VkResult result;
@@ -2744,8 +2744,8 @@ static bool device_extension_supporeted(const VkPhysicalDevice phys_dev, const c
 
   uint32_t supported_exts_idx            = 0;
   while (supported_exts_idx < supported_dev_exts_count) {
-    const VkExtensionProperties supporeted_ext = supported_dev_exts[supported_exts_idx];
-    if (strcmp(ext_name, supporeted_ext.extensionName) == 0) {
+    const VkExtensionProperties supported_ext = supported_dev_exts[supported_exts_idx];
+    if (strcmp(ext_name, supported_ext.extensionName) == 0) {
         free(supported_dev_exts);
         return true; 
     }
@@ -2896,7 +2896,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   };
   const uint32_t device_exts_count = sizeof(device_exts) / sizeof(const char*);
   const bool     shader_float16_int8_supported =
-      device_extension_supporeted(_vk.phys_dev, "VK_KHR_shader_float16_int8");
+      device_extension_supported(_vk.phys_dev, "VK_KHR_shader_float16_int8");
 
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
