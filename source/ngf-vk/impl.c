@@ -3583,9 +3583,9 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
     
   // setup frame capture
-  const ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
-  if (rdoc.api && rdoc.is_capturing_frame) {
-      rdoc.api->StartFrameCapture(
+  const ngf_rdoc_api* rdoc = &CURRENT_CONTEXT->rdoc;
+  if (rdoc->api && rdoc->is_capturing_frame) {
+      rdoc->api->StartFrameCapture(
               RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
               (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
   }
@@ -3709,12 +3709,12 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   }
 
   // end frame capture
-  ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
-  if (rdoc.api && rdoc.is_capturing_frame) {
-      rdoc.api->EndFrameCapture(
+  ngf_rdoc_api* rdoc = &CURRENT_CONTEXT->rdoc;
+  if (rdoc->api && rdoc->is_capturing_frame) {
+      rdoc->api->EndFrameCapture(
               RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
               (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
-      rdoc.is_capturing_frame = false;
+      rdoc->is_capturing_frame = false;
   }
 
   return err;
