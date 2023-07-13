@@ -160,7 +160,7 @@ typedef struct ngf_rdoc_info {
    * Relaitve (to process) or absolute path to RenderDoc library. If this string is NULL,
    * RenderDoc will not be initialized.
    */
-   const char* renderdoc_lib_path;
+  const char* renderdoc_lib_path;
 
   /**
    * Template for how RenderDoc captures are saved. If template is "example/capture", captures will be saved as
@@ -174,8 +174,28 @@ typedef struct ngf_rdoc_info {
  * Triggers RenderDoc Capture.
  *
  * Captures the next frame from the active window in the current context.
+ * If called, subsequent calls to \ref ngf_rdoc_capture_begin and \ref ngf_rdoc_capture_end
+ * will do nothing until after the next frame that ngf_rdoc_capture_next_frame 
+ * was called (i.e. you cannot do nested captures).
  */
 void ngf_rdoc_capture_next_frame();
+
+/**
+ * \ingroup ngf
+ * Begins RenderDoc Capture.
+ *
+ * Begins frame capture for the active window in the current context.
+ * Ended by \ref ngf_rdoc_capture_end.
+ */
+void ngf_rdoc_capture_begin();
+
+/**
+ * \ingroup ngf
+ * Triggers RenderDoc Capture.
+ *
+ * Ends frame capture for the active window in the current context.
+ */
+void ngf_rdoc_capture_end();
 
 /**
  * The diagnostic callback function type.
@@ -276,6 +296,13 @@ typedef struct ngf_init_info {
    * A list of available device and their handles can be obtained with \ref ngf_enumerate_devices.
    */
   ngf_device_handle device;
+
+  /**
+   * Pointer to a structure containing RenderDoc API configuration.
+   * If this pointer is set to `NULL`, the RenderDoc API will not be initialized.
+   */
+  const ngf_rdoc_info* rdoc_info;
+
 } ngf_init_info;
 
 /**
@@ -2233,12 +2260,6 @@ typedef struct ngf_context_info {
    * presents to a window.
    */
   const ngf_swapchain_info* swapchain_info;
-
-  /**
-   * Pointer to a structure containing RenderDoc API configuration.
-   * If this pointer is set to `NULL`, the RenderDoc API will not be initialized.
-   */
-  const ngf_rdoc_info* rdoc_info;
 
   /**
    * A reference to another context; the newly created context shall be able to use the resources
