@@ -251,15 +251,10 @@ typedef struct ngf_image_t {
   uint32_t       nlayers;
 } ngf_image_t;
 
-// Macros for obtaining proper RenderDoc Version
-#define NGF_RENDERDOC_API_VERSION 1_6_0
-#define NGF_RENDERDOC_VERSION NGFI_EVAL_AND_PASTE(eRENDERDOC_API_Version_, NGF_RENDERDOC_API_VERSION)
-#define NGF_RENDERDOC_API NGFI_EVAL_AND_PASTE(RENDERDOC_API_, NGF_RENDERDOC_API_VERSION)
-
-typedef struct ngf_rdoc_api_t {
-    NGF_RENDERDOC_API* api;
+typedef struct ngf_rdoc_api {
+    RENDERDOC_API_1_6_0* api;
     bool is_capturing_frame;
-} ngf_rdoc_api_t;
+} ngf_rdoc_api;
 
 typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
@@ -3205,13 +3200,13 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       }
 
       pRENDERDOC_GetAPI RENDERDOC_GetAPI = (pRENDERDOC_GetAPI) GetProcAddress(rdoc_get_api_mod, "RENDERDOC_GetAPI");
-      if (!RENDERDOC_GetAPI(NGF_RENDERDOC_VERSION, (void**) &ctx->rdoc)) {
+      if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**) &ctx->rdoc.api)) {
           err = NGF_ERROR_OBJECT_CREATION_FAILED;
           goto ngf_create_context_cleanup;
       }
 
-      ctx->rdoc->api->SetCaptureFilePathTemplate(info->rdoc_info->renderdoc_destination_template);
-      ctx->rdoc->is_capturing_frame = false;
+      ctx->rdoc.api->SetCaptureFilePathTemplate(info->rdoc_info->renderdoc_destination_template);
+      ctx->rdoc.is_capturing_frame = false;
   }
 
 ngf_create_context_cleanup:
@@ -3589,8 +3584,8 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
     
   // setup frame capture
   const ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
-  if (rdoc && rdoc->is_capturing_frame) {
-      rdoc->api->StartFrameCapture(
+  if (rdoc.api && rdoc.is_capturing_frame) {
+      rdoc.api->StartFrameCapture(
               RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
               (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
   }
@@ -3714,12 +3709,12 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   }
 
   // end frame capture
-  const ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
-  if (rdoc && rdoc->is_capturing_frame) {
-      rdoc->api->EndFrameCapture(
+  ngf_rdoc_api rdoc = CURRENT_CONTEXT->rdoc;
+  if (rdoc.api && rdoc.is_capturing_frame) {
+      rdoc.api->EndFrameCapture(
               RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
               (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
-      rdoc->is_capturing_frame = false;
+      rdoc.is_capturing_frame = false;
   }
 
   return err;
@@ -4997,7 +4992,7 @@ void ngf_finish(void) {
 }
 
 void ngf_rdoc_capture_next_frame() {
-    if(CURRENT_CONTEXT->rdoc) CURRENT_CONTEXT->rdoc->is_capturing_frame = true;
+    if(CURRENT_CONTEXT->rdoc.api) CURRENT_CONTEXT->rdoc.is_capturing_frame = true;
 }
 
 #pragma endregion

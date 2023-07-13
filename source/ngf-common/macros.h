@@ -30,10 +30,6 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 extern "C" {
 #endif
 
-// Macros for writing macros
-#define NGFI_PASTE(x,y) x ## y
-#define NGFI_EVAL_AND_PASTE(x,y) NGFI_PASTE(x,y)
-
 // Custom allocation callbacks.
 extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 
