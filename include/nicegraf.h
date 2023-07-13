@@ -157,7 +157,7 @@ typedef enum ngf_diagnostic_message_type {
  */
 typedef struct ngf_rdoc_info {
   /**
-   * Relaitve (to process) or absolute path to RenderDoc library. If this string is NUL,
+   * Relaitve (to process) or absolute path to RenderDoc library. If this string is NULL,
    * RenderDoc will not be initialized.
    */
    char* renderdoc_lib_path;
@@ -168,27 +168,6 @@ typedef struct ngf_rdoc_info {
    */
    char* renderdoc_destination_template;
 } ngf_rdoc_info;
-
-/**
- * @struct ngf_rdoc_api
- * \ingroup ngf
- *
- * A wrapper over a RenderDoc API instance.
- *
- * RenderDoc can be used to debug graphical programs. This interface
- * allows you to perform frame captures programatically, rather than
- * from the RenderDoc GUI.
- *
- * Through the RenderDoc API you can:
- *  - Begin capturing a frame
- *  - End capturing a frame
- *  - Change the location of where captures are written to
- *  - Change the title of an in-progress capture
- *  - Capture the next frame
- *
- * See also: \ref ngf_rdoc_init, \ref ngf_rdoc_capture_begin, \ref ngf_rdoc_capture_end
- * */
-typedef struct ngf_rdoc_api_t* ngf_rdoc_api; 
 
 /**
  * \ingroup ngf
