@@ -151,11 +151,11 @@ typedef enum ngf_diagnostic_message_type {
 } ngf_diagnostic_message_type;
 
 /**
- * @struct ngf_rdoc_info
+ * @struct ngf_renderdoc_info
  * 
  * Information for initializing the RenderDoc API.
  */
-typedef struct ngf_rdoc_info {
+typedef struct ngf_renderdoc_info {
   /**
    * Relaitve (to process) or absolute path to RenderDoc library. If this string is NULL,
    * RenderDoc will not be initialized.
@@ -167,27 +167,27 @@ typedef struct ngf_rdoc_info {
    * "example/capture_1234.rdc".
    */
    const char* renderdoc_destination_template;
-} ngf_rdoc_info;
+} ngf_renderdoc_info;
 
 /**
  * \ingroup ngf
  * Triggers RenderDoc Capture.
  *
  * Captures the next frame from the active window in the current context.
- * If called, subsequent calls to \ref ngf_rdoc_capture_begin and \ref ngf_rdoc_capture_end
- * will do nothing until after the next frame that ngf_rdoc_capture_next_frame 
+ * If called, subsequent calls to \ref ngf_renderdoc_capture_begin and \ref ngf_renderdoc_capture_end
+ * will do nothing until after the next frame that ngf_renderdoc_capture_next_frame 
  * was called (i.e. you cannot do nested captures).
  */
-void ngf_rdoc_capture_next_frame();
+void ngf_renderdoc_capture_next_frame();
 
 /**
  * \ingroup ngf
  * Begins RenderDoc Capture.
  *
  * Begins frame capture for the active window in the current context.
- * Ended by \ref ngf_rdoc_capture_end.
+ * Ended by \ref ngf_renderdoc_capture_end.
  */
-void ngf_rdoc_capture_begin();
+void ngf_renderdoc_capture_begin();
 
 /**
  * \ingroup ngf
@@ -195,7 +195,7 @@ void ngf_rdoc_capture_begin();
  *
  * Ends frame capture for the active window in the current context.
  */
-void ngf_rdoc_capture_end();
+void ngf_renderdoc_capture_end();
 
 /**
  * The diagnostic callback function type.
@@ -301,7 +301,7 @@ typedef struct ngf_init_info {
    * Pointer to a structure containing RenderDoc API configuration.
    * If this pointer is set to `NULL`, the RenderDoc API will not be initialized.
    */
-  const ngf_rdoc_info* rdoc_info;
+  const ngf_renderdoc_info* renderdoc_info;
 
 } ngf_init_info;
 
