@@ -178,7 +178,7 @@ typedef struct ngf_renderdoc_info {
  * will do nothing until after the next frame that ngf_renderdoc_capture_next_frame 
  * was called (i.e. you cannot do nested captures).
  */
-void ngf_renderdoc_capture_next_frame();
+void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -187,7 +187,7 @@ void ngf_renderdoc_capture_next_frame();
  * Begins frame capture for the active window in the current context.
  * Ended by \ref ngf_renderdoc_capture_end.
  */
-void ngf_renderdoc_capture_begin();
+void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -195,7 +195,7 @@ void ngf_renderdoc_capture_begin();
  *
  * Ends frame capture for the active window in the current context.
  */
-void ngf_renderdoc_capture_end();
+void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
 
 /**
  * The diagnostic callback function type.

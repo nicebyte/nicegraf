@@ -2304,14 +2304,14 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
                                                                   depth_stencil_desc]];
 }
 
-void ngf_renderdoc_capture_next_frame() NGF_NO_EXCEPT {
+void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
 
-void ngf_renderdoc_capture_begin() NGF_NO_EXCEPT {
+void ngf_renderdoc_capture_begin() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
 
-void ngf_renderdoc_capture_end() NGF_NO_EXCEPT {
+void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
