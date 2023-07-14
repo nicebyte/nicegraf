@@ -2740,19 +2740,6 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     }
   }
 
-  if (init_info->renderdoc_info) {
-    ModuleHandle ngf_renderdoc_mod = LoadLibraryA(init_info->renderdoc_info->renderdoc_lib_path);
-    if (ngf_renderdoc_mod != NULL) {
-      pRENDERDOC_GetAPI RENDERDOC_GetAPI =
-          (pRENDERDOC_GetAPI)GetProcAddress(ngf_renderdoc_mod, "RENDERDOC_GetAPI");
-      if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&_renderdoc.api)) {
-        return NGF_ERROR_OBJECT_CREATION_FAILED;
-      }
-      _renderdoc.api->SetCaptureFilePathTemplate(init_info->renderdoc_info->renderdoc_destination_template);
-      _renderdoc.is_capturing_next_frame = false;
-    }
-  }
-
   // Sanity checks.
   if (!init_info) { return NGF_ERROR_INVALID_OPERATION; }
   if (_vk.instance != VK_NULL_HANDLE) {
