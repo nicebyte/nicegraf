@@ -113,10 +113,35 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       .verbosity = diagnostics_verbosity,
       .userdata  = nullptr,
       .callback  = ngf_samples::sample_diagnostic_callback};
+
+  /*
+   * Initialize RenderDoc.
+   * Allows capturing of frame data to be opened in the RenderDoc debugger.
+   * To enable RenderDoc functionality, fill in the below struct with the path
+   * to the RenderDoc library (renderdoc.dll on Windows, librenderdoc.so on Linux,
+   * N/A on Mac OSX) and a file path template for where the captures should be stored.
+   *
+   * For example, if your library is saved in C:\example\dir\renderdoc.dll and you want to save
+   * your captures as C:\capture\dir\test. You would fill out the struct as such:
+   *
+   * const ngf_renderdoc_info renderdoc_info = {
+   *   .renderdoc_lib_path             = "C:\\example\\dir\\renderdoc.dll",
+   *   .renderdoc_destination_template = "C:\\capture\\dir\\test"};
+   *
+   * Provided that the above steps are completed, captures can be taken by pressing the
+   * "C" key while a sample is running. Captures will be saved to the specified directory. 
+   * Custom instrumenting within the samples can also be done by making calls to 
+   * ngf_capture_begin and ngf_capture end, respectively.
+   */
+  const ngf_renderdoc_info renderdoc_info = {
+      .renderdoc_lib_path             = NULL,
+      .renderdoc_destination_template = NULL};
+
   const ngf_init_info init_info {
       .diag_info            = &diagnostic_info,
       .allocation_callbacks = NULL,
-      .device               = device_handle};
+      .device               = device_handle,
+      .renderdoc_info       = (renderdoc_info.renderdoc_lib_path != NULL) ? &renderdoc_info : NULL};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
@@ -182,18 +207,23 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
    * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with
    * the highest supported framebuffer sample count.
    */
-  const ngf_sample_count main_render_target_sample_count = ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
-  const ngf_swapchain_info swapchain_info                  = {
-                       .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
-                       .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
-                       .sample_count  = main_render_target_sample_count,
-                       .capacity_hint = 3u,
-                       .width         = (uint32_t)fb_width,
-                       .height        = (uint32_t)fb_height,
-                       .native_handle = native_window_handle,
-                       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
-  const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
-  ngf::context           context;
+  const ngf_sample_count main_render_target_sample_count =
+      ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
+  const ngf_swapchain_info swapchain_info = {
+      .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+      .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
+      .sample_count  = main_render_target_sample_count,
+      .capacity_hint = 3u,
+      .width         = (uint32_t)fb_width,
+      .height        = (uint32_t)fb_height,
+      .native_handle = native_window_handle,
+      .present_mode  = NGF_PRESENTATION_MODE_FIFO};
+
+  const ngf_context_info ctx_info = {
+      .swapchain_info = &swapchain_info,
+      .shared_context = nullptr,
+  };
+  ngf::context context;
   NGF_SAMPLES_CHECK_NGF_ERROR(context.initialize(ctx_info));
 
   /**
@@ -234,6 +264,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     float                              time_delta_f = time_delta.count();
     prev_frame_start                                = frame_start;
 
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) { ngf_renderdoc_capture_next_frame(); }
+
     /**
      * Query the updated size of the window and handle resize events.
      */
@@ -268,9 +300,10 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
         /**
          * Start a new transfer command encoder for uploading resources to the GPU.
          */
-        ngf_xfer_encoder xfer_encoder {};
+        ngf_xfer_encoder   xfer_encoder {};
         ngf_xfer_pass_info xfer_pass_info {};
-        NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_pass_info, &xfer_encoder));
+        NGF_SAMPLES_CHECK_NGF_ERROR(
+            ngf_cmd_begin_xfer_pass(main_cmd_buffer, &xfer_pass_info, &xfer_encoder));
 
         /**
          * Initialize the sample, and save the opaque data pointer.
@@ -308,10 +341,10 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       }
 
       /**
-       * Let the sample code record any commands prior to the main render pass, and specify which compute passes to
-       * wait on (if any).
+       * Let the sample code record any commands prior to the main render pass, and specify which
+       * compute passes to wait on (if any).
        */
-      ngf_sync_compute_resource main_render_pass_sync_resources[64u] = {};
+      ngf_sync_compute_resource               main_render_pass_sync_resources[64u] = {};
       ngf_samples::main_render_pass_sync_info main_pass_sync_info {
           .nsync_compute_resources = 0u,
           .sync_compute_resources  = main_render_pass_sync_resources};
@@ -370,8 +403,9 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
         imgui_backend->record_rendering_commands(main_render_pass_encoder);
 
         /**
-         * The C++ wrappers for command encoders end the pass automatically when the wrapper object goes out of scope.
-         * However, the raw handle remains valid to use for synchronization purposes.
+         * The C++ wrappers for command encoders end the pass automatically when the wrapper object
+         * goes out of scope. However, the raw handle remains valid to use for synchronization
+         * purposes.
          */
         main_render_encoder_handle = main_render_pass_encoder;
       }
