@@ -2732,7 +2732,10 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&_renderdoc.api)) {
         return NGF_ERROR_OBJECT_CREATION_FAILED;
       }
-      _renderdoc.api->SetCaptureFilePathTemplate(init_info->renderdoc_info->renderdoc_destination_template);
+      if (init_info->renderdoc_info->renderdoc_destination_template) {
+        _renderdoc.api->SetCaptureFilePathTemplate(
+            init_info->renderdoc_info->renderdoc_destination_template);
+      }
       _renderdoc.is_capturing_next_frame = false;
     }
   }
