@@ -800,7 +800,7 @@ static size_t ngfmtl_max_supported_gpu_family(id<MTLDevice> mtldev) {
 }
 
 extern "C" {
-void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+void             ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 }
 
@@ -880,15 +880,16 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, id<M
                                    ([mtldev supportsTextureSampleCount:4] ? 4 : 0) |
                                    ([mtldev supportsTextureSampleCount:8] ? 8 : 0);
 
-  ngf_sample_count max_supported_sample_count = ngfi_get_highest_sample_count(supports_samples_bitmap);
+  ngf_sample_count max_supported_sample_count =
+      ngfi_get_highest_sample_count(supports_samples_bitmap);
 
-  caps.texture_color_sample_counts = supports_samples_bitmap;
-  caps.max_supported_texture_color_sample_count = max_supported_sample_count;
-  caps.texture_depth_sample_counts = supports_samples_bitmap;
-  caps.max_supported_texture_depth_sample_count = max_supported_sample_count;
-  caps.framebuffer_color_sample_counts = supports_samples_bitmap;
+  caps.texture_color_sample_counts                  = supports_samples_bitmap;
+  caps.max_supported_texture_color_sample_count     = max_supported_sample_count;
+  caps.texture_depth_sample_counts                  = supports_samples_bitmap;
+  caps.max_supported_texture_depth_sample_count     = max_supported_sample_count;
+  caps.framebuffer_color_sample_counts              = supports_samples_bitmap;
   caps.max_supported_framebuffer_color_sample_count = max_supported_sample_count;
-  caps.framebuffer_depth_sample_counts = supports_samples_bitmap;
+  caps.framebuffer_depth_sample_counts              = supports_samples_bitmap;
   caps.max_supported_framebuffer_depth_sample_count = max_supported_sample_count;
 }
 
@@ -1723,19 +1724,7 @@ void ngfmtl_finish_pending_encoders(ngf_cmd_buffer cmd_buffer) {
   }
 }
 
-ngf_error ngf_cmd_begin_render_pass_simple(ngf_cmd_buffer      cmd_buf,
-                                           ngf_render_target   rt,
-                                           float               clear_color_r,
-                                           float               clear_color_g,
-                                           float               clear_color_b,
-                                           float               clear_color_a,
-                                           float               clear_depth,
-                                           uint32_t            clear_stencil,
-                                           ngf_render_encoder* enc) NGF_NOEXCEPT {
-  return ngf_cmd_begin_render_pass_simple_with_sync(cmd_buf, rt, clear_color_r, clear_color_g, clear_color_b, clear_color_a, clear_depth, clear_stencil, 0, nullptr, enc);
-}
-
-ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
+ngf_error ngf_cmd_begin_render_pass_simple(
     ngf_cmd_buffer      cmd_buf,
     ngf_render_target   rt,
     float               clear_color_r,
@@ -1744,7 +1733,32 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
-    uint32_t, const ngf_sync_compute_resource*,
+    ngf_render_encoder* enc) NGF_NOEXCEPT {
+  return ngf_cmd_begin_render_pass_simple_with_sync(
+      cmd_buf,
+      rt,
+      clear_color_r,
+      clear_color_g,
+      clear_color_b,
+      clear_color_a,
+      clear_depth,
+      clear_stencil,
+      0,
+      nullptr,
+      enc);
+}
+
+ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
+    ngf_cmd_buffer    cmd_buf,
+    ngf_render_target rt,
+    float             clear_color_r,
+    float             clear_color_g,
+    float             clear_color_b,
+    float             clear_color_a,
+    float             clear_depth,
+    uint32_t          clear_stencil,
+    uint32_t,
+    const ngf_sync_compute_resource*,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi_sa_reset(ngfi_tmp_store());
   const uint32_t nattachments = rt->attachment_descs.ndescs;
@@ -1778,9 +1792,9 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
 }
 
 ngf_error ngf_cmd_begin_render_pass(
-    ngf_cmd_buffer       cmd_buffer,
+    ngf_cmd_buffer              cmd_buffer,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*  enc) NGF_NOEXCEPT {
+    ngf_render_encoder*         enc) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
   assert(pass_info);
   const ngf_render_target rt = pass_info->render_target;
@@ -1872,7 +1886,8 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info*, ngf_xfer_encoder* enc)
+ngf_error
+ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info*, ngf_xfer_encoder* enc)
     NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   ngfmtl_finish_pending_encoders(cmd_buf);
@@ -1891,9 +1906,10 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_error
-ngf_cmd_begin_compute_pass(ngf_cmd_buffer cmd_buf, const ngf_compute_pass_info*, ngf_compute_encoder* enc)
-    NGF_NOEXCEPT {
+ngf_error ngf_cmd_begin_compute_pass(
+    ngf_cmd_buffer cmd_buf,
+    const ngf_compute_pass_info*,
+    ngf_compute_encoder* enc) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
   cmd_buf->active_cce       = [cmd_buf->mtl_cmd_buffer computeCommandEncoder];
@@ -2286,4 +2302,16 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
       setDepthStencilState:[CURRENT_CONTEXT->device
                                newDepthStencilStateWithDescriptor:cmd_buf->active_gfx_pipe->
                                                                   depth_stencil_desc]];
+}
+
+void ngf_renderdoc_capture_next_frame() NGF_NO_EXCEPT {
+  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
+}
+
+void ngf_renderdoc_capture_begin() NGF_NO_EXCEPT {
+  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
+}
+
+void ngf_renderdoc_capture_end() NGF_NO_EXCEPT {
+  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }

@@ -254,7 +254,7 @@ typedef struct ngf_image_t {
 struct {
   RENDERDOC_API_1_6_0* api;
   bool                 is_capturing_next_frame;
-} _rdoc;
+} _renderdoc;
 
 typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
@@ -2724,16 +2724,16 @@ ngf_enumerate_devices_cleanup:
 ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
 
-  if (init_info->rdoc_info) {
-    ModuleHandle ngf_rdoc_mod = LoadLibraryA(init_info->rdoc_info->renderdoc_lib_path);
-    if (ngf_rdoc_mod != NULL) {
+  if (init_info->renderdoc_info) {
+    ModuleHandle ngf_renderdoc_mod = LoadLibraryA(init_info->renderdoc_info->renderdoc_lib_path);
+    if (ngf_renderdoc_mod != NULL) {
       pRENDERDOC_GetAPI RENDERDOC_GetAPI =
-          (pRENDERDOC_GetAPI)GetProcAddress(ngf_rdoc_mod, "RENDERDOC_GetAPI");
-      if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&_rdoc.api)) {
+          (pRENDERDOC_GetAPI)GetProcAddress(ngf_renderdoc_mod, "RENDERDOC_GetAPI");
+      if (!RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_6_0, (void**)&_renderdoc.api)) {
         return NGF_ERROR_OBJECT_CREATION_FAILED;
       }
-      _rdoc.api->SetCaptureFilePathTemplate(init_info->rdoc_info->renderdoc_destination_template);
-      _rdoc.is_capturing_next_frame = false;
+      _renderdoc.api->SetCaptureFilePathTemplate(init_info->renderdoc_info->renderdoc_destination_template);
+      _renderdoc.is_capturing_next_frame = false;
     }
   }
 
@@ -3583,8 +3583,8 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   const uint32_t fi  = CURRENT_CONTEXT->frame_id;
 
   // setup frame capture
-  if (_rdoc.api && _rdoc.is_capturing_next_frame) {
-    _rdoc.api->StartFrameCapture(
+  if (_renderdoc.api && _renderdoc.is_capturing_next_frame) {
+    _renderdoc.api->StartFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
         (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
   }
@@ -3708,11 +3708,11 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   }
 
   // end frame capture
-  if (_rdoc.api && _rdoc.is_capturing_next_frame) {
-    _rdoc.api->EndFrameCapture(
+  if (_renderdoc.api && _renderdoc.is_capturing_next_frame) {
+    _renderdoc.api->EndFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
         (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
-    _rdoc.is_capturing_next_frame = false;
+    _renderdoc.is_capturing_next_frame = false;
   }
 
   return err;
@@ -4991,23 +4991,23 @@ void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
 }
 
-void ngf_rdoc_capture_next_frame() {
-  if (_rdoc.api) _rdoc.is_capturing_next_frame = true;
+void ngf_renderdoc_capture_next_frame() {
+  if (_renderdoc.api) _renderdoc.is_capturing_next_frame = true;
 }
 
-void ngf_rdoc_capture_begin() {
-  if (_rdoc.api && !_rdoc.api->IsFrameCapturing()) { 
-      _rdoc.api->StartFrameCapture(
-          RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance), 
-          (RENDERDOC_WindowHandle) CURRENT_CONTEXT->swapchain_info.native_handle); 
+void ngf_renderdoc_capture_begin() {
+  if (_renderdoc.api && !_renderdoc.api->IsFrameCapturing()) {
+    _renderdoc.api->StartFrameCapture(
+        RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
+        (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
   }
 }
 
-void ngf_rdoc_capture_end() {
-  if (_rdoc.api && _rdoc.api->IsFrameCapturing()) {
-      _rdoc.api->EndFrameCapture(
-          RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
-          (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
+void ngf_renderdoc_capture_end() {
+  if (_renderdoc.api && _renderdoc.api->IsFrameCapturing()) {
+    _renderdoc.api->EndFrameCapture(
+        RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
+        (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
   }
 }
 
