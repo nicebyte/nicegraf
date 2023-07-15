@@ -105,6 +105,29 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   ngf_samples::logi("selected device %d", preferred_device_idx);
 
   /*
+   * Initialize RenderDoc.
+   * Allows capturing of frame data to be opened in the RenderDoc debugger.
+   * To enable RenderDoc functionality, fill in the below struct with the path
+   * to the RenderDoc library (renderdoc.dll on Windows, librenderdoc.so on Linux,
+   * N/A on Mac OSX) and a file path template for where the captures should be stored.
+   *
+   * For example, if your library is saved in C:\example\dir\renderdoc.dll and you want to save
+   * your captures as C:\capture\dir\test. You would fill out the struct as such:
+   *
+   * const ngf_renderdoc_info renderdoc_info = {
+   *   .renderdoc_lib_path             = "C:\\example\\dir\\renderdoc.dll",
+   *   .renderdoc_destination_template = "C:\\capture\\dir\\test"};
+   *
+   * Provided that the above steps are completed, captures can be taken by pressing the
+   * "C" key while a sample is running. Captures will be saved to the specified directory. 
+   * Custom instrumenting within the samples can also be done by making calls to 
+   * ngf_capture_begin and ngf_capture end, respectively.
+   */
+  const ngf_renderdoc_info renderdoc_info = {
+      .renderdoc_lib_path             = NULL,
+      .renderdoc_destination_template = NULL};
+
+  /*
    * Initialize nicegraf.
    * Set our rendering device preference to "discrete" to pick a high-power GPU if one is available,
    * and install a diagnostic callback.
@@ -113,10 +136,12 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
       .verbosity = diagnostics_verbosity,
       .userdata  = nullptr,
       .callback  = ngf_samples::sample_diagnostic_callback};
+
   const ngf_init_info init_info {
       .diag_info            = &diagnostic_info,
       .allocation_callbacks = NULL,
-      .device               = device_handle};
+      .device               = device_handle,
+      .renderdoc_info       = (renderdoc_info.renderdoc_lib_path != NULL) ? &renderdoc_info : NULL};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
   /**
@@ -234,6 +259,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
     float                              time_delta_f = time_delta.count();
     prev_frame_start                                = frame_start;
 
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) { ngf_renderdoc_capture_next_frame(); }
+      
     /**
      * Query the updated size of the window and handle resize events.
      */
