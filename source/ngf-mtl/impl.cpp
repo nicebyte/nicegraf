@@ -30,20 +30,13 @@
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #define CA_PRIVATE_IMPLEMENTATION
-#include "MetalSingleHeader.hpp"
+#include <MetalSingleHeader.hpp>
 //#import <QuartzCore/QuartzCore.h>
 #include <memory>
 #include <new>
 #include <optional>
 #include <string>
 #include <vector>
-#if TARGET_OS_OSX
-//#import <AppKit/AppKit.h>
-//using NGFMTL_VIEW_TYPE = NSView;
-#else
-//#import <UIKit/UIKit.h>
-//using NGFMTL_VIEW_TYPE = UIView;
-#endif
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // can be bound at the same time.
@@ -551,7 +544,7 @@ struct ngf_sampler_t {
 };
 
 struct ngf_image_t {
-  MTL::Texture*        texture = nullptr;
+  MTL::Texture*         texture = nullptr;
   ngf_image_format      format;
   uint32_t         usage_flags = 0u;
 };
@@ -581,7 +574,21 @@ template<class NgfObjType, void (*Dtor)(NgfObjType*)> class ngfmtl_object_nurser
   NgfObjType* ptr_;
 };
 
-/*
+CA::MetalLayer* ngf_do_layer_stuff(MTL::Device* device,
+                                   uint32_t width,
+                                   uint32_t height,
+                                   MTL::PixelFormat pixel_format,
+                                   uint32_t capacity_hint,
+                                   bool display_sync_enabled,
+                                   uintptr_t native_handle);
+
+CA::MetalDrawable* ngf_layer_next_drawable(CA::MetalLayer* layer);
+
+void ngf_resize_swapchain(CA::MetalLayer* layer,
+                          uint32_t width,
+                          uint32_t height,
+                          uintptr_t native_handle);
+
 // Manages the final presentation surfaces.
 class ngfmtl_swapchain {
   public:
@@ -628,31 +635,15 @@ class ngfmtl_swapchain {
       NGFI_DIAG_ERROR("Image format not supported by Metal backend");
       return NGF_ERROR_INVALID_FORMAT;
     }
-    layer_                 = [CAMetalLayer layer];
-    layer_.device          = device;
-    layer_.drawableSize    = CGSizeMake(swapchain_info.width, swapchain_info.height);
-    layer_.pixelFormat     = pixel_format;
-    layer_.framebufferOnly = YES;
-#if TARGET_OS_OSX
-    if (@available(macOS 10.13.2, *)) {
-      layer_.maximumDrawableCount = swapchain_info.capacity_hint;
-    }
-    if (@available(macOS 10.13, *)) {
-      layer_.displaySyncEnabled = (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO);
-    }
-#endif
-    
-    // Associate the newly created Metal layer with the user-provided View.
-    NGFMTL_VIEW_TYPE* view = CFBridgingRelease((void*)swapchain_info.native_handle);
-#if TARGET_OS_OSX
-    [view setLayer:layer_];
-#else
-    [view.layer addSublayer:layer_];
-    [layer_ setContentsScale:view.layer.contentsScale];
-    [layer_ setContentsGravity:kCAGravityResizeAspect];
-    [layer_ setFrame:view.frame];
-#endif
-    CFBridgingRetain(view);
+      
+    layer_ = ngf_do_layer_stuff(
+                                device,
+                                swapchain_info.width,
+                                swapchain_info.height,
+                                pixel_format,
+                                swapchain_info.capacity_hint,
+                                (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO),
+                                swapchain_info.native_handle);
 
     // Remember the number of images in the swapchain.
     capacity_ = swapchain_info.capacity_hint;
@@ -665,14 +656,8 @@ class ngfmtl_swapchain {
   }
 
   ngf_error resize(const ngf_swapchain_info& swapchain_info) {
-    layer_.drawableSize = CGSizeMake(swapchain_info.width, swapchain_info.height);
-
-    NGFMTL_VIEW_TYPE* view = CFBridgingRelease((void*)swapchain_info.native_handle);
-
-    [layer_ setContentsScale:view.layer.contentsScale];
-    [layer_ setFrame:view.frame];
-
-    CFBridgingRetain(view);
+    ngf_resize_swapchain(layer_, swapchain_info.width, swapchain_info.height, swapchain_info.native_handle);
+    
 
     // ReiInitialize depth attachments & multisample images if necessary.
     initialize_depth_attachments(swapchain_info);
@@ -684,8 +669,8 @@ class ngfmtl_swapchain {
   frame next_frame() {
     img_idx_ = (img_idx_ + 1u) % capacity_;
     return {
-        [layer_ nextDrawable],
-        depth_images_.get() ? depth_images_[img_idx_] : nullptr,
+        ngf_layer_next_drawable(layer_),
+        depth_images_[img_idx_], // TODO: depth_images_ is no longer a pointer type so its always valid. OK?
         is_multusampled() ? multisample_images_[img_idx_]->texture : nullptr};
   }
 
@@ -700,28 +685,27 @@ class ngfmtl_swapchain {
   private:
   void initialize_depth_attachments(const ngf_swapchain_info& swapchain_info) {
     if (swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
-      depth_images_.reset(new id<MTLTexture>[swapchain_info.capacity_hint]);
-      MTLPixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
-      assert(depth_format != MTLPixelFormatInvalid);
+      depth_images_ = std::vector<MTL::Texture*>(swapchain_info.capacity_hint, nullptr);
+      MTL::PixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
+      //assert(depth_format != MTL::PixelFormatInvalid);
       for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
-        auto* depth_texture_desc = [MTLTextureDescriptor new];
-        depth_texture_desc.textureType =
-            swapchain_info.sample_count > 1u ? MTLTextureType2DMultisample : MTLTextureType2D;
-        depth_texture_desc.width            = swapchain_info.width;
-        depth_texture_desc.height           = swapchain_info.height;
-        depth_texture_desc.pixelFormat      = depth_format;
-        depth_texture_desc.depth            = 1u;
-        depth_texture_desc.sampleCount      = (NSUInteger)swapchain_info.sample_count;
-        depth_texture_desc.mipmapLevelCount = 1u;
-        depth_texture_desc.arrayLength      = 1u;
-        depth_texture_desc.usage            = MTLTextureUsageRenderTarget;
-        depth_texture_desc.storageMode      = MTLStorageModePrivate;
-        depth_texture_desc.resourceOptions  = MTLResourceStorageModePrivate;
-        if (@available(macOS 10.14, *)) { depth_texture_desc.allowGPUOptimizedContents = true; }
+        auto* depth_texture_desc = MTL::TextureDescriptor::alloc()->init();
+        depth_texture_desc->setTextureType     (swapchain_info.sample_count > 1u ? MTL::TextureType2DMultisample : MTL::TextureType2D);
+        depth_texture_desc->setWidth           (swapchain_info.width);
+        depth_texture_desc->setHeight          (swapchain_info.height);
+        depth_texture_desc->setPixelFormat     (depth_format);
+        depth_texture_desc->setDepth           (1u);
+        depth_texture_desc->setSampleCount     ((NS::UInteger)swapchain_info.sample_count);
+        depth_texture_desc->setMipmapLevelCount(1u);
+        depth_texture_desc->setArrayLength     (1u);
+        depth_texture_desc->setUsage           (MTL::TextureUsageRenderTarget);
+        depth_texture_desc->setStorageMode     (MTL::StorageModePrivate);
+        depth_texture_desc->setResourceOptions (MTL::ResourceStorageModePrivate);
+        // if (@available(macOS 10.14, *)) { depth_texture_desc.allowGPUOptimizedContents = true; } // TODO: Implement this
         depth_images_[i] = MTL_DEVICE->newTexture(depth_texture_desc);
       }
     } else {
-      depth_images_.reset(nullptr);
+      depth_images_.resize(0); // TODO: Need to free underlying textures?
     }
   }
 
@@ -753,18 +737,17 @@ class ngfmtl_swapchain {
   CA::MetalLayer*                   layer_    = nullptr;
   uint32_t                          img_idx_  = 0u;
   uint32_t                          capacity_ = 0u;
-  std::unique_ptr<MTL::Texture*[]>  depth_images_;
+  std::vector<MTL::Texture*>        depth_images_;
   std::unique_ptr<ngf_image[]>      multisample_images_;
 };
-*/
 
 struct ngf_context_t {
   ~ngf_context_t() {
     if (last_cmd_buffer) last_cmd_buffer->waitUntilCompleted();
   }
   MTL::Device*            device = nullptr;
-  //ngfmtl_swapchain        swapchain;
-  //ngfmtl_swapchain::frame frame;
+  ngfmtl_swapchain        swapchain;
+  ngfmtl_swapchain::frame frame;
   MTL::CommandQueue*      queue      = nullptr;
   bool                    is_current = false;
   ngf_swapchain_info      swapchain_info;
@@ -817,7 +800,7 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
 #else
   ngfdev.performance_tier = NGF_DEVICE_PERFORMANCE_TIER_UNKNOWN;
 #endif
-  const size_t device_name_length = 0; //TODO Fix this [mtldev.name dataUsingEncoding:NSUTF8StringEncoding].length;
+  const size_t device_name_length = mtldev->name()->length();
   strncpy(
       ngfdev.name,
       mtldev->name()->utf8String(),
@@ -961,31 +944,26 @@ void  NSPopAutoreleasePool(void* token);
 ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   *token = (uintptr_t)NSPushAutoreleasePool(0);
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
-  // CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame(); // TODO: IMPLEMENT
-  // return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK; // // TODO: IMPLEMENT
-  return NGF_ERROR_INVALID_OPERATION;
+  CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
+  return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
 }
 
 ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
-   /*
-   ngf_context ctx = CURRENT_CONTEXT;
-   // TODO: IMPLEMENT
+  ngf_context ctx = CURRENT_CONTEXT;
   if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
-    CURRENT_CONTEXT->pending_cmd_buffer->addCompletedHandler:^(id<MTLCommandBuffer> _Nonnull) {
+    CURRENT_CONTEXT->pending_cmd_buffer->addCompletedHandler([ctx](MTL::CommandBuffer*) {
       dispatch_semaphore_signal(ctx->frame_sync_sem);
-    }]; // TODO: IMPLEMENT
+    });
     CURRENT_CONTEXT->pending_cmd_buffer->presentDrawable(CURRENT_CONTEXT->frame.color_drawable);
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
-    // CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {}; // TODO: IMPLEMENT
+    CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {};
     CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
   NSPopAutoreleasePool((void*)token);
-   return NGF_ERROR_OK;
-  */
-  return NGF_ERROR_INVALID_OPERATION;
+  return NGF_ERROR_OK;
 }
 
 ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
@@ -1011,8 +989,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
-    // ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device); // TODO: IMPLEMENT
-    ngf_error err = NGF_ERROR_INVALID_OPERATION;
+    ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device); // TODO: IMPLEMENT
     if (err != NGF_ERROR_OK) return err;
     ngf_attachment_descriptions attachment_descs;
     ngf_attachment_description  desc_array[3];
@@ -1063,8 +1040,7 @@ ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF
   ctx->swapchain_info.height = new_height;
   ctx->default_rt->width     = new_width;
   ctx->default_rt->height    = new_height;
-  // return ctx->swapchain.resize(ctx->swapchain_info); // TODO: IMPLEMENT
-  return NGF_ERROR_INVALID_OPERATION;
+  return ctx->swapchain.resize(ctx->swapchain_info);
 }
 
 ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
@@ -1137,7 +1113,7 @@ void ngfmtl_attachment_set_common(
     attachment->setLevel(rt->image_refs[i].mip_level);
     attachment->setSlice(rt->image_refs[i].layer);
   } else {
-    // attachment->setTexture(type == NGF_ATTACHMENT_COLOR ? CURRENT_CONTEXT->frame.color_attachment_texture() : CURRENT_CONTEXT->frame.depth_attachment_texture()); // TODO: IMPLEMENT
+    attachment->setTexture(type == NGF_ATTACHMENT_COLOR ? CURRENT_CONTEXT->frame.color_attachment_texture() : CURRENT_CONTEXT->frame.depth_attachment_texture());
     attachment->setLevel(0);
     attachment->setSlice(0);
   }
@@ -1799,7 +1775,7 @@ ngf_error ngf_cmd_begin_render_pass(
             clear_info->clear_color[2],
             clear_info->clear_color[3]));
       }
-      // mtl_desc->setResolveTexture(rt->is_default ? CURRENT_CONTEXT->frame->resolve_attachment_texture() : nullptr); // TODO : IMPLEMENT
+      mtl_desc->setResolveTexture(rt->is_default ? CURRENT_CONTEXT->frame.resolve_attachment_texture() : nullptr);
       if (mtl_desc->resolveTexture()) {
         // Override user-specified store action
           mtl_desc->setStoreAction(MTL::StoreActionMultisampleResolve);
