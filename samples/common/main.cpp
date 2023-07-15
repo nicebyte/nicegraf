@@ -202,6 +202,8 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   native_window_handle = (uintptr_t)glfwGetX11Window(window);
 #endif
 
+// Begin Context Scope 
+  {
   /**
    * Configure the swapchain and create a nicegraf context.
    * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with
@@ -432,6 +434,9 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**) {
   ngf_samples::logi("Finishing execution");
   ngf_samples::sample_shutdown(sample_opaque_data);
   ImGui::DestroyContext(imgui_ctx);
+  } // End Context Scope
+
+  ngf_shutdown();
 
   return 0;
 }

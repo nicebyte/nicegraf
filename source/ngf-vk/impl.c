@@ -63,6 +63,8 @@ struct {
   VkQueue          present_queue;
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
+  bool             validation_enabled;
+  VkDebugUtilsMessengerEXT debug_messenger;
   VkExtensionProperties* supported_phys_dev_exts;
   uint32_t nsupported_phys_dev_exts;
 #if defined(__linux__)
@@ -1237,13 +1239,13 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     vkDestroyBufferView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_buffer_views, s), NULL);
   }
 
+  NGFI_DARRAY_FOREACH(frame_res->retire_events, s) {
+    NGFI_DARRAY_APPEND(frame_res->real_retire_events, NGFI_DARRAY_AT(frame_res->retire_events, s));
+  }
   NGFI_DARRAY_FOREACH(frame_res->real_retire_events, s) {
     vkDestroyEvent(_vk.device, NGFI_DARRAY_AT(frame_res->real_retire_events, s), NULL);
   }
   NGFI_DARRAY_CLEAR(frame_res->real_retire_events);
-  NGFI_DARRAY_FOREACH(frame_res->retire_events, s) {
-    NGFI_DARRAY_APPEND(frame_res->real_retire_events, NGFI_DARRAY_AT(frame_res->retire_events, s));
-  }
 
   NGFI_DARRAY_FOREACH(frame_res->retire_buffers, a) {
     ngfvk_alloc* b = &(NGFI_DARRAY_AT(frame_res->retire_buffers, a));
@@ -2804,15 +2806,14 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   ngfvk_init_loader_if_necessary();
 
   // Create vk instance, attempting to enable api validation according to user preference.
-  bool       validation_enabled = false;
   const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
-  ngfvk_create_instance(request_validation, &_vk.instance, &validation_enabled);
+  ngfvk_create_instance(request_validation, &_vk.instance, &_vk.validation_enabled);
   vkl_init_instance(
       _vk.instance);  // load instance-level Vulkan functions into the global namespace.
 
   // If validation was requested, and successfully enabled, install a debug callback to forward
   // vulkan debug messages to the user.
-  if (validation_enabled) {
+  if (_vk.validation_enabled) {
     NGFI_DIAG_INFO("vulkan validation layers enabled");
     const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
         .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -2828,8 +2829,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = ngfvk_debug_message_callback,
         .pUserData       = NULL};
-    VkDebugUtilsMessengerEXT vk_debug_messenger;
-    vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
+    vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &_vk.debug_messenger);
   } else {
     NGFI_DIAG_INFO("vulkan validation is disabled");
   }
@@ -2971,6 +2971,15 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   // Done!
 
   return NGF_ERROR_OK;
+}
+
+void ngf_shutdown(void) {
+    vkDestroyDevice(_vk.device, NULL);
+ 
+    if (_vk.validation_enabled) {
+        vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
+    }
+    vkDestroyInstance(_vk.instance, NULL);
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
@@ -3294,7 +3303,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_bufs);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_pools);
-      for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
+      for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
       if (ctx->frame_res[f].semaphore != VK_NULL_HANDLE) {
@@ -4323,11 +4332,6 @@ void ngf_destroy_render_target(ngf_render_target target) {
     NGFI_FREEN(target->attachment_descs, target->nattachments);
     NGFI_FREEN(target->attachment_compat_pass_descs, target->nattachments);
     NGFI_FREE(target);
-
-    // clear out the entire renderpass cache to make sure the entries associated
-    // with this target don't stick around.
-    // TODO: clear out all caches across all contexts.
-    NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->renderpass_cache);
   }
 }
 
