@@ -13,7 +13,7 @@ using NGFMTL_VIEW_TYPE = UIView;
 #include "MetalSingleHeader.hpp"
 
 // Return type of CA::MetalLayer*
-CA::MetalLayer* ngf_do_layer_stuff(MTL::Device* device,
+CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
                                  uint32_t width,
                                  uint32_t height,
                                  MTL::PixelFormat pixel_format,

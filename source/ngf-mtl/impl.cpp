@@ -574,7 +574,7 @@ template<class NgfObjType, void (*Dtor)(NgfObjType*)> class ngfmtl_object_nurser
   NgfObjType* ptr_;
 };
 
-CA::MetalLayer* ngf_do_layer_stuff(MTL::Device* device,
+CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
                                    uint32_t width,
                                    uint32_t height,
                                    MTL::PixelFormat pixel_format,
@@ -636,14 +636,13 @@ class ngfmtl_swapchain {
       return NGF_ERROR_INVALID_FORMAT;
     }
       
-    layer_ = ngf_do_layer_stuff(
-                                device,
-                                swapchain_info.width,
-                                swapchain_info.height,
-                                pixel_format,
-                                swapchain_info.capacity_hint,
-                                (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO),
-                                swapchain_info.native_handle);
+    layer_ = ngf_layer_add_to_view(device,
+                                   swapchain_info.width,
+                                   swapchain_info.height,
+                                   pixel_format,
+                                   swapchain_info.capacity_hint,
+                                   (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO),
+                                   swapchain_info.native_handle);
 
     // Remember the number of images in the swapchain.
     capacity_ = swapchain_info.capacity_hint;
