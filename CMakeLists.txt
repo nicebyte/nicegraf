@@ -65,12 +65,20 @@ if (APPLE)
   find_library(APPLE_QUARTZ Quartz)
 endif()
 
-if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes")) 
-  # Nicegraf with native Metal backend.
-  nmk_static_library(NAME nicegraf-mtl
+if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
+  # Nicegraf with native Metal backend.	
+  nmk_static_library(NAME nicegraf-mtl	
+                     SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h	
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm	
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}	
+                     COPTS "-fobjc-arc")	
+
+  nmk_static_library(NAME nicegraf-mtl-cpp
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/applekit-impl.mm
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/metal-cpp
                      COPTS "-fobjc-arc")
 else()
   nmk_header_library(NAME nicegraf-vk-headers
