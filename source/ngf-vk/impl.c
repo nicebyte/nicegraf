@@ -63,6 +63,7 @@ struct {
   uint32_t         gfx_family_idx;
   uint32_t         present_family_idx;
   VkExtensionProperties* supported_phys_dev_exts;
+  uint32_t nsupported_phys_dev_exts;
 #if defined(__linux__)
   xcb_connection_t* xcb_connection;
   xcb_visualid_t    xcb_visualid;
@@ -2612,17 +2613,16 @@ static ngf_error ngfvk_execute_sync_op(
 }
 
 static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
-  VkResult result;
+  if (_vk.supported_phys_dev_exts == NULL || _vk.nsupported_phys_dev_exts == 0) {
+    VkResult result;
 
-  uint32_t supported_phys_dev_exts_cnt;
-  result = vkEnumerateDeviceExtensionProperties(_vk.phys_dev, NULL, &supported_phys_dev_exts_cnt, NULL);
-  if (result != VK_SUCCESS) {
-    NGFI_DIAG_WARNING("Failed to fetch physical device extensions count");
-    return false;
-  }
+    result = vkEnumerateDeviceExtensionProperties(_vk.phys_dev, NULL, & _vk.nsupported_phys_dev_exts, NULL);
+    if (result != VK_SUCCESS) {
+      NGFI_DIAG_WARNING("Failed to fetch physical device extensions count");
+		return false;
+    }
 
-  if (_vk.supported_phys_dev_exts == NULL) {
-    _vk.supported_phys_dev_exts = malloc(sizeof(VkExtensionProperties) * supported_phys_dev_exts_cnt);
+    _vk.supported_phys_dev_exts = malloc(sizeof(VkExtensionProperties) * _vk.nsupported_phys_dev_exts);
     if (_vk.supported_phys_dev_exts == NULL) {
       NGFI_DIAG_WARNING("Out of memory");
       return false;
@@ -2631,7 +2631,7 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
     result = vkEnumerateDeviceExtensionProperties(
         _vk.phys_dev,
         NULL,
-        &supported_phys_dev_exts_cnt,
+        & _vk.nsupported_phys_dev_exts,
         _vk.supported_phys_dev_exts);
     if (result != VK_SUCCESS) {
       NGFI_DIAG_WARNING("Failed to fetch physical device extensions");
@@ -2639,13 +2639,12 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
     }
   }
 
-  uint32_t supported_exts_idx            = 0;
-  while (supported_exts_idx < supported_phys_dev_exts_cnt) {
-    const VkExtensionProperties supported_ext = _vk.supported_phys_dev_exts[supported_exts_idx];
-    if (strcmp(ext_name, supported_ext.extensionName) == 0) {
+  uint32_t supported_exts_idx;
+  for (supported_exts_idx = 0; supported_exts_idx < _vk.nsupported_phys_dev_exts; supported_exts_idx++) {
+    const VkExtensionProperties* supported_ext = & _vk.supported_phys_dev_exts[supported_exts_idx];
+    if (strcmp(ext_name, supported_ext->extensionName) == 0) {
         return true;
     }
-    supported_exts_idx++;
   }
   return false;
 }
