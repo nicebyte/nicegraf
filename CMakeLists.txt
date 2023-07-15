@@ -69,6 +69,12 @@ if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
   # Nicegraf with native Metal backend.
   nmk_static_library(NAME nicegraf-mtl
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                          ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
+                     COPTS "-fobjc-arc")
+
+  nmk_static_library(NAME nicegraf-mtl-cpp
+                     SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
                      COPTS "-fobjc-arc")
