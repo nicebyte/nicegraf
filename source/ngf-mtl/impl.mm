@@ -778,7 +778,6 @@ constexpr MTLGPUFamily NGFMTL_GPU_FAMILIES[] = {
     MTLGPUFamilyApple4,
     MTLGPUFamilyApple5,
     MTLGPUFamilyApple6,
-    MTLGPUFamilyApple7,
     MTLGPUFamilyMac2,
     MTLGPUFamilyMac2,
     MTLGPUFamilyMac2,
@@ -979,8 +978,8 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-void ngf_shutdown(void) NGF_NOEXCEPT {
-    NGF_DIAG_INFO("Shutting down nicegraf.");
+void ngf_shutdown() NGF_NOEXCEPT {
+    NGFI_DIAG_INFO("Shutting down nicegraf.");
 }
 
 ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
