@@ -56,15 +56,17 @@
 // Singleton for holding vulkan instance, device and queue handles.
 // This is shared by all contexts.
 struct {
-  VkInstance       instance;
-  VkPhysicalDevice phys_dev;
-  VkDevice         device;
-  VkQueue          gfx_queue;
-  VkQueue          present_queue;
-  uint32_t         gfx_family_idx;
-  uint32_t         present_family_idx;
-  VkExtensionProperties* supported_phys_dev_exts;
-  uint32_t nsupported_phys_dev_exts;
+  VkInstance               instance;
+  VkPhysicalDevice         phys_dev;
+  VkDevice                 device;
+  VkQueue                  gfx_queue;
+  VkQueue                  present_queue;
+  uint32_t                 gfx_family_idx;
+  uint32_t                 present_family_idx;
+  VkExtensionProperties*   supported_phys_dev_exts;
+  uint32_t                 nsupported_phys_dev_exts;
+  bool                     validation_enabled;
+  VkDebugUtilsMessengerEXT debug_messenger;
 #if defined(__linux__)
   xcb_connection_t* xcb_connection;
   xcb_visualid_t    xcb_visualid;
@@ -2622,13 +2624,18 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
   if (_vk.supported_phys_dev_exts == NULL || _vk.nsupported_phys_dev_exts == 0) {
     VkResult result;
 
-    result = vkEnumerateDeviceExtensionProperties(_vk.phys_dev, NULL, & _vk.nsupported_phys_dev_exts, NULL);
+    result = vkEnumerateDeviceExtensionProperties(
+        _vk.phys_dev,
+        NULL,
+        &_vk.nsupported_phys_dev_exts,
+        NULL);
     if (result != VK_SUCCESS) {
       NGFI_DIAG_WARNING("Failed to fetch physical device extensions count");
-		return false;
+      return false;
     }
 
-    _vk.supported_phys_dev_exts = malloc(sizeof(VkExtensionProperties) * _vk.nsupported_phys_dev_exts);
+    _vk.supported_phys_dev_exts =
+        malloc(sizeof(VkExtensionProperties) * _vk.nsupported_phys_dev_exts);
     if (_vk.supported_phys_dev_exts == NULL) {
       NGFI_DIAG_WARNING("Out of memory");
       return false;
@@ -2637,7 +2644,7 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
     result = vkEnumerateDeviceExtensionProperties(
         _vk.phys_dev,
         NULL,
-        & _vk.nsupported_phys_dev_exts,
+        &_vk.nsupported_phys_dev_exts,
         _vk.supported_phys_dev_exts);
     if (result != VK_SUCCESS) {
       NGFI_DIAG_WARNING("Failed to fetch physical device extensions");
@@ -2646,12 +2653,12 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
   }
 
   uint32_t supported_exts_idx;
-  for (supported_exts_idx = 0; supported_exts_idx < _vk.nsupported_phys_dev_exts; supported_exts_idx++) {
-    const VkExtensionProperties* supported_ext = & _vk.supported_phys_dev_exts[supported_exts_idx];
-    if (strcmp(ext_name, supported_ext->extensionName) == 0) {
-        return true;
-    }
+  for (supported_exts_idx = 0; supported_exts_idx < _vk.nsupported_phys_dev_exts;
+       supported_exts_idx++) {
+    const VkExtensionProperties* supported_ext = &_vk.supported_phys_dev_exts[supported_exts_idx];
+    if (strcmp(ext_name, supported_ext->extensionName) == 0) { return true; }
   }
+
   return false;
 }
 
@@ -2804,15 +2811,14 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   ngfvk_init_loader_if_necessary();
 
   // Create vk instance, attempting to enable api validation according to user preference.
-  bool       validation_enabled = false;
   const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
-  ngfvk_create_instance(request_validation, &_vk.instance, &validation_enabled);
+  ngfvk_create_instance(request_validation, &_vk.instance, &_vk.validation_enabled);
   vkl_init_instance(
       _vk.instance);  // load instance-level Vulkan functions into the global namespace.
 
   // If validation was requested, and successfully enabled, install a debug callback to forward
   // vulkan debug messages to the user.
-  if (validation_enabled) {
+  if (_vk.validation_enabled) {
     NGFI_DIAG_INFO("vulkan validation layers enabled");
     const VkDebugUtilsMessengerCreateInfoEXT debug_callback_info = {
         .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -2828,8 +2834,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
         .pfnUserCallback = ngfvk_debug_message_callback,
         .pUserData       = NULL};
-    VkDebugUtilsMessengerEXT vk_debug_messenger;
-    vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &vk_debug_messenger);
+    vkCreateDebugUtilsMessengerEXT(_vk.instance, &debug_callback_info, NULL, &_vk.debug_messenger);
   } else {
     NGFI_DIAG_INFO("vulkan validation is disabled");
   }
@@ -2913,8 +2918,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const char*    device_exts[]   = {
       "VK_KHR_maintenance1",
       "VK_KHR_swapchain",
-      "VK_KHR_shader_float16_int8"
-  };
+      "VK_KHR_shader_float16_int8"};
   const uint32_t device_exts_count = sizeof(device_exts) / sizeof(const char*);
   const bool     shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
@@ -2938,15 +2942,16 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   }
 
   const VkDeviceCreateInfo dev_info = {
-      .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext                   = &sf16_features,
-      .flags                   = 0,
-      .queueCreateInfoCount    = num_queue_infos,
-      .pQueueCreateInfos       = &queue_infos[same_gfx_and_present ? 1u : 0u],
-      .enabledLayerCount       = 0,
-      .ppEnabledLayerNames     = NULL,
-      .pEnabledFeatures        = &required_features,
-      .enabledExtensionCount   = shader_float16_int8_supported ? device_exts_count : device_exts_count - 1,
+      .sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext                = &sf16_features,
+      .flags                = 0,
+      .queueCreateInfoCount = num_queue_infos,
+      .pQueueCreateInfos    = &queue_infos[same_gfx_and_present ? 1u : 0u],
+      .enabledLayerCount    = 0,
+      .ppEnabledLayerNames  = NULL,
+      .pEnabledFeatures     = &required_features,
+      .enabledExtensionCount =
+          shader_float16_int8_supported ? device_exts_count : device_exts_count - 1,
       .ppEnabledExtensionNames = device_exts};
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
   if (vk_err != VK_SUCCESS) {
@@ -2971,6 +2976,20 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   // Done!
 
   return NGF_ERROR_OK;
+}
+
+void ngf_shutdown(void) {
+  NGFI_DIAG_INFO("Shutting down nicegraf.");
+
+  if (CURRENT_CONTEXT != NULL) {
+      NGFI_DIAG_ERROR("Context not destroyed before shutdown.")
+  }
+
+  vkDestroyDevice(_vk.device, NULL);
+  if (_vk.validation_enabled) {
+    vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
+  }
+  vkDestroyInstance(_vk.instance, NULL);
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
@@ -3268,6 +3287,13 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   return err;
 }
 
+void ngfvk_destroy_renderpass_cache(ngf_context ctx) {
+  NGFI_DARRAY_FOREACH(ctx->renderpass_cache, p) {
+    vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(ctx->renderpass_cache, p).renderpass, NULL);
+  }
+  NGFI_DARRAY_CLEAR(ctx->renderpass_cache);
+}
+
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
     vkDeviceWaitIdle(_vk.device);
@@ -3280,6 +3306,11 @@ void ngf_destroy_context(ngf_context ctx) {
 
     for (uint32_t f = 0u; ctx->frame_res != NULL && f < ctx->max_inflight_frames; ++f) {
       ngfvk_retire_resources(&ctx->frame_res[f]);
+
+      NGFI_DARRAY_FOREACH(ctx->frame_res[f].real_retire_events, s) {
+        vkDestroyEvent(_vk.device, NGFI_DARRAY_AT(ctx->frame_res[f].real_retire_events, s), NULL);
+      }
+
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
@@ -3294,7 +3325,7 @@ void ngf_destroy_context(ngf_context ctx) {
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buffers);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_bufs);
       NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_pools);
-      for (uint32_t i = 0u; i < ctx->frame_res[f].nwait_fences; ++i) {
+      for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
       if (ctx->frame_res[f].semaphore != VK_NULL_HANDLE) {
@@ -3307,9 +3338,7 @@ void ngf_destroy_context(ngf_context ctx) {
     }
     NGFI_DARRAY_DESTROY(ctx->desc_superpools);
 
-    NGFI_DARRAY_FOREACH(ctx->renderpass_cache, r) {
-      vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(ctx->renderpass_cache, r).renderpass, NULL);
-    }
+    ngfvk_destroy_renderpass_cache(ctx);
     NGFI_DARRAY_DESTROY(ctx->renderpass_cache);
 
     NGFI_DARRAY_FOREACH(ctx->command_superpools, i) {
@@ -4327,7 +4356,7 @@ void ngf_destroy_render_target(ngf_render_target target) {
     // clear out the entire renderpass cache to make sure the entries associated
     // with this target don't stick around.
     // TODO: clear out all caches across all contexts.
-    NGFI_DARRAY_CLEAR(CURRENT_CONTEXT->renderpass_cache);
+    ngfvk_destroy_renderpass_cache(CURRENT_CONTEXT);
   }
 }
 

@@ -931,6 +931,10 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT {
   return (MTL_DEVICE != nullptr) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
+void ngf_shutdown(void) NGF_NOEXCEPT {
+    NGFI_DIAG_INFO("Shutting down nicegraf.");
+}
+
 const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT {
   return &DEVICE_CAPS;
 }
@@ -2220,3 +2224,4 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   cmd_buf->active_gfx_pipe->depth_stencil_desc->backFaceStencil()->setWriteMask(back);
   cmd_buf->active_rce->setDepthStencilState(CURRENT_CONTEXT->device->newDepthStencilState(cmd_buf->active_gfx_pipe->depth_stencil_desc));
 }
+

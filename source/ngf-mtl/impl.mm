@@ -979,6 +979,10 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
+void ngf_shutdown(void) NGF_NOEXCEPT {
+    NGF_DIAG_INFO("Shutting down nicegraf.");
+}
+
 ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
   return CURRENT_CONTEXT->default_rt;
 }
