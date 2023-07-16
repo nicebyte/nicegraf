@@ -5058,8 +5058,30 @@ void ngf_renderdoc_capture_end() {
   }
 }
 
+VkImage* ngf_get_vk_image_handle(uint32_t index, ngf_context context) {
+  if (index >= context->swapchain.num_images) return 0;
+  return &(context->swapchain.images[index]);
+}
+
+VkBufferView* ngf_get_vk_texel_buffer_handle(ngf_texel_buffer_view texel_buffer_view) {
+  return &(texel_buffer_view->vk_buf_view);
+}
+
+VkCommandBuffer* ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
+  return &(cmd_buffer->vk_cmd_buffer);
+}
+
+VkCommandPool* ngf_get_vk_cmd_pool_handle(ngf_cmd_buffer cmd_buffer) {
+  return &(cmd_buffer->vk_cmd_pool);
+}
+
+VkSampler* ngf_get_vk_sampler_handle(ngf_sampler sampler) {
+  return &(sampler->vksampler);
+}
+
 #pragma endregion
 
 #if defined(NGFVK_TEST_MODE)
 #include "../tests/vk-backend-tests.c"
 #endif
+ 

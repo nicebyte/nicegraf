@@ -3350,6 +3350,7 @@ void ngf_cmd_write_image(
 
 /**
  * \ingroup ngf
+ * 
  * Generates mipmaps automatically.
  *
  * Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level
@@ -3361,6 +3362,54 @@ void ngf_cmd_write_image(
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
 
+#if defined(_WIN32) || defined(_WIN64)
+/**
+ * \ingroup ngf
+ * 
+ * Returns a pointer to the underlying VkImage at the specified swapchain index.
+ *
+ * @param index The index of the desired image in the swapchain.
+ * @param context A handle to a nicegraf rendering context.
+ */
+VkImage* ngf_get_vk_image_handle(uint32_t index, ngf_context context) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a pointer to the underlying VkBufferView.
+ *
+ * @param texel_buffer_view A handle to a nicegraf buffer.
+ */
+VkBufferView*
+ngf_get_vk_texel_buffer_view_handle(ngf_texel_buffer_view texel_buffer_view) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a pointer to the underlying VkCommandBuffer.
+ *
+ * @param cmd_buffer A handle to a nicegraf command buffer.
+ */
+VkCommandBuffer* ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a pointer to the underlying VkCommandPool.
+ *
+ * @param cmd_buffer A handle to a nicegraf command buffer.
+ */
+VkCommandPool* ngf_get_vk_cmd_pool_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a pointer to the underlying VkSampler.
+ *
+ * @param sampler A handle to a nicegraf sampler.
+ */
+VkSampler* ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
+#endif
 
 #ifdef _MSC_VER
 #pragma endregion
