@@ -3251,6 +3251,28 @@ void ngf_cmd_write_image(
 
 /**
  * \ingroup ngf
+ *
+ * Copies data from an image to a buffer.
+ *
+ * @param enc The handle to the transfer encoder object to record the command into.
+ * @param src Reference to the image region that shall be copied from.
+ * @param src_offset The offset in the source image from which to start copying.
+ * @param extent The size of the region in the source mip level being copied.
+ * @param nlayers The number of layers to be copied.
+ * @param dst Reference to the image region that shall be written to.
+ * @param dst_offset Offset within the target mip level to write to (in texels).
+ */
+void ngf_cmd_copy_image_to_buffer(
+    ngf_xfer_encoder    enc,
+    const ngf_image_ref src,
+    ngf_offset3d        src_offset,
+    ngf_extent3d        src_extent,
+    uint32_t            nlayers,
+    ngf_buffer          dst,
+    size_t              dst_offset) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
  * Generates mipmaps automatically.
  *
  * Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level

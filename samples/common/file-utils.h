@@ -34,5 +34,5 @@
 namespace ngf_samples {
 
 std::vector<char> load_file(const char* file_name);
-
+void              store_file(const void* src, const char* file_name, size_t size);
 }

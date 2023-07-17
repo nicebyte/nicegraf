@@ -36,4 +36,14 @@ std::vector<char> load_file(const char* file_name) {
                              std::istreambuf_iterator<char>() };
 }
 
+void store_file(const void* src, const char* file_name, size_t size) {
+  std::ofstream outfile(file_name, std::ios::out | std::ios::binary);
+  if (!outfile) { 
+      throw std::runtime_error {file_name};
+  }
+
+  outfile.write(static_cast<const char*>(src), size);
+  outfile.close();
+}
+
 }  // namespace ngf_common

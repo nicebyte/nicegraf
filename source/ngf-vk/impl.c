@@ -4492,14 +4492,16 @@ void ngf_cmd_copy_image_to_buffer(
     assert(buf);
     const uint32_t src_layer =
         src.image->type == NGF_IMAGE_TYPE_CUBE ? 6u * src.layer + src.cubemap_face : src.layer;
-
+    const VkImageLayout        src_layout = (src.image->usage_flags & NGF_IMAGE_USAGE_STORAGE)
+                                                   ? VK_IMAGE_LAYOUT_GENERAL
+                                                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     const VkAccessFlags        image_access_flags = get_vk_image_access_flags(src.image);
     const VkImageMemoryBarrier pre_xfer_barrier   = {
           .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .pNext               = NULL,
           .srcAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
-          .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-          .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+          .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+          .oldLayout           = src_layout,
           .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -4545,16 +4547,13 @@ void ngf_cmd_copy_image_to_buffer(
         1u,
         &copy_op);
 
-    const VkImageLayout        source_layout = (src.image->usage_flags & NGF_IMAGE_USAGE_XFER_SRC)
-                                                   ? VK_IMAGE_LAYOUT_GENERAL
-                                                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     const VkImageMemoryBarrier post_xfer_barrier = {
         .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext               = NULL,
         .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
         .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_WRITE_BIT,
         .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        .newLayout           = source_layout,
+        .newLayout           = src_layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image               = (VkImage)src.image->alloc.obj_handle,
