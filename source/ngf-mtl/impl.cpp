@@ -742,7 +742,10 @@ class ngfmtl_swapchain {
 
 struct ngf_context_t {
   ~ngf_context_t() {
-    if (last_cmd_buffer) last_cmd_buffer->waitUntilCompleted();
+    if (last_cmd_buffer) {
+      last_cmd_buffer->waitUntilCompleted();
+      last_cmd_buffer->release();
+    }
   }
   MTL::Device*            device = nullptr;
   ngfmtl_swapchain        swapchain;
@@ -960,7 +963,11 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
     CURRENT_CONTEXT->pending_cmd_buffer->presentDrawable(CURRENT_CONTEXT->frame.color_drawable);
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {};
+    if (CURRENT_CONTEXT->last_cmd_buffer) {
+      CURRENT_CONTEXT->last_cmd_buffer->release();
+    }
     CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
+    CURRENT_CONTEXT->last_cmd_buffer->retain();
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
