@@ -742,7 +742,10 @@ class ngfmtl_swapchain {
 
 struct ngf_context_t {
   ~ngf_context_t() {
-    if (last_cmd_buffer) last_cmd_buffer->waitUntilCompleted();
+    if (last_cmd_buffer) {
+      last_cmd_buffer->waitUntilCompleted();
+      last_cmd_buffer->release();
+    }
   }
   MTL::Device*            device = nullptr;
   ngfmtl_swapchain        swapchain;
