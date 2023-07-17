@@ -2636,6 +2636,19 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
  */
 ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
 
+
+/*
+ * \ingroup ngf
+ *
+ * De-initializes nicegraf.
+ *
+ * The client should call this function only once during the
+ * entire lifetime of the application. Must be called after
+ * \ref ngf_initialize and after \ref ngf_destroy_context has
+ * been called on every initialized \ref ngf_context.
+ */
+void ngf_shutdown() NGF_NOEXCEPT;
+
 /**
  * \ingroup ngf
  *
