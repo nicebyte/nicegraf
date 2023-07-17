@@ -2647,7 +2647,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
  * \ref ngf_initialize and after \ref ngf_destroy_context has
  * been called on every initialized \ref ngf_context.
  */
-void ngf_shutdown(void) NGF_NOEXCEPT;
+void ngf_shutdown() NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

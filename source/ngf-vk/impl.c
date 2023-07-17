@@ -3287,7 +3287,7 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   return err;
 }
 
-void ngfvk_destroy_renderpass_cache(ngf_context ctx) {
+void ngfvk_reset_renderpass_cache(ngf_context ctx) {
   NGFI_DARRAY_FOREACH(ctx->renderpass_cache, p) {
     vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(ctx->renderpass_cache, p).renderpass, NULL);
   }
@@ -3338,7 +3338,7 @@ void ngf_destroy_context(ngf_context ctx) {
     }
     NGFI_DARRAY_DESTROY(ctx->desc_superpools);
 
-    ngfvk_destroy_renderpass_cache(ctx);
+    ngfvk_reset_renderpass_cache(ctx);
     NGFI_DARRAY_DESTROY(ctx->renderpass_cache);
 
     NGFI_DARRAY_FOREACH(ctx->command_superpools, i) {
@@ -4356,7 +4356,7 @@ void ngf_destroy_render_target(ngf_render_target target) {
     // clear out the entire renderpass cache to make sure the entries associated
     // with this target don't stick around.
     // TODO: clear out all caches across all contexts.
-    ngfvk_destroy_renderpass_cache(CURRENT_CONTEXT);
+    ngfvk_reset_renderpass_cache(CURRENT_CONTEXT);
   }
 }
 
