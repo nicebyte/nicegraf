@@ -931,7 +931,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT {
   return (MTL_DEVICE != nullptr) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
-void ngf_shutdown(void) NGF_NOEXCEPT {
+void ngf_shutdown() NGF_NOEXCEPT {
     NGFI_DIAG_INFO("Shutting down nicegraf.");
 }
 

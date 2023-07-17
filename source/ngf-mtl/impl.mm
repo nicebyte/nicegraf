@@ -778,6 +778,7 @@ constexpr MTLGPUFamily NGFMTL_GPU_FAMILIES[] = {
     MTLGPUFamilyApple4,
     MTLGPUFamilyApple5,
     MTLGPUFamilyApple6,
+    MTLGPUFamilyApple7,
     MTLGPUFamilyMac2,
     MTLGPUFamilyMac2,
     MTLGPUFamilyMac2,
