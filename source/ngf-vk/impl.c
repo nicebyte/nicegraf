@@ -726,6 +726,7 @@ static VkAccessFlags get_vk_image_access_flags(ngf_image img) {
   if (img->usage_flags & NGF_IMAGE_USAGE_SAMPLE_FROM) { result |= VK_ACCESS_SHADER_READ_BIT; }
   if (img->usage_flags & NGF_IMAGE_USAGE_STORAGE) { result |= VK_ACCESS_SHADER_WRITE_BIT; }
   if (img->usage_flags & NGF_IMAGE_USAGE_XFER_DST) { result |= VK_ACCESS_TRANSFER_WRITE_BIT; }
+  if (img->usage_flags & NGF_IMAGE_USAGE_XFER_SRC) { result |= VK_ACCESS_TRANSFER_READ_BIT; }
   return result;
 }
 
@@ -4516,7 +4517,7 @@ void ngf_cmd_copy_image_to_buffer(
     vkCmdPipelineBarrier(
         buf->vk_cmd_buffer,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         0u,
         0u,
@@ -4551,7 +4552,7 @@ void ngf_cmd_copy_image_to_buffer(
         .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext               = NULL,
         .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
-        .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_WRITE_BIT,
+        .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
         .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         .newLayout           = src_layout,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -4568,7 +4569,7 @@ void ngf_cmd_copy_image_to_buffer(
         buf->vk_cmd_buffer,
         VK_PIPELINE_STAGE_TRANSFER_BIT,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
         0u,
         0u,
         NULL,
@@ -4846,6 +4847,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const bool is_sampled_from  = info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM;
   const bool is_storage       = info->usage_hint & NGF_IMAGE_USAGE_STORAGE;
   const bool is_xfer_dst      = info->usage_hint & NGF_IMAGE_USAGE_XFER_DST;
+  const bool is_xfer_src      = info->usage_hint & NGF_IMAGE_USAGE_XFER_SRC;
   const bool is_attachment    = info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT;
   const bool enable_auto_mips = info->usage_hint & NGF_IMAGE_USAGE_MIPMAP_GENERATION;
   const bool is_transient     = info->usage_hint & NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
@@ -4864,6 +4866,7 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       (is_attachment ? attachment_usage_bits : 0u) |
       (is_transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0) |
       (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u) |
+      (is_xfer_src ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u) |
       (enable_auto_mips ? (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : 0u);
 
   ngf_error err = NGF_ERROR_OK;

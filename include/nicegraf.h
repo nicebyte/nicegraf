@@ -1711,7 +1711,7 @@ typedef enum ngf_image_usage {
 
   /** \ingroup ngf
    * The image may be used as a source for a transfer operation. */
-  NGF_IMAGE_USAGE_XFER_SRC = 0x12
+  NGF_IMAGE_USAGE_XFER_SRC = 0x20
 } ngf_image_usage;
 
 /**
