@@ -23,7 +23,6 @@
 #include "sample-interface.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf-util.h"
-#include "file-utils.h"
 #include "shader-loader.h"
 #include "check.h"
 
@@ -38,7 +37,6 @@ struct render_to_texture_data {
   ngf::graphics_pipeline offscreen_pipeline;
   ngf::image rt_texture;
   ngf::sampler sampler;
-  ngf_frame_token        frame_token;
 };
 
 void* sample_initialize(
@@ -151,7 +149,6 @@ void sample_draw_frame(
     float           ,
     void* userdata) {
   auto state = reinterpret_cast<render_to_texture_data*>(userdata);
-  state->frame_token = frame_token;
   ngf_irect2d         offsc_viewport {0, 0, 512, 512};
   ngf_irect2d         onsc_viewport {0, 0, w, h};
   ngf_cmd_buffer      offscr_cmd_buf = nullptr;
