@@ -2303,31 +2303,3 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
                                newDepthStencilStateWithDescriptor:cmd_buf->active_gfx_pipe->
                                                                   depth_stencil_desc]];
 }
-
-void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
-  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
-}
-
-void ngf_renderdoc_capture_begin() NGF_NOEXCEPT {
-  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
-}
-
-void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
-  NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
-}
-
-uintptr_t ngf_get_mtl_image_handle(ngf_image image) {
-  return (uintptr_t)(image->texture);
-}
-
-uintptr_t ngf_get_mtl_buffer_handle(ngf_buffer buffer) {
-  return (uintptr_t)(buffer->mtl_buffer);
-}
-
-uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
-  return (uintptr_t)(cmd_buffer->mtl_cmd_buffer);
-}
-
-uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) {
-  return (uintptr_t)(sampler->sampler);
-}

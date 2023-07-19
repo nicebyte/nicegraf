@@ -3404,48 +3404,6 @@ uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
 uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
 #endif
 
-#ifdef NGF_EXPOSE_NATIVE_MTL_HANDLES
-/**
- * \ingroup ngf
- *
- * Returns a uintptr_t to the underlying MTLTexture. The caller is responsible for casting the
- * return value to a MTLTexture.
- *
- * @param image A handle to a nicegraf image.
- */
-uintptr_t ngf_get_mtl_image_handle(ngf_image image) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- *
- * Returns a uintptr_t to the underlying MTLBuffer. The caller is responsible for casting the
- * return value to a MTLBuffer.
- *
- * @param buffer A handle to a nicegraf buffer.
- */
-uintptr_t ngf_get_mtl_buffer_handle(ngf_buffer buffer) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- *
- * Returns a uintptr_t to the underlying MTLCommandBuffer. The caller is responsible for casting
- * the return value to a MTLCommandBuffer.
- *
- * @param cmd_buffer A handle to a nicegraf command buffer.
- */
-uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- *
- * Returns a uintptr_t to the underlying MTLSamplerState. The caller is responsible for casting the
- * return value to a MTLSamplerState.
- *
- * @param sampler A handle to a nicegraf sampler.
- */
-uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
-#endif
-
 #ifdef _MSC_VER
 #pragma endregion
 #endif
