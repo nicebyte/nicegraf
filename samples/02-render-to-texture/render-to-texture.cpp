@@ -183,7 +183,7 @@ void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
 
 void sample_draw_ui(void*) {}
 
-void sample_post_submit(void* userdata){}
+void sample_post_submit(void*){}
 
 void sample_shutdown(void* userdata) {
   auto data = static_cast<render_to_texture_data*>(userdata);
