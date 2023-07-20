@@ -5189,8 +5189,25 @@ void ngf_renderdoc_capture_end() {
   }
 }
 
+uintptr_t ngf_get_vk_image_handle(ngf_image image) {
+  return image->alloc.obj_handle;
+}
+
+uintptr_t ngf_get_vk_buffer_handle(ngf_buffer buffer) {
+  return buffer->alloc.obj_handle;
+}
+
+uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
+  return (uintptr_t)(cmd_buffer->vk_cmd_buffer);
+}
+
+uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
+  return (uintptr_t)(sampler->vksampler);
+}
+
 #pragma endregion
 
 #if defined(NGFVK_TEST_MODE)
 #include "../tests/vk-backend-tests.c"
 #endif
+ 

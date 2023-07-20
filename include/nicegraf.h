@@ -3389,6 +3389,7 @@ void ngf_cmd_copy_image_to_buffer(
 
 /**
  * \ingroup ngf
+ *
  * Generates mipmaps automatically.
  *
  * Mipmaps are generated for all layers of the given image, from level 1 to the the maximum level
@@ -3400,6 +3401,47 @@ void ngf_cmd_copy_image_to_buffer(
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
 
+#ifdef NGF_EXPOSE_NATIVE_VK_HANDLES
+/**
+ * \ingroup ngf
+ * 
+ * Returns a uintptr_t to the underlying VkImage. The caller is responsible for casting the return
+ * value to a VkImage.
+ *
+ * @param image A handle to a nicegraf image.
+ */
+uintptr_t ngf_get_vk_image_handle(ngf_image image) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a uintptr_t to the underlying VkBuffer. The caller is responsible for casting the return
+ * value to a VkBuffer.
+ *
+ * @param buffer A handle to a nicegraf buffer.
+ */
+uintptr_t ngf_get_vk_buffer_handle(ngf_buffer buffer) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a uintptr_t to the underlying VkCommandBuffer. The caller is responsible for casting
+ * the return value to a VkCommandBuffer.
+ *
+ * @param cmd_buffer A handle to a nicegraf command buffer.
+ */
+uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Returns a uintptr_t to the underlying VkSampler. The caller is responsible for casting the
+ * return value to a VkSampler.
+ *
+ * @param sampler A handle to a nicegraf sampler.
+ */
+uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
+#endif
 
 #ifdef _MSC_VER
 #pragma endregion
