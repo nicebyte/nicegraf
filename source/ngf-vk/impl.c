@@ -2663,6 +2663,35 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
   return false;
 }
 
+static ngf_error ngfvk_submit_pending_cmd_buffers(
+    ngfvk_frame_resources* frame_res,
+    bool                   have_deferred_barriers,
+    VkSemaphore*           image_semaphore) {
+  ngf_error                  err          = NGF_ERROR_OK;
+  const VkPipelineStageFlags wait_masks[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  const uint32_t ncmd_bufs = have_deferred_barriers ? NGFI_DARRAY_SIZE(frame_res->cmd_bufs)
+                                                    : NGFI_DARRAY_SIZE(frame_res->cmd_bufs) - 1u;
+
+  const VkSubmitInfo submit_info = {
+      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+      .pNext = NULL,
+      .pCommandBuffers =
+          have_deferred_barriers ? (frame_res->cmd_bufs.data) : &(frame_res->cmd_bufs.data[1]),
+      .commandBufferCount   = ncmd_bufs,
+      .pWaitDstStageMask    = wait_masks,
+      .pWaitSemaphores      = image_semaphore,
+      .waitSemaphoreCount   = (image_semaphore != NULL) ? 1u : 0u,
+      .pSignalSemaphores    = &(frame_res->semaphore),
+      .signalSemaphoreCount = 1u};
+
+  VkResult submit_result =
+      vkQueueSubmit(_vk.gfx_queue, 1, &submit_info, frame_res->fences[frame_res->nwait_fences++]);
+
+  if (submit_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
+
+  return err;
+}
+
 #pragma endregion
 
 #pragma region external_funcs
@@ -2982,9 +3011,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 void ngf_shutdown(void) {
   NGFI_DIAG_INFO("Shutting down nicegraf.");
 
-  if (CURRENT_CONTEXT != NULL) {
-      NGFI_DIAG_ERROR("Context not destroyed before shutdown.")
-  }
+  if (CURRENT_CONTEXT != NULL) { NGFI_DIAG_ERROR("Context not destroyed before shutdown.") }
 
   vkDestroyDevice(_vk.device, NULL);
   if (_vk.validation_enabled) {
@@ -3749,28 +3776,13 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   const bool  needs_present   = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
   if (needs_present) { image_semaphore = CURRENT_CONTEXT->swapchain.image_semaphores[fi]; }
 
-  const VkPipelineStageFlags wait_masks[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-  const uint32_t ncmd_bufs = have_deferred_barriers ? NGFI_DARRAY_SIZE(frame_res->cmd_bufs)
-                                                    : NGFI_DARRAY_SIZE(frame_res->cmd_bufs) - 1u;
-
-  const VkSubmitInfo submit_info = {
-      .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-      .pNext = NULL,
-      .pCommandBuffers =
-          have_deferred_barriers ? (frame_res->cmd_bufs.data) : &(frame_res->cmd_bufs.data[1]),
-      .commandBufferCount   = ncmd_bufs,
-      .pWaitDstStageMask    = wait_masks,
-      .pWaitSemaphores      = needs_present ? &image_semaphore : NULL,
-      .waitSemaphoreCount   = needs_present ? 1u : 0u,
-      .pSignalSemaphores    = &(frame_res->semaphore),
-      .signalSemaphoreCount = 1u};
-
-  const VkResult submit_result =
-      vkQueueSubmit(_vk.gfx_queue, 1, &submit_info, frame_res->fences[frame_res->nwait_fences++]);
-  if (submit_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
+  ngf_error submit_result = ngfvk_submit_pending_cmd_buffers(
+      frame_res,
+      have_deferred_barriers,
+      (needs_present) ? &image_semaphore : NULL);
 
   // Present if necessary.
-  if (submit_result == VK_SUCCESS && needs_present) {
+  if (submit_result == NGF_ERROR_OK && needs_present) {
     const VkPresentInfoKHR present_info = {
         .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext              = NULL,
@@ -4612,80 +4624,28 @@ void ngf_cmd_write_image(
 }
 
 void ngf_cmd_copy_image_to_buffer(
-    ngf_xfer_encoder enc,
+    ngf_xfer_encoder    enc,
     const ngf_image_ref src,
-    ngf_offset3d src_offset,
-    ngf_extent3d src_extent,
-    uint32_t nlayers,
-    ngf_buffer dst,
-    size_t dst_offset) 
-{
-    ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-    assert(buf);
-    const uint32_t src_layer =
-        src.image->type == NGF_IMAGE_TYPE_CUBE ? 6u * src.layer + src.cubemap_face : src.layer;
-    const VkImageLayout        src_layout = (src.image->usage_flags & NGF_IMAGE_USAGE_STORAGE)
-                                                   ? VK_IMAGE_LAYOUT_GENERAL
-                                                   : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    const VkAccessFlags        image_access_flags = get_vk_image_access_flags(src.image);
-    const VkImageMemoryBarrier pre_xfer_barrier   = {
-          .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-          .pNext               = NULL,
-          .srcAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
-          .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
-          .oldLayout           = src_layout,
-          .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .image               = (VkImage)src.image->alloc.obj_handle,
-          .subresourceRange    = {
-                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                 .baseMipLevel   = src.mip_level,
-                 .levelCount     = 1u,
-                 .baseArrayLayer = src_layer,
-                 .layerCount     = nlayers}};
-
-    vkCmdPipelineBarrier(
-        buf->vk_cmd_buffer,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        0u,
-        0u,
-        NULL,
-        0u,
-        NULL,
-        1u,
-        &pre_xfer_barrier);
-
-    const VkBufferImageCopy copy_op = {
-        .bufferOffset      = dst_offset,
-        .bufferRowLength   = 0u,
-        .bufferImageHeight = 0u,
-        .imageSubresource =
-            {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-             .mipLevel       = src.mip_level,
-             .baseArrayLayer = src_layer,
-             .layerCount     = nlayers},
-        .imageOffset = {.x = src_offset.x, .y = src_offset.y, .z = src_offset.z},
-        .imageExtent = {.width = src_extent.width, .height = src_extent.height, .depth = src_extent.depth}
-    };
-
-    vkCmdCopyImageToBuffer(
-        buf->vk_cmd_buffer,
-        (VkImage)src.image->alloc.obj_handle,
-        VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        (VkBuffer)dst->alloc.obj_handle,
-        1u,
-        &copy_op);
-
-    const VkImageMemoryBarrier post_xfer_barrier = {
+    ngf_offset3d        src_offset,
+    ngf_extent3d        src_extent,
+    uint32_t            nlayers,
+    ngf_buffer          dst,
+    size_t              dst_offset) {
+  ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
+  assert(buf);
+  const uint32_t src_layer =
+      src.image->type == NGF_IMAGE_TYPE_CUBE ? 6u * src.layer + src.cubemap_face : src.layer;
+  const VkImageLayout        src_layout         = (src.image->usage_flags & NGF_IMAGE_USAGE_STORAGE)
+                                                      ? VK_IMAGE_LAYOUT_GENERAL
+                                                      : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  const VkAccessFlags        image_access_flags = get_vk_image_access_flags(src.image);
+  const VkImageMemoryBarrier pre_xfer_barrier   = {
         .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .pNext               = NULL,
-        .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
-        .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
-        .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-        .newLayout           = src_layout,
+        .srcAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
+        .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+        .oldLayout           = src_layout,
+        .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image               = (VkImage)src.image->alloc.obj_handle,
@@ -4696,18 +4656,69 @@ void ngf_cmd_copy_image_to_buffer(
                .baseArrayLayer = src_layer,
                .layerCount     = nlayers}};
 
-    vkCmdPipelineBarrier(
-        buf->vk_cmd_buffer,
-        VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0u,
-        0u,
-        NULL,
-        0u,
-        NULL,
-        1u,
-        &post_xfer_barrier);
+  vkCmdPipelineBarrier(
+      buf->vk_cmd_buffer,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+          VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      0u,
+      0u,
+      NULL,
+      0u,
+      NULL,
+      1u,
+      &pre_xfer_barrier);
+
+  const VkBufferImageCopy copy_op = {
+      .bufferOffset      = dst_offset,
+      .bufferRowLength   = 0u,
+      .bufferImageHeight = 0u,
+      .imageSubresource =
+          {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+           .mipLevel       = src.mip_level,
+           .baseArrayLayer = src_layer,
+           .layerCount     = nlayers},
+      .imageOffset = {.x = src_offset.x, .y = src_offset.y, .z = src_offset.z},
+      .imageExtent =
+          {.width = src_extent.width, .height = src_extent.height, .depth = src_extent.depth}};
+
+  vkCmdCopyImageToBuffer(
+      buf->vk_cmd_buffer,
+      (VkImage)src.image->alloc.obj_handle,
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      (VkBuffer)dst->alloc.obj_handle,
+      1u,
+      &copy_op);
+
+  const VkImageMemoryBarrier post_xfer_barrier = {
+      .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+      .pNext               = NULL,
+      .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+      .dstAccessMask       = image_access_flags ^ VK_ACCESS_TRANSFER_READ_BIT,
+      .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+      .newLayout           = src_layout,
+      .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+      .image               = (VkImage)src.image->alloc.obj_handle,
+      .subresourceRange    = {
+             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+             .baseMipLevel   = src.mip_level,
+             .levelCount     = 1u,
+             .baseArrayLayer = src_layer,
+             .layerCount     = nlayers}};
+
+  vkCmdPipelineBarrier(
+      buf->vk_cmd_buffer,
+      VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+          VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+      0u,
+      0u,
+      NULL,
+      0u,
+      NULL,
+      1u,
+      &post_xfer_barrier);
 }
 
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
@@ -5166,6 +5177,14 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 }
 
 void ngf_finish(void) {
+  ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
+
+  pthread_mutex_lock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
+  const bool have_deferred_barriers =
+      NGFI_DARRAY_SIZE(NGFVK_PENDING_IMG_BARRIER_QUEUE.barriers) > 0;
+  pthread_mutex_unlock(&NGFVK_PENDING_IMG_BARRIER_QUEUE.lock);
+
+  ngfvk_submit_pending_cmd_buffers(frame_res, have_deferred_barriers, NULL);
   vkDeviceWaitIdle(_vk.device);
 }
 
