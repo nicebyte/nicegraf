@@ -5181,7 +5181,7 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 
 void ngf_finish(void) {
   ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
-  ngfvk_submit_pending_cmd_buffers(frame_res, NULL, NULL);
+  ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
   vkDeviceWaitIdle(_vk.device);
 }
 
