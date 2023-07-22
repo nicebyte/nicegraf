@@ -596,13 +596,28 @@ struct ngf_image_t {
 // Common use case for descriptors: create them, then destroy
 // them after they are given to their create function
 template<typename T>
-class scoped_lifetime {
+class strong_ptr {
 public:
-    scoped_lifetime() : ptr_(T::alloc()->init()) {
+    strong_ptr() : ptr_(T::alloc()->init()) { }
+    // Note: Does NOT increment ref count. You can use this directly after calling alloc()->init()
+    strong_ptr(T* starting_ptr) : ptr_(starting_ptr) { }
+    ~strong_ptr() { if (ptr_) ptr_->release(); }
+    
+    strong_ptr(const strong_ptr& other) : ptr_(other.ptr_) {
+        if (ptr_) ptr_->retain();
     }
-    scoped_lifetime(T* starting_ptr) : ptr_(starting_ptr) { }
-    ~scoped_lifetime() {
-        ptr_->release();
+    strong_ptr& operator=(const strong_ptr& other) {
+        if (ptr_) ptr_->release();
+        ptr_ = other.ptr_;
+        if (ptr_) ptr_->retain();
+    }
+    strong_ptr(strong_ptr&& other) : ptr_(other.ptr_) {
+        other.ptr_ = nullptr;
+    }
+    strong_ptr& operator=(strong_ptr&& other) {
+        if (ptr_) ptr_->release();
+        ptr_ = other.ptr_;
+        other.ptr_ = nullptr;
     }
     
     T* get() const { return ptr_; }
@@ -751,7 +766,7 @@ class ngfmtl_swapchain {
       MTL::PixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
       //assert(depth_format != MTL::PixelFormatInvalid);
       for (uint32_t i = 0u; i < swapchain_info.capacity_hint; ++i) {
-        scoped_lifetime<MTL::TextureDescriptor> depth_texture_desc;
+        strong_ptr<MTL::TextureDescriptor> depth_texture_desc;
         depth_texture_desc->setTextureType     (swapchain_info.sample_count > 1u ? MTL::TextureType2DMultisample : MTL::TextureType2D);
         depth_texture_desc->setWidth           (swapchain_info.width);
         depth_texture_desc->setHeight          (swapchain_info.height);
@@ -1373,7 +1388,7 @@ ngf_error ngf_create_compute_pipeline(
       ngfmtl_parse_niceshade_metadata(info->shader_stage->source_code.c_str(), true, &metadata);
   if (metadata_parse_error != NGF_ERROR_OK) return metadata_parse_error;
 
-  scoped_lifetime<MTL::FunctionConstantValues> func_const_values = ngfmtl_function_consts(info->spec_info);
+  strong_ptr<MTL::FunctionConstantValues> func_const_values = ngfmtl_function_consts(info->spec_info);
   MTL::Function*            function          = ngfmtl_get_shader_main(
       info->shader_stage->func_lib,
       info->shader_stage->entry_point_name.c_str(),
@@ -1399,7 +1414,7 @@ ngf_error ngf_create_graphics_pipeline(
   assert(info);
   assert(result);
 
-  scoped_lifetime<MTL::RenderPipelineDescriptor> mtl_pipe_desc;
+  strong_ptr<MTL::RenderPipelineDescriptor> mtl_pipe_desc;
   const ngf_attachment_descriptions& attachment_descs   = *info->compatible_rt_attachment_descs;
   uint32_t                           ncolor_attachments = 0u;
   for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
@@ -1523,8 +1538,8 @@ ngf_error ngf_create_graphics_pipeline(
   pipeline->depth_stencil_desc->setDepthWriteEnabled(info->depth_stencil->depth_write);
         
         
-  scoped_lifetime<MTL::StencilDescriptor> backface_descriptor  = ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
-  scoped_lifetime<MTL::StencilDescriptor> frontface_descriptor = ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
+  strong_ptr<MTL::StencilDescriptor> backface_descriptor  = ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
+  strong_ptr<MTL::StencilDescriptor> frontface_descriptor = ngfmtl_create_stencil_descriptor(depth_stencil_info.front_stencil);
   pipeline->depth_stencil_desc->setBackFaceStencil(backface_descriptor.get());
   pipeline->depth_stencil_desc->setFrontFaceStencil(frontface_descriptor.get());
   pipeline->front_stencil_reference = depth_stencil_info.front_stencil.reference;
@@ -1585,7 +1600,7 @@ ngf_error ngf_create_texel_buffer_view(
     const ngf_texel_buffer_view_info* info,
     ngf_texel_buffer_view*            result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(texel_buffer_view, view);
-  scoped_lifetime<MTL::TextureDescriptor> texel_buf_descriptor;
+  strong_ptr<MTL::TextureDescriptor> texel_buf_descriptor;
 
   texel_buf_descriptor->setDepth            (1);
   texel_buf_descriptor->setMipmapLevelCount (1);
@@ -1641,7 +1656,7 @@ void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT {
-  scoped_lifetime<MTL::SamplerDescriptor> sampler_desc;
+  strong_ptr<MTL::SamplerDescriptor> sampler_desc;
   std::optional<MTL::SamplerAddressMode> s            = get_mtl_address_mode(info->wrap_u),
                                          t            = get_mtl_address_mode(info->wrap_v),
                                          r            = get_mtl_address_mode(info->wrap_w);
@@ -1675,7 +1690,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*, ngf_cmd_buffer* resu
 }
 
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT {
-  scoped_lifetime<MTL::TextureDescriptor> mtl_img_desc;
+  strong_ptr<MTL::TextureDescriptor> mtl_img_desc;
 
   const MTL::PixelFormat fmt = get_mtl_pixel_format(info->format).format;
   if (fmt == MTL::PixelFormatInvalid) {
@@ -1843,7 +1858,7 @@ ngf_error ngf_cmd_begin_render_pass(
   cmd_buffer->renderpass_active = true;
 
   uint32_t color_attachment_idx      = 0u;
-  scoped_lifetime<MTL::RenderPassDescriptor> pass_descriptor;
+  strong_ptr<MTL::RenderPassDescriptor> pass_descriptor;
   pass_descriptor->setRenderTargetWidth(rt->width);
   pass_descriptor->setRenderTargetHeight(rt->height);
   pass_descriptor->setDepthAttachment(nullptr);
@@ -1856,7 +1871,7 @@ ngf_error ngf_cmd_begin_render_pass(
         load_op == NGF_LOAD_OP_CLEAR && pass_info->clears ? &pass_info->clears[i] : nullptr;
     switch (attachment_desc.type) {
     case NGF_ATTACHMENT_COLOR: {
-      scoped_lifetime<MTL::RenderPassColorAttachmentDescriptor> mtl_desc;
+      strong_ptr<MTL::RenderPassColorAttachmentDescriptor> mtl_desc;
       ngfmtl_attachment_set_common(mtl_desc.get(), i, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) {
         mtl_desc->setClearColor(MTL::ClearColor::Make(
@@ -1874,18 +1889,18 @@ ngf_error ngf_cmd_begin_render_pass(
       break;
     }
     case NGF_ATTACHMENT_DEPTH: {
-      scoped_lifetime<MTL::RenderPassDepthAttachmentDescriptor> mtl_desc;
+      strong_ptr<MTL::RenderPassDepthAttachmentDescriptor> mtl_desc;
       ngfmtl_attachment_set_common(mtl_desc.get(), i, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) { mtl_desc->setClearDepth(clear_info->clear_depth_stencil.clear_depth); }
       pass_descriptor->setDepthAttachment(mtl_desc.get());
       break;
     }
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
-      scoped_lifetime<MTL::RenderPassDepthAttachmentDescriptor> mtl_depth_desc;
+      strong_ptr<MTL::RenderPassDepthAttachmentDescriptor> mtl_depth_desc;
       ngfmtl_attachment_set_common(mtl_depth_desc.get(), i, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) { mtl_depth_desc->setClearDepth(clear_info->clear_depth_stencil.clear_depth); }
       pass_descriptor->setDepthAttachment(mtl_depth_desc.get());
-      scoped_lifetime<MTL::RenderPassStencilAttachmentDescriptor> mtl_stencil_desc;
+      strong_ptr<MTL::RenderPassStencilAttachmentDescriptor> mtl_stencil_desc;
       ngfmtl_attachment_set_common(
           mtl_stencil_desc.get(),
           i,
