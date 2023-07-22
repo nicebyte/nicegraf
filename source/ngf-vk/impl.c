@@ -2721,6 +2721,15 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   return err;
 }
 
+void ngfvk_reset_renderpass_cache(ngf_context ctx) {
+  NGFI_DARRAY_FOREACH(ctx->renderpass_cache, p) {
+    NGFI_DARRAY_APPEND(
+        ctx->frame_res[ctx->frame_id].retire_render_passes,
+        NGFI_DARRAY_AT(ctx->renderpass_cache, p).renderpass);
+  }
+  NGFI_DARRAY_CLEAR(ctx->renderpass_cache);
+}
+
 #pragma endregion
 
 #pragma region external_funcs
@@ -3342,13 +3351,6 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   ctx->default_render_target->height = ctx->swapchain_info.height;
   err = ngfvk_create_swapchain(&ctx->swapchain_info, ctx->surface, &ctx->swapchain);
   return err;
-}
-
-void ngfvk_reset_renderpass_cache(ngf_context ctx) {
-  NGFI_DARRAY_FOREACH(ctx->renderpass_cache, p) {
-    vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(ctx->renderpass_cache, p).renderpass, NULL);
-  }
-  NGFI_DARRAY_CLEAR(ctx->renderpass_cache);
 }
 
 void ngf_destroy_context(ngf_context ctx) {
@@ -5226,4 +5228,3 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
 #if defined(NGFVK_TEST_MODE)
 #include "../tests/vk-backend-tests.c"
 #endif
- 
