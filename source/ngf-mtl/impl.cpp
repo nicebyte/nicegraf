@@ -732,19 +732,20 @@ class ngfmtl_swapchain {
     return {
         ngf_layer_next_drawable(layer_),
         depth_images_[img_idx_],
-        is_multusampled() ? multisample_images_[img_idx_]->texture : nullptr};
+        is_multisampled() ? multisample_images_[img_idx_]->texture : nullptr};
   }
 
   operator bool() {
     return layer_;
   }
 
-  bool is_multusampled() const {
+  bool is_multisampled() const {
     return !multisample_images_.empty();
   }
 
   private:
   void initialize_depth_attachments(const ngf_swapchain_info& swapchain_info) {
+    destroy_depth_attachments();
     if (swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
       depth_images_ = std::vector<MTL::Texture*>(swapchain_info.capacity_hint, nullptr);
       MTL::PixelFormat depth_format = get_mtl_pixel_format(swapchain_info.depth_format).format;
@@ -765,10 +766,15 @@ class ngfmtl_swapchain {
         if (__builtin_available(macOS 10.14, *)) { depth_texture_desc->setAllowGPUOptimizedContents(true); }
         depth_images_[i] = MTL_DEVICE->newTexture(depth_texture_desc.get());
       }
-    } else {
-      depth_images_.resize(0); // TODO: Need to free underlying textures?
     }
   }
+    
+    void destroy_depth_attachments() {
+        for (MTL::Texture* depth_image : depth_images_) {
+            depth_image->release();
+        }
+      depth_images_.resize(0);
+    }
 
   void initialize_multisample_images(const ngf_swapchain_info& swapchain_info) {
     destroy_multisample_images();
