@@ -1510,8 +1510,8 @@ ngf_error ngf_create_graphics_pipeline(
 
   // Set up depth and stencil state.
   
-  scoped_lifetime<MTL::DepthStencilDescriptor> depth_stencil_desc;
-  pipeline->depth_stencil_desc                     = depth_stencil_desc.get();
+  MTL::DepthStencilDescriptor* depth_stencil_desc  = MTL::DepthStencilDescriptor::alloc()->init();
+  pipeline->depth_stencil_desc                     = depth_stencil_desc;
   const ngf_depth_stencil_info& depth_stencil_info = *info->depth_stencil;
   pipeline->depth_stencil_desc->setDepthCompareFunction(depth_stencil_info.depth_test ? get_mtl_compare_function(depth_stencil_info.depth_compare) : MTL::CompareFunctionAlways);
   pipeline->depth_stencil_desc->setDepthWriteEnabled(info->depth_stencil->depth_write);
