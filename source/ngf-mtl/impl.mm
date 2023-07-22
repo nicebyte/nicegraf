@@ -2345,9 +2345,12 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 }
 
 void ngf_finish() NGF_NOEXCEPT {
-  [CURRENT_CONTEXT->pending_cmd_buffer commit];
-  [CURRENT_CONTEXT->pending_cmd_buffer waitUntilCompleted];
-  CURRENT_CONTEXT->pending_cmd_buffer = nil;
+  if (CURRENT_CONTEXT->pending_cmd_buffer != nil) {
+    [CURRENT_CONTEXT->pending_cmd_buffer commit];
+    CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
+    CURRENT_CONTEXT->pending_cmd_buffer = nil;
+    [CURRENT_CONTEXT->last_cmd_buffer waitUntilCompleted];
+  }
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
