@@ -2266,6 +2266,42 @@ void ngf_cmd_write_image(
   }
 }
 
+void ngf_cmd_copy_image_to_buffer(
+    ngf_xfer_encoder enc,
+    const ngf_image_ref src,
+    ngf_offset3d src_offset,
+    ngf_extent3d src_extent,
+    uint32_t nlayers,
+    ngf_buffer dst,
+    size_t dst_offset) NGF_NOEXCEPT {
+  auto buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(buf->active_rce == nullptr);
+  const MTLTextureType texture_type = src.image->texture.textureType;
+  const bool           is_cubemap =
+      texture_type == MTLTextureTypeCube || texture_type == MTLTextureTypeCubeArray;
+  const uint32_t src_slice =
+      (is_cubemap ? 6u : 1u) * src.layer + (is_cubemap ? src.cubemap_face : 0);
+  const uint32_t pitch    = ngfmtl_get_pitch(src_extent.width, src.image->format);
+  const uint32_t num_rows = ngfmtl_get_num_rows(src_extent.height, src.image->format);
+  for (uint32_t l = 0; l < nlayers; ++l) {
+    [buf->active_bce copyFromTexture:src.image->texture
+                         sourceSlice:src_slice + l
+                         sourceLevel:src.mip_level
+                        sourceOrigin:MTLOriginMake(
+                                         (NSUInteger) src_offset.x,
+                                         (NSUInteger) src_offset.y,
+                                         (NSUInteger) src_offset.z)
+                          sourceSize:MTLSizeMake(
+                                         src_extent.width,
+                                         src_extent.height,
+                                         src_extent.depth)
+                            toBuffer:dst->mtl_buffer
+                   destinationOffset:dst_offset + (l * pitch * num_rows)
+              destinationBytesPerRow:pitch
+            destinationBytesPerImage:pitch * num_rows];
+  }
+}
+
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT {
   if (!(img->usage_flags & NGF_IMAGE_USAGE_MIPMAP_GENERATION)) {
     NGFI_DIAG_ERROR("mipmap generation was requested for an image that was created "
@@ -2306,6 +2342,12 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
       setDepthStencilState:[CURRENT_CONTEXT->device
                                newDepthStencilStateWithDescriptor:cmd_buf->active_gfx_pipe->
                                                                   depth_stencil_desc]];
+}
+
+void ngf_finish() NGF_NOEXCEPT {
+  [CURRENT_CONTEXT->pending_cmd_buffer commit];
+  [CURRENT_CONTEXT->pending_cmd_buffer waitUntilCompleted];
+  CURRENT_CONTEXT->pending_cmd_buffer = nil;
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
