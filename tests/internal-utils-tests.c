@@ -191,8 +191,8 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL); 
-    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1)); 
+    NT_ASSERT(sa->next_free_block != NULL);
+    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1));
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
@@ -211,8 +211,8 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL); 
-    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1)); 
+    NT_ASSERT(sa->next_free_block != NULL);
+    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1));
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
@@ -230,7 +230,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_free_block != NULL); 
     NT_ASSERT(sa->next_free_block != old_free_block);
     NT_ASSERT(old_free_block->next_block == sa->next_free_block);
-    NT_ASSERT(x == sa->next_free_block->ptr - size); 
+    NT_ASSERT(x == sa->next_free_block->ptr - size);
 
     // the next block of the base allocator should be old_free_block
     NT_ASSERT(sa->next_block == old_free_block); 
