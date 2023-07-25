@@ -24,7 +24,6 @@
 
 #include "macros.h"
 
-#include <alloca.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,6 +63,7 @@ void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
       result = new_block->ptr;
       new_block->ptr += nbytes;
   }
+
   return result;
 }
 

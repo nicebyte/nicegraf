@@ -124,7 +124,7 @@ NT_TESTSUITE {
 
   NT_TESTCASE("stack alloc: exhaust-reset-exhaust cycle") {
     const uint32_t value   = 0xdeadbeef;
-    const uint32_t nvalues = 10;
+    const uint32_t nvalues= 10;
     ngfi_sa*       sa      = ngfi_sa_create(sizeof(value) * nvalues);
     NT_ASSERT(sa != NULL);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
