@@ -24,7 +24,6 @@
 
 #include "macros.h"
 
-#include <alloca.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
