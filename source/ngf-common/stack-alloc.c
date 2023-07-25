@@ -33,29 +33,58 @@ ngfi_sa* ngfi_sa_create(size_t capacity) {
   if (result) {
     result->capacity = capacity;
     result->ptr      = result->data;
+    result->next_free_block = result;
+    result->next_block = NULL;
   }
   return result;
 }
 
 void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
   assert(allocator);
+
+  ngfi_sa* alloc_block = allocator->next_free_block;
+
   void*           result             = NULL;
-  const ptrdiff_t consumed_capacity  = allocator->ptr - allocator->data;
-  const ptrdiff_t available_capacity = (ptrdiff_t)allocator->capacity - consumed_capacity;
+  const ptrdiff_t consumed_capacity  = alloc_block->ptr - alloc_block->data;
+  const ptrdiff_t available_capacity = (ptrdiff_t)alloc_block->capacity - consumed_capacity;
   if (available_capacity >= (ptrdiff_t)nbytes) {
-    result = allocator->ptr;
-    allocator->ptr += nbytes;
+    result = alloc_block->ptr;
+    alloc_block->ptr += nbytes;
+  }
+  else {
+      size_t new_capacity = alloc_block->capacity * 2; 
+      size_t min_acceptable_capacity = alloc_block->capacity + nbytes;
+      new_capacity = NGFI_MAX(new_capacity, min_acceptable_capacity);
+
+      ngfi_sa* new_block = ngfi_sa_create(new_capacity);
+      alloc_block->next_free_block->next_block = new_block;
+      alloc_block->next_free_block = new_block;
+
+      result = new_block->ptr;
+      new_block->ptr += nbytes;
   }
   return result;
 }
 
 void ngfi_sa_reset(ngfi_sa* allocator) {
   assert(allocator);
+ 
+  // free all blocks except for first block
+  ngfi_sa* curr_block = allocator->next_block;
+  while (curr_block != NULL) {
+      ngfi_sa* next = curr_block->next_block;
+      free(curr_block);
+      curr_block = next;
+  }
+
   allocator->ptr = allocator->data;
+  allocator->next_free_block = allocator;
+  allocator->next_block = NULL;
 }
 
 void ngfi_sa_destroy(ngfi_sa* allocator) {
   assert(allocator);
+  ngfi_sa_reset(allocator);
   free(allocator);
 }
 
