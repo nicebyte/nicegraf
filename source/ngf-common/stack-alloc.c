@@ -57,8 +57,8 @@ void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
       new_capacity = NGFI_MAX(new_capacity, min_acceptable_capacity);
 
       ngfi_sa* new_block = ngfi_sa_create(new_capacity);
-      alloc_block->next_free_block->next_block = new_block;
-      alloc_block->next_free_block = new_block;
+      alloc_block->next_block = new_block;
+      allocator->next_free_block = new_block;
 
       result = new_block->ptr;
       new_block->ptr += nbytes;
