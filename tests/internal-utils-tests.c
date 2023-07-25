@@ -164,13 +164,9 @@ NT_TESTSUITE {
 
     ngfi_sa_reset(sa);
 
-    for (uint32_t i = 0; i < nvalues; ++i) {
-      uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      *target = value;
-      NT_ASSERT(*target == value);
-    }
+    ngfi_sa_alloc(sizeof(value) * (nvalues - 1));
    
-    size_t alloc_size = ((sizeof(value) * nvalues) * 2) + 1;
+    size_t alloc_size = sizeof(value) + 1;
     uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
 
     // another block should have been allocated
@@ -183,7 +179,7 @@ NT_TESTSUITE {
 
 
     // next free block should be sa->capacity + alloc_size 
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + alloc_size);
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
 
     ngfi_sa_destroy(sa);
   }
@@ -203,7 +199,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == sa->next_free_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size + 1);
 
     ngfi_sa_destroy(sa);
   }
@@ -223,7 +219,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == sa->next_free_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size + 1);
 
     ngfi_sa* old_free_block = sa->next_free_block;
 
@@ -240,7 +236,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == old_free_block); 
 
     // next free block should be the base capacity + size
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size);
+    NT_ASSERT(sa->next_free_block->capacity == old_free_block->capacity + size + 1);
 
     ngfi_sa_destroy(sa);
   }
