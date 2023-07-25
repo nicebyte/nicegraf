@@ -2527,9 +2527,47 @@ static ngf_error ngfvk_execute_sync_op(
   if (max_buffer_size <= 0u) { return NGF_ERROR_OK; }
 
   // Allocate memory for vkCmdWaitEvents parameters.
-  temp_data.max_buffer_memory_barriers = max_buffer_size;
-  temp_data.max_image_memory_barriers  = max_buffer_size;
-  temp_data.max_wait_events            = max_buffer_size;
+  temp_data.max_buffer_memory_barriers = 0u;
+  temp_data.max_image_memory_barriers  = 0u;
+  temp_data.max_wait_events            = 0u;
+  for (uint32_t i = 0; i < nsync_compute_resources; ++i) {
+    switch (sync_compute_resources[i].resource.sync_resource_type) {
+    case NGF_SYNC_RESOURCE_BUFFER:
+      ++temp_data.max_buffer_memory_barriers;
+      break;
+    case NGF_SYNC_RESOURCE_IMAGE:
+      ++temp_data.max_image_memory_barriers;
+      break;
+    default:
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+  }
+  for (uint32_t i = 0; i < nsync_render_resources; ++i) {
+    switch (sync_render_resources[i].resource.sync_resource_type) {
+    case NGF_SYNC_RESOURCE_BUFFER:
+      ++temp_data.max_buffer_memory_barriers;
+      break;
+    case NGF_SYNC_RESOURCE_IMAGE:
+      ++temp_data.max_image_memory_barriers;
+      break;
+    default:
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+  }
+  for (uint32_t i = 0; i < nsync_xfer_resources; ++i) {
+    switch (sync_xfer_resources[i].resource.sync_resource_type) {
+    case NGF_SYNC_RESOURCE_BUFFER:
+      ++temp_data.max_buffer_memory_barriers;
+      break;
+    case NGF_SYNC_RESOURCE_IMAGE:
+      ++temp_data.max_image_memory_barriers;
+      break;
+    default:
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+  }
+  temp_data.max_wait_events =
+      temp_data.max_buffer_memory_barriers + temp_data.max_image_memory_barriers;
   if (temp_data.max_wait_events > 0u) {
     temp_data.wait_events =
         ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkEvent) * temp_data.max_wait_events);
