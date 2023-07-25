@@ -160,7 +160,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == sa->next_free_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2)
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
 
     ngfi_sa_reset(sa);
 
@@ -203,7 +203,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == sa->next_free_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2)
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
 
     ngfi_sa_destroy(sa);
   }
@@ -223,8 +223,8 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == sa->next_free_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2)
-    
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
+
     ngfi_sa* old_free_block = sa->next_free_block;
 
     size = sa->next_free_block->capacity + 1;
@@ -240,7 +240,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa->next_block == old_free_block); 
 
     // next free block should be the base capacity + size
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size)
+    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size);
 
     ngfi_sa_destroy(sa);
   }
