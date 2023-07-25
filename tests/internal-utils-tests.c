@@ -164,7 +164,7 @@ NT_TESTSUITE {
 
     ngfi_sa_reset(sa);
 
-    ngfi_sa_alloc(sizeof(value) * (nvalues - 1));
+    ngfi_sa_alloc(sa, sizeof(value) * (nvalues - 1));
    
     size_t alloc_size = sizeof(value) + 1;
     uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
