@@ -153,14 +153,14 @@ NT_TESTSUITE {
     }
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL); 
+    NT_ASSERT(sa->active_block != NULL); 
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->next_free_block); 
+    NT_ASSERT(sa->next_block == sa->active_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
+    NT_ASSERT(sa->active_block->capacity == sa->capacity + sizeof(value));
 
     ngfi_sa_reset(sa);
 
@@ -170,16 +170,16 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL); 
+    NT_ASSERT(sa->active_block != NULL); 
     NT_ASSERT(x != NULL); 
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->next_free_block); 
+    NT_ASSERT(sa->next_block == sa->active_block); 
 
 
     // next free block should be sa->capacity + alloc_size 
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity * 2);
+    NT_ASSERT(sa->active_block->capacity == sa->capacity + alloc_size);
 
     ngfi_sa_destroy(sa);
   }
@@ -191,15 +191,15 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL);
-    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1));
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(x == sa->active_block->ptr - (size + 1));
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->next_free_block); 
+    NT_ASSERT(sa->next_block == sa->active_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size + 1);
+    NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
 
     ngfi_sa_destroy(sa);
   }
@@ -211,32 +211,32 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL);
-    NT_ASSERT(x == sa->next_free_block->ptr - (size + 1));
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(x == sa->active_block->ptr - (size + 1));
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->next_free_block); 
+    NT_ASSERT(sa->next_block == sa->active_block); 
 
     // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->next_free_block->capacity == sa->capacity + size + 1);
+    NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
 
-    ngfi_sa* old_free_block = sa->next_free_block;
+    ngfi_sa* old_free_block = sa->active_block;
 
-    size = sa->next_free_block->capacity + 1;
+    size = sa->active_block->capacity + 1;
     x = ngfi_sa_alloc(sa, size);
 
     // another block should have been allocated
-    NT_ASSERT(sa->next_free_block != NULL); 
-    NT_ASSERT(sa->next_free_block != old_free_block);
-    NT_ASSERT(old_free_block->next_block == sa->next_free_block);
-    NT_ASSERT(x == sa->next_free_block->ptr - size);
+    NT_ASSERT(sa->active_block != NULL); 
+    NT_ASSERT(sa->active_block != old_free_block);
+    NT_ASSERT(old_free_block->next_block == sa->active_block);
+    NT_ASSERT(x == sa->active_block->ptr - size);
 
     // the next block of the base allocator should be old_free_block
     NT_ASSERT(sa->next_block == old_free_block); 
 
     // next free block should be the base capacity + size
-    NT_ASSERT(sa->next_free_block->capacity == old_free_block->capacity + size);
+    NT_ASSERT(sa->active_block->capacity == old_free_block->capacity + size);
 
     ngfi_sa_destroy(sa);
   }
