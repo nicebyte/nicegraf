@@ -153,11 +153,11 @@ NT_TESTSUITE {
     }
 
     // another block should have been allocated
-    NT_ASSERT(sa->active_block != NULL); 
+    NT_ASSERT(sa->active_block != NULL);
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->active_block); 
+    NT_ASSERT(sa->next_block == sa->active_block);
 
     // next free block should have double the capacity of the base block
     NT_ASSERT(sa->active_block->capacity == sa->capacity + sizeof(value));
@@ -170,15 +170,14 @@ NT_TESTSUITE {
     uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
 
     // another block should have been allocated
-    NT_ASSERT(sa->active_block != NULL); 
+    NT_ASSERT(sa->active_block != NULL);
     NT_ASSERT(x != NULL); 
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->active_block); 
+    NT_ASSERT(sa->next_block == sa->active_block);
 
-
-    // next free block should be sa->capacity + alloc_size 
+    // next free block should be sa->capacity + alloc_size
     NT_ASSERT(sa->active_block->capacity == sa->capacity + alloc_size);
 
     ngfi_sa_destroy(sa);
@@ -196,7 +195,7 @@ NT_TESTSUITE {
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->active_block); 
+    NT_ASSERT(sa->next_block == sa->active_block);
 
     // next free block should have double the capacity of the base block
     NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
@@ -216,7 +215,7 @@ NT_TESTSUITE {
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
-    NT_ASSERT(sa->next_block == sa->active_block); 
+    NT_ASSERT(sa->next_block == sa->active_block);
 
     // next free block should have double the capacity of the base block
     NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
@@ -227,7 +226,7 @@ NT_TESTSUITE {
     x = ngfi_sa_alloc(sa, size);
 
     // another block should have been allocated
-    NT_ASSERT(sa->active_block != NULL); 
+    NT_ASSERT(sa->active_block != NULL);
     NT_ASSERT(sa->active_block != old_free_block);
     NT_ASSERT(old_free_block->next_block == sa->active_block);
     NT_ASSERT(x == sa->active_block->ptr - size);
