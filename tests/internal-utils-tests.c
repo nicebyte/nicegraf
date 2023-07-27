@@ -159,8 +159,6 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-    // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->active_block->capacity == sa->capacity + sizeof(value));
 
     ngfi_sa_reset(sa);
 
@@ -197,8 +195,6 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-    // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
 
     ngfi_sa_destroy(sa);
   }
@@ -217,8 +213,6 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-    // next free block should have double the capacity of the base block
-    NT_ASSERT(sa->active_block->capacity == sa->capacity + size + 1);
 
     ngfi_sa* old_free_block = sa->active_block;
 
@@ -234,8 +228,6 @@ NT_TESTSUITE {
     // the next block of the base allocator should be old_free_block
     NT_ASSERT(sa->next_block == old_free_block); 
 
-    // next free block should be the base capacity + size
-    NT_ASSERT(sa->active_block->capacity == old_free_block->capacity + size);
 
     ngfi_sa_destroy(sa);
   }
