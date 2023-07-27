@@ -129,23 +129,104 @@ NT_TESTSUITE {
     NT_ASSERT(sa != NULL);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
       uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      if (i >= nvalues)
-        NT_ASSERT(target == NULL);
-      else {
-        *target = value;
-        NT_ASSERT(*target == value);
-      }
+      *target = value;
+      NT_ASSERT(*target == value);
     }
     ngfi_sa_reset(sa);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
       uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      if (i >= nvalues)
-        NT_ASSERT(target == NULL);
-      else {
-        *target = value;
-        NT_ASSERT(*target == value);
-      }
+      *target = value;
+      NT_ASSERT(*target == value);
     }
+    ngfi_sa_destroy(sa);
+  }
+
+  NT_TESTCASE("stack alloc: allocate beyond available capacity") {
+    const uint32_t value   = 0xdeadbeef;
+    const uint32_t nvalues = 10;
+    ngfi_sa*       sa      = ngfi_sa_create(sizeof(value) * nvalues);
+    NT_ASSERT(sa != NULL);
+    for (uint32_t i = 0; i < nvalues + 1; ++i) {
+      uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
+      *target = value;
+      NT_ASSERT(*target == value);
+    }
+
+    // another block should have been allocated
+    NT_ASSERT(sa->active_block != NULL);
+
+    // the next block of the base allocator should be the next free block
+    // since only two total block have been allocated
+    NT_ASSERT(sa->next_block == sa->active_block);
+
+
+    ngfi_sa_reset(sa);
+
+    ngfi_sa_alloc(sa, sizeof(value) * (nvalues - 1));
+
+    size_t alloc_size = sizeof(value) + 1;
+    uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
+
+    // another block should have been allocated
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(x != NULL); 
+
+    // the next block of the base allocator should be the next free block
+    // since only two total block have been allocated
+    NT_ASSERT(sa->next_block == sa->active_block);
+
+
+    ngfi_sa_destroy(sa);
+  }
+
+  NT_TESTCASE("stack alloc: allocate beyond base capacity") {
+    size_t size = 32;
+    ngfi_sa*       sa      = ngfi_sa_create(size);
+
+    uint8_t* x = ngfi_sa_alloc(sa, size + 1);
+
+    // another block should have been allocated
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(x == sa->active_block->ptr - (size + 1));
+
+    // the next block of the base allocator should be the next free block
+    // since only two total block have been allocated
+    NT_ASSERT(sa->next_block == sa->active_block);
+
+
+    ngfi_sa_destroy(sa);
+  }
+
+  NT_TESTCASE("stack alloc: allocate more than 1 new block") {
+    size_t size = 32;
+    ngfi_sa*       sa      = ngfi_sa_create(size);
+
+    uint8_t* x = ngfi_sa_alloc(sa, size + 1);
+
+    // another block should have been allocated
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(x == sa->active_block->ptr - (size + 1));
+
+    // the next block of the base allocator should be the next free block
+    // since only two total block have been allocated
+    NT_ASSERT(sa->next_block == sa->active_block);
+
+
+    ngfi_sa* old_free_block = sa->active_block;
+
+    size = sa->active_block->capacity + 1;
+    x = ngfi_sa_alloc(sa, size);
+
+    // another block should have been allocated
+    NT_ASSERT(sa->active_block != NULL);
+    NT_ASSERT(sa->active_block != old_free_block);
+    NT_ASSERT(old_free_block->next_block == sa->active_block);
+    NT_ASSERT(x == sa->active_block->ptr - size);
+
+    // the next block of the base allocator should be old_free_block
+    NT_ASSERT(sa->next_block == old_free_block); 
+
+
     ngfi_sa_destroy(sa);
   }
 

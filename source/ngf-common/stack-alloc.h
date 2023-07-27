@@ -28,6 +28,8 @@ extern "C" {
 typedef struct ngfi_sa_t {
   uint8_t* ptr;
   size_t   capacity;
+  struct ngfi_sa_t* next_block;
+  struct ngfi_sa_t* active_block;
 #pragma warning(push)
 #pragma warning(disable : 4200)
   uint8_t data[];
