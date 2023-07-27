@@ -52,10 +52,10 @@ void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
     alloc_block->ptr += nbytes;
   }
   else {
-    size_t new_capacity = alloc_block->capacity + nbytes;
+    const size_t new_capacity = NGFI_MAX(alloc_block->capacity, nbytes);
 
     ngfi_sa* new_block = ngfi_sa_create(new_capacity);
-    assert(new_block);
+    if(new_block == NULL) { return NULL; }
 
     alloc_block->next_block = new_block;
     allocator->active_block = new_block;
