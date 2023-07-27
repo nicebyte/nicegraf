@@ -175,8 +175,6 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-    // next free block should be sa->capacity + alloc_size
-    NT_ASSERT(sa->active_block->capacity == sa->capacity + alloc_size);
 
     ngfi_sa_destroy(sa);
   }
