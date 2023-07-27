@@ -3994,7 +3994,7 @@ ngf_error ngf_create_graphics_pipeline(
       .depthBiasConstantFactor = 0.0f,
       .depthBiasClamp          = 0.0f,
       .depthBiasSlopeFactor    = 0.0f,
-      .lineWidth               = 0.0f};
+      .lineWidth               = 1.0f};
 
   // Prepare multisampling.
   VkPipelineMultisampleStateCreateInfo multisampling = {
@@ -4103,7 +4103,6 @@ ngf_error ngf_create_graphics_pipeline(
   const VkDynamicState dynamic_states[] = {
       VK_DYNAMIC_STATE_VIEWPORT,
       VK_DYNAMIC_STATE_SCISSOR,
-      VK_DYNAMIC_STATE_LINE_WIDTH,
       VK_DYNAMIC_STATE_DEPTH_BOUNDS};
   const uint32_t                   ndynamic_states = NGFI_ARRAYSIZE(dynamic_states);
   VkPipelineDynamicStateCreateInfo dynamic_state   = {
