@@ -832,10 +832,10 @@ struct ngf_context_t {
   ~ngf_context_t() {
     if (last_cmd_buffer) { last_cmd_buffer->waitUntilCompleted(); }
   }
-  MTL::Device*               device = nullptr;
+  ngf_id<MTL::Device>        device = nullptr;
   ngfmtl_swapchain           swapchain;
   ngfmtl_swapchain::frame    frame;
-  MTL::CommandQueue*         queue      = nullptr;
+  ngf_id<MTL::CommandQueue>  queue      = nullptr;
   bool                       is_current = false;
   ngf_swapchain_info         swapchain_info;
   MTL::CommandBuffer*        pending_cmd_buffer = nullptr;
@@ -1084,7 +1084,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   if (info->swapchain_info) {
     ctx->swapchain_info = *(info->swapchain_info);
-    ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device);
+    ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device.get());
     if (err != NGF_ERROR_OK) return err;
     ngf_attachment_descriptions attachment_descs;
     ngf_attachment_description  desc_array[3];
@@ -1246,13 +1246,13 @@ void ngf_destroy_render_target(ngf_render_target rt) NGF_NOEXCEPT {
   }
 }
 
-MTL::Function* ngfmtl_get_shader_main(
+ngf_id<MTL::Function> ngfmtl_get_shader_main(
     MTL::Library*                func_lib,
     const char*                  entry_point_name,
     MTL::FunctionConstantValues* spec_consts) {
-  NS::Error*     err                 = nullptr;
-  NS::String*    ns_entry_point_name = NS::String::string(entry_point_name, NS::UTF8StringEncoding);
-  MTL::Function* result = func_lib->newFunction(ns_entry_point_name, spec_consts, &err);
+  NS::Error*  err                 = nullptr;
+  NS::String* ns_entry_point_name = NS::String::string(entry_point_name, NS::UTF8StringEncoding);
+  ngf_id<MTL::Function> result    = func_lib->newFunction(ns_entry_point_name, spec_consts, &err);
   if (err) {
     NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return nullptr;
@@ -1399,14 +1399,14 @@ ngf_error ngf_create_compute_pipeline(
   if (metadata_parse_error != NGF_ERROR_OK) return metadata_parse_error;
 
   ngf_id<MTL::FunctionConstantValues> func_const_values = ngfmtl_function_consts(info->spec_info);
-  MTL::Function*                      function          = ngfmtl_get_shader_main(
+  ngf_id<MTL::Function>               function          = ngfmtl_get_shader_main(
       info->shader_stage->func_lib.get(),
       info->shader_stage->entry_point_name.c_str(),
       func_const_values.get());
   if (!function) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  NS::Error*                 err = nullptr;
-  MTL::ComputePipelineState* computePSO =
-      CURRENT_CONTEXT->device->newComputePipelineState(function, &err);
+  NS::Error*                        err = nullptr;
+  ngf_id<MTL::ComputePipelineState> computePSO =
+      CURRENT_CONTEXT->device->newComputePipelineState(function.get(), &err);
   if (err) {
     NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return NGF_ERROR_OBJECT_CREATION_FAILED;
@@ -1489,15 +1489,17 @@ ngf_error ngf_create_graphics_pipeline(
     if (stage->type == NGF_STAGE_VERTEX) {
       assert(!mtl_pipe_desc->vertexFunction());
       mtl_pipe_desc->setVertexFunction(ngfmtl_get_shader_main(
-          stage->func_lib.get(),
-          stage->entry_point_name.c_str(),
-          spec_consts.get()));
+                                           stage->func_lib.get(),
+                                           stage->entry_point_name.c_str(),
+                                           spec_consts.get())
+                                           .get());
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc->fragmentFunction());
       mtl_pipe_desc->setFragmentFunction(ngfmtl_get_shader_main(
-          stage->func_lib.get(),
-          stage->entry_point_name.c_str(),
-          spec_consts.get()));
+                                             stage->func_lib.get(),
+                                             stage->entry_point_name.c_str(),
+                                             spec_consts.get())
+                                             .get());
     }
   }
   if (!have_niceshade_metadata) {
@@ -1598,7 +1600,7 @@ void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipe) NGF_NOEXCEPT {
   }
 }
 
-MTL::Buffer* ngfmtl_create_buffer(const ngf_buffer_info& info) {
+ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   MTL::ResourceOptions options         = 0u;
   MTL::ResourceOptions managed_storage = 0u;
 #if TARGET_OS_OSX
@@ -2425,8 +2427,10 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32
 
   cmd_buf->active_gfx_pipe->depth_stencil_desc->frontFaceStencil()->setReadMask(front);
   cmd_buf->active_gfx_pipe->depth_stencil_desc->backFaceStencil()->setReadMask(back);
-  cmd_buf->active_rce->setDepthStencilState(CURRENT_CONTEXT->device->newDepthStencilState(
-      cmd_buf->active_gfx_pipe->depth_stencil_desc.get()));
+  ngf_id<MTL::DepthStencilState> depth_stencil_state =
+      CURRENT_CONTEXT->device->newDepthStencilState(
+          cmd_buf->active_gfx_pipe->depth_stencil_desc.get());
+  cmd_buf->active_rce->setDepthStencilState(depth_stencil_state.get());
 }
 
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
@@ -2434,8 +2438,10 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->active_gfx_pipe->depth_stencil_desc->frontFaceStencil()->setWriteMask(front);
   cmd_buf->active_gfx_pipe->depth_stencil_desc->backFaceStencil()->setWriteMask(back);
-  cmd_buf->active_rce->setDepthStencilState(CURRENT_CONTEXT->device->newDepthStencilState(
-      cmd_buf->active_gfx_pipe->depth_stencil_desc.get()));
+  ngf_id<MTL::DepthStencilState> depth_stencil_state =
+      CURRENT_CONTEXT->device->newDepthStencilState(
+          cmd_buf->active_gfx_pipe->depth_stencil_desc.get());
+  cmd_buf->active_rce->setDepthStencilState(depth_stencil_state.get());
 }
 
 void ngf_finish() NGF_NOEXCEPT {
