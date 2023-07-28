@@ -3753,7 +3753,10 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
 
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngf_error      err = NGF_ERROR_OK;
-  const uint32_t fi  = CURRENT_CONTEXT->frame_id;
+
+  // increment frame id.
+  const uint32_t fi = (CURRENT_CONTEXT->frame_id + 1u) % CURRENT_CONTEXT->max_inflight_frames;
+  CURRENT_CONTEXT->frame_id = fi;
 
   // setup frame capture
   if (_renderdoc.api && _renderdoc.is_capturing_next_frame) {
@@ -3806,10 +3809,8 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
 
   ngf_error err = NGF_ERROR_OK;
 
-  // Obtain the current frame resource structure and increment frame number.
+  // Obtain the current frame resource structure.
   const uint32_t fi                = CURRENT_CONTEXT->frame_id;
-  const uint32_t next_fi           = (fi + 1u) % CURRENT_CONTEXT->max_inflight_frames;
-  CURRENT_CONTEXT->frame_id        = next_fi;
   ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[fi];
 
   frame_res->nwait_fences = 0u;
