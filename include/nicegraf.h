@@ -1246,6 +1246,8 @@ typedef struct ngf_attachment_description {
   ngf_sample_count sample_count; /**< Number of samples per pixel in the associated image. */
   bool is_sampled; /**< Whether the image associated with this attachment is sampled from a shader
                       at any point. */
+  bool is_resolve; /**< Whether the image associated with this attachment is used as an MSAA resolve
+                      target. */
 } ngf_attachment_description;
 
 /**
@@ -1822,6 +1824,13 @@ typedef enum ngf_attachment_store_op {
    * presenting it to screen. The contents of the attachment shall be written out to system memory.
    */
   NGF_STORE_OP_STORE,
+
+  /**
+   * \ingroup ngf
+   *
+   * Use this to resolve a multisampled color attachment to a corresponding resolve attachment.
+   */
+  NGF_STORE_OP_RESOLVE,
 
   NGF_STORE_OP_COUNT
 } ngf_attachment_store_op;
