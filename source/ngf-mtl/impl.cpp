@@ -487,23 +487,23 @@ template<typename T> class ngf_id {
   ngf_id(T* starting_ptr) : ptr_(starting_ptr) {
   }
   ~ngf_id() {
-    if (ptr_) { ptr_->release(); }
+    destroy_if_necessary();
   }
 
-  ngf_id(const ngf_id& other) : ptr_(other.ptr_) {
-    if (ptr_) { ptr_->retain(); }
+  ngf_id(const ngf_id& other) : ptr_(nullptr) {
+    *this = other;
   }
   ngf_id& operator=(const ngf_id& other) {
-    if (ptr_) { ptr_->release(); }
+    destroy_if_necessary();
     ptr_ = other.ptr_;
     if (ptr_) { ptr_->retain(); }
     return *this;
   }
-  ngf_id(ngf_id&& other) : ptr_(other.ptr_) {
-    other.ptr_ = nullptr;
+  ngf_id(ngf_id&& other) : ptr_(nullptr) {
+    *this = other;
   }
   ngf_id& operator=(ngf_id&& other) {
-    if (ptr_) { ptr_->release(); }
+    destroy_if_necessary();
     ptr_       = other.ptr_;
     other.ptr_ = nullptr;
     return *this;
@@ -520,6 +520,10 @@ template<typename T> class ngf_id {
   }
 
   private:
+  void destroy_if_necessary() {
+    if (ptr_) { ptr_->release(); }
+  }
+
   T* ptr_;
 };
 
