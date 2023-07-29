@@ -500,7 +500,7 @@ template<typename T> class ngf_id {
     return *this;
   }
   ngf_id(ngf_id&& other) : ptr_(nullptr) {
-    *this = other;
+    *this = std::move(other);
   }
   ngf_id& operator=(ngf_id&& other) {
     destroy_if_necessary();
