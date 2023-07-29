@@ -171,7 +171,7 @@ PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR;
 PFN_vkDestroyDebugUtilsMessengerEXT    vkDestroyDebugUtilsMessengerEXT;
 
 bool vkl_init_loader(void) {
-  ModuleHandle vkdll = LoadLibraryA(VK_LOADER_LIB);
+  ngf_module_handle vkdll = LoadLibraryA(VK_LOADER_LIB);
 
   if (!vkdll) {
     return false;
