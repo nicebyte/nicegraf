@@ -2271,6 +2271,9 @@ void ngf_finish() NGF_NOEXCEPT {
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
+  }
+
+  if (CURRENT_CONTEXT->last_cmd_buffer != nullptr) {
     CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted();
   }
 }

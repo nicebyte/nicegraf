@@ -2349,6 +2349,9 @@ void ngf_finish() NGF_NOEXCEPT {
     [CURRENT_CONTEXT->pending_cmd_buffer commit];
     CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nil;
+  }
+
+  if (CURRENT_CONTEXT->last_cmd_buffer != nil) {
     [CURRENT_CONTEXT->last_cmd_buffer waitUntilCompleted];
   }
 }
