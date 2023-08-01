@@ -490,15 +490,8 @@ template<typename T> class ngf_id {
     destroy_if_necessary();
   }
 
-  ngf_id(const ngf_id& other) : ptr_(nullptr) {
-    *this = other;
-  }
-  ngf_id& operator=(const ngf_id& other) {
-    destroy_if_necessary();
-    ptr_ = other.ptr_;
-    if (ptr_) { ptr_->retain(); }
-    return *this;
-  }
+  ngf_id(const ngf_id&)            = delete;
+  ngf_id& operator=(const ngf_id&) = delete;
   ngf_id(ngf_id&& other) : ptr_(nullptr) {
     *this = std::move(other);
   }
@@ -1081,7 +1074,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   ctx->device = MTL_DEVICE;
   if (info->shared_context != nullptr) {
-    ctx->queue = info->shared_context->queue;
+    ctx->queue = ngf_id<MTL::CommandQueue>::add_retain(info->shared_context->queue.get());
   } else {
     ctx->queue = ctx->device->newCommandQueue();
   }
@@ -1416,7 +1409,7 @@ ngf_error ngf_create_compute_pipeline(
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
   NGFMTL_NURSERY(compute_pipeline, compute_pipeline);
-  compute_pipeline->pipeline           = computePSO;
+  compute_pipeline->pipeline           = std::move(computePSO);
   compute_pipeline->niceshade_metadata = std::move(metadata);
   *result                              = compute_pipeline.release();
   return NGF_ERROR_OK;
@@ -1562,9 +1555,8 @@ ngf_error ngf_create_graphics_pipeline(
 
   // Set up depth and stencil state.
 
-  ngf_id<MTL::DepthStencilDescriptor> depth_stencil_desc = id_default;
-  pipeline->depth_stencil_desc                           = depth_stencil_desc;
-  const ngf_depth_stencil_info& depth_stencil_info       = *info->depth_stencil;
+  pipeline->depth_stencil_desc                     = id_default;
+  const ngf_depth_stencil_info& depth_stencil_info = *info->depth_stencil;
   pipeline->depth_stencil_desc->setDepthCompareFunction(
       depth_stencil_info.depth_test ? get_mtl_compare_function(depth_stencil_info.depth_compare)
                                     : MTL::CompareFunctionAlways);
@@ -2157,7 +2149,7 @@ void ngf_cmd_bind_index_buffer(
     uint32_t           offset,
     ngf_type           type) NGF_NOEXCEPT {
   auto cmd_buf                       = NGFMTL_ENC2CMDBUF(enc);
-  cmd_buf->bound_index_buffer        = buf->mtl_buffer;
+  cmd_buf->bound_index_buffer        = ngf_id<MTL::Buffer>::add_retain(buf->mtl_buffer.get());
   cmd_buf->bound_index_buffer_type   = get_mtl_index_type(type);
   cmd_buf->bound_index_buffer_offset = offset;
 }
@@ -2449,15 +2441,13 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 }
 
 void ngf_finish() NGF_NOEXCEPT {
-  if (CURRENT_CONTEXT->pending_cmd_buffer != nullptr) {
+  if (CURRENT_CONTEXT->pending_cmd_buffer) {
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   }
 
-  if (CURRENT_CONTEXT->last_cmd_buffer != nullptr) {
-    CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted();
-  }
+  if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
