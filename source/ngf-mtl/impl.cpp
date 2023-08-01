@@ -1046,11 +1046,11 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
     CURRENT_CONTEXT->pending_cmd_buffer->addCompletedHandler(
         [ctx](MTL::CommandBuffer*) { dispatch_semaphore_signal(ctx->frame_sync_sem); });
     CURRENT_CONTEXT->pending_cmd_buffer->presentDrawable(CURRENT_CONTEXT->frame.color_drawable);
-    CURRENT_CONTEXT->pending_cmd_buffer->commit();
-    CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame {};
     CURRENT_CONTEXT->last_cmd_buffer =
         ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
+    CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
+    CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame {};
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
@@ -2442,8 +2442,8 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 
 void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->pending_cmd_buffer) {
+    CURRENT_CONTEXT->last_cmd_buffer = ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
-    CURRENT_CONTEXT->last_cmd_buffer    = CURRENT_CONTEXT->pending_cmd_buffer;
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   }
 
