@@ -2461,3 +2461,19 @@ void ngf_renderdoc_capture_begin() NGF_NOEXCEPT {
 void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
+
+uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
+  return (uintptr_t)(cmd_buffer->mtl_cmd_buffer);
+}
+
+uintptr_t ngf_get_render_encoder_handle(ngf_cmd_buffer cmd_buffer) {
+  return (uintptr_t)(cmd_buffer->active_rce);
+}
+
+uintptr_t ngf_get_xfer_encoder_handle(ngf_cmd_buffer cmd_buffer) {
+  return (uintptr_t)(cmd_buffer->active_bce);
+}
+
+uintptr_t ngf_get_compute_encoder_handle(ngf_cmd_buffer cmd_buffer) {
+  return (uintptr_t)(cmd_buffer->active_cce);
+}
