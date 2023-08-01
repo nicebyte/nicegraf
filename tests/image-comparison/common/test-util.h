@@ -6,12 +6,15 @@
 struct render_to_texture_data {
   ngf::render_target default_rt;
   ngf::render_target offscreen_rt;
-  ngf::graphics_pipeline blit_pipeline;
   ngf::graphics_pipeline offscreen_pipeline;
   ngf::image rt_texture;
-  ngf::sampler sampler;
   ngf_frame_token frame_token;
 };
+
+void ngf_test_init()
+{
+
+}
 
 bool ngf_validate_result(void* userdata, const char* ref_image)
 {
