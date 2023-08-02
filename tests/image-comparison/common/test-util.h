@@ -3,30 +3,63 @@
 #include "nicegraf-util.h"
 #include "check.h"
 
-struct render_to_texture_data {
-  ngf::render_target default_rt;
-  ngf::render_target offscreen_rt;
-  ngf::graphics_pipeline offscreen_pipeline;
-  ngf::image rt_texture;
-  ngf_frame_token frame_token;
-};
-
 void ngf_test_init()
 {
+  uint32_t          ndevices = 0u;
+  const ngf_device* devices  = NULL;
+  ngf_get_device_list(&devices, &ndevices);
+  const char* device_perf_tier_names[NGF_DEVICE_PERFORMANCE_TIER_COUNT] = {
+      "high",
+      "low",
+      "unknown"};
 
+  size_t high_power_device_idx = (~0u);
+  for (uint32_t i = 0; i < ndevices; ++i) {
+    if (high_power_device_idx == (~0u) &&
+        devices[i].performance_tier == NGF_DEVICE_PERFORMANCE_TIER_HIGH) {
+      high_power_device_idx = i;
+    }
+  }
+  /* Fall back to 1st device if no high-power device was found. */
+  const size_t preferred_device_idx = (high_power_device_idx == ~0u) ? 0 : high_power_device_idx;
+  const ngf_device_handle device_handle = devices[preferred_device_idx].handle;
+
+  const ngf_init_info init_info {
+      .diag_info            = &diagnostic_info,
+      .allocation_callbacks = NULL,
+      .device               = device_handle,
+      .renderdoc_info       = NULL};
+  ngf_initialize(&init_info);
+
+  const ngf_sample_count main_render_target_sample_count = ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
+  const ngf_swapchain_info swapchain_info                  = {
+                       .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+                       .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
+                       .sample_count  = main_render_target_sample_count,
+                       .capacity_hint = 3u,
+                       .width         = (uint32_t)fb_width,
+                       .height        = (uint32_t)fb_height,
+                       .native_handle = native_window_handle,
+                       .present_mode  = NGF_PRESENTATION_MODE_FIFO};
+  const ngf_context_info ctx_info = {.swapchain_info = &swapchain_info, .shared_context = nullptr};
+  ngf::context           context;
+
+  context.initialize(ctx_info);
+  ngf_set_context(context);
+
+  ngf::cmd_buffer main_cmd_buffer;
+  main_cmd_buffer.initialize(ngf_cmd_buffer_info {});
 }
 
-bool ngf_validate_result(void* userdata, const char* ref_image)
+bool ngf_validate_result(ngf_image output_image, const char* ref_image, ngf_frame_token frame_token)
 {
-  auto state = reinterpret_cast<render_to_texture_data*>(userdata);
-
   ngf_cmd_buffer      xfer_cmd_buf  = nullptr;
   ngf_cmd_buffer_info xfer_cmd_info = {};
 
   ngf_extent3d        src_extent = {512u, 512u, 1u};
   ngf_offset3d        src_offset = {0u, 0u, 0u};
   const ngf_image_ref src_image  = {
-       .image        = state->rt_texture.get(),
+       .image        = output_image.get(),
        .mip_level    = 0u,
        .layer        = 0u,
        .cubemap_face = NGF_CUBEMAP_FACE_COUNT
@@ -39,7 +72,7 @@ bool ngf_validate_result(void* userdata, const char* ref_image)
   };
   ngf_create_buffer(&dst_buffer_info, &dst_buffer);
   ngf_create_cmd_buffer(&xfer_cmd_info, &xfer_cmd_buf);
-  ngf_start_cmd_buffer(xfer_cmd_buf, state->frame_token);
+  ngf_start_cmd_buffer(xfer_cmd_buf, frame_token);
   ngf_xfer_encoder   xfer_encoder {};
   ngf_xfer_pass_info xfer_pass_info {};
   NGF_SAMPLES_CHECK_NGF_ERROR(ngf_cmd_begin_xfer_pass(xfer_cmd_buf, &xfer_pass_info, &xfer_encoder));
