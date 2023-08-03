@@ -13,10 +13,8 @@
 #define NGF_TESTS_COMMON_MAIN main
 #endif
 
-void ngf_test_draw(ngf_image output_image){
-
+void ngf_test_draw(ngf_image output_image, ngf_frame_token frame_token){
   // Initialize the triangle test
-
   ngf::render_target offscreen_rt;
   ngf::graphics_pipeline offscreen_pipeline;
 
@@ -56,12 +54,33 @@ void ngf_test_draw(ngf_image output_image){
   offscreen_pipeline.initialize(offscreen_pipe_info);
 
   // Start drawing to output_image
+  ngf_irect2d         offsc_viewport {0, 0, 512, 512};
+  ngf_cmd_buffer      offscr_cmd_buf = nullptr;
+  ngf_cmd_buffer_info cmd_info       = {};
+  ngf_create_cmd_buffer(&cmd_info, &offscr_cmd_buf);
+  ngf_start_cmd_buffer(offscr_cmd_buf, frame_token);
+  {
+    ngf::render_encoder renc {offscr_cmd_buf, offscreen_rt, .0f, 0.0f, 0.0f, 0.0f, 1.0, 0u};
+    ngf_cmd_bind_gfx_pipeline(renc, offscreen_pipeline);
+    ngf_cmd_viewport(renc, &offsc_viewport);
+    ngf_cmd_scissor(renc, &offsc_viewport);
+    ngf_cmd_draw(renc, false, 0u, 3u, 1u);
+  }
+  ngf_submit_cmd_buffers(1, &offscr_cmd_buf);
+  ngf_destroy_cmd_buffer(offscr_cmd_buf);
 }
 
 int NGF_SAMPLES_COMMON_MAIN(int, char**){
   // ngf_test_init(...): initializes nicegraf; common for all tests
-  ngf_test_init();
-  // ngf_test_draw(ngf_image output_image): initializes test and draws the test render to output_image
+  ngf_frame_token frame_token = ngf_test_init();
+
+  // [PENDING] Create an ngf_image to render to
+  ngf_image output_image;
+
+  // ngf_test_draw(...): initializes test and draws the test render to output_image
+  ngf_test_draw(output_image, frame_token);
 
   // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue. if true, test is passed
+
+  // Shutdown test
 }

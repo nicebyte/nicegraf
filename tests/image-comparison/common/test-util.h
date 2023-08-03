@@ -3,7 +3,7 @@
 #include "nicegraf-util.h"
 #include "check.h"
 
-void ngf_test_init()
+ngf_frame_token ngf_test_init()
 {
   uint32_t          ndevices = 0u;
   const ngf_device* devices  = NULL;
@@ -49,6 +49,16 @@ void ngf_test_init()
 
   ngf::cmd_buffer main_cmd_buffer;
   main_cmd_buffer.initialize(ngf_cmd_buffer_info {});
+  ngf_frame_token frame_token;
+  if (ngf_begin_frame(&frame_token) == NGF_ERROR_OK) return;
+  ngf_start_cmd_buffer(main_cmd_buffer, frame_token);
+  // Return only frame_token?
+}
+
+void ngf_test_shutdown(){
+  // submit main cmd buffer
+  // end frame
+  // ngf_shutdown()
 }
 
 bool ngf_validate_result(ngf_image output_image, const char* ref_image, ngf_frame_token frame_token)
