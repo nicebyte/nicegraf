@@ -2474,16 +2474,19 @@ uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
   return (uintptr_t)(cmd_buffer->mtl_cmd_buffer);
 }
 
-uintptr_t ngf_get_render_encoder_handle(ngf_cmd_buffer cmd_buffer) {
-  return (uintptr_t)(cmd_buffer->active_rce);
+uintptr_t ngf_get_render_encoder_handle(ngf_render_encoder render_encoder) {
+  auto buf = NGFMTL_ENC2CMDBUF(render_encoder);
+  return (uintptr_t)(buf->active_rce);
 }
 
-uintptr_t ngf_get_xfer_encoder_handle(ngf_cmd_buffer cmd_buffer) {
-  return (uintptr_t)(cmd_buffer->active_bce);
+uintptr_t ngf_get_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) {
+  auto buf = NGFMTL_ENC2CMDBUF(xfer_encoder);
+  return (uintptr_t)(buf->active_bce);
 }
 
-uintptr_t ngf_get_compute_encoder_handle(ngf_cmd_buffer cmd_buffer) {
-  return (uintptr_t)(cmd_buffer->active_cce);
+uintptr_t ngf_get_compute_encoder_handle(ngf_compute_encoder compute_encoder) {
+  auto buf = NGFMTL_ENC2CMDBUF(compute_encoder);
+  return (uintptr_t)(buf->active_cce);
 }
 
 uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) {
