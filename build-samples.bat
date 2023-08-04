@@ -1,12 +1,18 @@
 @echo off
 
-echo "Downloading binary dependencies for samples"
-git lfs install || (exit /b)
-git lfs pull --exclude="" || (exit /b)
-echo "Downloading library dependencies for samples"
+echo Downloading binary dependencies and data for samples...
+powershell -Command "(New-Object Net.WebClient).DownloadFile('https://github.com/nicebyte/nicegraf/releases/download/v0.1/nicegraf-samples-data.zip', 'nicegraf-samples-data.zip')" || (exit /b)
+echo Unpacking binary dependencies and data for samples...
+powershell -Command "Expand-Archive -Force nicegraf-samples-data.zip ." || (exit /b)
+echo Removing temporary files...
+del nicegraf-samples-data.zip || (exit /b)
+echo Downloading library dependencies for samples...
 git submodule init || (exit /b)
 git submodule update || (exit /b)
+echo Setting up folder for build files...
 if not exist ".\samples-build-files" mkdir samples-build-files || (exit /b)
 cd samples-build-files || (exit /b)
+echo Generating build files...
 cmake .. -DNGF_BUILD_SAMPLES="yes" || (exit /b)
+echo Finished successfully!
 pause
