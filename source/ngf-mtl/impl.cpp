@@ -27,8 +27,6 @@
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 
-#include <_types/_uint32_t.h>
-
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #define CA_PRIVATE_IMPLEMENTATION
