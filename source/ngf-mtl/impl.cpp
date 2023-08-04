@@ -1936,7 +1936,9 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     const bool needs_resolve = rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR &&
                                rt->attachment_descs.descs[i].sample_count > NGF_SAMPLE_COUNT_1 &&
                                (rt->resolve_image_refs || rt->is_default);
-    store_ops[i] = needs_resolve ? NGF_STORE_OP_RESOLVE : NGF_STORE_OP_DONTCARE;
+    store_ops[i] = (needs_resolve)                              ? NGF_STORE_OP_RESOLVE
+                   : (rt->attachment_descs.descs[i].is_sampled) ? NGF_STORE_OP_STORE
+                                                                : NGF_STORE_OP_DONTCARE;
   }
   const ngf_render_pass_info pass_info =
       {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
@@ -2531,4 +2533,3 @@ void ngf_renderdoc_capture_begin() NGF_NOEXCEPT {
 void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
-
