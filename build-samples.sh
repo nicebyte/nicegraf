@@ -3,7 +3,7 @@
 set -e
 
 echo "Downloading binary dependencies for samples..."
-curl https://github.com/nicebyte/nicegraf/releases/download/v0.1/nicegraf-samples-data.zip -fL -o nicegraf-samples-data.zip
+curl https://github.com/nicebyte/nicegraf/releases/download/v0.1.1/nicegraf-samples-data.zip -fL -o nicegraf-samples-data.zip
 echo "Unpacking binary dependencies and data for samples..."
 unzip -u nicegraf-samples-data.zip
 chmod +x ./samples/deps/niceshade/macos/niceshade
