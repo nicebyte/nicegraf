@@ -234,7 +234,8 @@ static MTL::LoadAction get_mtl_load_action(ngf_attachment_load_op op) {
 static MTL::StoreAction get_mtl_store_action(ngf_attachment_store_op op) {
   static const MTL::StoreAction action[NGF_STORE_OP_COUNT] = {
       MTL::StoreActionDontCare,
-      MTL::StoreActionStore};
+      MTL::StoreActionStore,
+      MTL::StoreActionMultisampleResolve};
   return action[op];
 }
 
@@ -483,7 +484,8 @@ template<typename T> class ngf_id {
   }
   ngf_id(const ngf_id_init_types& type) : ptr_(T::alloc()->init()) {
   }
-  // Note: Does NOT increment ref count. You can use this directly after calling alloc()->init()
+  // Note: Does NOT increment ref count. You can use this directly after calling
+  // alloc()->init()
   ngf_id(T* starting_ptr) : ptr_(starting_ptr) {
   }
   ~ngf_id() {
@@ -521,34 +523,80 @@ template<typename T> class ngf_id {
 };
 
 struct ngf_render_target_t {
-  ngf_render_target_t(
+  ngf_error initialize(
       const ngf_attachment_descriptions& attachment_descs,
       const ngf_image_ref*               img_refs,
-      uint32_t                           width,
-      uint32_t                           height)
-      : width(width),
-        height(height) {
-    const uint32_t              nattachments = attachment_descs.ndescs;
-    ngf_attachment_description* descs = NGFI_ALLOCN(ngf_attachment_description, nattachments);
-    memcpy(descs, attachment_descs.descs, sizeof(ngf_attachment_description) * nattachments);
-    this->attachment_descs.descs  = descs;
-    this->attachment_descs.ndescs = nattachments;
-    if (img_refs) {
-      image_refs = NGFI_ALLOCN(ngf_image_ref, nattachments);
-      memcpy(image_refs, img_refs, sizeof(ngf_image_ref) * nattachments);
+      uint32_t                           rt_width,
+      uint32_t                           rt_height) {
+    width                             = rt_width;
+    height                            = rt_height;
+    const uint32_t nattachments       = attachment_descs.ndescs;
+    nresolve_attachments              = 0u;
+    uint32_t nnon_resolve_attachments = 0u;
+    uint32_t ncolor_attachments       = 0u;
+
+    for (uint32_t i = 0; i < nattachments; ++i) {
+      if (attachment_descs.descs[i].is_resolve) {
+        ++nresolve_attachments;
+      } else {
+        ++nnon_resolve_attachments;
+
+        if (attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR) { ++ncolor_attachments; }
+      }
     }
+
+    if (nresolve_attachments > 0 && ncolor_attachments != nresolve_attachments) {
+      NGFI_DIAG_ERROR("the same number of resolve and color attachments must be provided");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+
+    ngf_attachment_description* non_resolve_attachment_descs =
+        NGFI_ALLOCN(ngf_attachment_description, nnon_resolve_attachments);
+
+    uint32_t attachment_idx = 0u;
+    for (uint32_t i = 0; i < nattachments; ++i) {
+      if (!attachment_descs.descs[i].is_resolve) {
+        non_resolve_attachment_descs[attachment_idx++] = attachment_descs.descs[i];
+      }
+    }
+
+    this->attachment_descs.descs  = non_resolve_attachment_descs;
+    this->attachment_descs.ndescs = nnon_resolve_attachments;
+
+    if (img_refs) {
+      image_refs = NGFI_ALLOCN(ngf_image_ref, nnon_resolve_attachments);
+
+      if (nresolve_attachments > 0u) {
+        resolve_image_refs = NGFI_ALLOCN(ngf_image_ref, nresolve_attachments);
+      }
+
+      uint32_t image_ref_idx         = 0u;
+      uint32_t resolve_image_ref_idx = 0u;
+      for (uint32_t i = 0; i < nattachments; ++i) {
+        if (!attachment_descs.descs[i].is_resolve) {
+          image_refs[image_ref_idx++] = img_refs[i];
+        } else if (nresolve_attachments > 0u) {
+          resolve_image_refs[resolve_image_ref_idx++] = img_refs[i];
+        }
+      }
+    }
+
+    return NGF_ERROR_OK;
   }
 
   ~ngf_render_target_t() {
     if (attachment_descs.descs) {
+      if (nresolve_attachments > 0u) { NGFI_FREEN(resolve_image_refs, nresolve_attachments); }
       NGFI_FREEN(image_refs, attachment_descs.ndescs);
       NGFI_FREEN(attachment_descs.descs, attachment_descs.ndescs);
     }
   }
 
   ngf_attachment_descriptions attachment_descs;
-  ngf_image_ref*              image_refs = nullptr;
-  bool                        is_default = false;
+  ngf_image_ref*              image_refs           = nullptr;
+  ngf_image_ref*              resolve_image_refs   = nullptr;
+  uint32_t                    nresolve_attachments = 0u;
+  bool                        is_default           = false;
   NS::UInteger                width;
   NS::UInteger                height;
 };
@@ -1050,7 +1098,7 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
         ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
-    CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame {};
+    CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {};
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
@@ -1091,6 +1139,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     desc_array[0].is_sampled   = false;
     desc_array[0].type         = NGF_ATTACHMENT_COLOR;
     desc_array[0].sample_count = ctx->swapchain_info.sample_count;
+    desc_array[0].is_resolve   = false;
     if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
       attachment_descs.ndescs++;
       desc_array[1].format     = ctx->swapchain_info.depth_format;
@@ -1099,15 +1148,19 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
                                ? NGF_ATTACHMENT_DEPTH_STENCIL
                                : NGF_ATTACHMENT_DEPTH;
       desc_array[1].sample_count = ctx->swapchain_info.sample_count;
+      desc_array[1].is_resolve   = false;
     }
 
-    NGFMTL_NURSERY(
-        render_target,
-        default_rt,
+    NGFMTL_NURSERY(render_target, default_rt);
+    if (!default_rt) { return NGF_ERROR_OUT_OF_MEM; }
+
+    err = default_rt->initialize(
         attachment_descs,
         nullptr,
         info->swapchain_info->width,
         info->swapchain_info->height);
+    if (err != NGF_ERROR_OK) { return err; }
+
     ctx->default_rt             = default_rt.release();
     ctx->default_rt->is_default = true;
   }
@@ -1225,13 +1278,17 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     NGF_NOEXCEPT {
   assert(info);
   assert(result);
-  NGFMTL_NURSERY(
-      render_target,
-      rt,
+
+  NGFMTL_NURSERY(render_target, rt);
+  if (!rt) { return NGF_ERROR_OUT_OF_MEM; }
+
+  ngf_error err = rt->initialize(
       *info->attachment_descriptions,
       info->attachment_image_refs,
       (uint32_t)info->attachment_image_refs[0].image->texture->width(),
       (uint32_t)info->attachment_image_refs[0].image->texture->height());
+  if (err != NGF_ERROR_OK) { return err; }
+
   *result = rt.release();
   return NGF_ERROR_OK;
 }
@@ -1426,6 +1483,7 @@ ngf_error ngf_create_graphics_pipeline(
   uint32_t                              ncolor_attachments = 0u;
   for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = attachment_descs.descs[i];
+    if (attachment_desc.is_resolve) continue;
     if (attachment_desc.type == NGF_ATTACHMENT_COLOR) {
       const ngf_blend_info                          blend = info->color_attachment_blend_states
                                                                 ? info->color_attachment_blend_states[ncolor_attachments]
@@ -1453,7 +1511,9 @@ ngf_error ngf_create_graphics_pipeline(
             (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B ? MTL::ColorWriteMaskBlue : 0) |
             (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A ? MTL::ColorWriteMaskAlpha : 0));
       }
-    } else if (attachment_desc.type == NGF_ATTACHMENT_DEPTH) {
+    } else if (
+        attachment_desc.type == NGF_ATTACHMENT_DEPTH ||
+        attachment_desc.type == NGF_ATTACHMENT_DEPTH_STENCIL) {
       mtl_pipe_desc->setDepthAttachmentPixelFormat(
           get_mtl_pixel_format(attachment_desc.format).format);
     }
@@ -1871,8 +1931,12 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     } else {
       assert(false);
     }
-    store_ops[i] =
-        rt->attachment_descs.descs[i].is_sampled ? NGF_STORE_OP_STORE : NGF_STORE_OP_DONTCARE;
+    const bool needs_resolve = rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR &&
+                               rt->attachment_descs.descs[i].sample_count > NGF_SAMPLE_COUNT_1 &&
+                               (rt->resolve_image_refs || rt->is_default);
+    store_ops[i] = (needs_resolve)                              ? NGF_STORE_OP_RESOLVE
+                   : (rt->attachment_descs.descs[i].is_sampled) ? NGF_STORE_OP_STORE
+                                                                : NGF_STORE_OP_DONTCARE;
   }
   const ngf_render_pass_info pass_info =
       {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
@@ -1892,8 +1956,9 @@ ngf_error ngf_cmd_begin_render_pass(
   ngfmtl_finish_pending_encoders(cmd_buffer);
   cmd_buffer->renderpass_active = true;
 
-  uint32_t                          color_attachment_idx = 0u;
-  ngf_id<MTL::RenderPassDescriptor> pass_descriptor      = id_default;
+  uint32_t                          color_attachment_idx   = 0u;
+  uint32_t                          resolve_attachment_idx = 0u;
+  ngf_id<MTL::RenderPassDescriptor> pass_descriptor        = id_default;
   pass_descriptor->setRenderTargetWidth(rt->width);
   pass_descriptor->setRenderTargetHeight(rt->height);
   pass_descriptor->setDepthAttachment(nullptr);
@@ -1915,12 +1980,16 @@ ngf_error ngf_cmd_begin_render_pass(
             clear_info->clear_color[2],
             clear_info->clear_color[3]));
       }
-      mtl_desc->setResolveTexture(
-          rt->is_default ? CURRENT_CONTEXT->frame.resolve_attachment_texture() : nullptr);
-      if (mtl_desc->resolveTexture()) {
-        // Override user-specified store action
-        mtl_desc->setStoreAction(MTL::StoreActionMultisampleResolve);
+
+      if (attachment_desc.sample_count > NGF_SAMPLE_COUNT_1) {
+        if (rt->is_default) {
+          mtl_desc->setResolveTexture(CURRENT_CONTEXT->frame.resolve_attachment_texture());
+        } else if (rt->resolve_image_refs) {
+          mtl_desc->setResolveTexture(
+              rt->resolve_image_refs[resolve_attachment_idx++].image->texture.get());
+        }
       }
+
       pass_descriptor->colorAttachments()->setObject(mtl_desc.get(), color_attachment_idx++);
       break;
     }
@@ -2046,12 +2115,14 @@ void ngf_cmd_dispatch(
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   assert(cmd_buf->active_cce);
   if (!cmd_buf->active_cce) {
-    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without an active compute encoder.");
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without an active "
+                    "compute encoder.");
     return;
   }
   assert(cmd_buf->active_compute_pipe);
   if (!cmd_buf->active_compute_pipe) {
-    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without a bound compute pipeline.");
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without a bound "
+                    "compute pipeline.");
     return;
   }
   const uint32_t* threadgroup_size =
@@ -2169,7 +2240,8 @@ void ngf_cmd_bind_resources(
     }
     assert(cmd_buf->active_rce);
     if (!cmd_buf->active_rce) {
-      NGFI_DIAG_ERROR("Attempt to bind resources without an active render command encoder.");
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active render "
+                      "command encoder.");
       return;
     }
     const uint32_t native_binding =
@@ -2230,7 +2302,8 @@ void ngf_cmd_bind_resources(
       break;
     }
     case NGF_DESCRIPTOR_STORAGE_IMAGE:
-      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
+      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is "
+                      "currently unsupported.");
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
@@ -2253,7 +2326,8 @@ void ngf_cmd_bind_compute_resources(
     }
     assert(cmd_buf->active_cce);
     if (!cmd_buf->active_cce) {
-      NGFI_DIAG_ERROR("Attempt to bind resources without an active compute command encoder.");
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active compute "
+                      "command encoder.");
       return;
     }
     const uint32_t native_binding =
@@ -2442,7 +2516,8 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 
 void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->pending_cmd_buffer) {
-    CURRENT_CONTEXT->last_cmd_buffer = ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
+    CURRENT_CONTEXT->last_cmd_buffer =
+        ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
     CURRENT_CONTEXT->pending_cmd_buffer->commit();
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   }
