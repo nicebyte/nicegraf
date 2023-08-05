@@ -484,7 +484,8 @@ template<typename T> class ngf_id {
   }
   ngf_id(const ngf_id_init_types& type) : ptr_(T::alloc()->init()) {
   }
-  // Note: Does NOT increment ref count. You can use this directly after calling alloc()->init()
+  // Note: Does NOT increment ref count. You can use this directly after calling
+  // alloc()->init()
   ngf_id(T* starting_ptr) : ptr_(starting_ptr) {
   }
   ~ngf_id() {
@@ -522,14 +523,6 @@ template<typename T> class ngf_id {
 };
 
 struct ngf_render_target_t {
-  ngf_render_target_t(
-      const ngf_attachment_descriptions& attachment_descs,
-      const ngf_image_ref*               img_refs,
-      uint32_t                           rt_width,
-      uint32_t                           rt_height) {
-    this->initialize(attachment_descs, img_refs, rt_width, rt_height);
-  }
-
   ngf_error initialize(
       const ngf_attachment_descriptions& attachment_descs,
       const ngf_image_ref*               img_refs,
@@ -1158,13 +1151,14 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       desc_array[1].is_resolve   = false;
     }
 
-    NGFMTL_NURSERY(
-        render_target,
-        default_rt,
+    NGFMTL_NURSERY(render_target, default_rt);
+    err = default_rt->initialize(
         attachment_descs,
         nullptr,
         info->swapchain_info->width,
         info->swapchain_info->height);
+    if (err != NGF_ERROR_OK) { return err; }
+
     if (!default_rt) { return NGF_ERROR_OUT_OF_MEM; }
 
     ctx->default_rt             = default_rt.release();
@@ -1284,9 +1278,8 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     NGF_NOEXCEPT {
   assert(info);
   assert(result);
-  NGFMTL_NURSERY(
-      render_target,
-      rt,
+  NGFMTL_NURSERY(render_target, rt);
+  rt->initialize(
       *info->attachment_descriptions,
       info->attachment_image_refs,
       (uint32_t)info->attachment_image_refs[0].image->texture->width(),
@@ -2117,12 +2110,14 @@ void ngf_cmd_dispatch(
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   assert(cmd_buf->active_cce);
   if (!cmd_buf->active_cce) {
-    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without an active compute encoder.");
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without an active "
+                    "compute encoder.");
     return;
   }
   assert(cmd_buf->active_compute_pipe);
   if (!cmd_buf->active_compute_pipe) {
-    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without a bound compute pipeline.");
+    NGFI_DIAG_ERROR("Attempt to perform a compute dispatch without a bound "
+                    "compute pipeline.");
     return;
   }
   const uint32_t* threadgroup_size =
@@ -2240,7 +2235,8 @@ void ngf_cmd_bind_resources(
     }
     assert(cmd_buf->active_rce);
     if (!cmd_buf->active_rce) {
-      NGFI_DIAG_ERROR("Attempt to bind resources without an active render command encoder.");
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active render "
+                      "command encoder.");
       return;
     }
     const uint32_t native_binding =
@@ -2301,7 +2297,8 @@ void ngf_cmd_bind_resources(
       break;
     }
     case NGF_DESCRIPTOR_STORAGE_IMAGE:
-      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
+      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is "
+                      "currently unsupported.");
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
@@ -2324,7 +2321,8 @@ void ngf_cmd_bind_compute_resources(
     }
     assert(cmd_buf->active_cce);
     if (!cmd_buf->active_cce) {
-      NGFI_DIAG_ERROR("Attempt to bind resources without an active compute command encoder.");
+      NGFI_DIAG_ERROR("Attempt to bind resources without an active compute "
+                      "command encoder.");
       return;
     }
     const uint32_t native_binding =
