@@ -1152,14 +1152,14 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     }
 
     NGFMTL_NURSERY(render_target, default_rt);
+    if (!default_rt) { return NGF_ERROR_OUT_OF_MEM; }
+
     err = default_rt->initialize(
         attachment_descs,
         nullptr,
         info->swapchain_info->width,
         info->swapchain_info->height);
     if (err != NGF_ERROR_OK) { return err; }
-
-    if (!default_rt) { return NGF_ERROR_OUT_OF_MEM; }
 
     ctx->default_rt             = default_rt.release();
     ctx->default_rt->is_default = true;
@@ -1278,12 +1278,17 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     NGF_NOEXCEPT {
   assert(info);
   assert(result);
+
   NGFMTL_NURSERY(render_target, rt);
-  rt->initialize(
+  if (!rt) { return NGF_ERROR_OUT_OF_MEM; }
+
+  ngf_error err = rt->initialize(
       *info->attachment_descriptions,
       info->attachment_image_refs,
       (uint32_t)info->attachment_image_refs[0].image->texture->width(),
       (uint32_t)info->attachment_image_refs[0].image->texture->height());
+  if (err != NGF_ERROR_OK) { return err; }
+
   *result = rt.release();
   return NGF_ERROR_OK;
 }
