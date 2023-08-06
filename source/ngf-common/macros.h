@@ -15,14 +15,14 @@ typedef CRITICAL_SECTION pthread_mutex_t;
 #define pthread_mutex_init(m, a) (InitializeCriticalSection(m), 0)
 #define pthread_mutex_destroy(m) (DeleteCriticalSection(m), 0)
 // dynamic module loading
-typedef HMODULE ngf_module_handle;
+typedef HMODULE ngfi_module_handle;
 #else
 #define NGFI_THREADLOCAL __thread
 #include <pthread.h>
 // dynamic module loading (emulate win32 api)
 #define LoadLibraryA(name) dlopen(name, RTLD_NOW)
 #define GetProcAddress(h, n) dlsym(h, n)
-typedef void* ngf_module_handle;
+typedef void* ngfi_module_handle;
 #endif
 
 #ifdef __cplusplus

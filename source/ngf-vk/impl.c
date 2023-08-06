@@ -2879,7 +2879,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   assert(init_info);
 
   if (init_info->renderdoc_info) {
-    ngf_module_handle ngf_renderdoc_mod = LoadLibraryA(init_info->renderdoc_info->renderdoc_lib_path);
+    ngfi_module_handle ngf_renderdoc_mod = LoadLibraryA(init_info->renderdoc_info->renderdoc_lib_path);
     if (ngf_renderdoc_mod != NULL) {
       pRENDERDOC_GetAPI RENDERDOC_GetAPI =
           (pRENDERDOC_GetAPI)GetProcAddress(ngf_renderdoc_mod, "RENDERDOC_GetAPI");
