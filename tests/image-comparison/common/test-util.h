@@ -53,6 +53,7 @@ ngf_frame_token ngf_test_init()
   if (ngf_begin_frame(&frame_token) == NGF_ERROR_OK) return;
   ngf_start_cmd_buffer(main_cmd_buffer, frame_token);
   // Return only frame_token?
+  return frame_token;
 }
 
 void ngf_test_shutdown(){
@@ -111,11 +112,18 @@ bool ngf_validate_result(ngf_image output_image, const char* ref_image, ngf_fram
   fread(buffer, 1, buff_size, file);
   fclose(file);
 
+  bool equal = true;
   const char* mem_data = (const char*)host_dst;
-    for (size_t i = 0; i < buff_size; i++) {
-        if (mem_data[i] != buffer[i]) {  
-            free(buffer);
-            return false;
-        }
-    }
+  for (size_t i = 0; i < buff_size; i++) {
+      if (mem_data[i] != buffer[i]) {  
+          free(buffer);
+          equal = false;
+      }
+  }
+  if(!equal){
+    FILE* f = fopen("./output/triangle_test.data", "wb");
+    fwrite(host_dst, 1u, 512 * 512 * 4, f);
+    fclose(f);
+  }
+  return equal;
 }

@@ -81,6 +81,11 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**){
   ngf_test_draw(output_image, frame_token);
 
   // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue. if true, test is passed
+  if(!ngf_validate_result(output_image, "references/triangle_reference.data", frame_token))
+  {
+    // Print Test failure message
+  }
 
-  // Shutdown test
+  // [PENDING] Shutdown test
+  ngf_test_shutdown();
 }
