@@ -72,20 +72,21 @@ void ngf_test_draw(ngf_image output_image, ngf_frame_token frame_token){
 
 int NGF_SAMPLES_COMMON_MAIN(int, char**){
   // ngf_test_init(...): initializes nicegraf; common for all tests
-  ngf_frame_token frame_token = ngf_test_init();
+  struct test_info info = ngf_test_init();
 
   // [PENDING] Create an ngf_image to render to
   ngf_image output_image;
 
   // ngf_test_draw(...): initializes test and draws the test render to output_image
-  ngf_test_draw(output_image, frame_token);
+  ngf_test_draw(output_image, info.frame_token);
 
   // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue. if true, test is passed
-  if(!ngf_validate_result(output_image, "references/triangle_reference.data", frame_token))
+  if(!ngf_validate_result(output_image, "references/triangle_reference.data", info.frame_token))
   {
     // Print Test failure message
+    printf("[NICEGRAF TEST] Test failed. Please view output image in the output directory.\n");
   }
 
-  // [PENDING] Shutdown test
-  ngf_test_shutdown();
+  // Shutdown test
+  ngf_test_shutdown(info);
 }
