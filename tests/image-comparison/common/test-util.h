@@ -65,7 +65,7 @@ struct test_info ngf_test_init()
   return info;
 }
 
-void ngf_test_shutdown(struct test_info info){
+void ngf_test_shutdown(struct test_info& info){
   // submit main cmd buffer
   ngf_cmd_buffer submitted_cmd_bufs[] = {info.main_cmd_buffer.get()};
   ngf_submit_cmd_buffers(1, submitted_cmd_bufs);

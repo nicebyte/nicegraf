@@ -75,7 +75,18 @@ int NGF_SAMPLES_COMMON_MAIN(int, char**){
   struct test_info info = ngf_test_init();
 
   // [PENDING] Create an ngf_image to render to
-  ngf_image output_image;
+  ngf::image output_image;
+  const ngf_extent3d img_size { 512u, 512u, 1u };
+  const ngf_image_info img_info {
+    NGF_IMAGE_TYPE_IMAGE_2D,
+    img_size,
+    1u,
+    1u,
+    NGF_IMAGE_FORMAT_BGRA8_SRGB,
+    NGF_SAMPLE_COUNT_1,
+    NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT
+  };
+  output_image.initialize(img_info);
 
   // ngf_test_draw(...): initializes test and draws the test render to output_image
   ngf_test_draw(output_image, info.frame_token);
