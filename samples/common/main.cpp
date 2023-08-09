@@ -20,6 +20,7 @@
  * IN THE SOFTWARE.
  */
 
+#include "nicegraf-mtl-handles.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -37,7 +38,6 @@
 #include "imgui_impl_glfw.h"
 #include "logging.h"
 #include "nicegraf-wrappers.h"
-#include "nicegraf.h"
 #include "sample-interface.h"
 
 #include <GLFW/glfw3native.h>
@@ -57,7 +57,7 @@
 #define NGF_SAMPLES_COMMON_MAIN main
 #endif
 
-int NGF_SAMPLES_COMMON_MAIN(int, char**) {
+int main(int, char**) {
   /**
    * We prefer a more verbose diagnostic output from nicegraf in debug builds.
    */

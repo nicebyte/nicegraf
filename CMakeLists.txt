@@ -155,20 +155,17 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
           set(NGF_SAMPLES_BACKEND nicegraf-mtl)
         endif()
         set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/main.mm
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
                                 ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
     elseif(UNIX AND NOT APPLE)
         set(NICEGRAF_SHADERC_PLATFORM linux)
-	set(NGF_SAMPLES_BACKEND nicegraf-vk)
+	      set(NGF_SAMPLES_BACKEND nicegraf-vk)
     else()
         message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
     endif()
     
     # Set the folder to hold all samples binaries.
     set(NGF_SAMPLES_OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/samples/binaries)
-
-
 
     # Custom target for generated shaders.
     file(GLOB shader_files ${CMAKE_CURRENT_LIST_DIR}/samples/shaders/*.hlsl)
