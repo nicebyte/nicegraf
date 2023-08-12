@@ -4343,7 +4343,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     // These are needed just to create a compatible render pass, load/store ops don't affect render
     // pass compatibility.
     const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_DONTCARE;
-    const ngf_attachment_store_op store_op = NGF_LOAD_OP_DONTCARE;
+    const ngf_attachment_store_op store_op = NGF_STORE_OP_DONTCARE;
     attachment_pass_desc->load_op          = get_vk_load_op(load_op);
     attachment_pass_desc->store_op         = get_vk_store_op(store_op);
 
