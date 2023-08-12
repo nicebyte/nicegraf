@@ -5,8 +5,7 @@ docs/doxygen/xml
 docs/doxygen/latex
 tests/ngf_tests
 samples/binaries/*
-!samples/binaries/assets/
-!samples/binaries/assets/*
+samples/deps/niceshade/*
 /out/build/x64-Debug
 /.vs
 samples-build-files/*
@@ -14,3 +13,4 @@ samples-build-files/*
 .idea
 cmake-build-debug-visual-studio
 docs/doxygen
+**/.DS_Store
