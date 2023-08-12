@@ -461,39 +461,24 @@ struct ngf_render_target_t {
       uint32_t                           rt_height) {
     width                             = rt_width;
     height                            = rt_height;
-    const uint32_t nattachments       = attachment_descs.ndescs;
-    nresolve_attachments              = 0u;
-    uint32_t nnon_resolve_attachments = 0u;
-    uint32_t ncolor_attachments       = 0u;
-    for (uint32_t i = 0; i < nattachments; ++i) {
+    ngf_attachment_description* attachment_descs_copy = NGFI_ALLOCN(ngf_attachment_description, attachment_descs.ndescs);
+    this->attachment_descs.descs = attachment_descs_copy;
+    if (this->attachment_descs.descs == NULL) {
+      return NGF_ERROR_OUT_OF_MEM;
+    }
+    this->attachment_descs.ndescs = attachment_descs.ndescs;
+    
+    for (uint32_t i = 0; i < this->attachment_descs.ndescs; ++i) {
       if (attachment_descs.descs[i].is_resolve) {
         ++nresolve_attachments;
       } else {
-        ++nnon_resolve_attachments;
-
-        if (attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR) { ++ncolor_attachments; }
+        ++nrender_attachments;
       }
+      attachment_descs_copy[i] = attachment_descs.descs[i];
     }
 
-    if (nresolve_attachments > 0 && ncolor_attachments != nresolve_attachments) {
-      NGFI_DIAG_ERROR("the same number of resolve and color attachments must be provided");
-      return NGF_ERROR_INVALID_OPERATION;
-    }
-
-    ngf_attachment_description* non_resolve_attachment_descs =
-        NGFI_ALLOCN(ngf_attachment_description, nnon_resolve_attachments);
-
-    uint32_t attachment_idx = 0u;
-    for (uint32_t i = 0; i < nattachments; ++i) {
-      if (!attachment_descs.descs[i].is_resolve) {
-        non_resolve_attachment_descs[attachment_idx++] = attachment_descs.descs[i];
-      }
-    }
-
-    this->attachment_descs.descs  = non_resolve_attachment_descs;
-    this->attachment_descs.ndescs = nnon_resolve_attachments;
     if (img_refs) {
-      image_refs = NGFI_ALLOCN(ngf_image_ref, nnon_resolve_attachments);
+      render_image_refs = NGFI_ALLOCN(ngf_image_ref, nrender_attachments);
 
       if (nresolve_attachments > 0u) {
         resolve_image_refs = NGFI_ALLOCN(ngf_image_ref, nresolve_attachments);
@@ -501,11 +486,13 @@ struct ngf_render_target_t {
 
       uint32_t image_ref_idx         = 0u;
       uint32_t resolve_image_ref_idx = 0u;
-      for (uint32_t i = 0; i < nattachments; ++i) {
-        if (!attachment_descs.descs[i].is_resolve) {
-          image_refs[image_ref_idx++] = img_refs[i];
+      for (uint32_t i = 0; i < this->attachment_descs.ndescs; ++i) {
+        if (!this->attachment_descs.descs[i].is_resolve) {
+          render_image_refs[image_ref_idx++] = img_refs[i];
         } else if (nresolve_attachments > 0u) {
           resolve_image_refs[resolve_image_ref_idx++] = img_refs[i];
+        } else {
+          assert(0);
         }
       }
     }
@@ -517,14 +504,15 @@ struct ngf_render_target_t {
     if (nresolve_attachments > 0u) { NGFI_FREEN(resolve_image_refs, nresolve_attachments); }
 
     if (attachment_descs.descs) {
-      NGFI_FREEN(image_refs, attachment_descs.ndescs);
+      NGFI_FREEN(render_image_refs, nrender_attachments);
       NGFI_FREEN(attachment_descs.descs, attachment_descs.ndescs);
     }
   }
 
   ngf_attachment_descriptions attachment_descs;
-  ngf_image_ref*              image_refs           = nullptr;
+  ngf_image_ref*              render_image_refs    = nullptr;
   ngf_image_ref*              resolve_image_refs   = nullptr;
+  uint32_t                    nrender_attachments  = 0u;
   uint32_t                    nresolve_attachments = 0u;
   bool                        is_default           = false;
   NSUInteger                  width;
@@ -1174,15 +1162,15 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT {
 
 void ngfmtl_attachment_set_common(
     MTLRenderPassAttachmentDescriptor* attachment,
-    uint32_t                           i,
+    uint32_t                           render_image_index,
     ngf_attachment_type                type,
     const ngf_render_target            rt,
     ngf_attachment_load_op             load_op,
     ngf_attachment_store_op            store_op) NGF_NOEXCEPT {
   if (!rt->is_default) {
-    attachment.texture = rt->image_refs[i].image->texture;
-    attachment.level   = rt->image_refs[i].mip_level;
-    attachment.slice   = rt->image_refs[i].layer;
+    attachment.texture = rt->render_image_refs[render_image_index].image->texture;
+    attachment.level   = rt->render_image_refs[render_image_index].mip_level;
+    attachment.slice   = rt->render_image_refs[render_image_index].layer;
   } else {
     attachment.texture = type == NGF_ATTACHMENT_COLOR
                              ? CURRENT_CONTEXT->frame.color_attachment_texture()
@@ -1876,6 +1864,7 @@ ngf_error ngf_cmd_begin_render_pass(
 
   uint32_t color_attachment_idx      = 0u;
   uint32_t resolve_attachment_idx    = 0u;
+  uint32_t render_image_idx          = 0u;
   auto     pass_descriptor           = [MTLRenderPassDescriptor new];
   pass_descriptor.renderTargetWidth  = rt->width;
   pass_descriptor.renderTargetHeight = rt->height;
@@ -1883,6 +1872,7 @@ ngf_error ngf_cmd_begin_render_pass(
   pass_descriptor.stencilAttachment  = nil;
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = rt->attachment_descs.descs[i];
+    if (attachment_desc.is_resolve) { continue; }
     const ngf_attachment_load_op      load_op         = pass_info->load_ops[i];
     const ngf_attachment_store_op     store_op        = pass_info->store_ops[i];
     const ngf_clear_info*             clear_info =
@@ -1890,7 +1880,7 @@ ngf_error ngf_cmd_begin_render_pass(
     switch (attachment_desc.type) {
     case NGF_ATTACHMENT_COLOR: {
       auto mtl_desc = [MTLRenderPassColorAttachmentDescriptor new];
-      ngfmtl_attachment_set_common(mtl_desc, i, attachment_desc.type, rt, load_op, store_op);
+      ngfmtl_attachment_set_common(mtl_desc, render_image_idx++, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) {
         mtl_desc.clearColor = MTLClearColorMake(
             clear_info->clear_color[0],
@@ -1912,20 +1902,20 @@ ngf_error ngf_cmd_begin_render_pass(
     }
     case NGF_ATTACHMENT_DEPTH: {
       auto mtl_desc = [MTLRenderPassDepthAttachmentDescriptor new];
-      ngfmtl_attachment_set_common(mtl_desc, i, attachment_desc.type, rt, load_op, store_op);
+      ngfmtl_attachment_set_common(mtl_desc, render_image_idx++, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) { mtl_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth; }
       pass_descriptor.depthAttachment = mtl_desc;
       break;
     }
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
       auto mtl_depth_desc = [MTLRenderPassDepthAttachmentDescriptor new];
-      ngfmtl_attachment_set_common(mtl_depth_desc, i, attachment_desc.type, rt, load_op, store_op);
+      ngfmtl_attachment_set_common(mtl_depth_desc, render_image_idx++, attachment_desc.type, rt, load_op, store_op);
       if (clear_info) { mtl_depth_desc.clearDepth = clear_info->clear_depth_stencil.clear_depth; }
       pass_descriptor.depthAttachment = mtl_depth_desc;
       auto mtl_stencil_desc           = [MTLRenderPassStencilAttachmentDescriptor new];
       ngfmtl_attachment_set_common(
           mtl_stencil_desc,
-          i,
+          render_image_idx++,
           attachment_desc.type,
           rt,
           load_op,
