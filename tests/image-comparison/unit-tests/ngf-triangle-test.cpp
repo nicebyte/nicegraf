@@ -1,9 +1,9 @@
-#include "nicegraf.h"
-#include "test-util.h"
-#include "nicegraf-wrappers.h"
-#include "nicegraf-util.h"
-#include "shader-loader.h"
 #include "check.h"
+#include "diagnostic-callback.h"
+#include "nicegraf-wrappers.h"
+#include "nicegraf.h"
+#include "shader-loader.h"
+#include "test-util.h"
 
 #include <stdio.h>
 
@@ -13,43 +13,39 @@
 #define NGF_TESTS_COMMON_MAIN main
 #endif
 
-void ngf_test_draw(ngf_image output_image, ngf_frame_token frame_token){
+void ngf_test_draw(ngf::image& output_image, ngf_frame_token frame_token) {
   // Initialize the triangle test
-  ngf::render_target offscreen_rt;
+  ngf::render_target     offscreen_rt;
   ngf::graphics_pipeline offscreen_pipeline;
 
   const ngf_attachment_description offscreen_color_attachment_description {
-    .type = NGF_ATTACHMENT_COLOR,
-    .format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
-    .sample_count = NGF_SAMPLE_COUNT_1,
-    .is_sampled = true
-  };
+      .type         = NGF_ATTACHMENT_COLOR,
+      .format       = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+      .sample_count = NGF_SAMPLE_COUNT_1,
+      .is_sampled   = true};
   const ngf_attachment_descriptions attachments_list = {
-    .descs = &offscreen_color_attachment_description,
-    .ndescs = 1u,
+      .descs  = &offscreen_color_attachment_description,
+      .ndescs = 1u,
   };
   const ngf_image_ref img_ref = {
-    .image = output_image.get(),
-    .mip_level = 0u,
-    .layer = 0u,
-    .cubemap_face = NGF_CUBEMAP_FACE_COUNT
-  };
-  ngf_render_target_info rt_info {
-    &attachments_list,
-    &img_ref
-  };
+      .image        = output_image.get(),
+      .mip_level    = 0u,
+      .layer        = 0u,
+      .cubemap_face = NGF_CUBEMAP_FACE_COUNT};
+  ngf_render_target_info rt_info {&attachments_list, &img_ref};
 
   offscreen_rt.initialize(rt_info);
-  const ngf::shader_stage offscreen_vertex_stage = ngf_samples::load_shader_stage("small-triangle", "VSMain", NGF_STAGE_VERTEX);
-  const ngf::shader_stage offscreen_fragment_stage = ngf_samples::load_shader_stage("small-triangle", "PSMain", NGF_STAGE_FRAGMENT);
+  const ngf::shader_stage offscreen_vertex_stage =
+      ngf_image_comparison::load_shader_stage("small-triangle", "VSMain", NGF_STAGE_VERTEX);
+  const ngf::shader_stage offscreen_fragment_stage =
+      ngf_image_comparison::load_shader_stage("small-triangle", "PSMain", NGF_STAGE_FRAGMENT);
 
   ngf_util_graphics_pipeline_data offscreen_pipeline_data;
   ngf_util_create_default_graphics_pipeline_data(&offscreen_pipeline_data);
-  ngf_graphics_pipeline_info &offscreen_pipe_info =
-      offscreen_pipeline_data.pipeline_info;
-  offscreen_pipe_info.nshader_stages = 2u;
-  offscreen_pipe_info.shader_stages[0] = offscreen_vertex_stage.get();
-  offscreen_pipe_info.shader_stages[1] = offscreen_fragment_stage.get();
+  ngf_graphics_pipeline_info& offscreen_pipe_info    = offscreen_pipeline_data.pipeline_info;
+  offscreen_pipe_info.nshader_stages                 = 2u;
+  offscreen_pipe_info.shader_stages[0]               = offscreen_vertex_stage.get();
+  offscreen_pipe_info.shader_stages[1]               = offscreen_fragment_stage.get();
   offscreen_pipe_info.compatible_rt_attachment_descs = &attachments_list;
   offscreen_pipeline.initialize(offscreen_pipe_info);
 
@@ -70,34 +66,40 @@ void ngf_test_draw(ngf_image output_image, ngf_frame_token frame_token){
   ngf_destroy_cmd_buffer(offscr_cmd_buf);
 }
 
-int NGF_SAMPLES_COMMON_MAIN(int, char**){
+int NGF_SAMPLES_COMMON_MAIN(int, char**) {
+  ngf_diagnostic_info diagnostic_info = {
+      .callback  = ngf_image_comparison::image_comparison_diagnostic_callback,
+      .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
+  };
+
   // ngf_test_init(...): initializes nicegraf; common for all tests
-  struct test_info info = ngf_test_init();
+  struct test_info info = ngf_test_init(&diagnostic_info, 512, 512, 0);
 
   // [PENDING] Create an ngf_image to render to
-  ngf::image output_image;
-  const ngf_extent3d img_size { 512u, 512u, 1u };
+  ngf::image           output_image;
+  const ngf_extent3d   img_size {512u, 512u, 1u};
   const ngf_image_info img_info {
-    NGF_IMAGE_TYPE_IMAGE_2D,
-    img_size,
-    1u,
-    1u,
-    NGF_IMAGE_FORMAT_BGRA8_SRGB,
-    NGF_SAMPLE_COUNT_1,
-    NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT
-  };
+      NGF_IMAGE_TYPE_IMAGE_2D,
+      img_size,
+      1u,
+      1u,
+      NGF_IMAGE_FORMAT_BGRA8_SRGB,
+      NGF_SAMPLE_COUNT_1,
+      NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT};
   output_image.initialize(img_info);
 
   // ngf_test_draw(...): initializes test and draws the test render to output_image
   ngf_test_draw(output_image, info.frame_token);
 
-  // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue. if true, test is passed
-  if(!ngf_validate_result(output_image, "references/triangle_reference.data", info.frame_token))
-  {
+  // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue.
+  // if true, test is passed
+  if (!ngf_validate_result(&output_image, "references/triangle_reference.data", info.frame_token)) {
     // Print Test failure message
     printf("[NICEGRAF TEST] Test failed. Please view output image in the output directory.\n");
   }
 
   // Shutdown test
-  ngf_test_shutdown(info);
+  ngf_test_shutdown(&info);
+
+  return 0;
 }
