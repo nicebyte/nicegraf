@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -51,6 +51,11 @@ void ngfi_blkalloc_destroy(ngfi_block_allocator* alloc);
  * Allocates the next free block from the allocator. Returns NULL on error.
  */
 void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc);
+
+/**
+ * Returns the size of the block for the given allocator.
+ */
+uint32_t ngfi_blkalloc_blksize(ngfi_block_allocator* alloc);
 
 typedef enum {
   NGFI_BLK_NO_ERROR,

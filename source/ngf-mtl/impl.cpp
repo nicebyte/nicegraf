@@ -2035,7 +2035,7 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   }
   cmd_buffer->renderpass_active = false;
   cmd_buffer->active_rt         = nullptr;
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
 
   return NGF_ERROR_OK;
 }
@@ -2052,7 +2052,7 @@ ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info*, ngf_x
 
 ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
   if (cmd_buf->active_bce) {
     cmd_buf->active_bce->endEncoding();
     cmd_buf->active_bce = nullptr;
@@ -2073,7 +2073,7 @@ ngf_error ngf_cmd_begin_compute_pass(
 ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   assert(cmd_buf);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_AWAITING_SUBMIT);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
   if (cmd_buf->active_cce) {
     cmd_buf->active_cce->endEncoding();
     cmd_buf->active_cce          = nullptr;

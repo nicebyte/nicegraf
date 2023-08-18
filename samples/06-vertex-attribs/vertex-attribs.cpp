@@ -370,13 +370,19 @@ void* sample_initialize(
                     NGF_IMAGE_USAGE_MIPMAP_GENERATION}));
 
   /* Populate the texture. */
+  const ngf_image_write img_write = {
+      .src_offset     = 0u,
+      .dst_offset     = {0, 0, 0},
+      .extent         = {texture_width, texture_height, 1u},
+      .dst_level      = 0u,
+      .dst_base_layer = 0u,
+      .nlayers        = 1u};
   ngf_cmd_write_image(
       xfer_encoder,
       staging_buffer.get(),
-      0,
-      ngf_image_ref {state->object_texture, 0, 0, NGF_CUBEMAP_FACE_COUNT},
-      ngf_offset3d {},
-      ngf_extent3d {texture_width, texture_height, 1}, 1u);
+      state->object_texture.get(),
+      &img_write,
+      1u);
   ngf_cmd_generate_mipmaps(xfer_encoder, state->object_texture);
 
   /* Create the image sampler. */

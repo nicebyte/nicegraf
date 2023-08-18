@@ -31,7 +31,9 @@
 
 typedef struct ngfi_blkalloc_block {  // The block itself.
   ngfi_list_node   free_list_node;    // Freelist node.
+#if !defined(NDEBUG)
   uint32_t         marker_and_tag;    // Identifies the parent allocator.
+#endif
   ngfi_max_align_t padding;
 #pragma warning(push)
 #pragma warning(disable : 4200)
@@ -42,8 +44,11 @@ typedef struct ngfi_blkalloc_block {  // The block itself.
 struct ngfi_block_allocator {
   NGFI_DARRAY_OF(uint8_t*) pools;
   ngfi_list_node* freelist;
-  size_t          block_size;
-  uint32_t        nblocks;
+  uint32_t        block_size;
+  uint32_t        block_size_user;
+  uint32_t        nblocks_per_pool;
+  uint32_t        nblocks_total;
+  uint32_t        nblocks_free;
   uint32_t        tag;
 };
 
@@ -69,10 +74,10 @@ static uint32_t ngfi_blkalloc_block_tag(const ngfi_blkalloc_block* b) {
 #endif
 
 static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
-  const size_t pool_size = allocator->block_size * allocator->nblocks;
+  const size_t pool_size = allocator->block_size * allocator->nblocks_per_pool;
   uint8_t*     pool      = NGFI_ALLOCN(uint8_t, pool_size);
   if (pool != NULL) {
-    for (uint32_t b = 0u; b < allocator->nblocks; ++b) {
+    for (uint32_t b = 0u; b < allocator->nblocks_per_pool; ++b) {
       ngfi_blkalloc_block* blk = (ngfi_blkalloc_block*)(pool + allocator->block_size * b);
       ngfi_list_init(&blk->free_list_node);
       if (allocator->freelist) {
@@ -80,10 +85,12 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
       } else {
         allocator->freelist = &blk->free_list_node;
       }
-      blk->marker_and_tag = allocator->tag;
 #if !defined(NDEBUG)
+      blk->marker_and_tag = allocator->tag;
       ngfi_blkalloc_mark_block_free(blk);
 #endif
+      allocator->nblocks_total++;
+      allocator->nblocks_free++;
     }
     NGFI_DARRAY_APPEND(allocator->pools, pool);
   }
@@ -103,12 +110,13 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
   if (allocator == NULL) { return NULL; }
   memset(allocator, 0, sizeof(*allocator));
 
-  const size_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
-  const size_t aligned_block_size =
-      unaligned_block_size + (unaligned_block_size % NGFI_MAX_ALIGNMENT);
+  const uint32_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
+  const uint32_t aligned_block_size =
+      unaligned_block_size + (NGFI_MAX_ALIGNMENT - (unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u)));
 
   allocator->block_size = aligned_block_size;
-  allocator->nblocks    = nblocks;
+  allocator->block_size_user = requested_block_size;
+  allocator->nblocks_per_pool    = nblocks;
 #if !defined(NDEBUG)
   allocator->tag        = (~IN_USE_BLOCK_MARKER_MASK) & (next_tag++);
 #endif
@@ -121,7 +129,7 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
 void ngfi_blkalloc_destroy(ngfi_block_allocator* allocator) {
   NGFI_DARRAY_FOREACH(allocator->pools, i) {
     uint8_t* pool = NGFI_DARRAY_AT(allocator->pools, i);
-    if (pool) { NGFI_FREEN(pool, allocator->block_size * allocator->nblocks); }
+    if (pool) { NGFI_FREEN(pool, allocator->block_size * allocator->nblocks_per_pool); }
   }
   NGFI_DARRAY_DESTROY(allocator->pools);
   NGFI_FREE(allocator);
@@ -137,6 +145,7 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
     ngfi_list_remove(alloc->freelist);
     alloc->freelist = new_head == alloc->freelist ? NULL : new_head;
     result          = blk->data;
+    alloc->nblocks_free--;
 #if !defined(NDEBUG)
     ngfi_blkalloc_mark_block_inuse(blk);
 #endif
@@ -166,7 +175,13 @@ ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
       } else {
         alloc->freelist = &blk->free_list_node;
       }
+      alloc->nblocks_free++;
     }
   }
   return result;
+}
+
+uint32_t ngfi_blkalloc_blksize(ngfi_block_allocator* alloc) {
+  assert(alloc);
+  return alloc->block_size_user;
 }

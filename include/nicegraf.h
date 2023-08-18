@@ -2614,6 +2614,21 @@ typedef struct ngf_device {
   ngf_device_capabilities capabilities; /**< Device capabilities and limits. */
 } ngf_device;
 
+/**
+ * @struct ngf_image_write
+ * Specifies an operation writing data from a source buffer into a mip level of an image.
+ * 
+ * See \ref ngf_cmd_write_image.
+ */
+typedef struct ngf_image_write {
+  size_t       src_offset;     /** < Data offset in the source buffer. */
+  ngf_offset3d dst_offset;     /** < Offset in texels of the subregion to write. */
+  ngf_extent3d extent;         /** < Size in texels of the subregion to write. */
+  uint32_t     dst_level;      /** < Destination mip level. */
+  uint32_t     dst_base_layer; /** < Starting destination layer. */
+  uint32_t     nlayers;        /** < Number of layers to copy for the specified mip level. */
+} ngf_image_write;
+
 #ifdef _MSC_VER
 #pragma endregion
 
@@ -3177,7 +3192,7 @@ ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT;
  *
  * Binds a graphics pipeline.
  */
-void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, const ngf_graphics_pipeline pipeline)
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, ngf_graphics_pipeline pipeline)
     NGF_NOEXCEPT;
 
 /**
@@ -3185,7 +3200,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, const ngf_graphics_pipeli
  *
  * Binds a compute pipeline.
  */
-void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder buf, const ngf_compute_pipeline pipeline)
+void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder buf, ngf_compute_pipeline pipeline)
     NGF_NOEXCEPT;
 
 /**
@@ -3268,9 +3283,9 @@ void ngf_cmd_bind_compute_resources(
  */
 void ngf_cmd_bind_attrib_buffer(
     ngf_render_encoder enc,
-    const ngf_buffer   vbuf,
+    ngf_buffer         vbuf,
     uint32_t           binding,
-    uint32_t           offset) NGF_NOEXCEPT;
+    size_t             offset) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3285,8 +3300,8 @@ void ngf_cmd_bind_attrib_buffer(
  */
 void ngf_cmd_bind_index_buffer(
     ngf_render_encoder enc,
-    const ngf_buffer   idxbuf,
-    uint32_t           offset,
+    ngf_buffer         idxbuf,
+    size_t             offset,
     ngf_type           index_type) NGF_NOEXCEPT;
 
 /**
@@ -3332,14 +3347,14 @@ void ngf_cmd_dispatch(
  *
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
- * @param dst The handle to the budder object to be copied into.
+ * @param dst The handle to the buffer object to be copied into.
  * @param size The size of the copied region, in bytes.
  * @param src_offset The offset in the source buffer to copy from.
  * @param dst_offset The offset in the destination buffer to copy into.
  */
 void ngf_cmd_copy_buffer(
     ngf_xfer_encoder enc,
-    const ngf_buffer src,
+    ngf_buffer       src,
     ngf_buffer       dst,
     size_t           size,
     size_t           src_offset,
@@ -3355,23 +3370,19 @@ void ngf_cmd_copy_buffer(
  * to last. For each layer, the first texel corresponds to the lower left corner of the image, and
  * the subsequent texels progress from left to right, through the remainder of the bottom row, and
  * from then on, through higher rows.
- *
+ * 
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
- * @param src_offset The offset in the source buffer from which to start copying.
- * @param dst Reference to the image region that shall be written to.
- * @param offset Offset within the target mip level to write to (in texels).
- * @param extent The size of the region in the target mip level being overwritten.
- * @param nlayers The number of layers affected by the copy.
+ * @param dst The image that the data from the buffer shall be written into.
+ * @param writes A pointer to an array of \ref ngf_image_write objects, each describing a write to a mip level of the image to be written.
+ * @param nwrites Number of objects in the `writes` array.
  */
 void ngf_cmd_write_image(
-    ngf_xfer_encoder enc,
-    const ngf_buffer src,
-    size_t           src_offset,
-    ngf_image_ref    dst,
-    ngf_offset3d     offset,
-    ngf_extent3d     extent,
-    uint32_t         nlayers) NGF_NOEXCEPT;
+    ngf_xfer_encoder       enc,
+    ngf_buffer             src,
+    ngf_image              dst,
+    const ngf_image_write* writes,
+    uint32_t               nwrites) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
