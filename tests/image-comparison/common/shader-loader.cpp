@@ -55,7 +55,7 @@ load_shader_stage(const char* shader_file_name, const char* entry_point_name, ng
         .entry_point_name = entry_point_name};
 
   ngf::shader_stage stage;
-  NGF_IMAGE_COMPARISON_CHECK_NGF_ERROR(stage.initialize(stage_info));
+  stage.initialize(stage_info);
 
   return stage;
 }

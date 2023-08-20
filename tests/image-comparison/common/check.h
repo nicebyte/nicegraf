@@ -22,7 +22,6 @@
 
 #pragma once
 
-#include "logging.h"
 #include "nicegraf-util.h"
 
 #include <stdio.h>

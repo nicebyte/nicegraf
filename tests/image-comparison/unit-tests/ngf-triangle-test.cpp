@@ -1,17 +1,9 @@
 #include "check.h"
-#include "diagnostic-callback.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 #include "shader-loader.h"
-#include "test-util.h"
 
 #include <stdio.h>
-
-#if defined(__APPLE__)
-#define NGF_TESTS_COMMON_MAIN apple_main
-#else
-#define NGF_TESTS_COMMON_MAIN main
-#endif
 
 void ngf_test_draw(ngf::image& output_image, ngf_frame_token frame_token) {
   // Initialize the triangle test
@@ -64,42 +56,4 @@ void ngf_test_draw(ngf::image& output_image, ngf_frame_token frame_token) {
   }
   ngf_submit_cmd_buffers(1, &offscr_cmd_buf);
   ngf_destroy_cmd_buffer(offscr_cmd_buf);
-}
-
-int NGF_SAMPLES_COMMON_MAIN(int, char**) {
-  ngf_diagnostic_info diagnostic_info = {
-      .callback  = ngf_image_comparison::image_comparison_diagnostic_callback,
-      .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
-  };
-
-  // ngf_test_init(...): initializes nicegraf; common for all tests
-  struct test_info info = ngf_test_init(&diagnostic_info, 512, 512, 0);
-
-  // [PENDING] Create an ngf_image to render to
-  ngf::image           output_image;
-  const ngf_extent3d   img_size {512u, 512u, 1u};
-  const ngf_image_info img_info {
-      NGF_IMAGE_TYPE_IMAGE_2D,
-      img_size,
-      1u,
-      1u,
-      NGF_IMAGE_FORMAT_BGRA8_SRGB,
-      NGF_SAMPLE_COUNT_1,
-      NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT};
-  output_image.initialize(img_info);
-
-  // ngf_test_draw(...): initializes test and draws the test render to output_image
-  ngf_test_draw(output_image, info.frame_token);
-
-  // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue.
-  // if true, test is passed
-  if (!ngf_validate_result(&output_image, "references/triangle_reference.data", info.frame_token)) {
-    // Print Test failure message
-    printf("[NICEGRAF TEST] Test failed. Please view output image in the output directory.\n");
-  }
-
-  // Shutdown test
-  ngf_test_shutdown(&info);
-
-  return 0;
 }

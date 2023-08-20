@@ -27,7 +27,7 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 set(NICEGRAF_DIR ${CMAKE_CURRENT_LIST_DIR}/../../)
 
-include("${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
 add_subdirectory(${NICEGRAF_DIR} ${CMAKE_CURRENT_LIST_DIR}/bin)
 
 if (WIN32)
@@ -51,23 +51,17 @@ string(TOUPPER "NGF_IMAGE_COMPARISON_BACKEND_${NGF_IMAGE_COMPARISON_BACKEND}" NG
 string(REPLACE "-" "_" NGF_IMAGE_COMPARISON_BACKEND_DEFINE ${NGF_IMAGE_COMPARISON_BACKEND_DEFINE})
 
 nmk_static_library(NAME nicegraf-image-comparison-tests-common
-                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/common/diagnostic-callback.h
-                         ${CMAKE_CURRENT_LIST_DIR}/common/diagnostic-callback.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/common/shader-loader.h
+                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/common/shader-loader.h
                          ${CMAKE_CURRENT_LIST_DIR}/common/shader-loader.cpp
                          ${CMAKE_CURRENT_LIST_DIR}/common/test-util.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/common/test-util.h
                          ${CMAKE_CURRENT_LIST_DIR}/common/file-utils.h
                          ${CMAKE_CURRENT_LIST_DIR}/common/file-utils.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/common/logging.h
                    DEPS ${NICEGRAF_IMAGE_COMPARISON_BACKEND} 
                    PUB_DEFINES  ${NGF_IMAGE_COMPARISON_BACKEND_DEFINE}
                    PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/common ${NICEGRAF_DIR}/include)
 
 set(NICEGRAF_IMAGE_COMPARISON_SRCS
-    ${CMAKE_CURRENT_LIST_DIR}/common/test-util.h
-    ${CMAKE_CURRENT_LIST_DIR}/unit-tests/ngf-triangle-test.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/image-comparison-tests.cpp)
+    ${CMAKE_CURRENT_LIST_DIR}/unit-tests/ngf-triangle-test.cpp)
 
 nmk_binary(NAME nicegraf-image-comparison-tests
   SRCS ${NICEGRAF_IMAGE_COMPARISON_SRCS}
