@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -27,22 +27,23 @@
 
 namespace ngf_samples {
 
-inline void vlog_msg(const char* prefix, const char* fmt, va_list args) {
-  fprintf(stderr, "\n[%s] ", prefix);
-  vfprintf(stderr, fmt, args);
-  fprintf(stderr, "\n");
+inline void vlog_msg(char prefix, const char* fmt, va_list args) {
+  auto file = prefix == 'E' ? stderr : stdout;
+  fprintf(file, "\n[%c] ", prefix);
+  vfprintf(file, fmt, args);
+  fprintf(file, "\n");
 }
 
 inline void vloge(const char* fmt, va_list args) {
-  vlog_msg("E", fmt, args);
+  vlog_msg('E', fmt, args);
 }
 
 inline void vlogi(const char* fmt, va_list args) {
-  vlog_msg("I", fmt, args);
+  vlog_msg('I', fmt, args);
 }
 
 inline void vlogd(const char* fmt, va_list args) {
-  vlog_msg("D", fmt, args);
+  vlog_msg('D', fmt, args);
 }
 
 inline void loge(const char* fmt, ...) {
