@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 
-using ngf_misc;
+using namespace ngf_misc;
 
 namespace ngf_samples {
 
