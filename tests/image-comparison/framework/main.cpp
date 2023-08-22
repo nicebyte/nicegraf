@@ -1,8 +1,8 @@
-#include "nicegraf-util.h"
-#include "nicegraf-wrappers.h"
-#include "nicegraf.h"
+#include <nicegraf.h>
+#include <nicegraf-util.h>
+#include <nicegraf-wrappers.h>
 
-void ngf_test_draw(ngf::image& output_image, ngf_frame_token frame_token);
+void ngf_test_draw(ngf::render_target& rt, const ngf_attachment_descriptions& rt_attachments, ngf_frame_token frame_token);
 bool ngf_validate_result(
     ngf::image*     output_image,
     const char*     ref_image,
@@ -11,9 +11,12 @@ bool ngf_validate_result(
 int main(int, char*[]) {
   uint32_t          ndevices = 0u;
   const ngf_device* devices  = nullptr;
+  
   ngf_get_device_list(&devices, &ndevices);
+
   size_t device_idx = ndevices <= 0 ? (~0u) : 0u;
-   const ngf_device_handle device_handle = devices[device_idx].handle;
+
+  const ngf_device_handle device_handle = devices[device_idx].handle;
 
   const ngf_init_info init_info {
       .diag_info            = nullptr,
@@ -28,40 +31,68 @@ int main(int, char*[]) {
   context.initialize(ctx_info);
   ngf_set_context(context);
 
-  ngf::cmd_buffer main_cmd_buffer;
-  main_cmd_buffer.initialize(ngf_cmd_buffer_info {});
   ngf_frame_token frame_token;
   if (ngf_begin_frame(&frame_token) == NGF_ERROR_OK) return {};
-  ngf_start_cmd_buffer(main_cmd_buffer, frame_token);
 
-  // [PENDING] Create an ngf_image to render to
-  ngf::image           output_image;
-  const ngf_extent3d   img_size {512u, 512u, 1u};
-  const ngf_image_info img_info {
+  const ngf_extent3d   output_dimensions {512u, 512u, 1u};
+  ngf::image           output_color;
+  const ngf_image_info output_color_info {
       NGF_IMAGE_TYPE_IMAGE_2D,
-      img_size,
+      output_dimensions,
       1u,
       1u,
       NGF_IMAGE_FORMAT_BGRA8_SRGB,
       NGF_SAMPLE_COUNT_1,
       NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT};
-  output_image.initialize(img_info);
+  ngf::image           output_depth;
+  const ngf_image_info output_depth_info {
+      NGF_IMAGE_TYPE_IMAGE_2D,
+      output_dimensions,
+      1u,
+      1u,
+      NGF_IMAGE_FORMAT_DEPTH24_STENCIL8,
+      NGF_SAMPLE_COUNT_1,
+      NGF_IMAGE_USAGE_ATTACHMENT};
+  output_color.initialize(output_color_info);
+  output_depth.initialize(output_depth_info);
 
-  // ngf_test_draw(...): initializes test and draws the test render to output_image
-  ngf_test_draw(output_image, frame_token);
-  ngf_cmd_buffer submitted_cmd_bufs[] = {main_cmd_buffer.get()};
-  ngf_submit_cmd_buffers(1, submitted_cmd_bufs);
+  const ngf_attachment_description attachment_descs[] = {
+      {.type         = NGF_ATTACHMENT_COLOR,
+       .format       = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+       .sample_count = NGF_SAMPLE_COUNT_1,
+       .is_sampled   = true},
+      {.type         = NGF_ATTACHMENT_DEPTH,
+       .format       = NGF_IMAGE_FORMAT_DEPTH24_STENCIL8,
+       .sample_count = NGF_SAMPLE_COUNT_1,
+       .is_sampled   = false}};
+  const ngf_attachment_descriptions attachments_list = {
+      .descs  = attachment_descs,
+      .ndescs = sizeof(attachment_descs) / sizeof(attachment_descs[0]),
+  };
+  const ngf_image_ref img_refs[] = {
+      {.image        = output_color.get(),
+       .mip_level    = 0u,
+       .layer        = 0u,
+       .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
+      {.image        = output_depth.get(),
+       .mip_level    = 0u,
+       .layer        = 0u,
+       .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
+  };
+  ngf_render_target_info rt_info {&attachments_list, img_refs};
+  ngf::render_target main_rt;
+  main_rt.initialize(rt_info);
+
+
+  ngf_test_draw(main_rt, attachments_list, frame_token);
+
   ngf_end_frame(frame_token);
 
-  // ngf_validate_result(ngf_image, const char*): if false, save the output_image to log the issue.
-  // if true, test is passed
-  if (!ngf_validate_result(&output_image, "references/triangle_reference.data", frame_token)) {
-    // Print Test failure message
+  if (!ngf_validate_result(&output_color, "references/triangle_reference.data", frame_token)) {
     printf("[NICEGRAF TEST] Test failed. Please view output image in the output directory.\n");
   }
 
   ngf_shutdown();
-
 
   return 0;
 }
