@@ -46,8 +46,8 @@ void camera_ui(
     float                   look_at_speed,
     std::pair<float, float> radius_range,
     float                   radius_speed) {
-  NGF_SAMPLES_ASSERT(look_at_range.first < look_at_range.second);
-  NGF_SAMPLES_ASSERT(radius_range.first < radius_range.second);
+  NGF_MISC_ASSERT(look_at_range.first < look_at_range.second);
+  NGF_MISC_ASSERT(radius_range.first < radius_range.second);
   ImGui::Text("camera");
   ImGui::DragFloat3(
       "look at",

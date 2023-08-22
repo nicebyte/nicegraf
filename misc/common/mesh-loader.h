@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,20 +20,18 @@
  * IN THE SOFTWARE.
  */
 
-#include "file-utils.h"
+#include <nicegraf-wrappers.h>
 
- #include <fstream>
- #include <stdexcept>
+namespace ngf_misc {
 
- namespace ngf_samples {
+struct mesh {
+  ngf::buffer vertex_data;
+  ngf::buffer index_data;
+  uint32_t    num_indices;
+  bool        have_normals;
+  bool        have_uvs;
+};
 
-std::vector<char> load_file(const char* file_name) {
-  std::basic_ifstream<char> fs(file_name, std::ios::binary | std::ios::in);
-  if (!fs.is_open()) {
-    throw std::runtime_error{ file_name };
-  }
-  return std::vector<char> { std::istreambuf_iterator<char>(fs),
-                             std::istreambuf_iterator<char>() };
+mesh load_mesh_from_file(const char* file_name, ngf_xfer_encoder xfenc);
+
 }
-
-}  // namespace ngf_common

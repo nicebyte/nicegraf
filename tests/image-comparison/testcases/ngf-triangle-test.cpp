@@ -1,7 +1,6 @@
-#include "check.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
-#include "shader-loader.h"
+#include <shader-loader.h>
 
 #include <stdio.h>
 
@@ -10,9 +9,9 @@ void ngf_test_draw(ngf::render_target& rt, const ngf_attachment_descriptions& rt
   ngf::graphics_pipeline offscreen_pipeline;
 
   const ngf::shader_stage offscreen_vertex_stage =
-      ngf_image_comparison::load_shader_stage("small-triangle", "VSMain", NGF_STAGE_VERTEX);
+      ngf_misc::load_shader_stage("small-triangle", "VSMain", NGF_STAGE_VERTEX);
   const ngf::shader_stage offscreen_fragment_stage =
-      ngf_image_comparison::load_shader_stage("small-triangle", "PSMain", NGF_STAGE_FRAGMENT);
+      ngf_misc::load_shader_stage("small-triangle", "PSMain", NGF_STAGE_FRAGMENT);
 
   ngf_util_graphics_pipeline_data offscreen_pipeline_data;
   ngf_util_create_default_graphics_pipeline_data(&offscreen_pipeline_data);

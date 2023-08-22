@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,18 +20,29 @@
  * IN THE SOFTWARE.
  */
 
-#include "nicegraf-wrappers.h"
+#pragma once
 
-namespace ngf_samples {
+#include <stdint.h>
+#include <stddef.h>
 
-struct mesh {
-  ngf::buffer vertex_data;
-  ngf::buffer index_data;
-  uint32_t    num_indices;
-  bool        have_normals;
-  bool        have_uvs;
-};
+namespace ngf_misc {
 
-mesh load_mesh_from_file(const char* file_name, ngf_xfer_encoder xfenc);
+/**
+ * Decodes an RLE-encoded true color targa file with an optional
+ * alpha channel into the target buffer.
+ * Assumes the source file uses sRGB color space.
+ * If `out_buf` is non-NULL, raw RGBA values, in sRGB, with
+ * premultiplied alpha, will be written to it. The width and
+ * height of the image are returned in the output parameters.
+ * If `out_buf` is NULL, no decoding is performed, however
+ * the width and height of the image are still returned.
+ */
+void load_targa(
+    const void* in_buf,
+    size_t      in_buf_size,
+    void*       out_buf,
+    size_t      out_buf_size,
+    uint32_t*   width_px,
+    uint32_t*   height_px);
 
-}
+}  // namespace ngf_misc

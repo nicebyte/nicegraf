@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,27 +22,53 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
+#include <stdarg.h>
+#include <stdio.h>
 
-namespace ngf_samples {
+namespace ngf_misc {
 
-/**
- * Decodes an RLE-encoded true color targa file with an optional
- * alpha channel into the target buffer.
- * Assumes the source file uses sRGB color space.
- * If `out_buf` is non-NULL, raw RGBA values, in sRGB, with
- * premultiplied alpha, will be written to it. The width and
- * height of the image are returned in the output parameters.
- * If `out_buf` is NULL, no decoding is performed, however
- * the width and height of the image are still returned.
- */
-void load_targa(
-    const void* in_buf,
-    size_t      in_buf_size,
-    void*       out_buf,
-    size_t      out_buf_size,
-    uint32_t*   width_px,
-    uint32_t*   height_px);
+inline void vlog_msg(char prefix, const char* fmt, va_list args) {
+  auto file = prefix == 'E' ? stderr : stdout;
+  fprintf(file, "\n[%c] ", prefix);
+  vfprintf(file, fmt, args);
+  fprintf(file, "\n");
+}
 
-}  // namespace ngf_samples
+inline void vloge(const char* fmt, va_list args) {
+  vlog_msg('E', fmt, args);
+}
+
+inline void vlogi(const char* fmt, va_list args) {
+  vlog_msg('I', fmt, args);
+}
+
+inline void vlogd(const char* fmt, va_list args) {
+  vlog_msg('D', fmt, args);
+}
+
+inline void loge(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vloge(fmt, args);
+  va_end(args);
+}
+
+inline void logi(const char* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  vlogi(fmt, args);
+  va_end(args);
+}
+
+inline void logd(const char* fmt, ...) {
+#if !defined(NDEBUG)
+  va_list args;
+  va_start(args, fmt);
+  vlogd(fmt, args);
+  va_end(args);
+#else
+  (void)fmt;
+#endif
+}
+
+}  // namespace ngf_misc

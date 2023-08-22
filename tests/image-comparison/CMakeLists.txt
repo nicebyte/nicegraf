@@ -29,23 +29,19 @@ set(CMAKE_CXX_STANDARD 20)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
 
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../ ${CMAKE_CURRENT_BINARY_DIR}/nicegraf)
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../misc/common ${CMAKE_CURRENT_BINARY_DIR}/misc-common)
 
 nmk_static_library(NAME nicegraf-imagetest-framework
-                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/framework/shader-loader.h
-                         ${CMAKE_CURRENT_LIST_DIR}/framework/shader-loader.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/framework/main.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/framework/file-utils.h
-                         ${CMAKE_CURRENT_LIST_DIR}/framework/file-utils.cpp
-                   DEPS nicegraf-vk
+                   SRCS ${CMAKE_CURRENT_LIST_DIR}/framework/main.cpp
+                   DEPS nicegraf-vk nicegraf-misc-common
                    PUB_DEFINES  ${NGF_IMAGE_COMPARISON_BACKEND_DEFINE}
-                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/framework ${NICEGRAF_DIR}/include)
+                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/framework)
 
 function (ngf_imagetest_testcase)
 	cmake_parse_arguments(TEST "" "NAME" "SRCS" ${ARGN})
 	nmk_binary(NAME ${TEST_NAME}
 			   SRCS ${TEST_SRCS}
-			   DEPS nicegraf-imagetest-framework nicegraf-util nicegraf-wrappers
+			   DEPS nicegraf-imagetest-framework nicegraf-util nicegraf-misc-common
 			   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
 	#add_dependencies(${SAMPLE_NAME} sample-shaders)                   
 	set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "testcases")

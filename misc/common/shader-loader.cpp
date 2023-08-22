@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -28,11 +28,11 @@
 #include <fstream>
 #include <string>
 
-namespace ngf_samples {
+namespace ngf_misc {
 
-#if defined(NGF_SAMPLES_BACKEND_NICEGRAF_VK)
+#if defined(NGF_BACKEND_NICEGRAF_VK)
 #define SHADER_EXTENSION ".spv"
-#elif defined(NGF_SAMPLES_BACKEND_NICEGRAF_MTL) || defined(NGF_SAMPLES_BACKEND_NICEGRAF_MTL_CPP)
+#elif defined(NGF_BACKEND_NICEGRAF_MTL) || defined(NGF_BACKEND_NICEGRAF_MTL_CPP)
 #define SHADER_EXTENSION ".21.msl"
 #else
 #error "build system needs to define samples backend"
@@ -40,7 +40,7 @@ namespace ngf_samples {
 
 ngf::shader_stage
 load_shader_stage(const char* shader_file_name, const char* entry_point_name, ngf_stage_type type) {
-  constexpr const char* shaders_root_dir        = "shaders" NGF_SAMPLES_PATH_SEPARATOR;
+  constexpr const char* shaders_root_dir        = "shaders" NGF_MISC_PATH_SEPARATOR;
   constexpr const char* stage_to_file_ext_map[] = {"vs", "ps", "cs"};
 
   const std::string file_name = shaders_root_dir + std::string(shader_file_name) + "." +
@@ -54,9 +54,9 @@ load_shader_stage(const char* shader_file_name, const char* entry_point_name, ng
       .entry_point_name = entry_point_name};
 
   ngf::shader_stage stage;
-  NGF_SAMPLES_CHECK_NGF_ERROR(stage.initialize(stage_info));
+  NGF_MISC_CHECK_NGF_ERROR(stage.initialize(stage_info));
 
   return stage;
 }
 
-}  // namespace ngf_samples
+}  // namespace ngf_misc

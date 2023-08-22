@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 struct render_to_multisample_texture_data {
@@ -61,7 +63,7 @@ void* sample_initialize(
       NGF_IMAGE_FORMAT_BGRA8_SRGB,
       main_render_target_sample_count,
       NGF_IMAGE_USAGE_ATTACHMENT};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->rt_texture.initialize(img_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->rt_texture.initialize(img_info));
   const ngf_image_info resolve_img_info {
       NGF_IMAGE_TYPE_IMAGE_2D,
       img_size,
@@ -70,7 +72,7 @@ void* sample_initialize(
       NGF_IMAGE_FORMAT_BGRA8_SRGB,
       NGF_SAMPLE_COUNT_1,
       NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_ATTACHMENT};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->resolve_texture.initialize(resolve_img_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->resolve_texture.initialize(resolve_img_info));
 
   const ngf_attachment_description offscreen_attachments = {
       .type         = NGF_ATTACHMENT_COLOR,
@@ -91,7 +93,7 @@ void* sample_initialize(
   };
 
   ngf_render_target_info rt_info {&offscreen_attachments_list, &offscreen_img_ref};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->offscreen_rt.initialize(rt_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->offscreen_rt.initialize(rt_info));
 
   const ngf_attachment_description offscreen_multisample_attachments[2] = {
       {.type         = NGF_ATTACHMENT_COLOR,
@@ -123,7 +125,7 @@ void* sample_initialize(
   ngf_render_target_info multisample_rt_info {
       &offscreen_multisample_attachments_list,
       offscreen_multisample_img_refs};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->offscreen_multisample_rt.initialize(multisample_rt_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->offscreen_multisample_rt.initialize(multisample_rt_info));
 
   /**
    * Load shader stages.
@@ -148,7 +150,7 @@ void* sample_initialize(
   blit_pipe_info.shader_stages[0]                  = blit_vertex_stage.get();
   blit_pipe_info.shader_stages[1]                  = blit_fragment_stage.get();
   blit_pipe_info.compatible_rt_attachment_descs    = ngf_default_render_target_attachment_descs();
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->blit_pipeline.initialize(blit_pipe_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->blit_pipeline.initialize(blit_pipe_info));
 
   /**
    * Create pipeline for offscreen pass.
@@ -160,7 +162,7 @@ void* sample_initialize(
   offscreen_pipe_info.shader_stages[0]               = offscreen_vertex_stage.get();
   offscreen_pipe_info.shader_stages[1]               = offscreen_fragment_stage.get();
   offscreen_pipe_info.compatible_rt_attachment_descs = &offscreen_attachments_list;
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->offscreen_pipeline.initialize(offscreen_pipe_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->offscreen_pipeline.initialize(offscreen_pipe_info));
 
   /**
    * Create pipeline for multisample offscreen pass.
@@ -176,7 +178,7 @@ void* sample_initialize(
   offscreen_multisample_pipe_info.shader_stages[1] = offscreen_fragment_stage.get();
   offscreen_multisample_pipe_info.compatible_rt_attachment_descs =
       &offscreen_multisample_attachments_list;
-  NGF_SAMPLES_CHECK_NGF_ERROR(
+  NGF_MISC_CHECK_NGF_ERROR(
       state->offscreen_multisample_pipeline.initialize(offscreen_multisample_pipe_info));
 
   /* Create sampler.*/
@@ -192,7 +194,7 @@ void* sample_initialize(
       0.0f,
       1.0f,
       false};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->sampler.initialize(samp_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->sampler.initialize(samp_info));
 
   return static_cast<void*>(state);
 }

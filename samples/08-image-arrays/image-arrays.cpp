@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace image_arrays {
@@ -112,7 +114,7 @@ void* sample_initialize(
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
                     NGF_IMAGE_USAGE_XFER_DST};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->image_array.initialize(image_array_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->image_array.initialize(image_array_info));
 
   /**
    * Populate the first mip level for each layer.
@@ -150,7 +152,7 @@ void* sample_initialize(
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
                     NGF_IMAGE_USAGE_XFER_DST};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->cubemap_array.initialize(cubemap_array_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->cubemap_array.initialize(cubemap_array_info));
 
   /** Upload the first mip level for each layer on each face. */
   for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
@@ -173,7 +175,7 @@ void* sample_initialize(
   ngf_cmd_generate_mipmaps(xfer_encoder, state->cubemap_array.get());
 
   /** Create an image sampler. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->image_sampler.initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->image_sampler.initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_LINEAR,
@@ -221,7 +223,7 @@ void* sample_initialize(
   /**
    * Initialize the image array pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->img_array_pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->img_array_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Load the shader stages for the cubemap array pipeline.
@@ -239,14 +241,14 @@ void* sample_initialize(
   /**
    * Initialize the cubemap array pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(
+  NGF_MISC_CHECK_NGF_ERROR(
       state->cubemap_array_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Create the uniform buffers.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->img_array_uniforms_multibuf.initialize(3));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->cube_array_uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->img_array_uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->cube_array_uniforms_multibuf.initialize(3));
 
   return static_cast<void*>(state);
 }

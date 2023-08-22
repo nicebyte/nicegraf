@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace cubemap {
@@ -114,7 +116,7 @@ void* sample_initialize(
   ngf_buffer_unmap(staging_buffer.get());
 
   /* Create the cubemap texture. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->texture.initialize(ngf_image_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->texture.initialize(ngf_image_info {
       .type         = NGF_IMAGE_TYPE_CUBE,
       .extent       = ngf_extent3d {.width = face_width, .height = face_height, .depth = 1},
       .nmips        = 1u,
@@ -135,7 +137,7 @@ void* sample_initialize(
   /* Create the image sampler. */
 
   /* Same comment as above regarding the min/max LOD applies in case of the bilinear sampler. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->sampler.initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->sampler.initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_NEAREST,
@@ -183,12 +185,12 @@ void* sample_initialize(
   /**
    * Initialize the pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   return static_cast<void*>(state);
 }

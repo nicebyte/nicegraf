@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace volume_rendering {
@@ -76,7 +78,7 @@ void* sample_initialize(
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
   };
   ngf::buffer staging_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(staging_buffer.initialize(staging_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(staging_buffer.initialize(staging_buffer_info));
 
   /** Map the staging buffer and read the volume data directly into the memory. */
   void* mapped_staging_buffer_ptr = ngf_buffer_map_range(staging_buffer, 0, staging_buffer_size);
@@ -109,7 +111,7 @@ void* sample_initialize(
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_XFER_DST | NGF_IMAGE_USAGE_SAMPLE_FROM,
   };
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->volume.initialize(img_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->volume.initialize(img_info));
 
   /** Upload the volume data into the image. */
   ngf_cmd_write_image(
@@ -128,7 +130,7 @@ void* sample_initialize(
   /**
    * Initialize the sampler.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->sampler.initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->sampler.initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_NEAREST,

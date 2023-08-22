@@ -34,6 +34,8 @@
 
 #include <stdio.h>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace blinn_phong {
@@ -162,7 +164,7 @@ void* sample_initialize(
   /**
    * Initialize the "vanilla" pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->vanilla_pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->vanilla_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Set the appropriate specialization constant and initialize the half-lambert pipeline object.
@@ -176,19 +178,19 @@ void* sample_initialize(
    pipeline_data.spec_info.nspecializations = 1;
    pipeline_data.spec_info.specializations =  &half_lambert_spec;
    pipeline_data.spec_info.value_buffer = &half_lambert_spec_value;
-   NGF_SAMPLES_CHECK_NGF_ERROR(state->half_lambert_pipeline.initialize(pipeline_data.pipeline_info));
+   NGF_MISC_CHECK_NGF_ERROR(state->half_lambert_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Load the model from a file.
    */
   state->bunny_mesh = load_mesh_from_file("assets/bunny.mesh", xfer_encoder);
-  NGF_SAMPLES_ASSERT(state->bunny_mesh.have_normals);
-  NGF_SAMPLES_ASSERT(state->bunny_mesh.num_indices > 0u);
+  NGF_MISC_ASSERT(state->bunny_mesh.have_normals);
+  NGF_MISC_ASSERT(state->bunny_mesh.num_indices > 0u);
 
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   /**
    * Set up some initial viewing parameters.

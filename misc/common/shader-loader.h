@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,9 +22,9 @@
 
 #pragma once
 
-#include "nicegraf-wrappers.h"
+#include <nicegraf-wrappers.h>
 
-namespace ngf_image_comparison {
+namespace ngf_misc {
 
 ngf::shader_stage
 load_shader_stage(const char* shader_file_name, const char* entry_point_name, ngf_stage_type type);

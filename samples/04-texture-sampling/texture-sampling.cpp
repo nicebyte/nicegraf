@@ -32,6 +32,8 @@
 
 #include <stdio.h>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace texture_sampling {
@@ -80,7 +82,7 @@ void* sample_initialize(
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
                       NGF_IMAGE_USAGE_XFER_DST};
-  NGF_SAMPLES_CHECK_NGF_ERROR(s->texture.initialize(texture_image_info));
+  NGF_MISC_CHECK_NGF_ERROR(s->texture.initialize(texture_image_info));
 
   /* Upload the data from the staging buffer into the 0th mip level of the texture. */
   ngf_cmd_write_image(
@@ -104,7 +106,7 @@ void* sample_initialize(
   /* Note that with the nearest-neighbor sampler, we constrain the min and max LOD to 0,
      in order to limit ourselves to mip level 0 only and demonstrate the effect of sampling
      without mips. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(s->samplers[0].initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(s->samplers[0].initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_NEAREST,
       .mag_filter        = NGF_FILTER_NEAREST,
       .mip_filter        = NGF_FILTER_NEAREST,
@@ -118,7 +120,7 @@ void* sample_initialize(
       .enable_anisotropy = false}));
 
   /* Same comment as above regarding the min/max LOD applies in case of the bilinear sampler. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(s->samplers[1].initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(s->samplers[1].initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_NEAREST,
@@ -131,7 +133,7 @@ void* sample_initialize(
       .max_anisotropy    = 0.0f,
       .enable_anisotropy = false}));
 
-  NGF_SAMPLES_CHECK_NGF_ERROR(s->samplers[2].initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(s->samplers[2].initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_LINEAR,
@@ -146,7 +148,7 @@ void* sample_initialize(
 
   /* note that with anisotropic sampling, mipmaps are still needed because the
      specific (hardware-dependent) implementation may access them. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(s->samplers[3].initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(s->samplers[3].initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_LINEAR,

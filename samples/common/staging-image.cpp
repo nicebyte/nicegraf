@@ -7,6 +7,8 @@
 #include <cmath>
 #include <vector>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 staging_image create_staging_image_from_tga(const char* file_name) {
@@ -26,7 +28,7 @@ staging_image create_staging_image_from_tga(const char* file_name) {
   /* Create an appropriately sized staging buffer for the texture upload. */
   const size_t texture_size_bytes = texture_width * texture_height * 4u;
   ngf::buffer  staging_buf;
-  NGF_SAMPLES_CHECK_NGF_ERROR(staging_buf.initialize(ngf_buffer_info {
+  NGF_MISC_CHECK_NGF_ERROR(staging_buf.initialize(ngf_buffer_info {
       .size         = texture_size_bytes,
       .storage_type = NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC}));

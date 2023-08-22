@@ -133,6 +133,7 @@ endif()
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
 
     # Ensure we have the required dependencies are available.
     if (TARGET glfw)
@@ -144,24 +145,10 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     # Determine the backend to build the samples with based on the platform, and
     # any platform-specific source files.
     set(NGF_PLATFORM_SOURCE "")
-    if (WIN32)
-        set(NICEGRAF_SHADERC_PLATFORM win)
-        set(NGF_SAMPLES_BACKEND nicegraf-vk)
-    elseif(APPLE)
-        set(NICEGRAF_SHADERC_PLATFORM macos)
-        if (NGF_USE_MVK STREQUAL "yes")
-          set(NGF_SAMPLES_BACKEND nicegraf-vk)
-        else()
-          set(NGF_SAMPLES_BACKEND nicegraf-mtl)
-        endif()
-        set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
-                                ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
-    elseif(UNIX AND NOT APPLE)
-        set(NICEGRAF_SHADERC_PLATFORM linux)
-	      set(NGF_SAMPLES_BACKEND nicegraf-vk)
-    else()
-        message(FATAL_ERROR "Your platform is not currently supported by nicegraf samples.")
+    if(APPLE)
+      set(NGF_PLATFORM_SOURCE ${NGF_PLATFORM_SOURCE}
+                              ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.mm
+                              ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/macos/glfw-cocoa-contentview.h)
     endif()
     
     # Set the folder to hold all samples binaries.
@@ -172,7 +159,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     include(${CMAKE_CURRENT_LIST_DIR}/misc/shaders.cmake)
     ngf_shaders_target(NAME sample-shaders
                        OUTPUT_DIR ${NGF_SAMPLES_OUTPUT_DIR}/shaders
-                       NICESHADE_PATH ${CMAKE_CURRENT_LIST_DIR}/samples/deps/niceshade/${NICEGRAF_SHADERC_PLATFORM}
+                       NICESHADE_PATH ${CMAKE_CURRENT_LIST_DIR}/samples/deps/niceshade/${NICESHADE_PLATFORM}
                        SRCS ${shader_files})
     set_target_properties(sample-shaders PROPERTIES FOLDER "samples")
 
@@ -206,25 +193,16 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     nmk_static_library(NAME ngf-samples-common
                        SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.cpp
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.cpp
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/file-utils.h
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/shader-loader.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/logging.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.h
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/targa-loader.cpp
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.h
-                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/mesh-loader.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
                             ${NGF_PLATFORM_SOURCE}
-                       DEPS ngf-imgui glfw
+                       DEPS ngf-imgui glfw nicegraf-misc-common
                        PUB_DEFINES  ${NGF_SAMPLES_BACKEND_DEFINE}
                        PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
                                     ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)

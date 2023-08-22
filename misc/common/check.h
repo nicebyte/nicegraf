@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -23,32 +23,32 @@
 #pragma once
 
 #include "logging.h"
-#include "nicegraf-util.h"
+#include <nicegraf-util.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #pragma warning(disable:26812)
 
-namespace ngf_samples {
+namespace ngf_misc {
 
-#define NGF_SAMPLES_CHECK_NGF_ERROR(expr)                         \
+#define NGF_MISC_CHECK_NGF_ERROR(expr)                         \
   {                                                               \
     const ngf_error err = (expr);                                 \
     if (err != NGF_ERROR_OK) {                                    \
-      ::ngf_samples::loge("nicegraf error %d (file %s line %d), aborting.\n", err, __FILE__, __LINE__); \
+      ::ngf_misc::loge("nicegraf error %d (file %s line %d), aborting.\n", err, __FILE__, __LINE__); \
       fflush(stderr);                                             \
       abort();                                                    \
     }                                                             \
   }
 
-#define NGF_SAMPLES_ASSERT(expr)                                                                 \
+#define NGF_MISC_ASSERT(expr)                                                                 \
   {                                                                                              \
     if (!(expr)) {                                                                               \
-      ::ngf_samples::loge("assertion %s failed (file %s line %d)\n", #expr, __FILE__, __LINE__); \
+      ::ngf_misc::loge("assertion %s failed (file %s line %d)\n", #expr, __FILE__, __LINE__); \
       fflush(stderr);                                                                            \
       abort();                                                                                   \
     }                                                                                            \
   }
 
-}  // namespace ngf_samples
+}  // namespace ngf_misc

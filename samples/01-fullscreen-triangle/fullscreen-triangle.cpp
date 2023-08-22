@@ -28,6 +28,8 @@
 
 #include <stdio.h>
 
+using ngf_misc;
+
 namespace ngf_samples {
 
 namespace fullscreen_triangle {
@@ -81,7 +83,7 @@ void* sample_initialize(
   /**
    * Initialize the pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
 
   return static_cast<void*>(state);
 }
@@ -107,7 +109,8 @@ void sample_draw_frame(
   ngf_cmd_draw(main_render_pass, false, 0, 3, 1);
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info*, void*) {}
+void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info*, void*) {
+}
 
 void sample_post_draw_frame(ngf_cmd_buffer, ngf_render_encoder, void*) {
 }

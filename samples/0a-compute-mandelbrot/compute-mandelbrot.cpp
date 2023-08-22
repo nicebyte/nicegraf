@@ -33,6 +33,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace compute_demo {
@@ -68,7 +70,7 @@ void* sample_initialize(
   ngf_compute_pipeline_info pipeline_info;
   pipeline_info.shader_stage = compute_shader.get();
   pipeline_info.spec_info    = nullptr;
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->compute_pipeline.initialize(pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->compute_pipeline.initialize(pipeline_info));
 
   /**
    * Load shader stages.
@@ -89,7 +91,7 @@ void* sample_initialize(
   blit_pipe_info.shader_stages[0]                  = blit_vertex_stage.get();
   blit_pipe_info.shader_stages[1]                  = blit_fragment_stage.get();
   blit_pipe_info.compatible_rt_attachment_descs    = ngf_default_render_target_attachment_descs();
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->blit_pipeline.initialize(blit_pipe_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->blit_pipeline.initialize(blit_pipe_info));
 
   /**
    * Initialize the image.
@@ -104,7 +106,7 @@ void* sample_initialize(
   image_info.sample_count  = NGF_SAMPLE_COUNT_1;
   image_info.type          = NGF_IMAGE_TYPE_IMAGE_2D;
   image_info.usage_hint    = NGF_IMAGE_USAGE_STORAGE | NGF_IMAGE_USAGE_SAMPLE_FROM;
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->image.initialize(image_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->image.initialize(image_info));
   state->image_ref.image     = state->image;
   state->image_ref.layer     = 0u;
   state->image_ref.mip_level = 0u;
@@ -122,7 +124,7 @@ void* sample_initialize(
       0.0f,
       1.0f,
       false};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->sampler.initialize(samp_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->sampler.initialize(samp_info));
 
   state->frame = 0u;
 
@@ -179,7 +181,7 @@ void sample_post_draw_frame(
           .sync_resources  = &sync_render_resource}};
 
   ngf_compute_encoder compute_enc;
-  NGF_SAMPLES_CHECK_NGF_ERROR(
+  NGF_MISC_CHECK_NGF_ERROR(
       ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc));
   ngf_resource_bind_op bind_op;
   bind_op.info.image_sampler.image = state->image;

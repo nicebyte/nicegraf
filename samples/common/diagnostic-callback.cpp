@@ -34,10 +34,10 @@ void sample_diagnostic_callback(ngf_diagnostic_message_type msg_type, void*, con
   switch (msg_type) {
   case NGF_DIAGNOSTIC_ERROR:
   case NGF_DIAGNOSTIC_WARNING:
-    vloge(fmt, args);
+    ngf_misc::vloge(fmt, args);
     break;
   case NGF_DIAGNOSTIC_INFO:
-    vlogi(fmt, args);
+    ngf_misc::vlogi(fmt, args);
     break;
   default:;
   }

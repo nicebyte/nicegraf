@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -27,12 +27,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
-namespace ngf_samples {
+namespace ngf_misc {
 
 mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   mesh  result;
   FILE* mesh_file = fopen(mesh_file_name, "rb");
-  NGF_SAMPLES_ASSERT(mesh_file != NULL);
+  NGF_MISC_ASSERT(mesh_file != NULL);
 
   /**
    * Read the "file header" - 4-byte field with the lowest bit indicating
@@ -42,7 +42,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   uint32_t header        = 0u;
   size_t   read_elements = 0u;
   read_elements          = fread(&header, sizeof(header), 1u, mesh_file);
-  NGF_SAMPLES_ASSERT(read_elements == 1u);
+  NGF_MISC_ASSERT(read_elements == 1u);
   result.have_normals = header & 1;
   result.have_uvs     = header & 2;
 
@@ -52,20 +52,20 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
    */
   uint32_t vertex_data_size = 0u;
   read_elements             = fread(&vertex_data_size, sizeof(vertex_data_size), 1u, mesh_file);
-  NGF_SAMPLES_ASSERT(read_elements == 1u);
+  NGF_MISC_ASSERT(read_elements == 1u);
   const ngf_buffer_info vertex_data_staging_buffer_info = {
       .size         = vertex_data_size,
       .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
   };
   ngf::buffer vertex_data_staging_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(
+  NGF_MISC_CHECK_NGF_ERROR(
       vertex_data_staging_buffer.initialize(vertex_data_staging_buffer_info));
   void* mapped_vertex_data_staging_buffer =
       ngf_buffer_map_range(vertex_data_staging_buffer.get(), 0u, vertex_data_size);
   read_elements =
       fread(mapped_vertex_data_staging_buffer, sizeof(char), vertex_data_size, mesh_file);
-  NGF_SAMPLES_ASSERT(read_elements == vertex_data_size);
+  NGF_MISC_ASSERT(read_elements == vertex_data_size);
   ngf_buffer_flush_range(vertex_data_staging_buffer.get(), 0, vertex_data_size);
   ngf_buffer_unmap(vertex_data_staging_buffer.get());
 
@@ -75,7 +75,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
    * should be used to render it.
    */
   read_elements = fread(&result.num_indices, sizeof(uint32_t), 1, mesh_file);
-  NGF_SAMPLES_ASSERT(read_elements == 1u);
+  NGF_MISC_ASSERT(read_elements == 1u);
 
   /**
    * Allocate a staging buffer for the index data, and read the index data
@@ -89,7 +89,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
         .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
         .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
     };
-    NGF_SAMPLES_CHECK_NGF_ERROR(
+    NGF_MISC_CHECK_NGF_ERROR(
         index_data_staging_buffer.initialize(index_data_staging_buffer_info));
     void* mapped_index_data_staging_buffer = ngf_buffer_map_range(
         index_data_staging_buffer.get(),
@@ -97,7 +97,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
         index_data_staging_buffer_info.size);
     read_elements =
         fread(mapped_index_data_staging_buffer, sizeof(uint32_t), result.num_indices, mesh_file);
-    NGF_SAMPLES_ASSERT(read_elements == result.num_indices);
+    NGF_MISC_ASSERT(read_elements == result.num_indices);
     ngf_buffer_flush_range(index_data_staging_buffer.get(), 0, index_data_staging_buffer_info.size);
     ngf_buffer_unmap(index_data_staging_buffer.get());
   }
@@ -111,7 +111,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
       .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
       .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
   };
-  NGF_SAMPLES_CHECK_NGF_ERROR(result.vertex_data.initialize(vertex_data_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(result.vertex_data.initialize(vertex_data_buffer_info));
   ngf_cmd_copy_buffer(
       xfenc,
       vertex_data_staging_buffer.get(),
@@ -125,7 +125,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
         .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
         .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
     };
-    NGF_SAMPLES_CHECK_NGF_ERROR(result.index_data.initialize(index_data_buffer_info));
+    NGF_MISC_CHECK_NGF_ERROR(result.index_data.initialize(index_data_buffer_info));
     ngf_cmd_copy_buffer(
         xfenc,
         index_data_staging_buffer.get(),

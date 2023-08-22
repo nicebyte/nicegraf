@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -26,12 +26,12 @@
 #include <vector>
 
 #if defined(_WIN64) || defined(_WIN32)
-#define NGF_IMAGE_COMPARISON_PATH_SEPARATOR "\\"
+#define NGF_MISC_PATH_SEPARATOR "\\"
 #else
-#define NGF_IMAGE_COMPARISON_PATH_SEPARATOR "/"
+#define NGF_MISC_PATH_SEPARATOR "/"
 #endif
 
-namespace ngf_image_comparison {
+namespace ngf_misc {
 
 std::vector<char> load_file(const char* file_name);
 

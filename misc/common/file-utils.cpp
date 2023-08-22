@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2023 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,13 +20,20 @@
  * IN THE SOFTWARE.
  */
 
-#pragma once
+#include "file-utils.h"
 
-#include "nicegraf-wrappers.h"
+ #include <fstream>
+ #include <stdexcept>
 
-namespace ngf_samples {
+ namespace ngf_misc {
 
-ngf::shader_stage
-load_shader_stage(const char* shader_file_name, const char* entry_point_name, ngf_stage_type type);
-
+std::vector<char> load_file(const char* file_name) {
+  std::basic_ifstream<char> fs(file_name, std::ios::binary | std::ios::in);
+  if (!fs.is_open()) {
+    throw std::runtime_error{ file_name };
+  }
+  return std::vector<char> { std::istreambuf_iterator<char>(fs),
+                             std::istreambuf_iterator<char>() };
 }
+
+}  // namespace ngf_common

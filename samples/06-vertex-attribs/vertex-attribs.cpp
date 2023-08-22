@@ -34,6 +34,8 @@
 
 #include <stdio.h>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace vertex_attribs {
@@ -206,7 +208,7 @@ void* sample_initialize(
   /**
    * Initialize the pipeline object.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Create and populate the vertex and index buffers.
@@ -232,11 +234,11 @@ void* sample_initialize(
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
   };
   ngf::buffer vertex_staging_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(vertex_staging_buffer.initialize(vertex_staging_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(vertex_staging_buffer.initialize(vertex_staging_buffer_info));
   ngf::buffer index_staging_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(index_staging_buffer.initialize(index_staging_buffer_info));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->vertex_attrib_buffer.initialize(vertex_buffer_info));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(index_staging_buffer.initialize(index_staging_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->vertex_attrib_buffer.initialize(vertex_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
   void* mapped_vertex_buffer =
       ngf_buffer_map_range(vertex_staging_buffer.get(), 0u, vertex_staging_buffer_info.size);
   void* mapped_index_buffer =
@@ -275,15 +277,15 @@ void* sample_initialize(
       .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC};
   ngf::buffer instance_data_staging_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(instance_data_staging_buffer.initialize(instance_data_staging_buffer_info));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data.initialize(instance_data_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(instance_data_staging_buffer.initialize(instance_data_staging_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->per_instance_data.initialize(instance_data_buffer_info));
   const ngf_texel_buffer_view_info instance_data_view_info = {
     .buffer = state->per_instance_data.get(),
     .offset = 0u,
     .size = instance_data_buffer_info.size,
     .texel_format = NGF_IMAGE_FORMAT_RGBA32F
   };
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->per_instance_data_view.initialize(instance_data_view_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->per_instance_data_view.initialize(instance_data_view_info));
   auto mapped_per_instance_staging_buffer = (float*)ngf_buffer_map_range(
       instance_data_staging_buffer.get(),
       0,
@@ -318,7 +320,7 @@ void* sample_initialize(
   /**
    * Create the uniform buffer.
    */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->uniforms_multibuf.initialize(3));
 
   /* Load contents of the model's texture into a staging buffer. */
   char              file_name[] = "assets/dodecahedron.tga";
@@ -357,7 +359,7 @@ void* sample_initialize(
   /* Create the texture. */
   const uint32_t nmips =
       1 + static_cast<uint32_t>(std::floor(std::log2(std::max(texture_width, texture_height))));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->object_texture.initialize(ngf_image_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->object_texture.initialize(ngf_image_info {
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
       .extent       = ngf_extent3d {.width = texture_width, .height = texture_height, .depth = 1},
       .nmips        = nmips,
@@ -378,7 +380,7 @@ void* sample_initialize(
   ngf_cmd_generate_mipmaps(xfer_encoder, state->object_texture);
 
   /* Create the image sampler. */
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->trilinear_sampler.initialize(ngf_sampler_info {
+  NGF_MISC_CHECK_NGF_ERROR(state->trilinear_sampler.initialize(ngf_sampler_info {
       .min_filter        = NGF_FILTER_LINEAR,
       .mag_filter        = NGF_FILTER_LINEAR,
       .mip_filter        = NGF_FILTER_LINEAR,

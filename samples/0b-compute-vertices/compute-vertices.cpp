@@ -34,6 +34,8 @@
 #include <stdio.h>
 #include <string>
 
+using namespace ngf_misc;
+
 namespace ngf_samples {
 
 namespace compute_verts {
@@ -87,7 +89,7 @@ void* sample_initialize(
   ngf_compute_pipeline_info pipeline_info;
   pipeline_info.shader_stage = compute_shader.get();
   pipeline_info.spec_info    = nullptr;
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->compute_pipeline.initialize(pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->compute_pipeline.initialize(pipeline_info));
 
   /**
    * Load shader stages.
@@ -130,7 +132,7 @@ void* sample_initialize(
   render_pipe_info.shader_stages[0]                         = render_vertex_stage.get();
   render_pipe_info.shader_stages[1]                         = render_fragment_stage.get();
   render_pipe_info.compatible_rt_attachment_descs = ngf_default_render_target_attachment_descs();
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->render_pipeline.initialize(render_pipe_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->render_pipeline.initialize(render_pipe_info));
 
   /**
    * Initialize the index buffer.
@@ -144,19 +146,19 @@ void* sample_initialize(
       .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_DST | NGF_BUFFER_USAGE_INDEX_BUFFER};
   ngf::buffer staging_index_buffer;
-  NGF_SAMPLES_CHECK_NGF_ERROR(staging_index_buffer.initialize(staging_index_buffer_info));
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(staging_index_buffer.initialize(staging_index_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
   auto mapped_staging_index_buffer = (uint32_t*)
       ngf_buffer_map_range(staging_index_buffer.get(), 0u, staging_index_buffer_info.size);
   uint32_t idx = 0u;
   for (uint32_t strip = 0u; strip < compute_verts::nverts_per_side - 1; ++strip) {
     for (uint32_t v = 0u; v < compute_verts::nverts_per_side; ++v) {
-      NGF_SAMPLES_ASSERT(idx < compute_verts::ntotal_indices);
+      NGF_MISC_ASSERT(idx < compute_verts::ntotal_indices);
       mapped_staging_index_buffer[idx++] = (strip + 1u) * compute_verts::nverts_per_side + v;
-      NGF_SAMPLES_ASSERT(idx < compute_verts::ntotal_indices);
+      NGF_MISC_ASSERT(idx < compute_verts::ntotal_indices);
       mapped_staging_index_buffer[idx++] = strip * compute_verts::nverts_per_side + v;
     }
-    NGF_SAMPLES_ASSERT(idx < compute_verts::ntotal_indices);
+    NGF_MISC_ASSERT(idx < compute_verts::ntotal_indices);
     mapped_staging_index_buffer[idx++] = ~0u;
   }
   ngf_buffer_flush_range(staging_index_buffer.get(), 0, staging_index_buffer_info.size);
@@ -176,7 +178,7 @@ void* sample_initialize(
       .size         = compute_verts::ntotal_verts * (4u * sizeof(float)) * 2,
       .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
       .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_STORAGE_BUFFER};
-  NGF_SAMPLES_CHECK_NGF_ERROR(state->vertex_buffer.initialize(vertex_buffer_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->vertex_buffer.initialize(vertex_buffer_info));
   state->compute_buffer_slice.buffer = state->vertex_buffer.get();
   state->compute_buffer_slice.range  = compute_verts::ntotal_verts * (4u * sizeof(float));
 
