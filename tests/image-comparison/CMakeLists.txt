@@ -29,6 +29,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../ "${CMAKE_CURRENT_BINARY_DIR}/nicegraf")
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../misc/common ${CMAKE_CURRENT_BINARY_DIR}/misc-common)
 
 nmk_static_library(NAME nicegraf-imagetest-framework
@@ -44,7 +45,7 @@ function (ngf_imagetest_testcase)
 			   DEPS nicegraf-imagetest-framework nicegraf-util nicegraf-misc-common
 			   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
 	#add_dependencies(${SAMPLE_NAME} sample-shaders)                   
-	set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "testcases")
+	set_target_properties(${TEST_NAME} PROPERTIES FOLDER "testcases")
 endfunction()
 
 ngf_imagetest_testcase(NAME triangle SRCS ${CMAKE_CURRENT_LIST_DIR}/testcases/ngf-triangle-test.cpp)
