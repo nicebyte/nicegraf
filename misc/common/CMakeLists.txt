@@ -28,7 +28,6 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
-#add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../ "${CMAKE_CURRENT_BINARY_DIR}/nicegrafMISC")
 
 if (WIN32)
     set(NICESHADE_PLATFORM win PARENT_SCOPE)
@@ -59,6 +58,6 @@ nmk_static_library(NAME nicegraf-misc-common
                          ${CMAKE_CURRENT_LIST_DIR}/targa-loader.cpp
                          ${CMAKE_CURRENT_LIST_DIR}/targa-loader.h
                          ${CMAKE_CURRENT_LIST_DIR}/logging.h
-                   DEPS nicegraf-vk
+                   DEPS ${NGF_BACKEND}
                    PUB_DEFINES  ${NGF_BACKEND_DEFINE}
                    PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/)
