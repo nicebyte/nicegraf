@@ -21,7 +21,7 @@ SOFTWARE.
 ]]
 
 cmake_minimum_required(VERSION 3.23.3)
-project(nicegraf-image-comparison)
+project(nicegraf-imagetests)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
@@ -30,40 +30,25 @@ set(NICEGRAF_DIR ${CMAKE_CURRENT_LIST_DIR}/../../)
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
 add_subdirectory(${NICEGRAF_DIR} ${CMAKE_CURRENT_LIST_DIR}/bin)
 
-if (WIN32)
-    set(NICEGRAF_SHADERC_PLATFORM win)
-    set(NGF_IMAGE_COMPARISON_BACKEND nicegraf-vk)
-elseif(APPLE)
-    set(NICEGRAF_SHADERC_PLATFORM macos)
-    if (NGF_USE_MVK STREQUAL "yes")
-      set(NGF_IMAGE_COMPARISON_BACKEND nicegraf-vk)
-    else()
-      set(NGF_IMAGE_COMPARISON_BACKEND nicegraf-mtl)
-    endif()
-elseif(UNIX AND NOT APPLE)
-    set(NICEGRAF_SHADERC_PLATFORM linux)
-    set(NGF_IMAGE_COMPARISON_BACKEND nicegraf-vk)
-else()
-    message(FATAL_ERROR "Your platform is not currently supported by nicegraf-image-comparison-tests.")
-endif()
-
-string(TOUPPER "NGF_IMAGE_COMPARISON_BACKEND_${NGF_IMAGE_COMPARISON_BACKEND}" NGF_IMAGE_COMPARISON_BACKEND_DEFINE)
-string(REPLACE "-" "_" NGF_IMAGE_COMPARISON_BACKEND_DEFINE ${NGF_IMAGE_COMPARISON_BACKEND_DEFINE})
-
-nmk_static_library(NAME nicegraf-image-comparison-tests-common
-                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/common/shader-loader.h
-                         ${CMAKE_CURRENT_LIST_DIR}/common/shader-loader.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/common/test-util.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/common/file-utils.h
-                         ${CMAKE_CURRENT_LIST_DIR}/common/file-utils.cpp
-                   DEPS ${NICEGRAF_IMAGE_COMPARISON_BACKEND} 
+nmk_static_library(NAME nicegraf-imagetest-framework
+                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/framework/shader-loader.h
+                         ${CMAKE_CURRENT_LIST_DIR}/framework/shader-loader.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/framework/main.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/framework/file-utils.h
+                         ${CMAKE_CURRENT_LIST_DIR}/framework/file-utils.cpp
+                   DEPS nicegraf-vk
                    PUB_DEFINES  ${NGF_IMAGE_COMPARISON_BACKEND_DEFINE}
-                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/common ${NICEGRAF_DIR}/include)
+                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/framework ${NICEGRAF_DIR}/include)
 
-set(NICEGRAF_IMAGE_COMPARISON_SRCS
-    ${CMAKE_CURRENT_LIST_DIR}/unit-tests/ngf-triangle-test.cpp)
+function (ngf_imagetest_testcase)
+	cmake_parse_arguments(TEST "" "NAME" "SRCS" ${ARGN})
+	nmk_binary(NAME ${TEST_NAME}
+			   SRCS ${TEST_SRCS}
+			   DEPS nicegraf-imagetest-framework nicegraf-util nicegraf-wrappers
+			   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
+	#add_dependencies(${SAMPLE_NAME} sample-shaders)                   
+	set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "testcases")
+endfunction()
 
-nmk_binary(NAME nicegraf-image-comparison-tests
-  SRCS ${NICEGRAF_IMAGE_COMPARISON_SRCS}
-  DEPS nicegraf-image-comparison-tests-common ${NGF_IMAGE_COMPARISON_BACKEND} nicegraf-util
-  PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/common ${NICEGRAF_DIR}/include)
+ngf_imagetest_testcase(NAME triangle SRCS ${CMAKE_CURRENT_LIST_DIR}/testcases/ngf-triangle-test.cpp)
+
