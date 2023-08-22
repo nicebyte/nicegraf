@@ -23,12 +23,13 @@ SOFTWARE.
 cmake_minimum_required(VERSION 3.23.3)
 project(nicegraf-imagetests)
 
+
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 20)
-set(NICEGRAF_DIR ${CMAKE_CURRENT_LIST_DIR}/../../)
 
 include("${CMAKE_CURRENT_LIST_DIR}/../../build-utils.cmake")
-add_subdirectory(${NICEGRAF_DIR} ${CMAKE_CURRENT_LIST_DIR}/bin)
+
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/../../ ${CMAKE_CURRENT_BINARY_DIR}/nicegraf)
 
 nmk_static_library(NAME nicegraf-imagetest-framework
                    SRCS  ${CMAKE_CURRENT_LIST_DIR}/framework/shader-loader.h
