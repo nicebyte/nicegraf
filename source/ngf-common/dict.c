@@ -71,7 +71,7 @@ void ngfi_dict_destroy(ngfi_dict dict) {
 
 void ngfi_dict_clear(ngfi_dict dict) {
   assert(dict);
-  memset(dict->data, NGFI_DICT_INVALID_KEY, dict->slot_size * dict->nslots);
+  memset(dict->data, 0xff, dict->slot_size * dict->nslots);
   dict->nitems = 0u;
 }
 

@@ -36,10 +36,10 @@
 #include <string.h>
 #include <time.h>
 
-static void ngft_bad_hashfn(uintptr_t key, uint32_t seed, uint64_t* out) {
+static void ngft_bad_hashfn(uintptr_t key, uint32_t seed, void* out) {
   (void)key;
-  out[0] = seed;
-  out[1] = seed;
+  ((uint32_t*)out)[0] = seed;
+  ((uint32_t*)out)[1] = seed;
 }
 
 static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float max_load_factor) {
@@ -51,9 +51,9 @@ static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float m
   test_dict_val* vals = (test_dict_val*)malloc(sizeof(test_dict_val) * nitems);
   NT_ASSERT(keys != NULL && vals != NULL);
   for (size_t i = 0u; i < nitems; ++i) {
-    keys[i] = rand() % RAND_MAX;
+    keys[i] = (uintptr_t)(rand() % RAND_MAX);
     keys[i] <<= 32;
-    keys[i] |= rand() % RAND_MAX;
+    keys[i] |= (uintptr_t)(rand() % RAND_MAX);
     vals[i].key                   = keys[i];
     vals[i].seen_during_iteration = false;
   }
@@ -656,7 +656,7 @@ NT_TESTSUITE {
     const uint32_t nchunks          = 10u;
     const uint32_t nelems_total     = nelems_per_chunk * nchunks;
     bool         elem_seen[100] = {false};
-    ngfi_block_allocator* blkalloc = ngfi_blkalloc_create(sizeof(ngfi_chnk_hdr) + sizeof(size_t) * nelems_per_chunk, 1u);
+    ngfi_block_allocator* blkalloc = ngfi_blkalloc_create((uint32_t)(sizeof(ngfi_chnk_hdr) + sizeof(size_t) * nelems_per_chunk), 1u);
     ngfi_chnklist  cl = {blkalloc, NULL};
     for (size_t i = 0u; i < nelems_total; ++i) { 
       void* e = ngfi_chnklist_append(&cl, &i, sizeof(i));

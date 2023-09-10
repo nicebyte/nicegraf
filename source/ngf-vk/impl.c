@@ -1885,7 +1885,6 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
   VkAttachmentReference depth_stencil_attachment_ref;
   bool                  have_depth_stencil_attachment = false;
   bool                  have_sampled_attachments      = false;
-  bool                  have_color_attachment         = false;
 
   for (uint32_t a = 0u; a < nattachments; ++a) {
     const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
@@ -1927,10 +1926,7 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
         depth_stencil_attachment_ref.attachment = a;
         depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
       }
-    } else if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
-      have_color_attachment = true;
     }
-
     have_sampled_attachments |= ngf_attachment_desc->is_sampled;
   }
   if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
@@ -3819,11 +3815,11 @@ ngf_error ngf_cmd_begin_render_pass(
       pass_info->store_ops,
       sizeof(ngf_attachment_store_op) * pass_info->render_target->nattachments);
 
-  uint16_t nclears = 0u;
-  uint16_t clear_idx = 0u;
+  uint32_t nclears = 0u;
+  uint32_t clear_idx = 0u;
   ngf_clear* cloned_clears = ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
   if (cloned_clears == NULL) { return NGF_ERROR_OUT_OF_MEM; }
-  for (uint16_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
+  for (uint32_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     if (cmd_buf->pending_render_pass_info.load_ops[i] == NGF_LOAD_OP_CLEAR) {
       nclears = NGFI_MAX(nclears, i + 1);
       cloned_clears[i] = pass_info->clears[clear_idx++];
@@ -3834,7 +3830,7 @@ ngf_error ngf_cmd_begin_render_pass(
   } else {
     cmd_buf->pending_render_pass_info.clears = NULL;
   }
-  cmd_buf->pending_clear_value_count = nclears;
+  cmd_buf->pending_clear_value_count = (uint16_t)nclears;
   cmd_buf->curr_rpass_id++;
 
   for (size_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
@@ -4962,7 +4958,7 @@ void ngf_cmd_write_image(
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
   assert(cmd_buf);
   assert(nwrites == 0u || writes);
-  if (writes == 0u) return;
+  if (nwrites == 0u) return;
   const ngfvk_sync_state src_dst_state = {
       .access = {.types = VK_ACCESS_TRANSFER_READ_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_UNDEFINED};

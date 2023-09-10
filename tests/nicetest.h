@@ -83,7 +83,7 @@ typedef struct nt_internal_test_suite_context {
 } nt_internal_test_suite_context;
 
 #if !defined(NT_IMPL)
-static int nt_internal_handle_test_failure(
+static inline  int nt_internal_handle_test_failure(
     const char*                     test_case_name,
     nt_internal_test_suite_context* test_suite_context) {
   fprintf(stderr, "test case \"%s\" failed.\n", test_case_name);
@@ -91,7 +91,7 @@ static int nt_internal_handle_test_failure(
   return 0;
 }
 
-static int nt_internal_handle_test_start(
+static inline int nt_internal_handle_test_start(
     const char*                     test_case_name,
     nt_internal_test_suite_context* test_suite_context) {
   fprintf(stderr, "\nrunning test case: \"%s\"\n", test_case_name);

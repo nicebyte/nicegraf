@@ -39,11 +39,11 @@ typedef struct ngfi_chnklist {
   ngfi_chnk_hdr*        firstchnk;
 } ngfi_chnklist;
 
-static void* ngfi_chnk_data(ngfi_chnk_hdr* hdr, uint32_t offset) {
+static inline void* ngfi_chnk_data(ngfi_chnk_hdr* hdr, uint32_t offset) {
   return (void*)((char*)hdr + sizeof(*hdr) + offset);
 }
 
-static void* ngfi_chnklist_append(ngfi_chnklist* list, const void* data, uint32_t data_size) {
+static inline void* ngfi_chnklist_append(ngfi_chnklist* list, const void* data, uint32_t data_size) {
   assert(list);
   assert(data);
   assert(list->blkalloc);
@@ -59,7 +59,7 @@ static void* ngfi_chnklist_append(ngfi_chnklist* list, const void* data, uint32_
     if (!new_chnk) { return NULL; }
     ngfi_list_init(&new_chnk->clnode);
     new_chnk->bytes_used  = 0u;
-    new_chnk->bytes_total = blksize - sizeof(ngfi_chnk_hdr);
+    new_chnk->bytes_total = (uint32_t)blksize - (uint32_t)sizeof(ngfi_chnk_hdr);
     if (tail != NULL) {
       ngfi_list_append(&new_chnk->clnode, &tail->clnode);
     } else {
@@ -75,7 +75,7 @@ static void* ngfi_chnklist_append(ngfi_chnklist* list, const void* data, uint32_
 
 #define NGFI_CHNK_FROM_NODE(node) (NGFI_LIST_CONTAINER_OF(node, ngfi_chnk_hdr, clnode))
 
-static void ngfi_chnklist_clear(ngfi_chnklist* list) {
+static inline void ngfi_chnklist_clear(ngfi_chnklist* list) {
   assert(list);
   assert(list->blkalloc);
   while (list->firstchnk) {
