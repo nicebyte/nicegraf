@@ -20,16 +20,98 @@
  * IN THE SOFTWARE.
  */
 
-#include <time.h>
-
-#include "nicetest.h"
+#define NGFI_DICT_TEST_MODE
+#define NT_BREAK_ON_ASSERT_FAIL
+#include "ngf-common/block-alloc.h"
+#include "ngf-common/chunk-list.h"
+#include "ngf-common/cmdbuf-state.h"
+#include "ngf-common/dict.h"
+#include "ngf-common/dynamic-array.h"
 #include "ngf-common/frame-token.h"
+#include "ngf-common/list.h"
 #include "ngf-common/native-binding-map.h"
 #include "ngf-common/stack-alloc.h"
-#include "ngf-common/block-alloc.h"
-#include "ngf-common/dynamic-array.h"
-#include "ngf-common/list.h"
-#include "ngf-common/cmdbuf-state.h"
+#include "nicetest.h"
+
+#include <string.h>
+#include <time.h>
+
+static void ngft_bad_hashfn(uintptr_t key, uint32_t seed, uint64_t* out) {
+  (void)key;
+  out[0] = seed;
+  out[1] = seed;
+}
+
+static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float max_load_factor) {
+  typedef struct {
+    uintptr_t key;
+    bool      seen_during_iteration;
+  } test_dict_val;
+  uintptr_t*     keys = (void*)malloc(sizeof(uintptr_t) * nitems);
+  test_dict_val* vals = (test_dict_val*)malloc(sizeof(test_dict_val) * nitems);
+  NT_ASSERT(keys != NULL && vals != NULL);
+  for (size_t i = 0u; i < nitems; ++i) {
+    keys[i] = rand() % RAND_MAX;
+    keys[i] <<= 32;
+    keys[i] |= rand() % RAND_MAX;
+    vals[i].key                   = keys[i];
+    vals[i].seen_during_iteration = false;
+  }
+
+  ngfi_dict d = ngfi_dict_create(nslots, sizeof(test_dict_val*));
+  NT_ASSERT(d);
+  if (max_load_factor > 0.f) { ngfi_dict_set_max_load_factor(d, max_load_factor); }
+
+  /* create */
+  for (size_t i = 0u; i < nitems; ++i) {
+    void* ptr  = &vals[i];
+    void* data = ngfi_dict_get(&d, keys[i], &ptr);
+    NT_ASSERT(data);
+    test_dict_val* val = *(test_dict_val**)data;
+    NT_ASSERT(val->key == keys[i]);
+  }
+  NT_ASSERT(ngfi_dict_count(d) == nitems);
+
+  /* lookup */
+  for (size_t i = 0u; i < nitems; ++i) {
+    void* data = ngfi_dict_get(&d, keys[i], NULL);
+    NT_ASSERT(data);
+    test_dict_val* val = *(test_dict_val**)data;
+    NT_ASSERT(val->key == keys[i]);
+  }
+
+  /* iterate */
+  size_t nvals_seen = 0u;
+  NGFI_DICT_FOREACH(d, it) {
+    void* data = ngfi_dict_itval(d, it);
+    NT_ASSERT(data);
+
+    test_dict_val* val         = *(test_dict_val**)data;
+    val->seen_during_iteration = true;
+    ++nvals_seen;
+  }
+  NT_ASSERT(nvals_seen == nitems);
+  bool seen_all = true;
+  for (size_t i = 0u; seen_all && i < nitems; ++i) {
+    seen_all = seen_all && vals[i].seen_during_iteration;
+  }
+  NT_ASSERT(seen_all);
+
+  /* clear */
+  ngfi_dict_clear(d);
+  for (size_t i = 0u; i < nitems; ++i) {
+    void* data = ngfi_dict_get(&d, keys[i], NULL);
+    NT_ASSERT(data == NULL);
+  }
+  nvals_seen = 0u;
+  NGFI_DICT_FOREACH(d, it) {
+    ++nvals_seen;
+  }
+  NT_ASSERT(nvals_seen == 0u);
+
+  free(keys);
+  free(vals);
+}
 
 NT_TESTSUITE {
   /* frame token tests */
@@ -129,13 +211,13 @@ NT_TESTSUITE {
     NT_ASSERT(sa != NULL);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
       uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      *target = value;
+      *target          = value;
       NT_ASSERT(*target == value);
     }
     ngfi_sa_reset(sa);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
       uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      *target = value;
+      *target          = value;
       NT_ASSERT(*target == value);
     }
     ngfi_sa_destroy(sa);
@@ -148,7 +230,7 @@ NT_TESTSUITE {
     NT_ASSERT(sa != NULL);
     for (uint32_t i = 0; i < nvalues + 1; ++i) {
       uint32_t* target = (uint32_t*)ngfi_sa_alloc(sa, sizeof(value));
-      *target = value;
+      *target          = value;
       NT_ASSERT(*target == value);
     }
 
@@ -159,29 +241,27 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-
     ngfi_sa_reset(sa);
 
     ngfi_sa_alloc(sa, sizeof(value) * (nvalues - 1));
 
-    size_t alloc_size = sizeof(value) + 1;
-    uint8_t* x = ngfi_sa_alloc(sa, alloc_size);
+    size_t   alloc_size = sizeof(value) + 1;
+    uint8_t* x          = ngfi_sa_alloc(sa, alloc_size);
 
     // another block should have been allocated
     NT_ASSERT(sa->active_block != NULL);
-    NT_ASSERT(x != NULL); 
+    NT_ASSERT(x != NULL);
 
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
-
 
     ngfi_sa_destroy(sa);
   }
 
   NT_TESTCASE("stack alloc: allocate beyond base capacity") {
-    size_t size = 32;
-    ngfi_sa*       sa      = ngfi_sa_create(size);
+    size_t   size = 32;
+    ngfi_sa* sa   = ngfi_sa_create(size);
 
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
@@ -192,14 +272,13 @@ NT_TESTSUITE {
     // the next block of the base allocator should be the next free block
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
-
 
     ngfi_sa_destroy(sa);
   }
 
   NT_TESTCASE("stack alloc: allocate more than 1 new block") {
-    size_t size = 32;
-    ngfi_sa*       sa      = ngfi_sa_create(size);
+    size_t   size = 32;
+    ngfi_sa* sa   = ngfi_sa_create(size);
 
     uint8_t* x = ngfi_sa_alloc(sa, size + 1);
 
@@ -211,11 +290,10 @@ NT_TESTSUITE {
     // since only two total block have been allocated
     NT_ASSERT(sa->next_block == sa->active_block);
 
-
     ngfi_sa* old_free_block = sa->active_block;
 
     size = sa->active_block->capacity + 1;
-    x = ngfi_sa_alloc(sa, size);
+    x    = ngfi_sa_alloc(sa, size);
 
     // another block should have been allocated
     NT_ASSERT(sa->active_block != NULL);
@@ -224,8 +302,7 @@ NT_TESTSUITE {
     NT_ASSERT(x == sa->active_block->ptr - size);
 
     // the next block of the base allocator should be old_free_block
-    NT_ASSERT(sa->next_block == old_free_block); 
-
+    NT_ASSERT(sa->next_block == old_free_block);
 
     ngfi_sa_destroy(sa);
   }
@@ -469,7 +546,19 @@ NT_TESTSUITE {
     NT_ASSERT(i == 3);
   }
 
-/* cmd buffer state transitions tests */
+  NT_TESTCASE("list: empty foreach") {
+    size_t          niters = 0u;
+    ngfi_list_node* n      = NULL;
+    NGFI_LIST_FOR_EACH(n, a) {
+      ++niters;
+    }
+    NGFI_LIST_FOR_EACH_CONST(n, b) {
+      ++niters;
+    }
+    NT_ASSERT(niters == 0u);
+  }
+
+  /* cmd buffer state transitions tests */
   NT_TESTCASE("cmdbuf transitions: valid") {
     ngfi_cmd_buffer_state s = NGFI_CMD_BUFFER_NEW;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_READY) == NGF_ERROR_OK);
@@ -478,20 +567,20 @@ NT_TESTSUITE {
 
     s = NGFI_CMD_BUFFER_READY;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_RECORDING) == NGF_ERROR_OK);
-    s = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_RECORDING) == NGF_ERROR_OK);
+    s = NGFI_CMD_BUFFER_PENDING;
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_RECORDING) != NGF_ERROR_OK);
 
     s = NGFI_CMD_BUFFER_RECORDING;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_AWAITING_SUBMIT) == NGF_ERROR_OK);
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
 
-    s = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
+    s = NGFI_CMD_BUFFER_PENDING;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_SUBMITTED) == NGF_ERROR_OK);
   }
 
   NT_TESTCASE("cmdbuf transitions: invalid") {
     ngfi_cmd_buffer_state s = NGFI_CMD_BUFFER_NEW;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_NEW) != NGF_ERROR_OK);
-    s = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
+    s = NGFI_CMD_BUFFER_PENDING;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_READY) != NGF_ERROR_OK);
 
     s = NGFI_CMD_BUFFER_NEW;
@@ -502,19 +591,90 @@ NT_TESTSUITE {
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_RECORDING) != NGF_ERROR_OK);
 
     s = NGFI_CMD_BUFFER_NEW;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_AWAITING_SUBMIT) != NGF_ERROR_OK);
-    s = NGFI_CMD_BUFFER_AWAITING_SUBMIT;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_AWAITING_SUBMIT) != NGF_ERROR_OK);
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
+    s = NGFI_CMD_BUFFER_PENDING;
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
     s = NGFI_CMD_BUFFER_READY;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_AWAITING_SUBMIT) != NGF_ERROR_OK);
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
     s = NGFI_CMD_BUFFER_RECORDING;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, true, NGFI_CMD_BUFFER_AWAITING_SUBMIT) != NGF_ERROR_OK);
+    NT_ASSERT(ngfi_transition_cmd_buf(&s, true, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
 
     s = NGFI_CMD_BUFFER_READY;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_SUBMITTED) != NGF_ERROR_OK);
     s = NGFI_CMD_BUFFER_RECORDING;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_SUBMITTED) != NGF_ERROR_OK);
+  }
 
+  /* hashtable tests */
+  NT_TESTCASE("dict: create and destroy") {
+    ngfi_dict d = ngfi_dict_create(10u, 4u);
+    NT_ASSERT(d);
+    NT_ASSERT(ngfi_dict_count(d) == 0u);
+    NT_ASSERT(ngfi_dict_nslots(d) == 10u);
+    ngfi_dict_destroy(d);
+  }
+
+  NT_TESTCASE("dict: lookup-clear-lookup") {
+    uintptr_t key = 0xdeadbeef, value = 0xbadf00d;
+    ngfi_dict d = ngfi_dict_create(10u, sizeof(value));
+    NT_ASSERT(d);
+    void* val0 = ngfi_dict_get(&d, key, &value);
+    NT_ASSERT(val0);
+    NT_ASSERT(memcmp(val0, &value, sizeof(value)) == 0);
+    NT_ASSERT(ngfi_dict_count(d) == 1u);
+    void* val1 = ngfi_dict_get(&d, key, NULL);
+    NT_ASSERT(memcmp(val1, &value, sizeof(value)) == 0);
+    ngfi_dict_clear(d);
+    NT_ASSERT(ngfi_dict_count(d) == 0u);
+    NT_ASSERT(ngfi_dict_get(&d, key, NULL) == NULL);
+    NT_ASSERT(ngfi_dict_count(d) == 0u);
+    ngfi_dict_destroy(d);
+  }
+
+  NT_TESTCASE("dict: iteration") {
+    ngft_dict_populate_and_iterate(50u, 500u, 0.f);
+  }
+
+  NT_TESTCASE("dict: fill all slots") {
+    ngft_dict_populate_and_iterate(500u, 500u, 2.0f);
+  }
+
+  NT_TESTCASE("dict: collisions") {
+    ngfi_dict_hashfn = ngft_bad_hashfn;
+    ngft_dict_populate_and_iterate(50u, 500u, 0.f);
+    ngfi_dict_hashfn = NULL;
+  }
+
+  NT_TESTCASE("dict: rehash") {
+    ngft_dict_populate_and_iterate(500u, 100u, 0.5f);
+  }
+
+  /* chunk list tests */
+
+  NT_TESTCASE("chunklist: multiple chunks and clear") {
+    const uint32_t nelems_per_chunk = 10u;
+    const uint32_t nchunks          = 10u;
+    const uint32_t nelems_total     = nelems_per_chunk * nchunks;
+    bool         elem_seen[100] = {false};
+    ngfi_block_allocator* blkalloc = ngfi_blkalloc_create(sizeof(ngfi_chnk_hdr) + sizeof(size_t) * nelems_per_chunk, 1u);
+    ngfi_chnklist  cl = {blkalloc, NULL};
+    for (size_t i = 0u; i < nelems_total; ++i) { 
+      void* e = ngfi_chnklist_append(&cl, &i, sizeof(i));
+      NT_ASSERT(e != NULL);
+      NT_ASSERT(*((size_t*)e) == i);
+    }
+
+    size_t niters = 0u;
+    NGFI_CHNKLIST_FOR_EACH(cl, size_t, i) {
+        elem_seen[*i] = true;
+        ++niters;
+    }
+    NT_ASSERT(niters == 100);
+    bool all_seen = true;
+    for (size_t i = 0u; all_seen && i < 100u; ++i) all_seen = all_seen && elem_seen[i];
+    NT_ASSERT(all_seen);
+    ngfi_chnklist_clear(&cl);
+    ngfi_blkalloc_destroy(blkalloc);
   }
 
 }

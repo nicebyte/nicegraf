@@ -120,17 +120,15 @@ void* sample_initialize(
    * Populate the first mip level for each layer.
    */
   for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
+    const ngf_image_write img_write = {
+        .src_offset = 0u, .dst_offset = {0,0,0}, .extent = {image_array_width, image_array_height, 1u},
+        .dst_base_layer = i, .nlayers =1u
+    };
     ngf_cmd_write_image(
         xfer_encoder,
         staging_images[i].staging_buffer.get(),
-        0u,
-        ngf_image_ref {
-            .image        = state->image_array.get(),
-            .mip_level    = 0u,
-            .layer        = i,
-            .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
-        ngf_offset3d {},
-        ngf_extent3d {image_array_width, image_array_height, 1u},
+        state->image_array.get(),
+        &img_write,
         1u);
   }
 
@@ -156,18 +154,19 @@ void* sample_initialize(
 
   /** Upload the first mip level for each layer on each face. */
   for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
-    for (int face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; ++face) {
+    for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; ++face) {
+      const ngf_image_write img_write = {
+          .src_offset     = 0u,
+          .dst_offset     = {0, 0, 0},
+          .extent         = {image_array_width, image_array_height, 1u},
+          .dst_level      = 0u,
+          .dst_base_layer = 6u * i + face,
+          .nlayers        = 1u};
       ngf_cmd_write_image(
           xfer_encoder,
           staging_images[i].staging_buffer.get(),
-          0u,
-          ngf_image_ref {
-              .image        = state->cubemap_array.get(),
-              .mip_level    = 0u,
-              .layer        = i,
-              .cubemap_face = (ngf_cubemap_face)face},
-          ngf_offset3d {},
-          ngf_extent3d {image_array_width, image_array_height, 1u},
+          state->cubemap_array.get(),
+          &img_write,
           1u);
     }
   }

@@ -98,3 +98,13 @@ ngfi_sa* ngfi_tmp_store(void) {
   return temp_storage;
 }
 
+
+ngfi_sa* ngfi_frame_store(void) {
+  static NGFI_THREADLOCAL ngfi_sa* frame_storage = NULL;
+  if (frame_storage == NULL) {
+    const size_t sa_capacity = 1024 * 100;  // 100K
+    frame_storage = ngfi_sa_create(sa_capacity);
+  }
+  return frame_storage;
+}
+

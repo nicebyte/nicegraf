@@ -49,6 +49,10 @@ nmk_static_library(NAME nicegraf-internal
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/list.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/chunk-list.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
 
@@ -112,14 +116,6 @@ else()
   nmk_static_library(NAME nicegraf-vk
                      SRCS ${NICEGRAF_VK_SRCS}
                      DEPS ${NICEGRAF_VK_DEPS})
-  nmk_static_library(NAME nicegraf-vk-for-tests 
-                     SRCS ${NICEGRAF_VK_SRCS}
-                     DEPS ${NICEGRAF_VK_DEPS}
-                     PVT_DEFINES NGFVK_TEST_MODE)
-                     
-  nmk_binary(NAME vk-backend-tests
-             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-             DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
 endif()
 
 # Build tests only if explicitly requested.
@@ -127,7 +123,14 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
     nmk_binary(NAME internal-utils-tests
            SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/internal-utils-tests.c
            SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-                    DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
+           DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
+  nmk_static_library(NAME nicegraf-vk-for-tests 
+                     SRCS ${NICEGRAF_VK_SRCS}
+                     DEPS ${NICEGRAF_VK_DEPS}
+                     PVT_DEFINES NGFVK_TEST_MODE)
+  nmk_binary(NAME vk-backend-tests
+             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
+             DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
 endif()
 
 # Build samples only if explicitly requested.

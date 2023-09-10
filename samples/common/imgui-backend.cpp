@@ -136,18 +136,14 @@ ngf_imgui::ngf_imgui(
       0,
       4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
   ngf_buffer_unmap(texture_data_.get());
-  ngf_image_ref font_texture_ref;
-  font_texture_ref.image     = font_texture_.get();
-  font_texture_ref.layer     = 0u;
-  font_texture_ref.mip_level = 0u;
-  ngf_cmd_write_image(
-      enc,
-      texture_data_.get(),
-      0,
-      font_texture_ref,
-      ngf_offset3d {},
-      ngf_extent3d {(uint32_t)font_atlas_width, (uint32_t)font_atlas_height, 1u},
-      1u);
+  const ngf_image_write img_write {
+      .src_offset     = 0u,
+      .dst_offset     = {0, 0, 0},
+      .extent         = {.width = font_atlas_width, .height = font_atlas_height, .depth = 1u},
+      .dst_level      = 0u,
+      .dst_base_layer = 0u,
+      .nlayers        = 1u};
+  ngf_cmd_write_image(enc, texture_data_.get(), font_texture_.get(), &img_write, 1u);
 
   // Create a sampler for the font texture.
   ngf_sampler_info sampler_info {

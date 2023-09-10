@@ -85,18 +85,21 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(s->texture.initialize(texture_image_info));
 
   /* Upload the data from the staging buffer into the 0th mip level of the texture. */
+  const ngf_image_write img_write = {
+      .src_offset = 0u,
+      .dst_offset = {.x = 0, .y = 0, .z = 0u},
+      .extent =
+          {.width = texture_staging_image.width_px, .height = texture_staging_image.height_px, .depth = 1u},
+      .dst_level      = 0u,
+      .dst_base_layer = 0u,
+      .nlayers        = 1u};
   ngf_cmd_write_image(
       xfer_encoder,
       texture_staging_image.staging_buffer.get(),
-      0u,
-      ngf_image_ref {
-          .image        = s->texture.get(),
-          .mip_level    = 0u,
-          .layer        = 0u,
-          .cubemap_face = NGF_CUBEMAP_FACE_COUNT},
-      ngf_offset3d {},
-      ngf_extent3d {texture_staging_image.width_px, texture_staging_image.height_px, 1u},
+      s->texture.get(),
+      &img_write,
       1u);
+
 
   /* Populate the rest of the mip levels automatically. */
   ngf_cmd_generate_mipmaps(xfer_encoder, s->texture.get());

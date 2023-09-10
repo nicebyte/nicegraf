@@ -80,11 +80,11 @@ static inline void ngfi_list_init(ngfi_list_node* node) {
  * Iterates over all the elements in the list in order, starting at the given one.
  */
 #define NGFI_LIST_FOR_EACH(list, node_name) for (ngfi_list_node* node_name = (list), *node_name##_prev = NULL; \
-                                                 (!node_name##_prev || node_name##_prev->next != (list)); \
+                                                 (list) && (!node_name##_prev || node_name##_prev->next != (list)); \
                                                  node_name##_prev = node_name, node_name = node_name->next)
 
 #define NGFI_LIST_FOR_EACH_CONST(list, node_name) for (const ngfi_list_node* node_name = (list), *node_name##_prev = NULL; \
-                                                       (!node_name##_prev || node_name##_prev->next != (list)); \
+                                                       (list) && (!node_name##_prev || node_name##_prev->next != (list)); \
                                                        node_name##_prev = node_name, node_name = node_name->next)
 
 #ifdef __cplusplus

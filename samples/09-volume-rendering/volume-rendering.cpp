@@ -114,18 +114,14 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(state->volume.initialize(img_info));
 
   /** Upload the volume data into the image. */
-  ngf_cmd_write_image(
-      xfer_encoder,
-      staging_buffer,
-      0u,
-      ngf_image_ref {
-          .image     = state->volume.get(),
-          .mip_level = 0u,
-          .layer     = 0u,
-      },
-      ngf_offset3d {},
-      img_info.extent,
-      1u);
+  const ngf_image_write img_write = {
+      .src_offset     = 0u,
+      .dst_offset     = {0, 0, 0},
+      .extent         = img_info.extent,
+      .dst_level      = 0u,
+      .dst_base_layer = 0u,
+      .nlayers        = 1u};
+  ngf_cmd_write_image(xfer_encoder, staging_buffer, state->volume.get(), &img_write, 1u);
 
   /**
    * Initialize the sampler.

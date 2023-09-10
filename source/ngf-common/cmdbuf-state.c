@@ -45,7 +45,7 @@ ngf_error ngfi_transition_cmd_buf(
       return NGF_ERROR_INVALID_OPERATION;
     }
     break;
-  case NGFI_CMD_BUFFER_AWAITING_SUBMIT:
+  case NGFI_CMD_BUFFER_READY_TO_SUBMIT:
     if (*cur_state != NGFI_CMD_BUFFER_RECORDING) {
       NGFI_DIAG_ERROR("command buffer is not actively recording.");
       return NGF_ERROR_INVALID_OPERATION;
@@ -55,11 +55,18 @@ ngf_error ngfi_transition_cmd_buf(
       return NGF_ERROR_INVALID_OPERATION;
     }
     break;
+  case NGFI_CMD_BUFFER_PENDING:
+    if (*cur_state != NGFI_CMD_BUFFER_READY_TO_SUBMIT) {
+      NGFI_DIAG_ERROR("command buffer not ready to be submitted");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+    break;
   case NGFI_CMD_BUFFER_SUBMITTED:
-    if (*cur_state != NGFI_CMD_BUFFER_AWAITING_SUBMIT) {
+    if (*cur_state != NGFI_CMD_BUFFER_PENDING) {
       NGFI_DIAG_ERROR("command buffer not in a submittable state");
       return NGF_ERROR_INVALID_OPERATION;
     }
+    break;
   }
   *cur_state = new_state;
   return NGF_ERROR_OK;
