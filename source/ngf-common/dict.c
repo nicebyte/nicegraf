@@ -25,6 +25,7 @@
 #include "macros.h"
 
 #include <stdint.h>
+#include <string.h>
 
 
 static inline void ngfi_mmh3_x64_128(uintptr_t key, const uint32_t seed, void* out);
@@ -159,7 +160,7 @@ ngfi_dict_iter ngfi_dict_itstart(ngfi_dict dict) {
 ngfi_dict_iter ngfi_dict_itnext(ngfi_dict dict, ngfi_dict_iter iter) {
   if (iter) {
     ngfi_dict_iter start     = (char*)ngfi_dict_itstart(dict);
-    const bool last_slot = ((char*)iter - (char*)start) / dict->slot_size == dict->nslots - 1u;
+    const bool last_slot = (size_t)((char*)iter - (char*)start) / dict->slot_size == dict->nslots - 1u;
     if (last_slot) {
       return NULL;
     } else {

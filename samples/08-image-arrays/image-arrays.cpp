@@ -154,7 +154,7 @@ void* sample_initialize(
 
   /** Upload the first mip level for each layer on each face. */
   for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
-    for (int face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; ++face) {
+    for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; ++face) {
       const ngf_image_write img_write = {
           .src_offset     = 0u,
           .dst_offset     = {0, 0, 0},

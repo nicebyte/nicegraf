@@ -599,7 +599,7 @@ struct ngf_cmd_buffer_t {
   ngf_render_target           active_rt                 = nullptr;
   ngf_id<MTL::Buffer>         bound_index_buffer        = nullptr;
   MTL::IndexType              bound_index_buffer_type   = MTL::IndexTypeUInt16;
-  uint32_t                    bound_index_buffer_offset = 0u;
+  size_t                      bound_index_buffer_offset = 0u;
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
@@ -1833,13 +1833,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer* cmd_buffers) NGF_NO
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   }
   for (uint32_t b = 0u; b < n; ++b) {
-    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_SUBMITTED);
+    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_PENDING);
     if (b < n - 1u) {
       cmd_buffers[b]->mtl_cmd_buffer->commit();
     } else {
       CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
     }
     cmd_buffers[b]->mtl_cmd_buffer = nullptr;
+    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_SUBMITTED);
   }
   return NGF_ERROR_OK;
 }
@@ -2194,7 +2195,7 @@ void ngf_cmd_bind_attrib_buffer(
     ngf_render_encoder enc,
     const ngf_buffer   buf,
     uint32_t           binding,
-    uint32_t           offset) NGF_NOEXCEPT {
+    size_t             offset) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->active_rce->setVertexBuffer(
       buf->mtl_buffer.get(),
@@ -2205,7 +2206,7 @@ void ngf_cmd_bind_attrib_buffer(
 void ngf_cmd_bind_index_buffer(
     ngf_render_encoder enc,
     const ngf_buffer   buf,
-    uint32_t           offset,
+    size_t             offset,
     ngf_type           type) NGF_NOEXCEPT {
   auto cmd_buf                       = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->bound_index_buffer        = ngf_id<MTL::Buffer>::add_retain(buf->mtl_buffer.get());
@@ -2393,7 +2394,37 @@ void ngf_cmd_copy_buffer(
       src_offset,
       dst_offset);
 }
-
+                                      
+void ngf_cmd_write_image(
+    ngf_xfer_encoder       enc,
+    ngf_buffer             src,
+    ngf_image              dst,
+    const ngf_image_write* writes,
+    uint32_t               nwrites) NGF_NOEXCEPT {
+        auto buf = NGFMTL_ENC2CMDBUF(enc);
+  assert(buf->active_rce == nil);
+  for (size_t i = 0u; i < nwrites; ++i) {
+    const ngf_image_write* w = &writes[i];
+    for (uint32_t l = 0u; l < w->nlayers; ++l) {
+      const uint32_t pitch    = ngfmtl_get_pitch(w->extent.width , dst->format);
+      const uint32_t num_rows = ngfmtl_get_num_rows(w->extent.height, dst->format);
+      buf->active_bce->copyFromBuffer(src->mtl_buffer.get(),
+                                      w->src_offset + (l * pitch * num_rows),
+                                      pitch,
+                                      pitch * num_rows,
+                                      MTL::Size::Make(w->extent.width, w->extent.height, w->extent.depth),
+                                      dst->texture.get(),
+                                      w->dst_base_layer + l,
+                                      w->dst_level,
+                                      MTL::Origin::Make(
+                                                        (NS::UInteger)w->dst_offset.x,
+                                                        (NS::UInteger)w->dst_offset.y,
+                                                        (NS::UInteger)w->dst_offset.z));
+    }
+  }
+}
+                
+/*
 void ngf_cmd_write_image(
     ngf_xfer_encoder enc,
     const ngf_buffer src,
@@ -2423,7 +2454,7 @@ void ngf_cmd_write_image(
         dst.mip_level,
         MTL::Origin::Make((NS::UInteger)offset.x, (NS::UInteger)offset.y, (NS::UInteger)offset.z));
   }
-}
+}*/
 
 void ngf_cmd_copy_image_to_buffer(
     ngf_xfer_encoder    enc,

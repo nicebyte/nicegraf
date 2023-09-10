@@ -93,7 +93,7 @@ typedef long double ngfi_max_align_t;
 
 #define NGFI_MAX_ALIGNMENT (sizeof(ngfi_max_align_t))
 
-static size_t ngfi_align_size(size_t s) {
+static inline size_t ngfi_align_size(size_t s) {
   static const size_t align_mask = NGFI_MAX_ALIGNMENT - 1u;
   return s + (NGFI_MAX_ALIGNMENT - (s & align_mask));
 }
