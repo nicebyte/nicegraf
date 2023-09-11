@@ -307,15 +307,15 @@ typedef struct ngfvk_render_cmd {
 #pragma region external_struct_definitions
 
 typedef struct ngf_cmd_buffer_t {
-  ngf_frame_token          parent_frame;     // < The frame this cmd buffer is associated with.
-  ngfi_cmd_buffer_state    state;            // < State of the cmd buffer (i.e. new/recording/etc.)
-  VkCommandBuffer          vk_cmd_buffer;    // < Active vulkan command buffer.
-  VkCommandPool            vk_cmd_pool;      // < Active vulkan command pool.
-  ngf_graphics_pipeline    active_gfx_pipe;  // < The bound graphics pipeline.
-  ngf_compute_pipeline     active_compute_pipe;  // < The bound compute pipeline.
-  ngf_render_target        active_rt;            // < Active render target.
-  ngfvk_bind_op_chunk_list pending_bind_ops;     // < Bind ops to be performed before the next draw.
+  ngf_frame_token        parent_frame;     // < The frame this cmd buffer is associated with.
+  ngfi_cmd_buffer_state  state;            // < State of the cmd buffer (i.e. new/recording/etc.)
+  VkCommandBuffer        vk_cmd_buffer;    // < Active vulkan command buffer.
+  VkCommandPool          vk_cmd_pool;      // < Active vulkan command pool.
+  ngf_graphics_pipeline  active_gfx_pipe;  // < The bound graphics pipeline.
+  ngf_compute_pipeline   active_compute_pipe;  // < The bound compute pipeline.
+  ngf_render_target      active_rt;            // < Active render target.
   ngfvk_desc_pools_list* desc_pools_list;  // < List of descriptor pools used in the buffer's frame.
+  ngfi_chnklist          pending_bind_ops;  // < Bind ops to be performed before the next draw.
   ngfi_chnklist          in_pass_cmd_chnks;
   ngfi_chnklist          pre_pass_cmd_chnks;
   ngfi_chnklist          virt_bind_ops_ranges;
@@ -324,6 +324,7 @@ typedef struct ngf_cmd_buffer_t {
   ngf_render_pass_info pending_render_pass_info;  // < describes the active render pass
   uint16_t             pending_clear_value_count;
   uint16_t             curr_rpass_id;            // < id number of current renderpass.
+  uint32_t             npending_bind_ops;
   bool                 renderpass_active : 1;    // < Has an active renderpass.
   bool                 compute_pass_active : 1;  // < Has an active compute pass.
   bool                 destroy_on_submit : 1;    // < Destroy after submitting.
@@ -1415,15 +1416,9 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
 }
 
 static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
-  ngfvk_bind_op_chunk* chunk = cmd_buf->pending_bind_ops.first;
-  while (chunk) {
-    ngfvk_bind_op_chunk* next = chunk->next;
-    ngfi_blkalloc_free(CURRENT_CONTEXT->blkalloc, chunk);
-    chunk = next;
-  }
-  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
-  cmd_buf->pending_bind_ops.size                                   = 0u;
-}
+  ngfi_chnklist_clear(&cmd_buf->pending_bind_ops);
+  cmd_buf->npending_bind_ops = 0u;
+ }
 
 static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
@@ -1722,12 +1717,10 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   VkDescriptorSet* vk_desc_sets = ngfi_sa_alloc(ngfi_tmp_store(), vk_desc_sets_size_bytes);
   memset(vk_desc_sets, (uintptr_t)VK_NULL_HANDLE, vk_desc_sets_size_bytes);
 
-  const uint32_t nbind_operations = cmd_buf->pending_bind_ops.size;
-
   // Allocate an array of vulkan descriptor set writes from temp storage, one write per
   // pending bind op.
   VkWriteDescriptorSet* vk_writes =
-      ngfi_sa_alloc(ngfi_tmp_store(), nbind_operations * sizeof(VkWriteDescriptorSet));
+      ngfi_sa_alloc(ngfi_tmp_store(), cmd_buf->npending_bind_ops * sizeof(VkWriteDescriptorSet));
 
   // Find a descriptor pools list to allocate from.
   ngfvk_desc_pools_list* pools = ngfvk_find_desc_pools_list(cmd_buf->parent_frame);
@@ -1735,117 +1728,105 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
 
   // Process each bind operation, constructing a corresponding
   // vulkan descriptor set write operation.
-  ngfvk_bind_op_chunk* chunk                = cmd_buf->pending_bind_ops.first;
-  uint32_t             descriptor_write_idx = 0u;
-  while (chunk) {
-    for (size_t boi = 0; boi < chunk->last_idx; ++boi) {
-      const ngf_resource_bind_op* bind_op = &chunk->data[boi];
+  uint32_t descriptor_write_idx = 0u;
+  NGFI_CHNKLIST_FOR_EACH(cmd_buf->pending_bind_ops, const ngf_resource_bind_op, bind_op) {
+    // Ensure that a valid descriptor set is referenced by this
+    // bind operation.
+    if (bind_op->target_set >= ndesc_set_layouts) {
+      NGFI_DIAG_ERROR(
+          "invalid descriptor set %d referenced by bind operation (max. "
+          "allowed is %d)",
+          bind_op->target_set,
+          ndesc_set_layouts);
+      return;
+    }
 
-      // Ensure that a valid descriptor set is referenced by this
-      // bind operation.
-      if (bind_op->target_set >= ndesc_set_layouts) {
-        NGFI_DIAG_ERROR(
-            "invalid descriptor set %d referenced by bind operation (max. "
-            "allowed is %d)",
-            bind_op->target_set,
-            ndesc_set_layouts);
+    // Allocate a new descriptor set if necessary.
+    const bool need_new_desc_set = vk_desc_sets[bind_op->target_set] == VK_NULL_HANDLE;
+    if (need_new_desc_set) {
+      // Find the corresponding descriptor set layout.
+      const ngfvk_desc_set_layout* set_layout =
+          &NGFI_DARRAY_AT(pipeline_data->descriptor_set_layouts, bind_op->target_set);
+      VkDescriptorSet set = ngfvk_desc_pools_list_allocate_set(pools, set_layout);
+      if (set == VK_NULL_HANDLE) {
+        NGFI_DIAG_WARNING("Failed to bind graphics resources - could not allocate descriptor set");
         return;
       }
-
-      // Allocate a new descriptor set if necessary.
-      const bool need_new_desc_set = vk_desc_sets[bind_op->target_set] == VK_NULL_HANDLE;
-      if (need_new_desc_set) {
-        // Find the corresponding descriptor set layout.
-        const ngfvk_desc_set_layout* set_layout =
-            &NGFI_DARRAY_AT(pipeline_data->descriptor_set_layouts, bind_op->target_set);
-        VkDescriptorSet set = ngfvk_desc_pools_list_allocate_set(pools, set_layout);
-        if (set == VK_NULL_HANDLE) {
-          NGFI_DIAG_WARNING(
-              "Failed to bind graphics resources - could not allocate descriptor set");
-          return;
-        }
-        vk_desc_sets[bind_op->target_set] = set;
-      }
-
-      // At this point, we have a valid descriptor set in the `vk_sets` array.
-      // We'll use it in the write operation corresponding to the current bind_op.
-      VkDescriptorSet set = vk_desc_sets[bind_op->target_set];
-
-      // Construct a vulkan descriptor set write corresponding to this bind
-      // operation.
-      VkWriteDescriptorSet* vk_write = &vk_writes[descriptor_write_idx++];
-
-      vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      vk_write->pNext           = NULL;
-      vk_write->dstSet          = set;
-      vk_write->dstBinding      = bind_op->target_binding;
-      vk_write->descriptorCount = 1u;
-      vk_write->dstArrayElement = 0u;
-      vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
-
-      switch (bind_op->type) {
-      case NGF_DESCRIPTOR_STORAGE_BUFFER:
-      case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-        const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
-        VkDescriptorBufferInfo*     vk_bind_info =
-            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
-
-        vk_bind_info->buffer = (VkBuffer)bind_info->buffer->alloc.obj_handle;
-        vk_bind_info->offset = bind_info->offset;
-        vk_bind_info->range  = bind_info->range;
-
-        vk_write->pBufferInfo = vk_bind_info;
-        break;
-      }
-      case NGF_DESCRIPTOR_TEXEL_BUFFER: {
-        vk_write->pTexelBufferView = &(bind_op->info.texel_buffer_view->vk_buf_view);
-        break;
-      }
-      case NGF_DESCRIPTOR_STORAGE_IMAGE:
-        if (cmd_buf->renderpass_active) {
-          NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
-          continue;
-        }
-      /* break omitted intentionally */
-      case NGF_DESCRIPTOR_IMAGE:
-      case NGF_DESCRIPTOR_SAMPLER:
-      case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
-        const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
-        VkDescriptorImageInfo*             vk_bind_info =
-            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
-        vk_bind_info->imageView   = VK_NULL_HANDLE;
-        vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        vk_bind_info->sampler     = VK_NULL_HANDLE;
-        if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
-            bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
-          vk_bind_info->imageView   = bind_info->image->vkview;
-          vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        } else if (bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE) {
-          vk_bind_info->imageView   = bind_info->image->vkview;
-          vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-        } else if (
-            bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
-            bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
-          vk_bind_info->sampler = bind_info->sampler->vksampler;
-        }
-        vk_write->pImageInfo = vk_bind_info;
-        break;
-      }
-
-      default:
-        assert(false);
-      }
+      vk_desc_sets[bind_op->target_set] = set;
     }
-    ngfvk_bind_op_chunk* prev_chunk = chunk;
-    chunk                           = prev_chunk->next;
-    ngfi_blkalloc_free(CURRENT_CONTEXT->blkalloc, prev_chunk);
-  }
-  cmd_buf->pending_bind_ops.first = cmd_buf->pending_bind_ops.last = NULL;
-  cmd_buf->pending_bind_ops.size                                   = 0u;
 
+    // At this point, we have a valid descriptor set in the `vk_sets` array.
+    // We'll use it in the write operation corresponding to the current bind_op.
+    VkDescriptorSet set = vk_desc_sets[bind_op->target_set];
+
+    // Construct a vulkan descriptor set write corresponding to this bind
+    // operation.
+    VkWriteDescriptorSet* vk_write = &vk_writes[descriptor_write_idx++];
+
+    vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    vk_write->pNext           = NULL;
+    vk_write->dstSet          = set;
+    vk_write->dstBinding      = bind_op->target_binding;
+    vk_write->descriptorCount = 1u;
+    vk_write->dstArrayElement = 0u;
+    vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
+
+    switch (bind_op->type) {
+    case NGF_DESCRIPTOR_STORAGE_BUFFER:
+    case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
+      const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
+      VkDescriptorBufferInfo*     vk_bind_info =
+          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
+
+      vk_bind_info->buffer = (VkBuffer)bind_info->buffer->alloc.obj_handle;
+      vk_bind_info->offset = bind_info->offset;
+      vk_bind_info->range  = bind_info->range;
+
+      vk_write->pBufferInfo = vk_bind_info;
+      break;
+    }
+    case NGF_DESCRIPTOR_TEXEL_BUFFER: {
+      vk_write->pTexelBufferView = &(bind_op->info.texel_buffer_view->vk_buf_view);
+      break;
+    }
+    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+      if (cmd_buf->renderpass_active) {
+        NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
+        continue;
+      }
+    /* break omitted intentionally */
+    case NGF_DESCRIPTOR_IMAGE:
+    case NGF_DESCRIPTOR_SAMPLER:
+    case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
+      const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
+      VkDescriptorImageInfo*             vk_bind_info =
+          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
+      vk_bind_info->imageView   = VK_NULL_HANDLE;
+      vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      vk_bind_info->sampler     = VK_NULL_HANDLE;
+      if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
+          bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
+        vk_bind_info->imageView   = bind_info->image->vkview;
+        vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      } else if (bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE) {
+        vk_bind_info->imageView   = bind_info->image->vkview;
+        vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+      } else if (
+          bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
+          bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
+        vk_bind_info->sampler = bind_info->sampler->vksampler;
+      }
+      vk_write->pImageInfo = vk_bind_info;
+      break;
+    }
+
+    default:
+      assert(false);
+    }
+  }
   // perform all the vulkan descriptor set write operations to populate the
   // newly allocated descriptor sets.
-  vkUpdateDescriptorSets(_vk.device, nbind_operations, vk_writes, 0, NULL);
+  vkUpdateDescriptorSets(_vk.device, cmd_buf->npending_bind_ops, vk_writes, 0, NULL);
 
   // bind each of the descriptor sets individually (this ensures that desc.
   // sets bound for a compatible pipeline earlier in this command buffer
@@ -1864,6 +1845,8 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
           NULL);
     }
   }
+
+  ngfvk_cleanup_pending_binds(cmd_buf);
 }
 
 static VkResult ngfvk_renderpass_from_attachment_descs(
@@ -2376,25 +2359,8 @@ static void ngfvk_cmd_bind_resources(
     const ngf_resource_bind_op* bind_operations,
     uint32_t                    nbind_operations) {
   for (uint32_t i = 0; i < nbind_operations; ++i) {
-    const ngf_resource_bind_op* bind_op          = &bind_operations[i];
-    ngfvk_bind_op_chunk_list*   pending_bind_ops = &buf->pending_bind_ops;
-    if (!pending_bind_ops->last || pending_bind_ops->last->last_idx >= NGFVK_BIND_OP_CHUNK_SIZE) {
-      ngfvk_bind_op_chunk* prev_last = pending_bind_ops->last;
-      pending_bind_ops->last = ngfi_blkalloc_alloc(CURRENT_CONTEXT->blkalloc);
-      if (pending_bind_ops->last == NULL) {
-        NGFI_DIAG_ERROR("failed memory allocation while binding resources");
-        return;
-      }
-      pending_bind_ops->last->next     = NULL;
-      pending_bind_ops->last->last_idx = 0;
-      if (prev_last) {
-        prev_last->next = pending_bind_ops->last;
-      } else {
-        pending_bind_ops->first = pending_bind_ops->last;
-      }
-    }
-    pending_bind_ops->last->data[pending_bind_ops->last->last_idx++] = *bind_op;
-    pending_bind_ops->size++;
+    ngfi_chnklist_append(&buf->pending_bind_ops, &bind_operations[i], sizeof(bind_operations[i]));
+    ++buf->npending_bind_ops;
   }
 }
 
@@ -2715,7 +2681,7 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
       // If we had a pipeline bound for which there have been resources bound, but no draw call
       // executed, commit those resources to actual descriptor sets and bind them so that the next
       // pipeline is able to "see" those resources, provided that it's compatible.
-      if (buf->active_gfx_pipe && buf->pending_bind_ops.size > 0u) {
+      if (buf->active_gfx_pipe && buf->npending_bind_ops > 0u) {
         ngfvk_execute_pending_binds(buf);
       }
       buf->active_gfx_pipe = cmd->data.pipeline;
@@ -3674,26 +3640,25 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
 
   ngf_cmd_buffer cmd_buf = NGFI_ALLOC(ngf_cmd_buffer_t);
   if (cmd_buf == NULL) { return NGF_ERROR_OUT_OF_MEM; }
-  *result                               = cmd_buf;
-  cmd_buf->parent_frame                 = ~0u;
-  cmd_buf->state                        = NGFI_CMD_BUFFER_NEW;
-  cmd_buf->active_gfx_pipe              = NULL;
-  cmd_buf->active_compute_pipe          = NULL;
-  cmd_buf->renderpass_active            = false;
-  cmd_buf->compute_pass_active          = false;
-  cmd_buf->destroy_on_submit            = false;
-  cmd_buf->active_rt                    = NULL;
-  cmd_buf->desc_pools_list              = NULL;
-  cmd_buf->pending_bind_ops.first       = NULL;
-  cmd_buf->pending_bind_ops.last        = NULL;
-  cmd_buf->pending_bind_ops.size        = 0u;
-  cmd_buf->curr_rpass_id                = 0u;
-  cmd_buf->vk_cmd_buffer                = VK_NULL_HANDLE;
-  cmd_buf->vk_cmd_pool                  = VK_NULL_HANDLE;
-  cmd_buf->in_pass_cmd_chnks.blkalloc   = CURRENT_CONTEXT->blkalloc;
-  cmd_buf->in_pass_cmd_chnks.firstchnk  = NULL;
-  cmd_buf->pre_pass_cmd_chnks.blkalloc  = CURRENT_CONTEXT->blkalloc;
-  cmd_buf->pre_pass_cmd_chnks.firstchnk = NULL;
+  *result                                 = cmd_buf;
+  cmd_buf->parent_frame                   = ~0u;
+  cmd_buf->state                          = NGFI_CMD_BUFFER_NEW;
+  cmd_buf->active_gfx_pipe                = NULL;
+  cmd_buf->active_compute_pipe            = NULL;
+  cmd_buf->renderpass_active              = false;
+  cmd_buf->compute_pass_active            = false;
+  cmd_buf->destroy_on_submit              = false;
+  cmd_buf->active_rt                      = NULL;
+  cmd_buf->desc_pools_list                = NULL;
+  cmd_buf->curr_rpass_id                  = 0u;
+  cmd_buf->vk_cmd_buffer                  = VK_NULL_HANDLE;
+  cmd_buf->vk_cmd_pool                    = VK_NULL_HANDLE;
+  cmd_buf->pending_bind_ops.firstchnk     = NULL;
+  cmd_buf->pending_bind_ops.blkalloc      = CURRENT_CONTEXT->blkalloc;
+  cmd_buf->in_pass_cmd_chnks.blkalloc     = CURRENT_CONTEXT->blkalloc;
+  cmd_buf->in_pass_cmd_chnks.firstchnk    = NULL;
+  cmd_buf->pre_pass_cmd_chnks.blkalloc    = CURRENT_CONTEXT->blkalloc;
+  cmd_buf->pre_pass_cmd_chnks.firstchnk   = NULL;
   cmd_buf->virt_bind_ops_ranges.blkalloc  = CURRENT_CONTEXT->blkalloc;
   cmd_buf->virt_bind_ops_ranges.firstchnk = NULL;
 
@@ -4003,6 +3968,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   cmd_buf->compute_pass_active = false;
   cmd_buf->renderpass_active   = false;
   cmd_buf->curr_rpass_id       = 0u;
+  cmd_buf->npending_bind_ops   = 0u;
 
   ngfi_chnklist_clear(&cmd_buf->virt_bind_ops_ranges);
 
@@ -4737,15 +4703,11 @@ void ngf_cmd_dispatch(
     uint32_t            z_threadgroups) {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
 
-  ngfvk_bind_op_chunk* bind_ops_chunk = cmd_buf->pending_bind_ops.first;
-  while (bind_ops_chunk) {
-    for (size_t i = 0u; i < bind_ops_chunk->last_idx; ++i) {
-      ngfvk_cmd_buf_barrier_for_bindop(
-          cmd_buf,
-          &bind_ops_chunk->data[i],
-          &cmd_buf->active_compute_pipe->generic_pipeline);
-    }
-    bind_ops_chunk = bind_ops_chunk->next;
+  NGFI_CHNKLIST_FOR_EACH(cmd_buf->pending_bind_ops, const ngf_resource_bind_op, bind_op) {
+    ngfvk_cmd_buf_barrier_for_bindop(
+        cmd_buf,
+        bind_op,
+        &cmd_buf->active_compute_pipe->generic_pipeline);
   }
   ngfvk_cmd_buf_record_render_cmds(cmd_buf, &cmd_buf->pre_pass_cmd_chnks);
   ngfvk_cmd_buf_reset_render_cmds(cmd_buf);
@@ -4834,7 +4796,7 @@ void ngf_cmd_bind_compute_resources(
 
 void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-  if (buf->active_compute_pipe && buf->pending_bind_ops.size > 0u) {
+  if (buf->active_compute_pipe && buf->npending_bind_ops > 0u) {
     ngfvk_execute_pending_binds(buf);
   }
 
