@@ -1884,7 +1884,6 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
   uint32_t              nresolve_attachments = 0u;
   VkAttachmentReference depth_stencil_attachment_ref;
   bool                  have_depth_stencil_attachment = false;
-  bool                  have_sampled_attachments      = false;
 
   for (uint32_t a = 0u; a < nattachments; ++a) {
     const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
@@ -1927,7 +1926,6 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
         depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
       }
     }
-    have_sampled_attachments |= ngf_attachment_desc->is_sampled;
   }
   if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
     // TODO: insert diag. log here.
