@@ -138,18 +138,6 @@ typedef struct ngfvk_desc_superpool_t {
   uint8_t                num_lists;
 } ngfvk_desc_superpool;
 
-typedef struct ngfvk_bind_op_chunk {
-  struct ngfvk_bind_op_chunk* next;
-  ngf_resource_bind_op        data[NGFVK_BIND_OP_CHUNK_SIZE];
-  size_t                      last_idx;
-} ngfvk_bind_op_chunk;
-
-typedef struct ngfvk_bind_op_chunk_list {
-  ngfvk_bind_op_chunk* first;
-  ngfvk_bind_op_chunk* last;
-  uint32_t             size;
-} ngfvk_bind_op_chunk_list;
-
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(ngf_cmd_buffer) cmd_bufs;  // < Submitted ngf command buffers.
