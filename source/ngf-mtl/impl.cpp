@@ -1860,30 +1860,6 @@ void ngfmtl_finish_pending_encoders(ngf_cmd_buffer cmd_buffer) {
 }
 
 ngf_error ngf_cmd_begin_render_pass_simple(
-    ngf_cmd_buffer      cmd_buf,
-    ngf_render_target   rt,
-    float               clear_color_r,
-    float               clear_color_g,
-    float               clear_color_b,
-    float               clear_color_a,
-    float               clear_depth,
-    uint32_t            clear_stencil,
-    ngf_render_encoder* enc) NGF_NOEXCEPT {
-  return ngf_cmd_begin_render_pass_simple_with_sync(
-      cmd_buf,
-      rt,
-      clear_color_r,
-      clear_color_g,
-      clear_color_b,
-      clear_color_a,
-      clear_depth,
-      clear_stencil,
-      0,
-      nullptr,
-      enc);
-}
-
-ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     ngf_cmd_buffer    cmd_buf,
     ngf_render_target rt,
     float             clear_color_r,
@@ -1892,8 +1868,6 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     float             clear_color_a,
     float             clear_depth,
     uint32_t          clear_stencil,
-    uint32_t,
-    const ngf_sync_compute_resource*,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi_sa_reset(ngfi_tmp_store());
   const uint32_t nattachments = rt->attachment_descs.ndescs;
