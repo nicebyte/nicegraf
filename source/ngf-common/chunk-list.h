@@ -88,13 +88,15 @@ static inline void ngfi_chnklist_clear(ngfi_chnklist* list) {
   }
 }
 
+#define NGFI_CHNK_FOR_EACH(chnk, elem_type, ptrname) \
+  for (elem_type* ptrname = ngfi_chnk_data((chnk), 0);          \
+       ptrname - (elem_type*)ngfi_chnk_data((chnk), 0) <        \
+       (ptrdiff_t)((chnk)->bytes_used / sizeof(elem_type)); \
+       ptrname++)
 
 #define NGFI_CHNKLIST_FOR_EACH(chnklist, elem_type, ptrname)                                 \
   if (chnklist.firstchnk) NGFI_LIST_FOR_EACH(&chnklist.firstchnk->clnode, ptrname##_node)    \
-  for (elem_type* ptrname = ngfi_chnk_data(NGFI_CHNK_FROM_NODE(ptrname##_node), 0);          \
-       ptrname - (elem_type*)ngfi_chnk_data(NGFI_CHNK_FROM_NODE(ptrname##_node), 0) <        \
-       (ptrdiff_t)(((NGFI_CHNK_FROM_NODE(ptrname##_node))->bytes_used) / sizeof(elem_type)); \
-       ptrname++)
+    NGFI_CHNK_FOR_EACH(NGFI_CHNK_FROM_NODE(ptrname##_node), elem_type, ptrname)
 
 typedef struct ngfi_chnk_range {
   ngfi_chnk_hdr* chnk;

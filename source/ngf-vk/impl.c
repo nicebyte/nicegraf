@@ -56,6 +56,24 @@
 
 #pragma region internal_struct_definitions
 
+typedef enum ngfvk_retire_obj { 
+    NGFVK_RETIRE_OBJ_PIPELINE = 0,
+    NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT,
+    NGFVK_RETIRE_OBJ_DSET_LAYOUT,
+    NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL,
+    NGFVK_RETIRE_OBJ_FRAMEBUFFER,
+    NGFVK_RETIRE_OBJ_RENDER_PASS,
+    NGFVK_RETIRE_OBJ_SAMPLER,
+    NGFVK_RETIRE_OBJ_IMG_VIEW,
+    NGFVK_RETIRE_OBJ_BUF_VIEW,
+    NGFVK_RETIRE_OBJ_IMG,
+    NGFVK_RETIRE_OBJ_BUF,
+    NGFVK_RETIRE_OBJ_DESC_POOL_LIST,
+    NGFVK_RETIRE_OBJ_COUNT
+} ngfvk_retire_obj;
+
+typedef void (*ngfvk_retire_obj_dtor)(ngfi_chnk_hdr*);
+
 // Singleton for holding vulkan instance, device and queue handles.
 // This is shared by all contexts.
 struct {
@@ -74,6 +92,7 @@ struct {
   xcb_connection_t* xcb_connection;
   xcb_visualid_t    xcb_visualid;
 #endif
+  ngfvk_retire_obj_dtor retire_obj_dtors[NGFVK_RETIRE_OBJ_COUNT];
 } _vk;
 
 // Swapchain state.
@@ -140,24 +159,12 @@ typedef struct ngfvk_desc_superpool_t {
 
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
-  NGFI_DARRAY_OF(ngf_cmd_buffer) cmd_bufs;  // < Submitted ngf command buffers.
+  NGFI_DARRAY_OF(ngf_cmd_buffer) submitted_cmd_bufs;  // < Submitted ngf command buffers.
   VkSemaphore semaphore;                    // < Signalled when the last cmd buffer finishes.
 
   // Resources that should be disposed of at some point after this
   // frame's completion.
-  NGFI_DARRAY_OF(VkCommandBuffer) retire_cmd_bufs;  // < Submitted vk command buffers.
-  NGFI_DARRAY_OF(VkCommandPool) retire_cmd_pools;   // < Command pools of each vk cmd buffer.
-  NGFI_DARRAY_OF(VkPipeline) retire_pipelines;
-  NGFI_DARRAY_OF(VkPipelineLayout) retire_pipeline_layouts;
-  NGFI_DARRAY_OF(VkDescriptorSetLayout) retire_dset_layouts;
-  NGFI_DARRAY_OF(VkFramebuffer) retire_framebufs;
-  NGFI_DARRAY_OF(VkRenderPass) retire_render_passes;
-  NGFI_DARRAY_OF(VkSampler) retire_samplers;
-  NGFI_DARRAY_OF(VkImageView) retire_img_views;
-  NGFI_DARRAY_OF(VkBufferView) retire_buf_views;
-  NGFI_DARRAY_OF(ngf_image) retire_imgs;
-  NGFI_DARRAY_OF(ngf_buffer) retire_bufs;
-  NGFI_DARRAY_OF(ngfvk_desc_pools_list*) reset_desc_pools_lists;
+  ngfi_chnklist retire_objs[NGFVK_RETIRE_OBJ_COUNT];
 
   // Fences that will be signaled at the end of the frame.
   VkFence fences[2];
@@ -172,6 +179,11 @@ typedef struct {
   uint16_t       ctx_id;
   uint8_t        num_pools;
 } ngfvk_command_superpool;
+
+typedef struct ngfvk_cmd_buf_with_pool {
+  VkCommandBuffer cmd_buf;
+  VkCommandPool   cmd_pool;
+} ngfvk_cmd_buf_with_pool;
 
 typedef struct ngfvk_attachment_pass_desc {
   VkImageLayout       layout;
@@ -801,6 +813,9 @@ static bool ngfvk_format_is_stencil(VkFormat image_format) {
 
 #pragma region internal_funcs
 
+#define NGFVK_RETIRE_OBJECT(frame_res, obj_type_idx, obj) \
+ ngfi_chnklist_append(&((frame_res)->retire_objs[(obj_type_idx)]), &(obj), sizeof(obj))
+
 void             ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
@@ -1298,109 +1313,16 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     frame_res->nwait_fences = 0;
   }
 
-  NGFI_DARRAY_FOREACH(frame_res->retire_pipelines, p) {
-    vkDestroyPipeline(_vk.device, NGFI_DARRAY_AT(frame_res->retire_pipelines, p), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_pipeline_layouts, p) {
-    vkDestroyPipelineLayout(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_pipeline_layouts, p),
-        NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_dset_layouts, p) {
-    vkDestroyDescriptorSetLayout(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_dset_layouts, p),
-        NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_framebufs, p) {
-    vkDestroyFramebuffer(_vk.device, NGFI_DARRAY_AT(frame_res->retire_framebufs, p), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_render_passes, p) {
-    vkDestroyRenderPass(_vk.device, NGFI_DARRAY_AT(frame_res->retire_render_passes, p), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_samplers, s) {
-    vkDestroySampler(_vk.device, NGFI_DARRAY_AT(frame_res->retire_samplers, s), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_imgs, i) {
-    ngf_image img = NGFI_DARRAY_AT(frame_res->retire_imgs, i);
-    if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
-    if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
-      vmaDestroyImage(
-          img->alloc.parent_allocator,
-          (VkImage)img->alloc.obj_handle,
-          img->alloc.vma_alloc);
+  for (size_t i = 0u; i < (size_t)NGFVK_RETIRE_OBJ_COUNT; ++i) { 
+    ngfi_chnklist* retire_objs_chnklist = &frame_res->retire_objs[i];
+    ngfi_chnk_hdr* retire_objs_firstchnk = retire_objs_chnklist->firstchnk;
+    if (retire_objs_firstchnk) {
+      NGFI_LIST_FOR_EACH(&(retire_objs_firstchnk->clnode), n) {
+        _vk.retire_obj_dtors[i](NGFI_CHNK_FROM_NODE(n));
+      }
     }
-    NGFI_FREE(img);
+    ngfi_chnklist_clear(retire_objs_chnklist);
   }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_img_views, s) {
-    vkDestroyImageView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_img_views, s), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_buf_views, s) {
-    vkDestroyBufferView(_vk.device, NGFI_DARRAY_AT(frame_res->retire_buf_views, s), NULL);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_bufs, b) {
-    ngf_buffer buf = NGFI_DARRAY_AT(frame_res->retire_bufs, b);
-    vmaDestroyBuffer(
-        buf->alloc.parent_allocator,
-        (VkBuffer)buf->alloc.obj_handle,
-        buf->alloc.vma_alloc);
-    NGFI_FREE(buf);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->reset_desc_pools_lists, p) {
-    ngfvk_desc_pools_list* superpool = NGFI_DARRAY_AT(frame_res->reset_desc_pools_lists, p);
-    for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
-      vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
-      memset(&pool->utilization, 0, sizeof(pool->utilization));
-    }
-    superpool->active_pool = superpool->list;
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->retire_cmd_bufs, i) {
-    vkFreeCommandBuffers(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_cmd_pools, i),
-        1,
-        &(NGFI_DARRAY_AT(frame_res->retire_cmd_bufs, i)));
-  }
-  NGFI_DARRAY_FOREACH(frame_res->retire_cmd_pools, i) {
-    vkResetCommandPool(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_cmd_pools, i),
-        VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
-  }
-
-  NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, i) {
-    vkResetCommandPool(
-        _vk.device,
-        NGFI_DARRAY_AT(frame_res->retire_cmd_pools, i),
-        VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
-  }
-
-  NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
-  NGFI_DARRAY_CLEAR(frame_res->retire_cmd_bufs);
-  NGFI_DARRAY_CLEAR(frame_res->retire_cmd_pools);
-  NGFI_DARRAY_CLEAR(frame_res->retire_pipelines);
-  NGFI_DARRAY_CLEAR(frame_res->retire_dset_layouts);
-  NGFI_DARRAY_CLEAR(frame_res->retire_framebufs);
-  NGFI_DARRAY_CLEAR(frame_res->retire_render_passes);
-  NGFI_DARRAY_CLEAR(frame_res->retire_samplers);
-  NGFI_DARRAY_CLEAR(frame_res->retire_img_views);
-  NGFI_DARRAY_CLEAR(frame_res->retire_buf_views);
-  NGFI_DARRAY_CLEAR(frame_res->retire_imgs);
-  NGFI_DARRAY_CLEAR(frame_res->retire_pipeline_layouts);
-  NGFI_DARRAY_CLEAR(frame_res->retire_bufs);
-  NGFI_DARRAY_CLEAR(frame_res->reset_desc_pools_lists);
 }
 
 static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
@@ -2326,15 +2248,15 @@ static ngf_error ngfvk_initialize_generic_pipeline_data(
 static void
 ngfi_destroy_generic_pipeline_data(ngfvk_frame_resources* res, ngfvk_generic_pipeline* data) {
   if (data->vk_pipeline != VK_NULL_HANDLE) {
-    NGFI_DARRAY_APPEND(res->retire_pipelines, data->vk_pipeline);
+    NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_PIPELINE, data->vk_pipeline);
   }
   if (data->vk_pipeline_layout != VK_NULL_HANDLE) {
-    NGFI_DARRAY_APPEND(res->retire_pipeline_layouts, data->vk_pipeline_layout);
+    NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT, data->vk_pipeline_layout);
   }
   NGFI_DARRAY_FOREACH(data->descriptor_set_layouts, l) {
     ngfvk_desc_set_layout* layout    = &NGFI_DARRAY_AT(data->descriptor_set_layouts, l);
     VkDescriptorSetLayout  vk_layout = layout->vk_handle;
-    NGFI_DARRAY_APPEND(res->retire_dset_layouts, vk_layout);
+    NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_DSET_LAYOUT, vk_layout);
     if (layout->readonly_bindings && layout->nall_bindings > 0u) {
       NGFI_FREEN(layout->readonly_bindings, layout->nall_bindings);
     }
@@ -2396,8 +2318,9 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
 
 static void ngfvk_reset_renderpass_cache(ngf_context ctx) {
   NGFI_DARRAY_FOREACH(ctx->renderpass_cache, p) {
-    NGFI_DARRAY_APPEND(
-        ctx->frame_res[ctx->frame_id].retire_render_passes,
+    NGFVK_RETIRE_OBJECT(
+        &(ctx->frame_res[ctx->frame_id]),
+        NGFVK_RETIRE_OBJ_RENDER_PASS,
         NGFI_DARRAY_AT(ctx->renderpass_cache, p).renderpass);
   }
   NGFI_DARRAY_CLEAR(ctx->renderpass_cache);
@@ -2812,13 +2735,13 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
     VkSemaphore            wait_semaphore,
     VkFence                signal_fence) {
   ngf_error        err       = NGF_ERROR_OK;
-  const uint32_t   ncmd_bufs = NGFI_DARRAY_SIZE(frame_res->cmd_bufs);
+  const uint32_t   ncmd_bufs = NGFI_DARRAY_SIZE(frame_res->submitted_cmd_bufs);
   VkCommandBuffer* submitted_cmd_buf_handles =
       ngfi_sa_alloc(ngfi_frame_store(), sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 1u);
   uint32_t submitted_cmd_buf_handles_idx = 0u;
 
-  NGFI_DARRAY_FOREACH(frame_res->cmd_bufs, c) {
-    ngf_cmd_buffer      cmd_buf          = NGFI_DARRAY_AT(frame_res->cmd_bufs, c);
+  NGFI_DARRAY_FOREACH(frame_res->submitted_cmd_bufs, c) {
+    ngf_cmd_buffer      cmd_buf          = NGFI_DARRAY_AT(frame_res->submitted_cmd_bufs, c);
     uint32_t            nimage_barriers  = 0u;
     uint32_t            nbuffer_barriers = 0u;
     ngfvk_barrier_data* barrier_list     = NULL;
@@ -2858,8 +2781,9 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       ngfvk_cmd_buf_record_barriers(aux_cmd_buf, barrier_list, nbuffer_barriers, nimage_barriers);
       vkEndCommandBuffer(aux_cmd_buf);
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
-      NGFI_DARRAY_APPEND(frame_res->retire_cmd_bufs, aux_cmd_buf);
-      NGFI_DARRAY_APPEND(frame_res->retire_cmd_pools, aux_cmd_pool);
+
+      ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
+      NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, aux_buf_pool);
     }
     submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = cmd_buf->vk_cmd_buffer;
     NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_SUBMITTED);
@@ -2867,13 +2791,14 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
     cmd_buf->active_compute_pipe = NULL;
     cmd_buf->active_rt           = NULL;
     ngfvk_cmd_buf_reset_res_states(cmd_buf);
-    NGFI_DARRAY_APPEND(frame_res->retire_cmd_bufs, cmd_buf->vk_cmd_buffer);
-    NGFI_DARRAY_APPEND(frame_res->retire_cmd_pools, cmd_buf->vk_cmd_pool);
+    ngfvk_cmd_buf_with_pool buf_pool = {cmd_buf->vk_cmd_buffer, cmd_buf->vk_cmd_pool};
+    NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, buf_pool);
+    
     cmd_buf->vk_cmd_buffer = VK_NULL_HANDLE;
     cmd_buf->vk_cmd_pool   = VK_NULL_HANDLE;
     if (cmd_buf->destroy_on_submit) { ngf_destroy_cmd_buffer(cmd_buf); }
   }
-  NGFI_DARRAY_CLEAR(frame_res->cmd_bufs);
+  NGFI_DARRAY_CLEAR(frame_res->submitted_cmd_bufs);
 
   // Transition the swapchain image to VK_IMAGE_LAYOUT_PRESENT_SRC if necessary.
   const bool needs_present = wait_semaphore != VK_NULL_HANDLE;
@@ -2919,8 +2844,8 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       swapchain_image->curr_state.access.stages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
       swapchain_image->curr_state.layout        = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
-      NGFI_DARRAY_APPEND(frame_res->retire_cmd_bufs, aux_cmd_buf);
-      NGFI_DARRAY_APPEND(frame_res->retire_cmd_pools, aux_cmd_pool);
+      ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
+      NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, aux_buf_pool);
     }
   }
 
@@ -2942,6 +2867,66 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
 
   return err;
 }
+
+#define NGFVK_VK_OBJECT_DTOR(obj_type) \
+static void ngfvk_Vk##obj_type##_dtor(ngfi_chnk_hdr* chunk) {                         \
+  NGFI_CHNK_FOR_EACH(chunk, Vk##obj_type, obj) vkDestroy##obj_type(_vk.device, *obj, NULL); \
+}
+
+NGFVK_VK_OBJECT_DTOR(Pipeline);
+NGFVK_VK_OBJECT_DTOR(PipelineLayout);
+NGFVK_VK_OBJECT_DTOR(DescriptorSetLayout);
+NGFVK_VK_OBJECT_DTOR(Framebuffer);
+NGFVK_VK_OBJECT_DTOR(RenderPass);
+NGFVK_VK_OBJECT_DTOR(ImageView);
+NGFVK_VK_OBJECT_DTOR(BufferView);
+NGFVK_VK_OBJECT_DTOR(Sampler);
+
+static void ngfvk_cmd_buf_dtor(ngfi_chnk_hdr* chunk) {
+  NGFI_CHNK_FOR_EACH(chunk, ngfvk_cmd_buf_with_pool, obj) {
+    vkFreeCommandBuffers(_vk.device, obj->cmd_pool, 1u, &obj->cmd_buf);
+  }
+  NGFI_CHNK_FOR_EACH(chunk, ngfvk_cmd_buf_with_pool, obj) {
+    vkResetCommandPool(_vk.device, obj->cmd_pool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
+  }
+}
+
+static void ngfvk_img_dtor(ngfi_chnk_hdr* chunk) {
+  NGFI_CHNK_FOR_EACH(chunk, ngf_image, img_ptr) {
+    ngf_image img = *img_ptr;
+    if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
+    if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
+      vmaDestroyImage(
+          img->alloc.parent_allocator,
+          (VkImage)img->alloc.obj_handle,
+          img->alloc.vma_alloc);
+    }
+    NGFI_FREE(img);
+  }
+}
+
+static void ngfvk_buf_dtor(ngfi_chnk_hdr* chunk) {
+  NGFI_CHNK_FOR_EACH(chunk, ngf_buffer, buf_ptr) {
+    ngf_buffer buf = *buf_ptr;
+    vmaDestroyBuffer(
+        buf->alloc.parent_allocator,
+        (VkBuffer)buf->alloc.obj_handle,
+        buf->alloc.vma_alloc);
+    NGFI_FREE(buf);
+  }
+}
+
+static void ngfvk_desc_pools_list_dtor(ngfi_chnk_hdr* chunk) {
+  NGFI_CHNK_FOR_EACH(chunk, ngfvk_desc_pools_list*, superpool_ptr) {
+    ngfvk_desc_pools_list* superpool = *superpool_ptr;
+    for (ngfvk_desc_pool* pool = superpool->list; pool; pool = pool->next) {
+      vkResetDescriptorPool(_vk.device, pool->vk_pool, 0u);
+      memset(&pool->utilization, 0, sizeof(pool->utilization));
+    }
+    superpool->active_pool = superpool->list;
+  }
+}
+
 #pragma endregion
 
 #pragma region external_funcs
@@ -3249,6 +3234,21 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   // Populate device capabilities.
   DEVICE_CAPS = NGFVK_DEVICE_LIST[init_info->device].capabilities;
 
+  // Set up object destructor table.
+  memset(_vk.retire_obj_dtors, 0, sizeof(_vk.retire_obj_dtors));
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_PIPELINE]         = ngfvk_VkPipeline_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT]  = ngfvk_VkPipelineLayout_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_DSET_LAYOUT]      = ngfvk_VkDescriptorSetLayout_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL] = ngfvk_cmd_buf_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_FRAMEBUFFER]      = ngfvk_VkFramebuffer_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_RENDER_PASS]      = ngfvk_VkRenderPass_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_SAMPLER]          = ngfvk_VkSampler_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_IMG_VIEW]         = ngfvk_VkImageView_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_BUF_VIEW]         = ngfvk_VkBufferView_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_IMG]              = ngfvk_img_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_BUF]              = ngfvk_buf_dtor;
+  _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_DESC_POOL_LIST]   = ngfvk_desc_pools_list_dtor;
+
   // Done!
 
   return NGF_ERROR_OK;
@@ -3471,6 +3471,15 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   } else {
     ctx->default_render_target = NULL;
   }
+ 
+  // Initialize block allocator for this context.
+  ctx->blkalloc = ngfi_blkalloc_create(
+      4096, // 4K per block
+      32u); // 32 blocks per pool
+  if (ctx->blkalloc == NULL) {
+    err = NGF_ERROR_OBJECT_CREATION_FAILED;
+    goto ngf_create_context_cleanup;
+  }
 
   // Create frame resource holders.
   const uint32_t max_inflight_frames = swapchain_info ? ctx->swapchain.nimgs : 3u;
@@ -3481,20 +3490,11 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     goto ngf_create_context_cleanup;
   }
   for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    NGFI_DARRAY_RESET(ctx->frame_res[f].cmd_bufs, 8u);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_cmd_bufs, 8u);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_cmd_pools, 8u);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipelines, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_pipeline_layouts, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_dset_layouts, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_framebufs, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_render_passes, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_samplers, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_img_views, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_buf_views, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_imgs, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].retire_bufs, 8);
-    NGFI_DARRAY_RESET(ctx->frame_res[f].reset_desc_pools_lists, 8);
+    memset(ctx->frame_res[f].retire_objs, 0, sizeof(ctx->frame_res[f].retire_objs));
+    for (uint32_t i = 0u; i < NGFVK_RETIRE_OBJ_COUNT; ++i) {
+      ctx->frame_res[f].retire_objs[i].blkalloc = ctx->blkalloc;
+    }
+    NGFI_DARRAY_RESET(ctx->frame_res[f].submitted_cmd_bufs, 8u);
 
     ctx->frame_res[f].semaphore                = VK_NULL_HANDLE;
     const VkSemaphoreCreateInfo semaphore_info = {
@@ -3523,16 +3523,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   }
 
   ctx->frame_id = 0u;
-
-  // initialize render cmd allocator.
-  ctx->blkalloc = ngfi_blkalloc_create(
-      4096, // 4K per block
-      32u); // 32 blocks per pool
-  if (ctx->blkalloc == NULL) {
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    goto ngf_create_context_cleanup;
-  }
-
   ctx->current_frame_token = ~0u;
 
   NGFI_DARRAY_RESET(ctx->command_superpools, 3);
@@ -3572,20 +3562,7 @@ void ngf_destroy_context(ngf_context ctx) {
 
     for (uint32_t f = 0u; ctx->frame_res != NULL && f < ctx->max_inflight_frames; ++f) {
       ngfvk_retire_resources(&ctx->frame_res[f]);
-
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipelines);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_pipeline_layouts);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_dset_layouts);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_framebufs);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_render_passes);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_samplers);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_img_views);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_buf_views);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_imgs);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_bufs);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].cmd_bufs);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_cmd_bufs);
-      NGFI_DARRAY_DESTROY(ctx->frame_res[f].retire_cmd_pools);
+      NGFI_DARRAY_DESTROY(ctx->frame_res[f].submitted_cmd_bufs);
       for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
         vkDestroyFence(_vk.device, ctx->frame_res[f].fences[i], NULL);
       }
@@ -3962,11 +3939,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
     }
     NGFI_TRANSITION_CMD_BUF(cmd_bufs[i], NGFI_CMD_BUFFER_PENDING);
     if (cmd_buf->desc_pools_list) {
-      NGFI_DARRAY_APPEND(frame_res_data->reset_desc_pools_lists, cmd_buf->desc_pools_list);
+      NGFVK_RETIRE_OBJECT(
+          frame_res_data,
+          NGFVK_RETIRE_OBJ_DESC_POOL_LIST,
+          cmd_buf->desc_pools_list);
     }
     vkEndCommandBuffer(cmd_buf->vk_cmd_buffer);
 
-    NGFI_DARRAY_APPEND(frame_res_data->cmd_bufs, cmd_buf);
+    NGFI_DARRAY_APPEND(frame_res_data->submitted_cmd_bufs, cmd_buf);
     CURRENT_CONTEXT->cmd_buffer_counter++;
   }
   return NGF_ERROR_OK;
@@ -4396,7 +4376,7 @@ ngf_create_graphics_pipeline_cleanup:
 void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   if (p != NULL) {
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
-    NGFI_DARRAY_APPEND(res->retire_render_passes, p->compatible_render_pass);
+    NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_RENDER_PASS, p->compatible_render_pass);
     ngfi_destroy_generic_pipeline_data(res, &p->generic_pipeline);
     NGFI_FREE(p);
   }
@@ -4629,15 +4609,15 @@ void ngf_destroy_render_target(ngf_render_target target) {
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     if (!target->is_default) {
       if (target->frame_buffer != VK_NULL_HANDLE) {
-        NGFI_DARRAY_APPEND(res->retire_framebufs, target->frame_buffer);
+        NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_FRAMEBUFFER, target->frame_buffer);
       }
     }
     if (target->compat_render_pass != VK_NULL_HANDLE) {
-      NGFI_DARRAY_APPEND(res->retire_render_passes, target->compat_render_pass);
+      NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_RENDER_PASS, target->compat_render_pass);
     }
     if (target->attachment_image_views) {
       for (size_t i = 0; i < target->nattachments; ++i) {
-        NGFI_DARRAY_APPEND(res->retire_img_views, target->attachment_image_views[i]);
+        NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_IMG_VIEW, target->attachment_image_views[i]);
       }
       NGFI_FREEN(target->attachment_image_views, target->nattachments);
     }
@@ -5095,7 +5075,10 @@ ngf_error ngf_create_texel_buffer_view(
 void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
   if (buf_view) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_buf_views, buf_view->vk_buf_view);
+    NGFVK_RETIRE_OBJECT(
+        &(CURRENT_CONTEXT->frame_res[fi]),
+        NGFVK_RETIRE_OBJ_BUF_VIEW,
+        buf_view->vk_buf_view);
     NGFI_FREE(buf_view);
   }
 }
@@ -5171,7 +5154,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
 void ngf_destroy_buffer(ngf_buffer buffer) {
   if (buffer) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_bufs, buffer);
+    NGFVK_RETIRE_OBJECT(&CURRENT_CONTEXT->frame_res[fi], NGFVK_RETIRE_OBJ_BUF, buffer);
   }
 }
 
@@ -5278,7 +5261,7 @@ ngf_create_image_cleanup:
 void ngf_destroy_image(ngf_image img) {
   if (img != NULL) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_imgs, img);
+    NGFVK_RETIRE_OBJECT(&CURRENT_CONTEXT->frame_res[fi], NGFVK_RETIRE_OBJ_IMG, img);
   }
 }
 
@@ -5322,7 +5305,10 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
 void ngf_destroy_sampler(ngf_sampler sampler) {
   if (sampler) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
-    NGFI_DARRAY_APPEND(CURRENT_CONTEXT->frame_res[fi].retire_samplers, sampler->vksampler);
+    NGFVK_RETIRE_OBJECT(
+        &CURRENT_CONTEXT->frame_res[fi],
+        NGFVK_RETIRE_OBJ_SAMPLER,
+        sampler->vksampler);
     NGFI_FREE(sampler);
   }
 }
