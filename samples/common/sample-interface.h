@@ -34,14 +34,6 @@
 namespace ngf_samples {
 
 /**
- * Samples may specify what compute passes the main render pass should wait on.
- */
-struct main_render_pass_sync_info {
-  uint32_t                   nsync_compute_resources;
-  ngf_sync_compute_resource* sync_compute_resources;
-};
-
-/**
  * This function is called once at startup, to let the sample set up whatever it needs.
  * This function may assume that a nicegraf context has already been created and made current on
  * the calling thread.
@@ -62,7 +54,7 @@ void* sample_initialize(
  * It receives the command buffer that the main render pass will eventually be
  * recorded into.
  */
-void sample_pre_draw_frame(ngf_cmd_buffer cmd_buffer, main_render_pass_sync_info* sync_op, void* userdata);
+void sample_pre_draw_frame(ngf_cmd_buffer cmd_buffer, void* userdata);
 
 /**
  * This function gets called every frame, to render the frame contents.
@@ -85,7 +77,7 @@ void sample_draw_frame(
  * It receives the command buffer that the main render pass was previously
  * recorded into.
  */
-void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, ngf_render_encoder prev_render_encoder, void* userdata);
+void sample_post_draw_frame(ngf_cmd_buffer cmd_buffer, void* userdata);
 
 void sample_post_submit(void* userdata);
 

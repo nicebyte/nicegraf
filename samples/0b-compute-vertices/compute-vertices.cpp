@@ -226,21 +226,10 @@ void sample_draw_frame(
   }
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info* sync_info, void* userdata) {
-  auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
-  const uint32_t f_prev = (state->frame + 1) % 2;
-  if (state->frame > 0) {
-    state->compute_buffer_slice.offset = f_prev * sizeof(float) * 4u * compute_verts::ntotal_verts;
-    sync_info->nsync_compute_resources = 1u;
-    sync_info->sync_compute_resources->encoder = state->prev_compute_encoder;
-    sync_info->sync_compute_resources->resource.resource.buffer_slice = state->compute_buffer_slice;
-    sync_info->sync_compute_resources->resource.sync_resource_type    = NGF_SYNC_RESOURCE_BUFFER;
-  }
-}
+void sample_pre_draw_frame(ngf_cmd_buffer, void*) { }
 
 void sample_post_draw_frame(
     ngf_cmd_buffer     cmd_buffer,
-    ngf_render_encoder prev_render_enc,
     void*              userdata) {
   static float   time   = 0.f;
   auto           state  = reinterpret_cast<compute_verts::state*>(userdata);
@@ -250,20 +239,7 @@ void sample_post_draw_frame(
   compute_uniforms.time = time;
   state->compute_uniforms_multibuf.write(compute_uniforms);
 
-  ngf_sync_render_resource sync_render_resource {};
   ngf_compute_pass_info pass_info {};
-  if (state->frame > 1) {
-    sync_render_resource.encoder         = prev_render_enc;
-    sync_render_resource.resource.sync_resource_type = NGF_SYNC_RESOURCE_BUFFER;
-    sync_render_resource.resource.resource.buffer_slice.buffer = state->vertex_buffer.get();
-    sync_render_resource.resource.resource.buffer_slice.offset =
-        f_curr * sizeof(float) * 4u * compute_verts::ntotal_verts;
-    sync_render_resource.resource.resource.buffer_slice.range =
-        compute_verts::ntotal_verts * (4u * sizeof(float));
-    pass_info.sync_render_resources.nsync_resources = 1u;
-    pass_info.sync_render_resources.sync_resources  = &sync_render_resource;
-  }
-
   ngf_compute_encoder compute_enc;
   ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc);
   ngf_cmd_bind_compute_pipeline(compute_enc, state->compute_pipeline);

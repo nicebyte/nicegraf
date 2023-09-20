@@ -153,32 +153,13 @@ void sample_draw_frame(
   }
 }
 
-void sample_pre_draw_frame(ngf_cmd_buffer, main_render_pass_sync_info* sync_info, void* userdata) {
-  auto state = reinterpret_cast<compute_demo::state*>(userdata);
-  if (state->frame > 0u) {
-    sync_info->nsync_compute_resources = 1u;
-    sync_info->sync_compute_resources->encoder        = state->prev_compute_enc;
-    sync_info->sync_compute_resources->resource.resource.image_ref = state->image_ref;
-    sync_info->sync_compute_resources->resource.sync_resource_type = NGF_SYNC_RESOURCE_IMAGE;
-  }
-}
+void sample_pre_draw_frame(ngf_cmd_buffer, void*) { }
 
 void sample_post_draw_frame(
     ngf_cmd_buffer     cmd_buffer,
-    ngf_render_encoder prev_render_encoder,
     void*              userdata) {
   auto              state = reinterpret_cast<compute_demo::state*>(userdata);
-  const ngf_sync_render_resource sync_render_resource = {
-      .encoder = prev_render_encoder,
-      .resource =
-          {.sync_resource_type = NGF_SYNC_RESOURCE_IMAGE,
-           .resource           = {.image_ref = state->image_ref}},
-  };
-      
-  const ngf_compute_pass_info pass_info {
-      .sync_render_resources = {
-          .nsync_resources = 1u,
-          .sync_resources  = &sync_render_resource}};
+  const ngf_compute_pass_info pass_info {};
 
   ngf_compute_encoder compute_enc;
   NGF_MISC_CHECK_NGF_ERROR(

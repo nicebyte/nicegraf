@@ -3654,7 +3654,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
+ngf_error ngf_cmd_begin_render_pass_simple(
     ngf_cmd_buffer                   cmd_buf,
     ngf_render_target                rt,
     float                            clear_color_r,
@@ -3663,8 +3663,6 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
     float                            clear_color_a,
     float                            clear_depth,
     uint32_t                         clear_stencil,
-    uint32_t                         nsync_compute_resources,
-    const ngf_sync_compute_resource* sync_compute_resources,
     ngf_render_encoder*              enc) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_attachment_load_op* load_ops =
@@ -3699,36 +3697,9 @@ ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
       .load_ops               = load_ops,
       .store_ops              = store_ops,
       .clears                 = clears,
-      .sync_compute_resources = {
-          .nsync_resources = nsync_compute_resources,
-          .sync_resources  = sync_compute_resources}};
+   };
   return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
 }
-
-ngf_error ngf_cmd_begin_render_pass_simple(
-    ngf_cmd_buffer      cmd_buf,
-    ngf_render_target   rt,
-    float               clear_color_r,
-    float               clear_color_g,
-    float               clear_color_b,
-    float               clear_color_a,
-    float               clear_depth,
-    uint32_t            clear_stencil,
-    ngf_render_encoder* enc) {
-  return ngf_cmd_begin_render_pass_simple_with_sync(
-      cmd_buf,
-      rt,
-      clear_color_r,
-      clear_color_g,
-      clear_color_b,
-      clear_color_a,
-      clear_depth,
-      clear_stencil,
-      0u,
-      NULL,
-      enc);
-}
-
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buf,
     const ngf_render_pass_info* pass_info,

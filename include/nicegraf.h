@@ -1872,59 +1872,6 @@ typedef struct ngf_compute_encoder {
   struct ngfi_private_encoder_data pvt_data_donotuse;
 } ngf_compute_encoder;
 
-typedef struct ngf_sync_compute_resource ngf_sync_compute_resource;
-typedef struct ngf_sync_render_resource  ngf_sync_render_resource;
-typedef struct ngf_sync_xfer_resource    ngf_sync_xfer_resource;
-
-/**
- * @struct ngf_sync_compute_resources
- * \ingroup ngf
- * 
- * A list of resources to synchronize with compute encoders on.
- */
-typedef struct ngf_sync_compute_resources {
-  uint32_t nsync_resources; /** < Number of elements in the list. */
-
-  /**
-   * Pointer to a continuous array of \ref ngf_sync_compute_resources::nsync_resources objects
-   * specifying the encoders and resources to synchronize on.
-   */
-  const ngf_sync_compute_resource* sync_resources;
-} ngf_sync_compute_resources;
-
-/**
- * @struct ngf_sync_render_resources
- * \ingroup ngf
- * 
- * A list of resources to synchronize with render encoders on.
- */
-typedef struct ngf_sync_render_resources {
-  uint32_t nsync_resources; /** < Number of elements in the list. */
-
-  /**
-   * Pointer to a continuous array of \ref ngf_sync_render_resources::nsync_resources objects
-   * specifying the encoders and resources to synchronize on.
-   */
-  const ngf_sync_render_resource* sync_resources;
-} ngf_sync_render_resources;
-
-/**
- * @struct ngf_sync_xfer_resources
- * \ingroup ngf
- * 
- * A list of resources to synchronize with transfer encoders on.
- */
-typedef struct ngf_sync_xfer_resources {
-  uint32_t nsync_resources; /** < Number of elements in the list. */
-
-  /**
-   * Pointer to a continuous array of \ref ngf_sync_xfer_resources::nsync_resources objects
-   * specifying the encoders and resources to synchronize on.
-   */
-  const ngf_sync_xfer_resource* sync_resources;
-} ngf_sync_xfer_resources;
-
-
 /**
  * @struct ngf_render_pass_info
  * \ingroup ngf
@@ -1961,11 +1908,6 @@ typedef struct ngf_render_pass_info {
    * The rest of the buffer's elements are ignored.
    */
   const ngf_clear* clears;
-
-  /**
-   * List of resources to synchronize on with compute encoders, before beginning this pass.
-   */
-  ngf_sync_compute_resources sync_compute_resources;
 } ngf_render_pass_info;
 
 /**
@@ -1976,11 +1918,7 @@ typedef struct ngf_render_pass_info {
  */
 
 typedef struct ngf_xfer_pass_info {
-  /**
-   * List of resources to synchronize on with compute encoders, before beginning this pass.
-   */
-  ngf_sync_compute_resources sync_compute_resources;
-
+  void* reserved;
 } ngf_xfer_pass_info;
 
 /**
@@ -1990,20 +1928,7 @@ typedef struct ngf_xfer_pass_info {
  * Information required to begin a compute pass.
  */
 typedef struct ngf_compute_pass_info {
-  /**
-   * List of resources to synchronize on with compute encoders, before beginning this pass.
-   */
-  ngf_sync_compute_resources sync_compute_resources;
-
-  /**
-   * List of resources to synchronize on with render encoders, before beginning this pass.
-   */
-  ngf_sync_render_resources  sync_render_resources;
-
-  /**
-   * List of resources to synchronize on with transfer encoders, before beginning this pass.
-   */
-  ngf_sync_xfer_resources    sync_xfer_resources;
+  void* reserved;
 } ngf_compute_pass_info;
 
 /**
@@ -2355,70 +2280,6 @@ typedef struct ngf_cmd_buffer_t* ngf_cmd_buffer;
  * details.
  */
 typedef uintptr_t ngf_frame_token;
-
-/**
- * @enum ngf_sync_resource_type
- * \ingroup ngf
- * 
- * Type of resource to synchronize on.
- */
-typedef enum ngf_sync_resource_type {
-    NGF_SYNC_RESOURCE_BUFFER,
-    NGF_SYNC_RESOURCE_IMAGE
-} ngf_sync_resource_type;
-
-/**
- * @struct ngf_sync_resource_ref
- * \ingroup ngf
- * 
- * Reference to a resource participating in a synchronization operation.
- */
-typedef struct ngf_sync_resource_ref {
-  ngf_sync_resource_type sync_resource_type; /**< The type of resource being accessed. */
-  union {
-    ngf_buffer_slice buffer_slice;
-    ngf_image_ref    image_ref;
-  } resource; /** < The subregion of the resource being accessed. */
-} ngf_sync_resource_ref;
-
-/**
- * @struct ngf_sync_compute_resource
- * \ingroup ngf
- * 
- * Synchronization operation on a resource accessed by a compute encoder.
- * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
- * starting execution until another given encoder completes all read/write accesses to the given resource.
- */
-struct ngf_sync_compute_resource {
-  ngf_compute_encoder   encoder; /** < The encoder to wait on. */
-  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
-};
-
-/**
- * @struct ngf_sync_render_resource
- * \ingroup ngf
- * 
- * Synchronization operation on a resource accessed by a render encoder.
- * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
- * starting execution until another given encoder completes all read/write accesses to the given resource.
- */
-struct ngf_sync_render_resource {
-  ngf_render_encoder   encoder; /** < The encoder to wait on. */
-  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
-};
-
-/**
- * @struct ngf_sync_xfer_resource
- * \ingroup ngf
- * 
- * Synchronization operation on a resource accessed by a transfer encoder.
- * A syncronization operation prevents commands recorded in a render/compute/transfer encoder from
- * starting execution until another given encoder completes all read/write accesses to the given resource.
- */
-struct ngf_sync_xfer_resource {
-  ngf_xfer_encoder   encoder; /** < The encoder to wait on. */
-  ngf_sync_resource_ref resource; /** < Reference to the (sub)resource being accessed. */
-};
 
 /**
  * This is a special value used within the \ref ngf_device_capabilities structure
@@ -3105,25 +2966,6 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_depth,
     uint32_t            clear_stencil,
     ngf_render_encoder* enc) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- * 
- * Same as \ref ngf_cmd_begin_render_pass_simple, but adds the ability to synchronize with compute
- * encoders.
- */
-ngf_error ngf_cmd_begin_render_pass_simple_with_sync(
-    ngf_cmd_buffer                   buf,
-    ngf_render_target                rt,
-    float                            clear_color_r,
-    float                            clear_color_g,
-    float                            clear_color_b,
-    float                            clear_color_a,
-    float                            clear_depth,
-    uint32_t                         clear_stencil,
-    uint32_t                         nsync_compute_resources,
-    const ngf_sync_compute_resource* sync_compute_resources,
-    ngf_render_encoder*              enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

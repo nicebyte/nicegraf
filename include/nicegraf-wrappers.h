@@ -297,36 +297,6 @@ class render_encoder {
   }
 
   /**
-   * Creates a new render encoder for the given command buffer. Has the same semantics as \ref
-   * ngf_cmd_begin_render_pass_simple_with_sync.
-   *
-   */
-  explicit render_encoder(
-      ngf_cmd_buffer                   cmd_buf,
-      ngf_render_target                rt,
-      float                            clear_color_r,
-      float                            clear_color_g,
-      float                            clear_color_b,
-      float                            clear_color_a,
-      float                            clear_depth,
-      uint32_t                         clear_stencil,
-      uint32_t                         nsync_compute_resources,
-      const ngf_sync_compute_resource* sync_compute_resources) {
-    ngf_cmd_begin_render_pass_simple_with_sync(
-        cmd_buf,
-        rt,
-        clear_color_r,
-        clear_color_g,
-        clear_color_b,
-        clear_color_a,
-        clear_depth,
-        clear_stencil,
-        nsync_compute_resources,
-        sync_compute_resources,
-        &enc_);
-  }
-
-  /**
    * Finishes the wrapped render pass.
    */
   ~render_encoder() {
