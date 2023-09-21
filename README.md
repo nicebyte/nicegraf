@@ -4,7 +4,7 @@ nicegraf
 ![Run tests](https://github.com/nicebyte/nicegraf/workflows/Run%20tests/badge.svg)
 
 
-An abstraction layer for low-level platform-specific graphics APIs.
+An abstraction layer for low-level platform-specific GPU APIs.
 
 * Reference documentation: http://wiki.gpfault.net/docs/nicegraf
 * Sample code: https://github.com/nicebyte/nicegraf/tree/master/samples
