@@ -227,12 +227,12 @@ void ngfi_blkalloc_dump_dbgstats(ngfi_block_allocator* alloc, FILE* out) {
       "Block size:\t%ld (requested)\t%ld (effective)\n",
       alloc->block_size_user,
       alloc->block_size);
-  fprintf(out, "Total mem:\t%ld\n", alloc->block_size * alloc->nblocks_total);
-  fprintf(out, "Avail mem:\t%ld\n", alloc->block_size * alloc->nblocks_free);
+  fprintf(out, "Total mem:\t%zu\n", alloc->block_size * alloc->nblocks_total);
+  fprintf(out, "Avail mem:\t%zu\n", alloc->block_size * alloc->nblocks_free);
   fprintf(
       out,
-      "Used mem:\t%ld\n",
+      "Used mem:\t%zu\n",
       alloc->block_size * (alloc->nblocks_total - alloc->nblocks_free));
-  fprintf(out, "Active pools:\t%ld\n", NGFI_DARRAY_SIZE(alloc->pools));
-  fprintf(out, "Blks per pool:\t%ld\n", alloc->nblocks_per_pool);
+  fprintf(out, "Active pools:\t%zu\n", NGFI_DARRAY_SIZE(alloc->pools));
+  fprintf(out, "Blks per pool:\t%zu\n", alloc->nblocks_per_pool);
 }
