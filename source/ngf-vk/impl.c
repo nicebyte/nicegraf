@@ -3474,8 +3474,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
  
   // Initialize block allocator for this context.
   ctx->blkalloc = ngfi_blkalloc_create(
-      4096, // 4K per block
-      32u); // 32 blocks per pool
+      1024, // 1K per block
+      16u); // 16 blocks per pool
   if (ctx->blkalloc == NULL) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
@@ -4000,7 +4000,11 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   return err;
 }
 
+void ngfi_dump_sys_alloc_dbgstats(FILE* out);
+
 ngf_error ngf_end_frame(ngf_frame_token token) {
+  ngfi_blkalloc_cleanup(CURRENT_CONTEXT->blkalloc);
+
   if (token != CURRENT_CONTEXT->current_frame_token) {
     NGFI_DIAG_ERROR("ending a frame with an unexpected frame token");
     return NGF_ERROR_INVALID_OPERATION;

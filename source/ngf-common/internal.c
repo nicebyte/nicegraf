@@ -23,6 +23,10 @@
 #include "macros.h"
 
 #include <stdlib.h>
+#include <stdio.h>
+struct {
+  size_t allocated_mem;
+} ngfi_sys_alloc_stats;
 
 ngf_diagnostic_info ngfi_diag_info = {
     .verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT,
@@ -31,12 +35,14 @@ ngf_diagnostic_info ngfi_diag_info = {
 
 // Default allocation callbacks.
 void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
+  ngfi_sys_alloc_stats.allocated_mem += obj_size * nobjs;
   return malloc(obj_size * nobjs);
 }
 
 void ngf_default_free(void* ptr, size_t s, size_t n) {
   NGFI_IGNORE_VAR(s);
   NGFI_IGNORE_VAR(n);
+  ngfi_sys_alloc_stats.allocated_mem -= s * n;
   free(ptr);
 }
 
@@ -58,4 +64,9 @@ ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap) {
         res >>= 1;
     }
     return (ngf_sample_count) res;
+}
+
+void ngfi_dump_sys_alloc_dbgstats(FILE* out) {
+    fprintf(out, "System allocator debug stats\n");
+    fprintf(out, "Requested memory:\t%zu\n", ngfi_sys_alloc_stats.allocated_mem);
 }

@@ -35,6 +35,8 @@ ngfi_sa* ngfi_sa_create(size_t capacity) {
     result->ptr      = result->data;
     result->active_block = result;
     result->next_block = NULL;
+    result->total_consumed = 0u;
+    result->total_allocd   = capacity + sizeof(ngfi_sa);
   }
   return result;
 }
@@ -53,9 +55,9 @@ void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
   }
   else {
     const size_t new_capacity = NGFI_MAX(alloc_block->capacity, nbytes);
-
     ngfi_sa* new_block = ngfi_sa_create(new_capacity);
     if(new_block == NULL) { return NULL; }
+    allocator->total_allocd += new_capacity + sizeof(ngfi_sa);
 
     alloc_block->next_block = new_block;
     allocator->active_block = new_block;
@@ -63,7 +65,7 @@ void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
     result = new_block->ptr;
     new_block->ptr += nbytes;
   }
-
+  if (result) allocator->total_consumed += nbytes;
   return result;
 }
 
@@ -74,6 +76,7 @@ void ngfi_sa_reset(ngfi_sa* allocator) {
   ngfi_sa* curr_block = allocator->next_block;
   while (curr_block != NULL) {
       ngfi_sa* next = curr_block->next_block;
+      allocator->total_allocd -= sizeof(ngfi_sa) + curr_block->capacity;
       free(curr_block);
       curr_block = next;
   }
@@ -81,6 +84,7 @@ void ngfi_sa_reset(ngfi_sa* allocator) {
   allocator->ptr = allocator->data;
   allocator->active_block = allocator;
   allocator->next_block = NULL;
+  allocator->total_consumed = 0u;
 }
 
 void ngfi_sa_destroy(ngfi_sa* allocator) {
@@ -89,10 +93,17 @@ void ngfi_sa_destroy(ngfi_sa* allocator) {
   free(allocator);
 }
 
+void ngfi_sa_dump_dbgstats(ngfi_sa* allocator, FILE* out) {
+  fprintf(out, "Debug stats for stack allocator %p\n", allocator);
+  fprintf(out, "Block size:\t%zu\n", allocator->active_block->capacity);
+  fprintf(out, "Total mem:\t%zu\n", (size_t)(allocator->total_allocd));
+  fprintf(out, "Used mem:\t%zu\n", (size_t)(allocator->total_consumed));
+
+}
 ngfi_sa* ngfi_tmp_store(void) {
   static NGFI_THREADLOCAL ngfi_sa* temp_storage = NULL;
   if (temp_storage == NULL) {
-    const size_t sa_capacity = 1024 * 100;  // 100K
+    const size_t sa_capacity = 1024 * 100;  // 100K 
     temp_storage             = ngfi_sa_create(sa_capacity);
   }
   return temp_storage;
@@ -102,7 +113,7 @@ ngfi_sa* ngfi_tmp_store(void) {
 ngfi_sa* ngfi_frame_store(void) {
   static NGFI_THREADLOCAL ngfi_sa* frame_storage = NULL;
   if (frame_storage == NULL) {
-    const size_t sa_capacity = 1024 * 100;  // 100K
+    const size_t sa_capacity = 1024 * 4;  // 4K
     frame_storage = ngfi_sa_create(sa_capacity);
   }
   return frame_storage;

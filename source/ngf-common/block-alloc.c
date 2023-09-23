@@ -26,13 +26,21 @@
 #include "list.h"
 #include "macros.h"
 
-#include <time.h>
 #include <string.h>
+#include <time.h>
+
+#define NGFI_BLKALLOC_MAX_FRAMES_INACTIVE (3u)
+
+typedef struct ngfi_blkalloc_pool_usage {
+  uint32_t nactive_blocks;
+  uint32_t nframes_inactive;
+} ngfi_blkalloc_pool_usage;
 
 typedef struct ngfi_blkalloc_block {  // The block itself.
-  ngfi_list_node   free_list_node;    // Freelist node.
+  ngfi_list_node free_list_node;      // Freelist node.
+  uint32_t       parent_pool_idx;     // Index of the block's pool.
 #if !defined(NDEBUG)
-  uint32_t         marker_and_tag;    // Identifies the parent allocator.
+  uint32_t marker_and_tag;  // Identifies the parent allocator.
 #endif
   ngfi_max_align_t padding;
 #pragma warning(push)
@@ -43,6 +51,7 @@ typedef struct ngfi_blkalloc_block {  // The block itself.
 
 struct ngfi_block_allocator {
   NGFI_DARRAY_OF(uint8_t*) pools;
+  NGFI_DARRAY_OF(ngfi_blkalloc_pool_usage) pool_usage;
   ngfi_list_node* freelist;
   uint32_t        block_size;
   uint32_t        block_size_user;
@@ -77,9 +86,14 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
   const size_t pool_size = allocator->block_size * allocator->nblocks_per_pool;
   uint8_t*     pool      = NGFI_ALLOCN(uint8_t, pool_size);
   if (pool != NULL) {
+    NGFI_DARRAY_APPEND(allocator->pools, pool);
+    static ngfi_blkalloc_pool_usage fresh_pool_usage = {0u, 0u};
+    NGFI_DARRAY_APPEND(allocator->pool_usage, fresh_pool_usage);
+    const uint32_t pool_idx = NGFI_DARRAY_SIZE(allocator->pools) - 1u;
     for (uint32_t b = 0u; b < allocator->nblocks_per_pool; ++b) {
       ngfi_blkalloc_block* blk = (ngfi_blkalloc_block*)(pool + allocator->block_size * b);
       ngfi_list_init(&blk->free_list_node);
+      blk->parent_pool_idx = pool_idx;
       if (allocator->freelist) {
         ngfi_list_append(&blk->free_list_node, allocator->freelist);
       } else {
@@ -92,7 +106,6 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
       allocator->nblocks_total++;
       allocator->nblocks_free++;
     }
-    NGFI_DARRAY_APPEND(allocator->pools, pool);
   }
 }
 
@@ -112,15 +125,17 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
 
   const uint32_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
   const uint32_t aligned_block_size =
-      unaligned_block_size + (uint32_t)(NGFI_MAX_ALIGNMENT - (unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u)));
+      unaligned_block_size +
+      (uint32_t)(NGFI_MAX_ALIGNMENT - (unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u)));
 
-  allocator->block_size = aligned_block_size;
-  allocator->block_size_user = requested_block_size;
-  allocator->nblocks_per_pool    = nblocks;
+  allocator->block_size       = aligned_block_size;
+  allocator->block_size_user  = requested_block_size;
+  allocator->nblocks_per_pool = nblocks;
 #if !defined(NDEBUG)
-  allocator->tag        = (~IN_USE_BLOCK_MARKER_MASK) & (next_tag++);
+  allocator->tag = (~IN_USE_BLOCK_MARKER_MASK) & (next_tag++);
 #endif
   NGFI_DARRAY_RESET(allocator->pools, 8u);
+  NGFI_DARRAY_RESET(allocator->pool_usage, 8u);
   allocator->freelist = NULL;
   ngfi_blkalloc_add_pool(allocator);
   return allocator;
@@ -132,6 +147,7 @@ void ngfi_blkalloc_destroy(ngfi_block_allocator* allocator) {
     if (pool) { NGFI_FREEN(pool, allocator->block_size * allocator->nblocks_per_pool); }
   }
   NGFI_DARRAY_DESTROY(allocator->pools);
+  NGFI_DARRAY_DESTROY(allocator->pool_usage);
   NGFI_FREE(allocator);
 }
 
@@ -141,11 +157,14 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
   if (alloc->freelist != NULL) {
     ngfi_blkalloc_block* blk =
         NGFI_LIST_CONTAINER_OF(alloc->freelist, ngfi_blkalloc_block, free_list_node);
-    ngfi_list_node* new_head = alloc->freelist->next;
+    ngfi_blkalloc_pool_usage* pool_usage = &NGFI_DARRAY_AT(alloc->pool_usage, blk->parent_pool_idx);
+    ngfi_list_node*           new_head   = alloc->freelist->next;
     ngfi_list_remove(alloc->freelist);
     alloc->freelist = new_head == alloc->freelist ? NULL : new_head;
     result          = blk->data;
     alloc->nblocks_free--;
+    pool_usage->nactive_blocks++;
+    pool_usage->nframes_inactive = 0u;
 #if !defined(NDEBUG)
     ngfi_blkalloc_mark_block_inuse(blk);
 #endif
@@ -158,6 +177,7 @@ ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
   if (ptr != NULL) {
     ngfi_blkalloc_block* blk =
         (ngfi_blkalloc_block*)((uint8_t*)ptr - offsetof(ngfi_blkalloc_block, data));
+    ngfi_blkalloc_pool_usage* pool_usage = &NGFI_DARRAY_AT(alloc->pool_usage, blk->parent_pool_idx);
 #if !defined(NDEBUG)
     uint32_t blk_tag = ngfi_blkalloc_block_tag(blk);
     uint32_t my_tag  = alloc->tag;
@@ -176,6 +196,7 @@ ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
         alloc->freelist = &blk->free_list_node;
       }
       alloc->nblocks_free++;
+      pool_usage->nactive_blocks--;
     }
   }
   return result;
@@ -184,4 +205,34 @@ ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr) {
 uint32_t ngfi_blkalloc_blksize(ngfi_block_allocator* alloc) {
   assert(alloc);
   return alloc->block_size_user;
+}
+
+void ngfi_blkalloc_cleanup(ngfi_block_allocator* alloc) {
+  NGFI_DARRAY_FOREACH(alloc->pools, i) {
+    ngfi_blkalloc_pool_usage* pool_usage = &NGFI_DARRAY_AT(alloc->pool_usage, i);
+    uint8_t*                  pool       = NGFI_DARRAY_AT(alloc->pools, i);
+    if (i > 0u && pool_usage->nframes_inactive >= NGFI_BLKALLOC_MAX_FRAMES_INACTIVE && pool) {
+      NGFI_FREEN(pool, alloc->block_size * alloc->nblocks_per_pool);
+      NGFI_DARRAY_AT(alloc->pools, i) = NULL;
+    } else if (pool_usage->nactive_blocks == 0u) {
+      NGFI_DARRAY_AT(alloc->pool_usage, i).nframes_inactive++;
+    }
+  }
+}
+
+void ngfi_blkalloc_dump_dbgstats(ngfi_block_allocator* alloc, FILE* out) {
+  fprintf(out, "Debug stats for block allocator 0x%p\n", alloc);
+  fprintf(
+      out,
+      "Block size:\t%ld (requested)\t%ld (effective)\n",
+      alloc->block_size_user,
+      alloc->block_size);
+  fprintf(out, "Total mem:\t%ld\n", alloc->block_size * alloc->nblocks_total);
+  fprintf(out, "Avail mem:\t%ld\n", alloc->block_size * alloc->nblocks_free);
+  fprintf(
+      out,
+      "Used mem:\t%ld\n",
+      alloc->block_size * (alloc->nblocks_total - alloc->nblocks_free));
+  fprintf(out, "Active pools:\t%ld\n", NGFI_DARRAY_SIZE(alloc->pools));
+  fprintf(out, "Blks per pool:\t%ld\n", alloc->nblocks_per_pool);
 }

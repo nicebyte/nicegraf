@@ -31,15 +31,33 @@
 #include "ngf-common/list.h"
 #include "ngf-common/native-binding-map.h"
 #include "ngf-common/stack-alloc.h"
+#include "ngf-common/macros.h"
 #include "nicetest.h"
 
 #include <string.h>
 #include <time.h>
 
+extern const ngf_allocation_callbacks NGF_DEFAULT_ALLOC_CB;
+
 static void ngft_bad_hashfn(uintptr_t key, uint32_t seed, void* out) {
   (void)key;
   ((uint32_t*)out)[0] = seed;
   ((uint32_t*)out)[1] = seed;
+}
+
+uint32_t allocs_called = 0u;
+uint32_t deallocs_called = 0u;
+ 
+void* ngft_counting_alloc(size_t obj_size, size_t nobjs) {
+  allocs_called++;
+  return malloc(obj_size * nobjs);
+}
+
+void ngft_counting_free(void* ptr, size_t obj_size, size_t nobjs) {
+  deallocs_called++;
+  (void)obj_size;
+  (void)nobjs;
+  free(ptr);
 }
 
 static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float max_load_factor) {
@@ -388,6 +406,42 @@ NT_TESTSUITE {
     }
   }
 
+  NT_TESTCASE("block alloc: cleanup") {
+    const uint32_t blocks_per_pool = 3u;
+    ngf_allocation_callbacks counting_alloc_callbacks = {ngft_counting_alloc, ngft_counting_free};
+    NGF_ALLOC_CB                                      = &counting_alloc_callbacks;
+    allocs_called = deallocs_called = 0u;
+    ngfi_block_allocator* alloc = ngfi_blkalloc_create(sizeof(test_data), blocks_per_pool);
+    allocs_called -= 1u; // discount the allocator struct itself.
+    NT_ASSERT(allocs_called == 1u);
+    NT_ASSERT(alloc != NULL);
+    test_data*            blocks[3 * 3] = { NULL };
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]); ++i) {
+      blocks[i] = ngfi_blkalloc_alloc(alloc);
+      NT_ASSERT(blocks[i] != NULL);
+    }
+    NT_ASSERT(allocs_called == 3u);
+    NT_ASSERT(deallocs_called == 0u);
+    for (size_t i = 0; i < sizeof(blocks) / sizeof(blocks[0]) - 3u; ++i) {
+      ngfi_blkalloc_free(alloc, blocks[i]);
+    }
+    NT_ASSERT(deallocs_called == 0u);
+    for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
+    NT_ASSERT(deallocs_called == 1u);
+    for (size_t i = sizeof(blocks) / sizeof(blocks[0]) - 3u; i < sizeof(blocks) / sizeof(blocks[0]);
+         ++i) {
+      ngfi_blkalloc_free(alloc, blocks[i]);
+    }
+    for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
+    NT_ASSERT(deallocs_called == 2u);
+    for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
+    NT_ASSERT(deallocs_called == 2u);
+    ngfi_blkalloc_destroy(alloc);
+    deallocs_called -= 1u; // discount the allocator struct itself.
+    NT_ASSERT(deallocs_called == 3u);
+    NGF_ALLOC_CB                = &NGF_DEFAULT_ALLOC_CB;
+  }
+
   /* dynamic array tests */
 
   typedef struct point {
@@ -472,7 +526,7 @@ NT_TESTSUITE {
     NT_ASSERT(container_ptr == &s);
   }
 
-  NT_TESTCASE("lust: single-element list iteration") {
+  NT_TESTCASE("list: single-element list iteration") {
     test_struct s;
     ngfi_list_init(&s.test_list);
     s.tag         = 0xbadbeef;

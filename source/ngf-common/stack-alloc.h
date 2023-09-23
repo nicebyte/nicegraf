@@ -20,6 +20,7 @@ SOFTWARE.
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +29,8 @@ extern "C" {
 typedef struct ngfi_sa_t {
   uint8_t* ptr;
   size_t   capacity;
+  size_t   total_consumed;
+  size_t   total_allocd;
   struct ngfi_sa_t* next_block;
   struct ngfi_sa_t* active_block;
 #pragma warning(push)
@@ -59,6 +62,11 @@ void ngfi_sa_reset(ngfi_sa* allocator);
  * tear down the given stack allocator.
  */
 void ngfi_sa_destroy(ngfi_sa* allocator);
+
+/**
+ * Dumps the given stack allocator's debug statics.
+ */
+void ngfi_sa_dump_dbgstats(ngfi_sa* allocator, FILE* out);
 
 /**
  * Per-thread temporary storage based on stack allocator.

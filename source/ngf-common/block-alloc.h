@@ -23,6 +23,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -78,6 +79,16 @@ typedef enum {
  * Freeing a NULL pointer does nothing.
  */
 ngfi_blkalloc_error ngfi_blkalloc_free(ngfi_block_allocator* alloc, void* ptr);
+
+/**
+ * Cleans up unused pools from the given allocator.
+ */
+void ngfi_blkalloc_cleanup(ngfi_block_allocator* alloc);
+
+/**
+ * Logs the statistics related to the given allocator into the given file.
+ */
+void ngfi_blkalloc_dump_dbgstats(ngfi_block_allocator* alloc, FILE* out);
 
 #ifdef __cplusplus
 }
