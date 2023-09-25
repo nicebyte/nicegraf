@@ -132,6 +132,8 @@ static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float m
 }
 
 NT_TESTSUITE {
+  ngfi_set_allocation_callbacks(NULL);
+
   /* frame token tests */
 
   NT_TESTCASE("frame token: encode-decode") {

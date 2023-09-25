@@ -816,7 +816,6 @@ static bool ngfvk_format_is_stencil(VkFormat image_format) {
 #define NGFVK_RETIRE_OBJECT(frame_res, obj_type_idx, obj) \
  ngfi_chnklist_append(&((frame_res)->retire_objs[(obj_type_idx)]), &(obj), sizeof(obj))
 
-void             ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
 // Handler for messages from validation layers, etc.

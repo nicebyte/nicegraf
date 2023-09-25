@@ -103,6 +103,8 @@ typedef struct ngfi_range {
   size_t last_idx;
 } ngfi_range;
 
+void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
+
 #ifdef __cplusplus
 }
 #endif
