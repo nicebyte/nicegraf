@@ -29,11 +29,11 @@
 #include <string.h>
 #include <time.h>
 
-#define NGFI_BLKALLOC_MAX_FRAMES_INACTIVE (3u)
+#define NGFI_BLKALLOC_OVERALLOC_THRESHOLD (1.3f)
+#define NGFI_BLKALLOC_HIST_BUFFER_SIZE    (3u)
 
 typedef struct ngfi_blkalloc_pool_usage {
   uint32_t nactive_blocks;
-  uint32_t nframes_inactive;
 } ngfi_blkalloc_pool_usage;
 
 typedef struct ngfi_blkalloc_block {  // The block itself.
@@ -58,7 +58,11 @@ struct ngfi_block_allocator {
   uint32_t        nblocks_per_pool;
   uint32_t        nblocks_total;
   uint32_t        nblocks_free;
+  uint32_t        max_concurrent_allocs;
+  uint32_t        nactive_pools;
   uint32_t        tag;
+  uint32_t        overalloc_hist_buf_idx;
+  float           overalloc_hist_buf[NGFI_BLKALLOC_HIST_BUFFER_SIZE];
 };
 
 #if !defined(NDEBUG)
@@ -86,10 +90,23 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
   const size_t pool_size = allocator->block_size * allocator->nblocks_per_pool;
   uint8_t*     pool      = NGFI_ALLOCN(uint8_t, pool_size);
   if (pool != NULL) {
-    NGFI_DARRAY_APPEND(allocator->pools, pool);
-    static ngfi_blkalloc_pool_usage fresh_pool_usage = {0u, 0u};
-    NGFI_DARRAY_APPEND(allocator->pool_usage, fresh_pool_usage);
-    const uint32_t pool_idx = NGFI_DARRAY_SIZE(allocator->pools) - 1u;
+    uint32_t pool_idx = ~0u;
+    NGFI_DARRAY_FOREACH(allocator->pools, p) {
+      if (NGFI_DARRAY_AT(allocator->pools, p) == NULL) {
+        pool_idx = (uint32_t)p;
+        break;
+      }
+    }
+    static ngfi_blkalloc_pool_usage fresh_pool_usage = {0u};
+    if (pool_idx == ~0u) {
+      NGFI_DARRAY_APPEND(allocator->pools, pool);
+      NGFI_DARRAY_APPEND(allocator->pool_usage, fresh_pool_usage);
+      pool_idx = NGFI_DARRAY_SIZE(allocator->pools) - 1u;
+    } else {
+      NGFI_DARRAY_AT(allocator->pools, pool_idx)      = pool;
+      NGFI_DARRAY_AT(allocator->pool_usage, pool_idx) = fresh_pool_usage;
+    }
+
     for (uint32_t b = 0u; b < allocator->nblocks_per_pool; ++b) {
       ngfi_blkalloc_block* blk = (ngfi_blkalloc_block*)(pool + allocator->block_size * b);
       ngfi_list_init(&blk->free_list_node);
@@ -106,6 +123,7 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
       allocator->nblocks_total++;
       allocator->nblocks_free++;
     }
+    allocator->nactive_pools++;
   }
 }
 
@@ -164,7 +182,7 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
     result          = blk->data;
     alloc->nblocks_free--;
     pool_usage->nactive_blocks++;
-    pool_usage->nframes_inactive = 0u;
+    alloc->max_concurrent_allocs = NGFI_MAX(alloc->nblocks_total - alloc->nblocks_free, alloc->max_concurrent_allocs);
 #if !defined(NDEBUG)
     ngfi_blkalloc_mark_block_inuse(blk);
 #endif
@@ -208,16 +226,61 @@ uint32_t ngfi_blkalloc_blksize(ngfi_block_allocator* alloc) {
 }
 
 void ngfi_blkalloc_cleanup(ngfi_block_allocator* alloc) {
-  NGFI_DARRAY_FOREACH(alloc->pools, i) {
-    ngfi_blkalloc_pool_usage* pool_usage = &NGFI_DARRAY_AT(alloc->pool_usage, i);
-    uint8_t*                  pool       = NGFI_DARRAY_AT(alloc->pools, i);
-    if (i > 0u && pool_usage->nframes_inactive >= NGFI_BLKALLOC_MAX_FRAMES_INACTIVE && pool) {
-      NGFI_FREEN(pool, alloc->block_size * alloc->nblocks_per_pool);
-      NGFI_DARRAY_AT(alloc->pools, i) = NULL;
-    } else if (pool_usage->nactive_blocks == 0u) {
-      NGFI_DARRAY_AT(alloc->pool_usage, i).nframes_inactive++;
+
+  // Compute the current over-allocation factor.
+  const uint32_t max_concurrent_allocs = NGFI_MAX(1u, alloc->max_concurrent_allocs);
+  const uint32_t nrequired_pools =
+      (max_concurrent_allocs / alloc->nblocks_per_pool) +
+      (max_concurrent_allocs % alloc->nblocks_per_pool ? 1u : 0u);
+  const float    over_alloc_factor = (float)alloc->nactive_pools /  (float)nrequired_pools;
+
+  // If we are over-allocating, add the factor to history buffer.
+  if (over_alloc_factor > 1.f) {
+    alloc->overalloc_hist_buf[alloc->overalloc_hist_buf_idx++] = over_alloc_factor;
+    alloc->overalloc_hist_buf_idx =
+        (alloc->overalloc_hist_buf_idx) % NGFI_ARRAYSIZE(alloc->overalloc_hist_buf);
+  }
+
+  // Compute average over-allocation factor from history buffer.
+  float avg_over_alloc_factor = 0.f;
+  for (size_t i = 0u; i < NGFI_ARRAYSIZE(alloc->overalloc_hist_buf); ++i) {
+    avg_over_alloc_factor += alloc->overalloc_hist_buf[i];
+  }
+  avg_over_alloc_factor /= NGFI_ARRAYSIZE(alloc->overalloc_hist_buf);
+
+  // Trigger pools cleanup if we go over threshold with over-allocation.
+  const bool pools_need_cleanup = avg_over_alloc_factor > NGFI_BLKALLOC_OVERALLOC_THRESHOLD;
+
+  size_t released_mem = 0u;
+  if (pools_need_cleanup) {
+    NGFI_DARRAY_FOREACH(alloc->pools, i) {
+      ngfi_blkalloc_pool_usage* pool_usage = &NGFI_DARRAY_AT(alloc->pool_usage, i);
+      uint8_t*                  pool       = NGFI_DARRAY_AT(alloc->pools, i);
+      // If we need clean-up, release the pool back to the system if it has no active allocations
+      // AND we still have more pools than we need.
+      if (pool && pool_usage->nactive_blocks == 0u && alloc->nactive_pools > nrequired_pools) {
+        for (uint32_t b = 0u; b < alloc->nblocks_per_pool; ++b) {
+          ngfi_blkalloc_block* blk = (ngfi_blkalloc_block*)(pool + alloc->block_size * b);
+          // Update the freelist pointer, make sure it's NULL if there are no more free blocks.
+          if (alloc->freelist == &blk->free_list_node) {
+            alloc->freelist =
+                alloc->freelist->next == alloc->freelist ? NULL : alloc->freelist->next;
+          }
+          ngfi_list_remove(&blk->free_list_node);
+        }
+        NGFI_FREEN(pool, alloc->block_size * alloc->nblocks_per_pool);
+        NGFI_DARRAY_AT(alloc->pools, i) = NULL;
+        alloc->nblocks_total -= alloc->nblocks_per_pool;
+        alloc->nblocks_free -= alloc->nblocks_per_pool;
+        alloc->nactive_pools--;
+        released_mem += alloc->nblocks_per_pool * alloc->block_size;
+      }
     }
   }
+  if (released_mem > 0u) {
+    NGFI_DIAG_INFO("Block allocator released %.3fK back to system\n", (float)released_mem / 1024.0f);
+  }
+  alloc->max_concurrent_allocs = 0u;
 }
 
 void ngfi_blkalloc_dump_dbgstats(ngfi_block_allocator* alloc, FILE* out) {

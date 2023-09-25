@@ -427,18 +427,25 @@ NT_TESTSUITE {
     }
     NT_ASSERT(deallocs_called == 0u);
     for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
-    NT_ASSERT(deallocs_called == 1u);
+    NT_ASSERT(deallocs_called == 2u);
+
+    test_data* td = ngfi_blkalloc_alloc(alloc);
+    NT_ASSERT(allocs_called == 4u);
+    ngfi_blkalloc_free(alloc, td);
+
     for (size_t i = sizeof(blocks) / sizeof(blocks[0]) - 3u; i < sizeof(blocks) / sizeof(blocks[0]);
          ++i) {
       ngfi_blkalloc_free(alloc, blocks[i]);
     }
     for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
-    NT_ASSERT(deallocs_called == 2u);
+    NT_ASSERT(deallocs_called == 3u);
+
     for (size_t i = 0; i < 4u; ++i) { ngfi_blkalloc_cleanup(alloc); }
-    NT_ASSERT(deallocs_called == 2u);
+    NT_ASSERT(deallocs_called == 3u);
+
     ngfi_blkalloc_destroy(alloc);
     deallocs_called -= 1u; // discount the allocator struct itself.
-    NT_ASSERT(deallocs_called == 3u);
+    NT_ASSERT(deallocs_called == 4u);
     NGF_ALLOC_CB                = &NGF_DEFAULT_ALLOC_CB;
   }
 
