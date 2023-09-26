@@ -161,6 +161,7 @@ extern PFN_vkDestroySemaphore vkDestroySemaphore;
 extern PFN_vkDestroyShaderModule vkDestroyShaderModule;
 extern PFN_vkDeviceWaitIdle vkDeviceWaitIdle;
 extern PFN_vkEndCommandBuffer vkEndCommandBuffer;
+extern PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties;
 extern PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
 extern PFN_vkFreeCommandBuffers vkFreeCommandBuffers;
 extern PFN_vkFreeDescriptorSets vkFreeDescriptorSets;

@@ -1981,11 +1981,36 @@ static void ngfvk_init_loader_if_necessary() {
 
 static VkResult
 ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* validation_enabled) {
-  const char* const ext_names[] = {// Names of instance-level extensions.
-                                   "VK_KHR_surface",
-                                   VK_SURFACE_EXT,
-                                   VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
-                                   VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+  // Scan through the list of instance-level extensions, determine which are supported.
+  bool swapchain_colorspace_supported = false;
+  uint32_t ninst_exts = 0u;
+  vkEnumerateInstanceExtensionProperties(NULL, &ninst_exts, NULL);
+  VkExtensionProperties* ext_props = malloc(sizeof(VkExtensionProperties) * ninst_exts);
+  if (ext_props == NULL) { return VK_ERROR_OUT_OF_HOST_MEMORY; }
+  vkEnumerateInstanceExtensionProperties(NULL, &ninst_exts, ext_props);
+  for (size_t i = 0; i < ninst_exts && !swapchain_colorspace_supported; ++i) {
+    swapchain_colorspace_supported =
+        (strcmp(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME, ext_props[i].extensionName) == 0u);
+  }
+  free(ext_props);
+
+  // Names of instance-level extensions.
+  const char* ext_names[] = {
+      "VK_KHR_surface",
+      VK_SURFACE_EXT,
+      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+      NULL,
+      NULL};
+  const uint32_t max_optional_exts  = 2u;
+  uint32_t       optional_ext_count = 0u;
+  const uint32_t nmandatory_exts    = NGFI_ARRAYSIZE(ext_names) - max_optional_exts;
+  if (swapchain_colorspace_supported) {
+    ext_names[nmandatory_exts + optional_ext_count++] = VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME;
+  }
+  if (request_validation) {
+    ext_names[nmandatory_exts + optional_ext_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
+  }
+  assert(max_optional_exts >= optional_ext_count);
 
   const VkApplicationInfo app_info = {// Application information.
                                       .sType            = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -2015,15 +2040,16 @@ ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* v
   if (validation_enabled) { *validation_enabled = enable_validation; }
 
   // Create a Vulkan instance.
-  const VkInstanceCreateInfo inst_info = {
-      .sType                 = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-      .pNext                 = NULL,
-      .flags                 = 0u,
-      .pApplicationInfo      = &app_info,
-      .enabledLayerCount     = enable_validation ? 1u : 0u,
-      .ppEnabledLayerNames   = enabled_layers,
-      .enabledExtensionCount = (uint32_t)NGFI_ARRAYSIZE(ext_names) - (enable_validation ? 0u : 1u),
-      .ppEnabledExtensionNames = ext_names};
+  const uint32_t             nunused_exts = (max_optional_exts - optional_ext_count);
+  const VkInstanceCreateInfo inst_info    = {
+         .sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+         .pNext                   = NULL,
+         .flags                   = 0u,
+         .pApplicationInfo        = &app_info,
+         .enabledLayerCount       = enable_validation ? 1u : 0u,
+         .ppEnabledLayerNames     = enabled_layers,
+         .enabledExtensionCount   = (uint32_t)NGFI_ARRAYSIZE(ext_names) - nunused_exts,
+         .ppEnabledExtensionNames = ext_names};
   VkResult vk_err = vkCreateInstance(&inst_info, NULL, instance_ptr);
   if (vk_err != VK_SUCCESS) {
     NGFI_DIAG_ERROR("Failed to create a Vulkan instance, VK error %d.", vk_err);

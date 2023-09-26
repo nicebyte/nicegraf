@@ -132,6 +132,7 @@ PFN_vkDestroySemaphore vkDestroySemaphore;
 PFN_vkDestroyShaderModule vkDestroyShaderModule;
 PFN_vkDeviceWaitIdle vkDeviceWaitIdle;
 PFN_vkEndCommandBuffer vkEndCommandBuffer;
+PFN_vkEnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties;
 PFN_vkFlushMappedMemoryRanges vkFlushMappedMemoryRanges;
 PFN_vkFreeCommandBuffers vkFreeCommandBuffers;
 PFN_vkFreeDescriptorSets vkFreeDescriptorSets;
@@ -173,19 +174,16 @@ PFN_vkDestroyDebugUtilsMessengerEXT    vkDestroyDebugUtilsMessengerEXT;
 bool vkl_init_loader(void) {
   ngfi_module_handle vkdll = LoadLibraryA(VK_LOADER_LIB);
 
-  if (!vkdll) {
-    return false;
-  }
+  if (!vkdll) { return false; }
 
-  vkGetInstanceProcAddr =
-    (PFN_vkGetInstanceProcAddr)GetProcAddress(vkdll,
-      "vkGetInstanceProcAddr");
+  vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)GetProcAddress(vkdll, "vkGetInstanceProcAddr");
   vkCreateInstance =
-    (PFN_vkCreateInstance)vkGetInstanceProcAddr(VK_NULL_HANDLE,
-      "vkCreateInstance");
-  vkEnumerateInstanceLayerProperties =
-    (PFN_vkEnumerateInstanceLayerProperties)vkGetInstanceProcAddr(VK_NULL_HANDLE,
-        "vkEnumerateInstanceLayerProperties");
+      (PFN_vkCreateInstance)vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkCreateInstance");
+  vkEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties)
+      vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceLayerProperties");
+
+  vkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)
+      vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceExtensionProperties");
   return true;
 }
 #if !defined(__APPLE__)
