@@ -170,34 +170,6 @@ typedef struct ngf_renderdoc_info {
 } ngf_renderdoc_info;
 
 /**
- * \ingroup ngf
- * Triggers RenderDoc Capture.
- *
- * Captures the next frame from the active window in the current context.
- * If called, subsequent calls to \ref ngf_renderdoc_capture_begin and \ref ngf_renderdoc_capture_end
- * will do nothing until after the next frame that ngf_renderdoc_capture_next_frame 
- * was called (i.e. you cannot do nested captures).
- */
-void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- * Begins RenderDoc Capture.
- *
- * Begins frame capture for the active window in the current context.
- * Ended by \ref ngf_renderdoc_capture_end.
- */
-void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- * Triggers RenderDoc Capture.
- *
- * Ends frame capture for the active window in the current context.
- */
-void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
-
-/**
  * The diagnostic callback function type.
  */
 typedef void (*ngf_diagnostic_callback)(ngf_diagnostic_message_type, void*, const char*, ...);
@@ -2289,6 +2261,20 @@ typedef uintptr_t ngf_frame_token;
 #define NGF_DEVICE_LIMIT_UNKNOWN (~0u)
 
 /**
+ * Enumerates color spaces for swapchain images.
+ * Check \ref ngf_device_capabilities::colorspace_support to determine whether a particular color space is supported.
+ */
+typedef enum ngf_colorspace {
+    NGF_COLORSPACE_SRGB_NONLINEAR = 0u,
+    NGF_COLORSPACE_EXTENDED_SRGB_NONLINEAR,
+    NGF_COLORSPACE_EXTENDED_SRGB_LINEAR,
+    NGF_COLORSPACE_DISPLAY_P3,
+    NGF_COLORSPACE_DISPLAY_P3_LINEAR,
+    NGF_COLORSPACE_DCI_P3,
+    NGF_COLORSPACE_COUNT
+} ngf_colorspace;
+
+/**
  * @struct ngf_device_capabilities
  * \ingroup ngf
  * Contains information about various device features, limits, etc. Clients
@@ -2449,6 +2435,12 @@ typedef struct ngf_device_capabilities {
    * This value is derived from \ref texture_depth_sample_counts.
    */
   ngf_sample_count max_supported_texture_depth_sample_count;
+
+  /**
+   * Array of boolean values indicating support for various color spaces.
+   * Index with \ref ngf_colorspace.
+   */
+  bool colorspace_support[NGF_COLORSPACE_COUNT];
 } ngf_device_capabilities;
 
 /**
@@ -3261,6 +3253,35 @@ void ngf_cmd_copy_image_to_buffer(
  * @param img The handle to the image to operate on.
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * Triggers RenderDoc Capture.
+ *
+ * Captures the next frame from the active window in the current context.
+ * If called, subsequent calls to \ref ngf_renderdoc_capture_begin and \ref ngf_renderdoc_capture_end
+ * will do nothing until after the next frame that ngf_renderdoc_capture_next_frame 
+ * was called (i.e. you cannot do nested captures).
+ */
+void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * Begins RenderDoc Capture.
+ *
+ * Begins frame capture for the active window in the current context.
+ * Ended by \ref ngf_renderdoc_capture_end.
+ */
+void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * Triggers RenderDoc Capture.
+ *
+ * Ends frame capture for the active window in the current context.
+ */
+void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
+
 
 #ifdef _MSC_VER
 #pragma endregion
