@@ -809,7 +809,19 @@ static bool ngfvk_format_is_stencil(VkFormat image_format) {
          image_format == VK_FORMAT_D32_SFLOAT_S8_UINT;
 }
 
-#pragma endregion
+static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
+  static VkColorSpaceKHR color_spaces[NGF_COLORSPACE_COUNT] = {
+    VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+    VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT,
+    VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
+    VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
+    VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
+    VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT
+  };
+  return color_spaces[colorspace];
+}
+
+#pragma endregion  // vk_enum_maps
 
 #pragma region internal_funcs
 
