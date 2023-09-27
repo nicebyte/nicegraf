@@ -685,6 +685,7 @@ CA::MetalLayer* ngf_layer_add_to_view(
     uint32_t         width,
     uint32_t         height,
     MTL::PixelFormat pixel_format,
+    ngf_colorspace   colorspace,
     uint32_t         capacity_hint,
     bool             display_sync_enabled,
     uintptr_t        native_handle);
@@ -749,6 +750,7 @@ class ngfmtl_swapchain {
         swapchain_info.width,
         swapchain_info.height,
         pixel_format,
+        swapchain_info.colorspace,
         swapchain_info.capacity_hint,
         (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO),
         swapchain_info.native_handle);

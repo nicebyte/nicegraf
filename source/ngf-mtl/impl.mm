@@ -389,6 +389,19 @@ static MTLWinding get_mtl_winding(ngf_front_face_mode w) {
   return windings[w];
 }
 
+static const CFStringRef get_mtl_colorspace(ngf_colorspace colorspace) {
+  const CFStringRef color_spaces[NGF_COLORSPACE_COUNT] = {
+    kCGColorSpaceSRGB,
+    kCGColorSpaceExtendedSRGB,
+    kCGColorSpaceExtendedLinearSRGB,
+    kCGColorSpaceDisplayP3,
+    kCGColorSpaceExtendedLinearDisplayP3,
+    kCGColorSpaceDCIP3,
+    kCGColorSpaceExtendedLinearITUR_2020
+  };
+  return color_spaces[colorspace];
+}
+
 static std::optional<MTLTextureType>
 get_mtl_texture_type(ngf_image_type type, uint32_t nlayers, ngf_sample_count sample_count) {
   if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1 && sample_count == NGF_SAMPLE_COUNT_1) {
@@ -662,6 +675,7 @@ class ngfmtl_swapchain {
     layer_.device          = device;
     layer_.drawableSize    = CGSizeMake(swapchain_info.width, swapchain_info.height);
     layer_.pixelFormat     = pixel_format;
+    layer_.colorspace      = CGColorSpaceCreateWithName(get_mtl_colorspace(swapchain_info.colorspace));
     layer_.framebufferOnly = YES;
 #if TARGET_OS_OSX
     if (@available(macOS 10.13.2, *)) {

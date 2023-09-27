@@ -1,3 +1,5 @@
+#include "nicegraf.h"
+
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
 
@@ -12,11 +14,25 @@ using NGFMTL_VIEW_TYPE = UIView;
 // Implementation is defined in impl.cpp, header only here
 #include "MetalSingleHeader.hpp"
 
+static const CFStringRef get_mtl_colorspace(ngf_colorspace colorspace) {
+  const CFStringRef color_spaces[NGF_COLORSPACE_COUNT] = {
+    kCGColorSpaceSRGB,
+    kCGColorSpaceExtendedSRGB,
+    kCGColorSpaceExtendedLinearSRGB,
+    kCGColorSpaceDisplayP3,
+    kCGColorSpaceExtendedLinearDisplayP3,
+    kCGColorSpaceDCIP3,
+    kCGColorSpaceExtendedLinearITUR_2020
+  };
+  return color_spaces[colorspace];
+}
+
 // Return type of CA::MetalLayer*
 CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
                                  uint32_t width,
                                  uint32_t height,
                                  MTL::PixelFormat pixel_format,
+                                 ngf_colorspace colorspace,
                                  uint32_t capacity_hint,
                                  bool display_sync_enabled,
                                  uintptr_t native_handle) {
@@ -24,6 +40,7 @@ CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
     layer_.device          = (__bridge id<MTLDevice>)device;
     layer_.drawableSize    = CGSizeMake(width, height);
     layer_.pixelFormat     = (MTLPixelFormat)pixel_format; // TODO: Is this cast correct?
+    layer_.colorspace      = CGColorSpaceCreateWithName(get_mtl_colorspace(colorspace));
     layer_.framebufferOnly = YES;
     #if TARGET_OS_OSX
     if (@available(macOS 10.13.2, *)) {
