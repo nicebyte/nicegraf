@@ -3,6 +3,9 @@ nicegraf
 
 ![Run tests](https://github.com/nicebyte/nicegraf/workflows/Run%20tests/badge.svg)
 
+<p align="center">
+<img src="https://github.com/nicebyte/nicegraf/blob/master/docs/logo.png?raw=true" width="256"/>
+</p>
 
 An abstraction layer for low-level platform-specific GPU APIs.
 
