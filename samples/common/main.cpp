@@ -201,6 +201,7 @@ int main(int, char**) {
         ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
     const ngf_swapchain_info swapchain_info = {
         .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+        .colorspace    = NGF_COLORSPACE_SRGB_NONLINEAR,
         .depth_format  = NGF_IMAGE_FORMAT_DEPTH32,
         .sample_count  = main_render_target_sample_count,
         .capacity_hint = 3u,

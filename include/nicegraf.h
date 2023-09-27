@@ -2108,12 +2108,28 @@ typedef enum ngf_present_mode {
 } ngf_present_mode;
 
 /**
+ * Enumerates color spaces for swapchain images.
+ * Check \ref ngf_device_capabilities::colorspace_support to determine whether a particular color space is supported.
+ */
+typedef enum ngf_colorspace {
+    NGF_COLORSPACE_SRGB_NONLINEAR = 0u,
+    NGF_COLORSPACE_EXTENDED_SRGB_NONLINEAR,
+    NGF_COLORSPACE_EXTENDED_SRGB_LINEAR,
+    NGF_COLORSPACE_DISPLAY_P3,
+    NGF_COLORSPACE_DISPLAY_P3_LINEAR,
+    NGF_COLORSPACE_DCI_P3,
+    NGF_COLORSPACE_ITUR_BT2020,
+    NGF_COLORSPACE_COUNT
+} ngf_colorspace;
+
+/**
  * @struct ngf_swapchain_info
  * \ingroup ngf
  * Swapchain configuration.
  */
 typedef struct ngf_swapchain_info {
   ngf_image_format color_format;  /**< Swapchain image format. */
+  ngf_colorspace   colorspace;    /**< Colorspace that the swapchain image uses. */
   ngf_image_format depth_format;  /**< Format to use for the depth buffer, if set to
                                      NGF_IMAGE_FORMAT_UNDEFINED, no depth buffer will be created. */
   ngf_sample_count sample_count;  /**< Number of samples per pixel (0 for non-multisampled) */
@@ -2259,20 +2275,6 @@ typedef uintptr_t ngf_frame_token;
  * relevant for the current backend.
  */
 #define NGF_DEVICE_LIMIT_UNKNOWN (~0u)
-
-/**
- * Enumerates color spaces for swapchain images.
- * Check \ref ngf_device_capabilities::colorspace_support to determine whether a particular color space is supported.
- */
-typedef enum ngf_colorspace {
-    NGF_COLORSPACE_SRGB_NONLINEAR = 0u,
-    NGF_COLORSPACE_EXTENDED_SRGB_NONLINEAR,
-    NGF_COLORSPACE_EXTENDED_SRGB_LINEAR,
-    NGF_COLORSPACE_DISPLAY_P3,
-    NGF_COLORSPACE_DISPLAY_P3_LINEAR,
-    NGF_COLORSPACE_DCI_P3,
-    NGF_COLORSPACE_COUNT
-} ngf_colorspace;
 
 /**
  * @struct ngf_device_capabilities
@@ -2435,12 +2437,6 @@ typedef struct ngf_device_capabilities {
    * This value is derived from \ref texture_depth_sample_counts.
    */
   ngf_sample_count max_supported_texture_depth_sample_count;
-
-  /**
-   * Array of boolean values indicating support for various color spaces.
-   * Index with \ref ngf_colorspace.
-   */
-  bool colorspace_support[NGF_COLORSPACE_COUNT];
 } ngf_device_capabilities;
 
 /**

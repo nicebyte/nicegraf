@@ -816,7 +816,8 @@ static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
     VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
     VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
     VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
-    VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT
+    VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT,
+    VK_COLOR_SPACE_BT2020_LINEAR_EXT
   };
   return color_spaces[colorspace];
 }
@@ -1095,7 +1096,7 @@ static ngf_error ngfvk_create_swapchain(
       .surface         = surface,
       .minImageCount   = swapchain_info->capacity_hint,
       .imageFormat     = requested_format,
-      .imageColorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      .imageColorSpace = get_vk_color_space(swapchain_info->colorspace),
       .imageExtent =
           {.width = NGFI_MIN(
                max_surface_extent.width,
