@@ -65,23 +65,33 @@ nmk_static_library(NAME nicegraf-util
 
 if (APPLE)
   find_library(APPLE_METAL Metal)
+  find_library(APPLE_QUARTZ QuartzCore)
+  find_library(APPLE_COREGRAPHICS CoreGraphics)
   find_library(APPLE_COCOA Cocoa)
-  find_library(APPLE_QUARTZ Quartz)
+  find_library(APPLE_UIKIT UIKit)
 endif()
 
 if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
-  # Nicegraf with native Metal backend.	
+  # Nicegraf with native Metal backend.
+  set(APPLE_LIBS ${APPLE_METAL} ${APPLE_QUARTZ} ${APPLE_COREGRAPHICS})
+
+  if (APPLE_COCOA)
+    set(APPLE_LIBS ${APPLE_LIBS} ${APPLE_COCOA}) # macOS
+  else()
+    set(APPLE_LIBS ${APPLE_LIBS} ${UIKit}) # iOS
+  endif()
+
   nmk_static_library(NAME nicegraf-mtl	
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h	
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm	
-                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}	
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_LIBS}
                      COPTS "-fobjc-arc")	
 
   nmk_static_library(NAME nicegraf-mtl-cpp
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/layer.mm
-                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_METAL} ${APPLE_COCOA} ${APPLE_QUARTZ}
+                     DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_LIBS}
                      PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/metal-cpp
                      COPTS "-fobjc-arc")
 else()
