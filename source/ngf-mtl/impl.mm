@@ -1508,9 +1508,6 @@ ngf_error ngf_create_graphics_pipeline(
   // Set primitive topology.
   mtl_pipe_desc.inputPrimitiveTopology =
       get_mtl_primitive_topology_class(info->input_assembly_info->primitive_topology);
-  if (!info->input_assembly_info->enable_primitive_restart) {
-    NGFI_DIAG_WARNING("Cannot disable primitive restart on Metal");
-  }
   if (mtl_pipe_desc.inputPrimitiveTopology == MTLPrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
