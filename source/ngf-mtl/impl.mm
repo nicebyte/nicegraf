@@ -1570,17 +1570,13 @@ void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipe) NGF_NOEXCEPT {
 
 id<MTLBuffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   MTLResourceOptions options         = 0u;
-  MTLResourceOptions managed_storage = 0u;
-#if TARGET_OS_OSX
-  managed_storage = MTLResourceStorageModeManaged;
-#endif
   switch (info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
-    options = MTLResourceCPUCacheModeDefaultCache | managed_storage;
+    options = MTLResourceCPUCacheModeDefaultCache | MTLResourceStorageModeShared;
     break;
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
-    options = MTLResourceCPUCacheModeWriteCombined | managed_storage;
+    options = MTLResourceCPUCacheModeWriteCombined | MTLResourceStorageModeShared;
     break;
   case NGF_BUFFER_STORAGE_PRIVATE:
     options = MTLResourceStorageModePrivate;
