@@ -1646,9 +1646,6 @@ void ngf_buffer_flush_range(
     [[maybe_unused]] ngf_buffer buf,
     [[maybe_unused]] size_t     offset,
     [[maybe_unused]] size_t     size) NGF_NOEXCEPT {
-#if TARGET_OS_OSX
-  [buf->mtl_buffer didModifyRange:NSMakeRange(buf->mapped_offset + offset, size)];
-#endif
 }
 
 void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
