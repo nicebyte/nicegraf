@@ -13,6 +13,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: update_apt
+      run: sudo apt-get update
     - name: install_deps
       run: sudo apt install libx11-xcb-dev
     - name: make_build_dir
