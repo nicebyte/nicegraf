@@ -30,7 +30,7 @@ set(CMAKE_CXX_STANDARD 20)
 include("${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake")
 
 # These are the compiler flags that are used on all nicegraf targets.
-if(WIN32)
+if(MSVC)
     set (NICEMAKE_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
 	set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
@@ -189,7 +189,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.h
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends/imgui_impl_glfw.cpp)
 	       
-    if(WIN32)
+    if(MSVC)
         set(NGF_IMGUI_COPTS "")
     else()
         # Turn off reporting warnings as errors for ImGui on gcc/clang, because it has a lot of them.
