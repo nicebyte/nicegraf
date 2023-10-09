@@ -1643,17 +1643,13 @@ void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipe) NGF_NOEXCEPT {
 
 ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   MTL::ResourceOptions options         = 0u;
-  MTL::ResourceOptions managed_storage = 0u;
-#if TARGET_OS_OSX
-  managed_storage = MTL::ResourceStorageModeManaged;
-#endif
   switch (info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
-    options = MTL::ResourceCPUCacheModeDefaultCache | managed_storage;
+    options = MTL::ResourceCPUCacheModeDefaultCache | MTL::ResourceStorageModeShared;
     break;
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
-    options = MTL::ResourceCPUCacheModeWriteCombined | managed_storage;
+    options = MTL::ResourceCPUCacheModeWriteCombined | MTL::ResourceStorageModeShared;
     break;
   case NGF_BUFFER_STORAGE_PRIVATE:
     options = MTL::ResourceStorageModePrivate;
@@ -1720,9 +1716,6 @@ void ngf_buffer_flush_range(
     [[maybe_unused]] ngf_buffer buf,
     [[maybe_unused]] size_t     offset,
     [[maybe_unused]] size_t     size) NGF_NOEXCEPT {
-#if TARGET_OS_OSX
-  buf->mtl_buffer->didModifyRange(NS::Range(buf->mapped_offset + offset, size));
-#endif
 }
 
 void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
