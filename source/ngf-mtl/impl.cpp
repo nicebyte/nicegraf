@@ -216,7 +216,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
                                                   // like it for some reason...
 #else
     {},                                         // DEPTH16, iOS does not support.
-    {MTLPixelFormatDepth32Float_Stencil8, 32},  // Emulate DEPTH24_STENCIL8 on iOS
+    {MTL::PixelFormatDepth32Float_Stencil8, 32},  // Emulate DEPTH24_STENCIL8 on iOS
 #endif
     {}
   };
@@ -783,7 +783,7 @@ class ngfmtl_swapchain {
     img_idx_ = (img_idx_ + 1u) % capacity_;
     return {
         ngf_layer_next_drawable(layer_),
-        depth_images_[img_idx_].get(),
+        depth_images_.size() > 0 ? depth_images_[img_idx_].get() : nullptr,
         is_multisampled() ? multisample_images_[img_idx_]->texture.get() : nullptr};
   }
 
@@ -1025,9 +1025,9 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
           static_cast<MTL::Device*>(NGFMTL_MTL_DEVICES->object(d)));
     }
 #else
-    NGFMTL_MTL_DEVICES = new NSArray(([[NSArray alloc] initWithObjects:MTLCreateSystemDefaultDevice(), nullptr];
+    NGFMTL_MTL_DEVICES = NS::Array::array(MTLCreateSystemDefaultDevice());
     NGFMTL_DEVICES_LIST.resize(1);
-    ngfmtl_populate_ngf_device(0, NGFMTL_DEVICES_LIST[0], NGFMTL_MTL_DEVICES->object(0));
+    ngfmtl_populate_ngf_device(0, NGFMTL_DEVICES_LIST[0], (MTL::Device*)NGFMTL_MTL_DEVICES->object(0));
 #endif
   }
   if (devices) { *devices = NGFMTL_DEVICES_LIST.data(); }
