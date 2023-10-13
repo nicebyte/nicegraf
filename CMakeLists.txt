@@ -81,13 +81,13 @@ if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
     set(APPLE_LIBS ${APPLE_LIBS} ${UIKit}) # iOS
   endif()
 
-  nmk_static_library(NAME nicegraf-mtl	
+  nmk_static_library(NAME nicegraf-mtl-legacy
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h	
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.mm	
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_LIBS}
                      COPTS "-fobjc-arc")	
 
-  nmk_static_library(NAME nicegraf-mtl-cpp
+  nmk_static_library(NAME nicegraf-mtl
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/layer.mm
