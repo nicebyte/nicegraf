@@ -1733,7 +1733,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
   sampler_desc->setMinFilter(get_mtl_minmag_filter(info->min_filter));
   sampler_desc->setMagFilter(get_mtl_minmag_filter(info->mag_filter));
   sampler_desc->setMipFilter(get_mtl_mip_filter(info->mip_filter));
-  sampler_desc->setMaxAnisotropy(info->enable_anisotropy ? (NS::UInteger)info->max_anisotropy : 0);
+  sampler_desc->setMaxAnisotropy(info->enable_anisotropy ? (NS::UInteger)info->max_anisotropy : 1);
   sampler_desc->setLodMinClamp(info->lod_min);
   sampler_desc->setLodMaxClamp(info->lod_max);
   NGFMTL_NURSERY(sampler, sampler);
