@@ -20,20 +20,50 @@
  * IN THE SOFTWARE.
  */
 
+#if defined(__APPLE__)
+#include "TargetConditionals.h"
+#endif
+
+#if defined(TARGET_OS_IPHONE)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #include "file-utils.h"
 
- #include <fstream>
- #include <stdexcept>
+#include <fstream>
+#include <stdexcept>
+#include <string>
 
- namespace ngf_misc {
+namespace ngf_misc {
 
 std::vector<char> load_file(const char* file_name) {
-  std::basic_ifstream<char> fs(file_name, std::ios::binary | std::ios::in);
-  if (!fs.is_open()) {
-    throw std::runtime_error{ file_name };
+  const char* path_cstr = nullptr;
+#if defined(TARGET_OS_IPHONE)
+  CFBundleRef mainBundle = CFBundleGetMainBundle();
+  if (!mainBundle) { throw std::runtime_error {"Failed to get the main bundle."}; }
+
+  CFStringRef fileNameCStr = CFStringCreateWithCString(nullptr, file_name, kCFStringEncodingUTF8);
+
+  CFURLRef fileURL = CFBundleCopyResourceURL(mainBundle, fileNameCStr, nullptr, nullptr);
+  if (!fileURL) { throw std::runtime_error {"Failed to locate the file in the main bundle."}; }
+
+  // Convert the URL to a filesystem path
+  char filePath[256];
+  if (!CFURLGetFileSystemRepresentation(fileURL, true, (UInt8*)filePath, sizeof(filePath))) {
+    throw std::runtime_error {"Failed to convert URL to filesystem path."};
   }
-  return std::vector<char> { std::istreambuf_iterator<char>(fs),
-                             std::istreambuf_iterator<char>() };
+
+  CFRelease(fileURL);
+  CFRelease(fileNameCStr);
+
+  path_cstr = filePath;
+#else
+  path_cstr = file_name;
+#endif
+
+  std::basic_ifstream<char> fs(path_cstr, std::ios::binary | std::ios::in);
+  if (!fs.is_open()) { throw std::runtime_error {file_name}; }
+  return std::vector<char> {std::istreambuf_iterator<char>(fs), std::istreambuf_iterator<char>()};
 }
 
-}  // namespace ngf_common
+}  // namespace ngf_misc
