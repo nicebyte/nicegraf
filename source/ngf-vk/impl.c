@@ -56,6 +56,11 @@
 
 #pragma region internal_struct_definitions
 
+typedef struct {
+  VkPipelineStageFlagBits pipeline_stage_mask;
+  VkAccessFlagBits        access_mask;
+} ngfvk_barrier_masks;
+
 typedef enum ngfvk_retire_obj { 
     NGFVK_RETIRE_OBJ_PIPELINE = 0,
     NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT,
@@ -340,6 +345,7 @@ typedef struct ngf_buffer_t {
   size_t                  mapped_offset;
   ngfvk_sync_state        curr_state;
   uint32_t                usage_flags;
+  ngfvk_barrier_masks     barrier_masks;
   ngf_buffer_storage_type storage_type;
 } ngf_buffer_t;
 
@@ -349,16 +355,17 @@ typedef struct ngf_texel_buffer_view_t {
 } ngf_texel_buffer_view_t;
 
 typedef struct ngf_image_t {
-  ngfvk_alloc      alloc;
-  VkImageView      vkview;
-  VkFormat         vk_fmt;
-  ngf_extent3d     extent;
-  ngf_image_type   type;
-  ngfvk_sync_state curr_state;
-  uint32_t         usage_flags;
-  uint32_t         nlevels;
-  uint32_t         nlayers;
-  bool             owns_backing_resource;
+  ngfvk_alloc         alloc;
+  VkImageView         vkview;
+  VkFormat            vk_fmt;
+  ngf_extent3d        extent;
+  ngf_image_type      type;
+  ngfvk_sync_state    curr_state;
+  uint32_t            usage_flags;
+  ngfvk_barrier_masks barrier_masks;
+  uint32_t            nlevels;
+  uint32_t            nlayers;
+  bool                owns_backing_resource;
 } ngf_image_t;
 
 // Singleton class for holding on to RenderDoc API
@@ -969,6 +976,38 @@ static ngf_error ngfvk_create_image(
 
   if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
 
+  memset(&(*result)->barrier_masks, 0u, sizeof((*result)->barrier_masks));
+  static struct {
+    ngf_image_usage     hint;
+    ngfvk_barrier_masks masks;
+  } img_hint_to_barrier_masks[] = {
+      {NGF_IMAGE_USAGE_ATTACHMENT,
+       {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT}},
+      {NGF_IMAGE_USAGE_SAMPLE_FROM,
+       {VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT}},
+      {NGF_IMAGE_USAGE_STORAGE,
+       {VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT}},
+      {NGF_IMAGE_USAGE_XFER_DST, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+      {NGF_IMAGE_USAGE_XFER_SRC, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT}},
+      {NGF_IMAGE_USAGE_MIPMAP_GENERATION,
+       {VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT}}};
+  for (size_t i = 0u; i < sizeof(img_hint_to_barrier_masks) / sizeof(img_hint_to_barrier_masks[0]);
+       ++i) {
+    if ((*result)->usage_flags & img_hint_to_barrier_masks[i].hint) {
+      (*result)->barrier_masks.access_mask |= img_hint_to_barrier_masks[i].masks.access_mask;
+      (*result)->barrier_masks.pipeline_stage_mask |=
+          img_hint_to_barrier_masks[i].masks.pipeline_stage_mask;
+    }
+  }
+
 ngfvk_create_image_exit:
   return err;
 }
@@ -1152,7 +1191,7 @@ static ngf_error ngfvk_create_swapchain(
       .nmips   = 1u,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
-      .usage_hint   = 0u};
+      .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT};
   for (size_t i = 0u; i < swapchain->nimgs; ++i) {
     ngfvk_alloc wrapper_alloc;
     memset(&wrapper_alloc, 0, sizeof(wrapper_alloc));
@@ -2426,13 +2465,15 @@ static bool ngfvk_sync_barrier(
                              (src_state->access.types != 0u && src_state->access.stages != 0u &&
                               ngfvk_sync_state_is_write(dst_state)) ||
                              (is_image && src_state->layout != dst_state->layout);
-
+  const ngfvk_barrier_masks* barrier_masks = res->type == NGFVK_SYNC_RES_BUFFER
+                                                   ? &(res->data.buf->barrier_masks)
+                                                   : &(res->data.img->barrier_masks);
   if (needs_barrier) {
     barrier->res             = *res;
     barrier->src_access_mask = src_state->access.types;
-    barrier->dst_access_mask = dst_state->access.types;
+    barrier->dst_access_mask = barrier_masks->access_mask;
     barrier->src_stage_mask  = src_state->access.stages;
-    barrier->dst_stage_mask  = dst_state->access.stages;
+    barrier->dst_stage_mask  = barrier_masks->pipeline_stage_mask;
     barrier->src_layout      = src_state->layout;
     barrier->dst_layout      = dst_state->layout;
   }
@@ -4445,6 +4486,7 @@ ngf_create_compute_pipeline(const ngf_compute_pipeline_info* info, ngf_compute_p
       &vk_shader_stage,
       &info->shader_stage,
       1);
+  if (err != NGF_ERROR_OK) { goto ngf_create_compute_pipeline_cleanup; }
 
   const VkComputePipelineCreateInfo vk_pipeline_ci = {
       .sType              = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -5189,6 +5231,39 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   buf->curr_state.access.types  = 0u;
   buf->curr_state.access.stages = 0u;
   buf->curr_state.layout        = VK_IMAGE_LAYOUT_UNDEFINED;
+
+  memset(&buf->barrier_masks, 0u, sizeof(buf->barrier_masks));
+  static struct {
+    ngf_buffer_usage    hint;
+    ngfvk_barrier_masks masks;
+  } buf_hint_to_barrier_masks[] = {
+      {NGF_BUFFER_USAGE_INDEX_BUFFER,
+       {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_INDEX_READ_BIT}},
+      {NGF_BUFFER_USAGE_VERTEX_BUFFER,
+       {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT}},
+      {NGF_BUFFER_USAGE_STORAGE_BUFFER,
+       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT}},
+      {NGF_BUFFER_USAGE_TEXEL_BUFFER,
+       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT}},
+      {NGF_BUFFER_USAGE_UNIFORM_BUFFER,
+       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_UNIFORM_READ_BIT}},
+      {NGF_BUFFER_USAGE_XFER_DST, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
+      {NGF_BUFFER_USAGE_XFER_SRC, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT}},
+  };
+  for (size_t i = 0u; i < sizeof(buf_hint_to_barrier_masks) / sizeof(buf_hint_to_barrier_masks[0]);
+       ++i) {
+    if (buf->usage_flags & buf_hint_to_barrier_masks[i].hint) {
+      buf->barrier_masks.access_mask |= buf_hint_to_barrier_masks[i].masks.access_mask;
+      buf->barrier_masks.pipeline_stage_mask |=
+          buf_hint_to_barrier_masks[i].masks.pipeline_stage_mask;
+    }
+  }
 
   return err;
 }
