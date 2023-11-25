@@ -2499,6 +2499,15 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   cmd_buf->active_rce->setDepthStencilState(depth_stencil_state.get());
 }
 
+void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buf,  const char* name) NGF_NOEXCEPT {
+  auto name_nsstr = NS::String::string(name, NS::ASCIIStringEncoding);
+  cmd_buf->mtl_cmd_buffer->pushDebugGroup(name_nsstr);
+}
+
+void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buf) NGF_NOEXCEPT {
+  cmd_buf->mtl_cmd_buffer->popDebugGroup();
+}
+
 void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->pending_cmd_buffer) {
     CURRENT_CONTEXT->last_cmd_buffer =
