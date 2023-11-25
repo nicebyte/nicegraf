@@ -2031,8 +2031,11 @@ static void ngfvk_init_loader_if_necessary() {
   }
 }
 
-static VkResult
-ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* validation_enabled) {
+static VkResult ngfvk_create_instance(
+    bool        request_validation,
+    bool        request_debug_groups,
+    VkInstance* instance_ptr,
+    bool*       validation_enabled) {
   // Scan through the list of instance-level extensions, determine which are supported.
   bool swapchain_colorspace_supported = false;
   uint32_t ninst_exts = 0u;
@@ -2059,7 +2062,7 @@ ngfvk_create_instance(bool request_validation, VkInstance* instance_ptr, bool* v
   if (swapchain_colorspace_supported) {
     ext_names[nmandatory_exts + optional_ext_count++] = VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME;
   }
-  if (request_validation) {
+  if (request_validation || request_debug_groups) {
     ext_names[nmandatory_exts + optional_ext_count++] = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
   }
   assert(max_optional_exts >= optional_ext_count);
@@ -3015,7 +3018,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
   if (NGFVK_DEVICE_LIST == NULL) {
     ngf_error  err          = NGF_ERROR_OK;
     VkInstance tmp_instance = VK_NULL_HANDLE;
-    VkResult   vk_err       = ngfvk_create_instance(false, &tmp_instance, NULL);
+    VkResult   vk_err       = ngfvk_create_instance(false, false, &tmp_instance, NULL);
     if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
     PFN_vkEnumeratePhysicalDevices enumerate_vk_phys_devs = (PFN_vkEnumeratePhysicalDevices)
         vkGetInstanceProcAddr(tmp_instance, "vkEnumeratePhysicalDevices");
@@ -3157,7 +3160,11 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 
   // Create vk instance, attempting to enable api validation according to user preference.
   const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
-  ngfvk_create_instance(request_validation, &_vk.instance, &_vk.validation_enabled);
+  ngfvk_create_instance(
+      request_validation,
+      ngfi_diag_info.enable_debug_groups,
+      &_vk.instance,
+      &_vk.validation_enabled);
   vkl_init_instance(
       _vk.instance);  // load instance-level Vulkan functions into the global namespace.
   // If validation was requested, and successfully enabled, install a debug callback to forward
@@ -3266,7 +3273,6 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const uint32_t device_exts_count = sizeof(device_exts) / sizeof(const char*);
   const bool     shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
-
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
@@ -5126,6 +5132,21 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   img_state->final_state.access.stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
   img_state->final_state.layout        = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
   return NGF_ERROR_OK;
+}
+
+void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) {
+  if (vkCmdBeginDebugUtilsLabelEXT) {
+    const VkDebugUtilsLabelEXT label = {
+        .color      = {0.f, 0.f, 0.f, 0.f},
+        .pLabelName = name,
+        .pNext      = NULL,
+        .sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+    vkCmdBeginDebugUtilsLabelEXT(cmd_buffer->vk_cmd_buffer, &label);
+  }
+}
+
+void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) {
+  if (vkCmdEndDebugUtilsLabelEXT) { vkCmdEndDebugUtilsLabelEXT(cmd_buffer->vk_cmd_buffer); }
 }
 
 ngf_error ngf_create_texel_buffer_view(

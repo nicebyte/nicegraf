@@ -186,6 +186,8 @@ typedef struct ngf_diagnostic_info {
                                                callback. */
   ngf_diagnostic_callback callback;       /**< Pointer to the diagnostic
                                                message callback function.*/
+  bool enable_debug_groups; /**< Indicates whether to enable debug group functionality.
+                                 See \ref ngf_cmd_begin_debug_group for details.*/
 } ngf_diagnostic_info;
 
 /**
@@ -3249,6 +3251,36 @@ void ngf_cmd_copy_image_to_buffer(
  * @param img The handle to the image to operate on.
  */
 ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Records the beginning of a "debug group" into the given command buffer.
+ * 
+ * Debug groups are a way to group together related commands for easier vieweing in graphics debugging tools
+ * such as RenderDoc. They do not have any other functional impact. Debug groups have to be enabled during
+ * initialization. See \ref ngf_diagnostic_info.
+ * 
+ * This command records a marker into the given command buffer indicating that the subsequent commands
+ * recorded into the buffer pertain to a certain debug group.
+ * 
+ * @param cmd_buffer the command buffer to record the debug group start marker into.
+ * @param name The name of the debug group that will appear in debugging tools.
+ */
+void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * 
+ * Records the end of a "debug group" into the given command buffer.
+ * 
+ * This command records a marker into the given command buffer that terminates the current debug group
+ * if there is one. Subsequent commands recorded into the buffer shall not pertain to any debug group until a new
+ * one is started.
+ * 
+ * @param cmd_buffer The command buffer to record the debug group end marker into.
+ */
+void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

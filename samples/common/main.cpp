@@ -123,7 +123,8 @@ int main(int, char**) {
   const ngf_diagnostic_info diagnostic_info {
       .verbosity = diagnostics_verbosity,
       .userdata  = nullptr,
-      .callback  = ngf_samples::sample_diagnostic_callback};
+      .callback  = ngf_samples::sample_diagnostic_callback,
+      .enable_debug_groups = true };
 
   const ngf_init_info init_info {
       .diag_info            = &diagnostic_info,
@@ -286,6 +287,7 @@ int main(int, char**) {
          * On first frame, initialize the sample and the ImGui rendering backend.
          */
         if (first_frame) {
+          ngf_cmd_begin_debug_group(main_cmd_buffer, "Initial GPU uploads");
           /**
            * Start a new transfer command encoder for uploading resources to the GPU.
            */
@@ -327,18 +329,22 @@ int main(int, char**) {
            * Finish the transfer encoder.
            */
           NGF_MISC_CHECK_NGF_ERROR(ngf_cmd_end_xfer_pass(xfer_encoder));
+          ngf_cmd_end_current_debug_group(main_cmd_buffer);
         }
 
         /**
          * Let the sample code record any commands prior to the main render pass.
          */
+        ngf_cmd_begin_debug_group(main_cmd_buffer, "Sample pre-draw frame");
         ngf_samples::sample_pre_draw_frame(
             main_cmd_buffer,
             sample_opaque_data);
+        ngf_cmd_end_current_debug_group(main_cmd_buffer);
 
         /**
          * Record the commands for the main render pass.
          */
+        ngf_cmd_begin_debug_group(main_cmd_buffer, "Main render pass");
         {
           /**
            * Begin the main render pass.
@@ -384,11 +390,14 @@ int main(int, char**) {
            */
           imgui_backend->record_rendering_commands(main_render_pass_encoder);
         }
+        ngf_cmd_end_current_debug_group(main_cmd_buffer);
 
         /**
          * Let the sample record commands after the main render pass.
          */
+        ngf_cmd_begin_debug_group(main_cmd_buffer, "Sample post-draw frame");
         ngf_samples::sample_post_draw_frame(main_cmd_buffer, sample_opaque_data);
+        ngf_cmd_end_current_debug_group(main_cmd_buffer);
 
         /**
          * Submit the main command buffer and end the frame.
