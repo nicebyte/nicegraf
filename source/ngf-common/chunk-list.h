@@ -95,7 +95,7 @@ static inline void ngfi_chnklist_clear(ngfi_chnklist* list) {
        ptrname++)
 
 #define NGFI_CHNKLIST_FOR_EACH(chnklist, elem_type, ptrname)                                 \
-  if (chnklist.firstchnk) NGFI_LIST_FOR_EACH(&chnklist.firstchnk->clnode, ptrname##_node)    \
+  if ((chnklist).firstchnk) NGFI_LIST_FOR_EACH(&(chnklist).firstchnk->clnode, ptrname##_node)    \
     NGFI_CHNK_FOR_EACH(NGFI_CHNK_FROM_NODE(ptrname##_node), elem_type, ptrname)
 
 typedef struct ngfi_chnk_range {

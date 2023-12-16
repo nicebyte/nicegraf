@@ -83,8 +83,10 @@ static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float m
   /* create */
   for (size_t i = 0u; i < nitems; ++i) {
     void* ptr  = &vals[i];
-    void* data = ngfi_dict_get(&d, keys[i], &ptr);
+    bool  new_ent = false;
+    void* data = ngfi_dict_get(&d, keys[i], &ptr, &new_ent);
     NT_ASSERT(data);
+    NT_ASSERT(new_ent);
     test_dict_val* val = *(test_dict_val**)data;
     NT_ASSERT(val->key == keys[i]);
   }
@@ -92,8 +94,10 @@ static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float m
 
   /* lookup */
   for (size_t i = 0u; i < nitems; ++i) {
-    void* data = ngfi_dict_get(&d, keys[i], NULL);
+    bool  new_ent = true;
+    void* data = ngfi_dict_get(&d, keys[i], NULL, &new_ent);
     NT_ASSERT(data);
+    NT_ASSERT(!new_ent);
     test_dict_val* val = *(test_dict_val**)data;
     NT_ASSERT(val->key == keys[i]);
   }
@@ -118,7 +122,7 @@ static void ngft_dict_populate_and_iterate(size_t nitems, size_t nslots, float m
   /* clear */
   ngfi_dict_clear(d);
   for (size_t i = 0u; i < nitems; ++i) {
-    void* data = ngfi_dict_get(&d, keys[i], NULL);
+    void* data = ngfi_dict_get(&d, keys[i], NULL, NULL);
     NT_ASSERT(data == NULL);
   }
   nvals_seen = 0u;
@@ -681,15 +685,15 @@ NT_TESTSUITE {
     uintptr_t key = 0xdeadbeef, value = 0xbadf00d;
     ngfi_dict d = ngfi_dict_create(10u, sizeof(value));
     NT_ASSERT(d);
-    void* val0 = ngfi_dict_get(&d, key, &value);
+    void* val0 = ngfi_dict_get(&d, key, &value, NULL);
     NT_ASSERT(val0);
     NT_ASSERT(memcmp(val0, &value, sizeof(value)) == 0);
     NT_ASSERT(ngfi_dict_count(d) == 1u);
-    void* val1 = ngfi_dict_get(&d, key, NULL);
+    void* val1 = ngfi_dict_get(&d, key, NULL, NULL);
     NT_ASSERT(memcmp(val1, &value, sizeof(value)) == 0);
     ngfi_dict_clear(d);
     NT_ASSERT(ngfi_dict_count(d) == 0u);
-    NT_ASSERT(ngfi_dict_get(&d, key, NULL) == NULL);
+    NT_ASSERT(ngfi_dict_get(&d, key, NULL, NULL) == NULL);
     NT_ASSERT(ngfi_dict_count(d) == 0u);
     ngfi_dict_destroy(d);
   }
