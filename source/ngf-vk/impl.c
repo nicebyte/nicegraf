@@ -268,10 +268,10 @@ typedef enum ngfvk_render_cmd_type {
 } ngfvk_render_cmd_type;
 
 typedef struct ngfvk_barrier_data {
-  VkAccessFlags        src_access_mask : 16;
-  VkAccessFlags        dst_access_mask : 16;
-  VkPipelineStageFlags src_stage_mask : 16;
-  VkPipelineStageFlags dst_stage_mask : 16;
+  VkAccessFlags        src_access_mask;
+  VkAccessFlags        dst_access_mask;
+  VkPipelineStageFlags src_stage_mask;
+  VkPipelineStageFlags dst_stage_mask;
   VkImageLayout        src_layout;
   VkImageLayout        dst_layout;
   ngfvk_sync_res       res;
