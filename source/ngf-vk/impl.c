@@ -2644,7 +2644,7 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
   return ngfvk_sync_req_batch_add(batch, sync_res_data, fresh, sync_req);
 }
 
-static void ngfvk_sync_commit_pending_barriers(
+static void ngfvk_sync_commit_pending_barriers_legacy(
     ngfvk_pending_barrier_list* pending_bars,
     VkCommandBuffer             cmd_buf) {
   VkImageMemoryBarrier* img_bars =
@@ -2715,6 +2715,90 @@ static void ngfvk_sync_commit_pending_barriers(
         buf_bars,
         nimg_bars,
         img_bars);
+  }
+}
+
+static void ngfvk_sync_commit_pending_barriers_sync2(
+    ngfvk_pending_barrier_list* pending_bars,
+    VkCommandBuffer             cmd_buf) {
+  VkImageMemoryBarrier2* img_bars =
+      NGFI_SALLOC(VkImageMemoryBarrier2, pending_bars->npending_img_bars);
+  VkBufferMemoryBarrier2* buf_bars =
+      NGFI_SALLOC(VkBufferMemoryBarrier2, pending_bars->npending_buf_bars);
+  uint32_t             nimg_bars      = 0u;
+  uint32_t             nbuf_bars      = 0u;
+  NGFI_CHNKLIST_FOR_EACH(pending_bars->chnklist, ngfvk_barrier_data, barrier) {
+    switch (barrier->res.type) {
+    case NGFVK_SYNC_RES_IMAGE: {
+      const ngf_image        img                     = barrier->res.data.img;
+      VkImageMemoryBarrier2* image_barrier           = &img_bars[nimg_bars++];
+      image_barrier->sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+      image_barrier->pNext                           = NULL;
+      image_barrier->srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->srcStageMask                    = barrier->src_stage_mask;
+      image_barrier->dstStageMask                    = barrier->dst_stage_mask;
+      image_barrier->srcAccessMask                   = barrier->src_access_mask;
+      image_barrier->dstAccessMask                   = barrier->dst_access_mask;
+      image_barrier->oldLayout                       = barrier->src_layout;
+      image_barrier->newLayout                       = barrier->dst_layout;
+      image_barrier->image                           = (VkImage)img->alloc.obj_handle;
+      image_barrier->subresourceRange.baseArrayLayer = 0u;
+      image_barrier->subresourceRange.baseMipLevel   = 0u;
+      image_barrier->subresourceRange.layerCount     = img->nlayers;
+      image_barrier->subresourceRange.levelCount     = img->nlevels;
+      const bool is_depth                            = ngfvk_format_is_depth(img->vk_fmt);
+      const bool is_stencil                          = ngfvk_format_is_stencil(img->vk_fmt);
+      image_barrier->subresourceRange.aspectMask =
+          (is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
+          (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0u) |
+          ((!is_depth && !is_stencil) ? VK_IMAGE_ASPECT_COLOR_BIT : 0u);
+      break;
+    }
+    case NGFVK_SYNC_RES_BUFFER: {
+      const ngf_buffer        buf            = barrier->res.data.buf;
+      VkBufferMemoryBarrier2* buffer_barrier = &buf_bars[nbuf_bars++];
+      buffer_barrier->sType                  = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+      buffer_barrier->pNext                  = NULL;
+      buffer_barrier->srcStageMask           = barrier->src_stage_mask;
+      buffer_barrier->dstStageMask           = barrier->dst_stage_mask;
+      buffer_barrier->srcQueueFamilyIndex    = VK_QUEUE_FAMILY_IGNORED;
+      buffer_barrier->dstQueueFamilyIndex    = VK_QUEUE_FAMILY_IGNORED;
+      buffer_barrier->srcAccessMask          = barrier->src_access_mask;
+      buffer_barrier->dstAccessMask          = barrier->dst_access_mask;
+      buffer_barrier->offset                 = 0u;
+      buffer_barrier->buffer                 = (VkBuffer)buf->alloc.obj_handle;
+      buffer_barrier->size                   = buf->size;
+      break;
+    }
+    }
+  }
+  ngfi_chnklist_clear(&pending_bars->chnklist);
+  pending_bars->npending_buf_bars = 0u;
+  pending_bars->npending_img_bars = 0u;
+  if (nbuf_bars > 0 || nimg_bars > 0) {
+    const VkDependencyInfo dep_info = {
+        .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext                    = NULL,
+        .dependencyFlags          = 0u,
+        .bufferMemoryBarrierCount = nbuf_bars,
+        .imageMemoryBarrierCount  = nimg_bars,
+        .memoryBarrierCount       = 0u,
+        .pBufferMemoryBarriers    = buf_bars,
+        .pImageMemoryBarriers     = img_bars,
+        .pMemoryBarriers          = NULL
+    };
+    vkCmdPipelineBarrier2(cmd_buf, &dep_info);
+  }
+}
+
+static void ngfvk_sync_commit_pending_barriers(
+    ngfvk_pending_barrier_list* pending_bars,
+    VkCommandBuffer             cmd_buf) {
+  if (vkCmdPipelineBarrier2) {
+    ngfvk_sync_commit_pending_barriers_sync2(pending_bars, cmd_buf);
+  } else {
+    ngfvk_sync_commit_pending_barriers_legacy(pending_bars, cmd_buf);
   }
 }
 
@@ -3468,10 +3552,20 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const char*    device_exts[]   = {
       "VK_KHR_maintenance1",
       "VK_KHR_swapchain",
-      "VK_KHR_shader_float16_int8"};
-  const uint32_t device_exts_count = sizeof(device_exts) / sizeof(const char*);
+      NULL,
+      NULL };
+  const uint32_t nmandatory_exts        = 2u;
+  uint32_t       nsupported_optional_exts = 0u;
   const bool     shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
+  const bool     sync2_supported = ngfvk_phys_dev_extension_supported("VK_KHR_synchronization2");
+  if (shader_float16_int8_supported) {
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_shader_float16_int8";
+  }
+  if (sync2_supported) {
+    NGFI_DIAG_INFO("VK sync2 support enabled");
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_synchronization2";
+  }
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
@@ -3482,25 +3576,36 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .pNext         = NULL,
       .shaderFloat16 = false,
       .shaderInt8    = false};
+  VkPhysicalDeviceSynchronization2Features sync2_features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, .pNext = &sf16_features };
+
+  void* features_structs = NULL;
+  if (shader_float16_int8_supported) {
+    sf16_features.pNext = features_structs;
+    features_structs    = &sf16_features;
+  }
+  if (sync2_supported) {
+    sync2_features.pNext = features_structs;
+    features_structs     = &sync2_features;
+  }
 
   if (vkGetPhysicalDeviceFeatures2KHR) {
     VkPhysicalDeviceFeatures2KHR phys_features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &sf16_features};
+        .pNext = features_structs};
     vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
   }
 
   const VkDeviceCreateInfo dev_info = {
       .sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext                = &sf16_features,
+      .pNext                = features_structs,
       .flags                = 0,
       .queueCreateInfoCount = num_queue_infos,
       .pQueueCreateInfos    = &queue_infos[same_gfx_and_present ? 1u : 0u],
       .enabledLayerCount    = 0,
       .ppEnabledLayerNames  = NULL,
       .pEnabledFeatures     = &required_features,
-      .enabledExtensionCount =
-          shader_float16_int8_supported ? device_exts_count : device_exts_count - 1,
+      .enabledExtensionCount = nmandatory_exts + nsupported_optional_exts,
       .ppEnabledExtensionNames = device_exts};
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
   if (vk_err != VK_SUCCESS) {
@@ -3509,7 +3614,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   }
 
   // Load device-level entry points.
-  vkl_init_device(_vk.device);
+  vkl_init_device(_vk.device, sync2_supported);
 
   // Obtain queue handles.
   vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
