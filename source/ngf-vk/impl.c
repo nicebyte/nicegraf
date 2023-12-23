@@ -2902,6 +2902,9 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
     const ngf_resource_bind_op*   bind_op,
     const ngfvk_generic_pipeline* pipeline) {
   ngfvk_sync_req sync_req;
+  memset(&sync_req, 0, sizeof(sync_req));
+  sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+
   const bool is_read_only = NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
                                 .readonly_bindings[bind_op->target_binding];
 
