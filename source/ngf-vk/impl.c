@@ -4039,7 +4039,6 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
 
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngf_error  err = NGF_ERROR_OK;
-  static int ix  = 0u;
 
   // increment frame id.
   const uint32_t fi = (CURRENT_CONTEXT->frame_id + 1u) % CURRENT_CONTEXT->max_inflight_frames;
@@ -4081,7 +4080,6 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
       (uint8_t)CURRENT_CONTEXT->frame_id);
 
   *token = CURRENT_CONTEXT->current_frame_token;
-  ++ix;
   return err;
 }
 
