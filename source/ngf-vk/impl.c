@@ -2697,6 +2697,9 @@ static void ngfvk_sync_commit_pending_barriers_legacy(
       buffer_barrier->buffer                = (VkBuffer)buf->alloc.obj_handle;
       buffer_barrier->size                  = buf->size;
       break;
+    default:
+      assert(false);
+      break;
     }
     }
   }
@@ -2771,6 +2774,9 @@ static void ngfvk_sync_commit_pending_barriers_sync2(
       buffer_barrier->size                   = buf->size;
       break;
     }
+    default:
+      assert(false);
+      break;
     }
   }
   ngfi_chnklist_clear(&pending_bars->chnklist);
