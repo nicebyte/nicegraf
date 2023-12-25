@@ -2899,7 +2899,8 @@ static ngfvk_sync_res ngfvk_sync_res_from_bind_op(const ngf_resource_bind_op* bi
   default:
     break;
   }
-  const ngfvk_sync_res none = {.type = NGFVK_SYNC_RES_COUNT, .data = 0u};
+  const ngfvk_sync_res none = {
+      .type = NGFVK_SYNC_RES_COUNT, .data = {.buf = NULL}};
   return none;
 }
 
