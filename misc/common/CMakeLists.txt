@@ -45,19 +45,27 @@ elseif(UNIX AND NOT APPLE)
 else()
     message(FATAL_ERROR "Your platform is not currently supported by nicegraf.")
 endif()
+
+nmk_header_library(NAME nicegraf
+                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/../../include
+                   PUB_DEPS ${NGF_BACKEND})
+
+
 string(TOUPPER "NGF_BACKEND_${NGF_BACKEND}" NGF_BACKEND_DEFINE)
 string(REPLACE "-" "_" NGF_BACKEND_DEFINE ${NGF_BACKEND_DEFINE})
 
-nmk_static_library(NAME nicegraf-misc-common
-                   SRCS  ${CMAKE_CURRENT_LIST_DIR}/shader-loader.h
-                         ${CMAKE_CURRENT_LIST_DIR}/shader-loader.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/file-utils.h
-                         ${CMAKE_CURRENT_LIST_DIR}/file-utils.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/mesh-loader.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/mesh-loader.h
-                         ${CMAKE_CURRENT_LIST_DIR}/targa-loader.cpp
-                         ${CMAKE_CURRENT_LIST_DIR}/targa-loader.h
-                         ${CMAKE_CURRENT_LIST_DIR}/logging.h
-                   DEPS ${NGF_BACKEND}
-                   PUB_DEFINES  ${NGF_BACKEND_DEFINE}
-                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/)
+if (NGF_BUILD_SAMPLES STREQUAL "yes")
+  nmk_static_library(NAME nicegraf-misc-common
+                     SRCS  ${CMAKE_CURRENT_LIST_DIR}/shader-loader.h
+                           ${CMAKE_CURRENT_LIST_DIR}/shader-loader.cpp
+                           ${CMAKE_CURRENT_LIST_DIR}/file-utils.h
+                           ${CMAKE_CURRENT_LIST_DIR}/file-utils.cpp
+                           ${CMAKE_CURRENT_LIST_DIR}/mesh-loader.cpp
+                           ${CMAKE_CURRENT_LIST_DIR}/mesh-loader.h
+                           ${CMAKE_CURRENT_LIST_DIR}/targa-loader.cpp
+                           ${CMAKE_CURRENT_LIST_DIR}/targa-loader.h
+                           ${CMAKE_CURRENT_LIST_DIR}/logging.h
+                     DEPS  nicegraf
+                     PVT_DEFINES  ${NGF_BACKEND_DEFINE}
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/)
+endif()

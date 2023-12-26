@@ -137,10 +137,15 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
              DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
 endif()
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
+
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
+    nmk_header_library(NAME nicegraf
+                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/../../include
+                   PUB_DEPS ${NGF_BACKEND})
+
 
     # Ensure we have the required dependencies are available.
     if (TARGET glfw)
@@ -170,9 +175,6 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        SRCS ${shader_files})
     set_target_properties(sample-shaders PROPERTIES FOLDER "samples")
 
-    string(TOUPPER "NGF_SAMPLES_BACKEND_${NGF_SAMPLES_BACKEND}" NGF_SAMPLES_BACKEND_DEFINE)
-    string(REPLACE "-" "_" NGF_SAMPLES_BACKEND_DEFINE ${NGF_SAMPLES_BACKEND_DEFINE})
-
     set(NGF_IMGUI_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_draw.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/imgui_tables.cpp
@@ -193,10 +195,11 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     nmk_static_library(NAME ngf-imgui
                 SRCS ${NGF_IMGUI_SRCS}
                 DEPS glfw
+                PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends
-	              PVT_DEFINES "GLFW_INCLUDE_NONE"
-	            	COPTS ${NGF_IMGUI_COPTS})
+	            PVT_DEFINES "GLFW_INCLUDE_NONE"
+	           	COPTS ${NGF_IMGUI_COPTS})
     nmk_static_library(NAME ngf-samples-common
                        SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
@@ -210,7 +213,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
                             ${NGF_PLATFORM_SOURCE}
                        DEPS ngf-imgui glfw nicegraf-misc-common
-                       PUB_DEFINES  ${NGF_SAMPLES_BACKEND_DEFINE}
+                       PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath
                        PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
                                     ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
@@ -218,11 +221,12 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     function (ngf_sample)
         cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
         file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
+
         nmk_binary(NAME ${SAMPLE_NAME}
                    SRCS ${SAMPLE_SRCS}
-                   DEPS ngf-samples-common ${NGF_SAMPLES_BACKEND} nicegraf-util
+                   DEPS nicegraf ngf-samples-common nicegraf-misc-common nicegraf-util ngf-imgui
                    PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}
-		               PVT_DEFINES "GLFW_INCLUDE_NONE"
+		           PVT_DEFINES "GLFW_INCLUDE_NONE"
                    OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
         add_dependencies(${SAMPLE_NAME} sample-shaders)                   
         set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")

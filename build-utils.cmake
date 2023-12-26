@@ -34,7 +34,7 @@ SOFTWARE.
 #  PUB_DEFINES  - a list of preprocessor definitions to add to all targets depending on this target.
 #  OUTPUT_DIR   - the path to the folder where the output for this target shall be stored.
 function (nmk_target)
-	cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES;PUB_DEFINES;PVT_DEFINES;OUTPUT_DIR;VS_DEBUGGER_WORKING_DIR" ${ARGN})
+	cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES;PUB_DEFINES;PUB_DEPS;PVT_DEFINES;OUTPUT_DIR;VS_DEBUGGER_WORKING_DIR" ${ARGN})
   if (TGT_TYPE STREQUAL "lib")
     add_library(${TGT_NAME} STATIC ${TGT_SRCS})
   elseif(TGT_TYPE STREQUAL "hdr")    
@@ -44,25 +44,50 @@ function (nmk_target)
   else()
     message(FATAL_ERROR "invalid target type")
   endif()
+
+  # Add dependencies.
   if ( TGT_DEPS )
-    target_link_libraries(${TGT_NAME} ${TGT_DEPS})
+    target_link_libraries(${TGT_NAME} PRIVATE ${TGT_DEPS})
   endif()
-  if ( TGT_TYPE STREQUAL "hdr")
-    target_include_directories(${TGT_NAME}
-                               INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})
-    target_compile_definitions(${TGT_NAME} INTERFACE ${TGT_PUB_DEFINES} ${TGT_PVT_DEFINES})
-  else()
-    target_include_directories(${TGT_NAME}
-                               PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${TGT_PVT_INCLUDES})  
-    target_include_directories(${TGT_NAME}
-                               PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include ${TGT_PUB_INCLUDES})
-    target_compile_options(${TGT_NAME} PRIVATE ${NICEMAKE_COMMON_COMPILE_OPTS})
-    target_compile_definitions(${TGT_NAME} PUBLIC ${TGT_PUB_DEFINES} PRIVATE ${TGT_PVT_DEFINES})                           
+  if ( TGT_PUB_DEPS )
+    target_link_libraries(${TGT_NAME} INTERFACE ${TGT_PUB_DEPS})
   endif()
-  
-  if ( TGT_COPTS )
-    target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
+
+  # Add include directories.
+  if ( TGT_PUB_INCLUDES )
+  target_include_directories(${TGT_NAME}
+                             INTERFACE ${TGT_PUB_INCLUDES})
   endif()
+  if ( TGT_PVT_INCLUDES )
+  target_include_directories(${TGT_NAME}
+                             PRIVATE ${TGT_PVT_INCLUDES})
+  endif()
+  if ( NOT ( TGT_TYPE STREQUAL "hdr" ) )
+    target_include_directories(${TGT_NAME}
+                               PRIVATE ${CMAKE_CURRENT_LIST_DIR}/source ${CMAKE_CURRENT_LIST_DIR}/include)
+  endif()
+  target_include_directories(${TGT_NAME}
+                             INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
+
+  # Add compile-time definitions.
+  if ( TGT_PUB_DEFINES )
+    target_compile_definitions(${TGT_NAME} INTERFACE ${TGT_PUB_DEFINES})
+  endif()
+  if ( TGT_PVT_DEFINES )
+    target_compile_definitions(${TGT_NAME} PRIVATE ${TGT_PVT_DEFINES})    
+  endif()
+   
+  # Add compiler options.
+  if ( NOT ( TGT_TYPE STREQUAL "hdr" ) )
+    if ( NICEMAKE_COMMON_COMPILE_OPTS )
+      target_compile_options(${TGT_NAME} PRIVATE ${NICEMAKE_COMMON_COMPILE_OPTS})
+    endif()
+    if ( TGT_COPTS )
+      target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
+    endif()
+  endif()
+
+  # Set output directory.
   if( TGT_OUTPUT_DIR )
     set_target_properties(${TGT_NAME} PROPERTIES
       RUNTIME_OUTPUT_DIRECTORY "${TGT_OUTPUT_DIR}")
