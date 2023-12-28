@@ -23,6 +23,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef uintptr_t           ngfi_dict_key;
 typedef struct ngfi_dict_t* ngfi_dict;
@@ -32,7 +33,7 @@ typedef void*               ngfi_dict_iter;
 
 ngfi_dict      ngfi_dict_create(size_t nslots, size_t val_size);
 void           ngfi_dict_destroy(ngfi_dict dict);
-void*          ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val);
+void*          ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val, bool* new_entry);
 void           ngfi_dict_clear(ngfi_dict dict);
 ngfi_dict_iter ngfi_dict_itstart(ngfi_dict dict);
 ngfi_dict_iter ngfi_dict_itnext(ngfi_dict dict, ngfi_dict_iter iter);

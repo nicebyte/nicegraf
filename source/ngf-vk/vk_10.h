@@ -107,6 +107,7 @@ extern PFN_vkCmdExecuteCommands vkCmdExecuteCommands;
 extern PFN_vkCmdFillBuffer vkCmdFillBuffer;
 extern PFN_vkCmdNextSubpass vkCmdNextSubpass;
 extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
+extern PFN_vkCmdPipelineBarrier2 vkCmdPipelineBarrier2;
 extern PFN_vkCmdPushConstants vkCmdPushConstants;
 extern PFN_vkCmdResetEvent vkCmdResetEvent;
 extern PFN_vkCmdResetQueryPool vkCmdResetQueryPool;
@@ -204,7 +205,7 @@ extern PFN_vkGetPhysicalDeviceFeatures2KHR vkGetPhysicalDeviceFeatures2KHR;
 
 bool vkl_init_loader(void);
 void vkl_init_instance(VkInstance instance);
-void vkl_init_device(VkDevice device);
+void vkl_init_device(VkDevice device, bool sync2_supported);
 
 #ifdef __cplusplus
 }

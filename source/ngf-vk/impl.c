@@ -47,36 +47,28 @@
 #define NGFVK_MAX_COLOR_ATTACHMENTS            (16u)
 #define NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT (1u << 31u)
 
-#define NGFVK_GFX_PIPELINE_STAGE_MASK                                                   \
-  (VK_PIPELINE_STAGE_VERTEX_INPUT_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |           \
-   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | \
-   VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT)
-
 #pragma endregion
 
 #pragma region internal_struct_definitions
 
-typedef struct {
-  VkPipelineStageFlagBits pipeline_stage_mask;
-  VkAccessFlagBits        access_mask;
-} ngfvk_barrier_masks;
-
-typedef enum ngfvk_retire_obj { 
-    NGFVK_RETIRE_OBJ_PIPELINE = 0,
-    NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT,
-    NGFVK_RETIRE_OBJ_DSET_LAYOUT,
-    NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL,
-    NGFVK_RETIRE_OBJ_FRAMEBUFFER,
-    NGFVK_RETIRE_OBJ_RENDER_PASS,
-    NGFVK_RETIRE_OBJ_SAMPLER,
-    NGFVK_RETIRE_OBJ_IMG_VIEW,
-    NGFVK_RETIRE_OBJ_BUF_VIEW,
-    NGFVK_RETIRE_OBJ_IMG,
-    NGFVK_RETIRE_OBJ_BUF,
-    NGFVK_RETIRE_OBJ_DESC_POOL_LIST,
-    NGFVK_RETIRE_OBJ_COUNT
+// Type of object in the Vulkan object retirement queue.
+typedef enum ngfvk_retire_obj {
+  NGFVK_RETIRE_OBJ_PIPELINE = 0,
+  NGFVK_RETIRE_OBJ_PIPELINE_LAYOUT,
+  NGFVK_RETIRE_OBJ_DSET_LAYOUT,
+  NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL,
+  NGFVK_RETIRE_OBJ_FRAMEBUFFER,
+  NGFVK_RETIRE_OBJ_RENDER_PASS,
+  NGFVK_RETIRE_OBJ_SAMPLER,
+  NGFVK_RETIRE_OBJ_IMG_VIEW,
+  NGFVK_RETIRE_OBJ_BUF_VIEW,
+  NGFVK_RETIRE_OBJ_IMG,
+  NGFVK_RETIRE_OBJ_BUF,
+  NGFVK_RETIRE_OBJ_DESC_POOL_LIST,
+  NGFVK_RETIRE_OBJ_COUNT
 } ngfvk_retire_obj;
 
+// Function pointer for Vulkan object destructors.
 typedef void (*ngfvk_retire_obj_dtor)(ngfi_chnk_hdr*);
 
 // Singleton for holding vulkan instance, device and queue handles.
@@ -99,6 +91,12 @@ struct {
 #endif
   ngfvk_retire_obj_dtor retire_obj_dtors[NGFVK_RETIRE_OBJ_COUNT];
 } _vk;
+
+// Singleton for holding on to RenderDoc API
+struct {
+  RENDERDOC_API_1_6_0* api;
+  bool                 is_capturing_next_frame;
+} _renderdoc;
 
 // Swapchain state.
 typedef struct ngfvk_swapchain {
@@ -137,11 +135,12 @@ typedef struct {
   ngfvk_desc_count descriptors;
 } ngfvk_desc_pool_capacity;
 
-typedef struct {
+typedef struct ngfvk_desc_set_layout {
   VkDescriptorSetLayout vk_handle;
   ngfvk_desc_count      counts;
-  bool*                 readonly_bindings;
   uint32_t              nall_bindings;  // < Number of ALL bindings (incl. unused ones).
+  bool*                 readonly_bindings;
+  VkPipelineStageFlags* stage_accessors;
 } ngfvk_desc_set_layout;
 
 typedef struct ngfvk_desc_pool {
@@ -165,7 +164,7 @@ typedef struct ngfvk_desc_superpool_t {
 // Vulkan resources associated with a given frame.
 typedef struct ngfvk_frame_resources {
   NGFI_DARRAY_OF(ngf_cmd_buffer) submitted_cmd_bufs;  // < Submitted ngf command buffers.
-  VkSemaphore semaphore;                    // < Signalled when the last cmd buffer finishes.
+  VkSemaphore semaphore;  // < Signalled when the last cmd buffer finishes.
 
   // Resources that should be disposed of at some point after this
   // frame's completion.
@@ -217,25 +216,35 @@ typedef struct ngfvk_generic_pipeline {
   VkSpecializationInfo vk_spec_info;
 } ngfvk_generic_pipeline;
 
-// Describes how a resource is accessed within a synchronization scope.
-typedef struct ngfvk_sync_access {
-  VkAccessFlags        types : 16;   // < Ways in which the resource is accessed.
-  VkPipelineStageFlags stages : 16;  // < Pipeline stages that have access to the resource.
-} ngfvk_sync_access;
-
-// Resource state descriptor.
+// Synchronization state of a resource within the context of a single command buffer.
 typedef struct ngfvk_sync_state {
-  ngfvk_sync_access access;  // < Access/stage masks.
-  VkImageLayout     layout;  // < For image resources only, current layout.
+  VkPipelineStageFlags last_writer_stage;
+  VkAccessFlags        last_writer_access_mask;
+  VkPipelineStageFlags active_readers_stage_mask;
+  VkAccessFlags        active_readers_access_mask;
+  VkImageLayout        layout;
 } ngfvk_sync_state;
+
+// Describes how a resource is accessed within a synchronization scope.
+typedef struct ngfvk_sync_barrier_masks {
+  VkAccessFlags        access_mask;  // < Ways in which the resource is accessed.
+  VkPipelineStageFlags stage_mask;   // < Pipeline stages that have access to the resource.
+} ngfvk_sync_barrier_masks;
+
+// Synchronization request, that describes the intent to access a resource.
+typedef struct ngfvk_sync_req {
+  ngfvk_sync_barrier_masks barrier_masks;  // < Access/stage masks.
+  VkImageLayout            layout;         // < For image resources only, current layout.
+} ngfvk_sync_req;
 
 // Type of synchronized resource.
 typedef enum ngfvk_sync_res_type {
   NGFVK_SYNC_RES_BUFFER,
-  NGFVK_SYNC_RES_IMAGE
+  NGFVK_SYNC_RES_IMAGE,
+  NGFVK_SYNC_RES_COUNT
 } ngfvk_sync_res_type;
 
-// Data associated with a synchronized resource.
+// Tagged union for passing around handles to synchronized GPU resources in a generic way.
 typedef struct ngfvk_sync_res {
   union {
     ngf_image  img;
@@ -244,14 +253,26 @@ typedef struct ngfvk_sync_res {
   ngfvk_sync_res_type type;
 } ngfvk_sync_res;
 
-// Tracks the state of a particular resource within a single cmd buffer.
-typedef struct ngfvk_sync_res_state {
-  ngfvk_sync_state initial_state;  // < Expected state before executing the cmd buffer.
-  ngfvk_sync_state final_state;    // < Expected state after executing the cmd buffer.
-  uint16_t last_rpass_id;  // < id number of the renderpass that last accessed this resource.
-  bool     first_use;  // < set to true when resource is used for the first time in a cmd buffer.
-  ngfvk_sync_res res;  // < Resource data.
-} ngfvk_sync_res_state;
+// Data associated with a particular synchronized resource within the context of a single cmd
+// buffer.
+typedef struct ngfvk_sync_res_data {
+  VkPipelineStageFlags accessor_stages;  // < Mask of all stages accessing this resource.
+  VkAccessFlags    initial_accesses;  // < Mask of first accesses requested by accessing each stage.
+  VkImageLayout    initial_layout;    // < For images only, initial layout.
+  ngfvk_sync_state sync_state;        // < Latest synchronization state.
+  uint32_t         pending_sync_req_idx;
+  ngfvk_sync_res_type res_type;
+  uintptr_t           res_handle;
+} ngfvk_sync_res_data;
+
+typedef struct ngfvk_sync_req_batch {
+  uintptr_t*            sync_res_data_keys;
+  ngfvk_sync_req*       pending_sync_reqs;
+  bool*                 freshness;
+  uint32_t              npending_sync_reqs;
+  uint32_t              nbuffer_sync_reqs;
+  uint32_t              nimage_sync_reqs;
+} ngfvk_sync_req_batch;
 
 typedef enum ngfvk_render_cmd_type {
   NGFVK_RENDER_CMD_BIND_PIPELINE,
@@ -264,7 +285,6 @@ typedef enum ngfvk_render_cmd_type {
   NGFVK_RENDER_CMD_BIND_ATTRIB_BUFFER,
   NGFVK_RENDER_CMD_BIND_INDEX_BUFFER,
   NGFVK_RENDER_CMD_DRAW,
-  NGFVK_RENDER_CMD_BARRIER
 } ngfvk_render_cmd_type;
 
 typedef struct ngfvk_barrier_data {
@@ -302,37 +322,47 @@ typedef struct ngfvk_render_cmd {
       uint32_t ninstances;
       bool     indexed;
     } draw;
-    ngfvk_barrier_data barrier;
   } data;
   ngfvk_render_cmd_type type : 8;
 } ngfvk_render_cmd;
+
+typedef struct ngfvk_pending_barrier_list {
+  ngfi_chnklist chnklist;
+  uint32_t      npending_img_bars;
+  uint32_t      npending_buf_bars;
+} ngfvk_pending_barrier_list;
+
+typedef struct ngfvk_reflect_binding_and_stage_mask {
+  SpvReflectDescriptorBinding binding_data;
+  VkPipelineStageFlags        mask;
+} ngfvk_reflect_binding_and_stage_mask;
 
 #pragma endregion
 
 #pragma region external_struct_definitions
 
 typedef struct ngf_cmd_buffer_t {
-  ngf_frame_token        parent_frame;     // < The frame this cmd buffer is associated with.
-  ngfi_cmd_buffer_state  state;            // < State of the cmd buffer (i.e. new/recording/etc.)
-  VkCommandBuffer        vk_cmd_buffer;    // < Active vulkan command buffer.
-  VkCommandPool          vk_cmd_pool;      // < Active vulkan command pool.
-  ngf_graphics_pipeline  active_gfx_pipe;  // < The bound graphics pipeline.
+  ngf_frame_token        parent_frame;         // < The frame this cmd buffer is associated with.
+  VkCommandBuffer        vk_cmd_buffer;        // < Active vulkan command buffer.
+  VkCommandPool          vk_cmd_pool;          // < Active vulkan command pool.
+  ngf_graphics_pipeline  active_gfx_pipe;      // < The bound graphics pipeline.
   ngf_compute_pipeline   active_compute_pipe;  // < The bound compute pipeline.
   ngf_render_target      active_rt;            // < Active render target.
+  ngf_buffer             active_attr_buf;
+  ngf_buffer             active_idx_buf;
   ngfvk_desc_pools_list* desc_pools_list;  // < List of descriptor pools used in the buffer's frame.
   ngfi_chnklist          pending_bind_ops;  // < Bind ops to be performed before the next draw.
   ngfi_chnklist          in_pass_cmd_chnks;
-  ngfi_chnklist          pre_pass_cmd_chnks;
   ngfi_chnklist          virt_bind_ops_ranges;
-  ngfi_dict              local_res_states;
-
-  ngf_render_pass_info pending_render_pass_info;  // < describes the active render pass
-  uint16_t             pending_clear_value_count;
-  uint16_t             curr_rpass_id;            // < id number of current renderpass.
-  uint32_t             npending_bind_ops;
-  bool                 renderpass_active : 1;    // < Has an active renderpass.
-  bool                 compute_pass_active : 1;  // < Has an active compute pass.
-  bool                 destroy_on_submit : 1;    // < Destroy after submitting.
+  ngfvk_pending_barrier_list pending_barriers;
+  ngfi_dict                  local_res_states;
+  ngf_render_pass_info       pending_render_pass_info;  // < describes the active render pass
+  uint32_t                   npending_bind_ops;
+  uint16_t                   pending_clear_value_count;
+  ngfi_cmd_buffer_state      state;  // < State of the cmd buffer (i.e. new/recording/etc.)
+  bool                       renderpass_active : 1;    // < Has an active renderpass.
+  bool                       compute_pass_active : 1;  // < Has an active compute pass.
+  bool                       destroy_on_submit : 1;    // < Destroy after submitting.
 } ngf_cmd_buffer_t;
 
 typedef struct ngf_sampler_t {
@@ -343,9 +373,8 @@ typedef struct ngf_buffer_t {
   ngfvk_alloc             alloc;
   size_t                  size;
   size_t                  mapped_offset;
-  ngfvk_sync_state        curr_state;
+  ngfvk_sync_state        sync_state;
   uint32_t                usage_flags;
-  ngfvk_barrier_masks     barrier_masks;
   ngf_buffer_storage_type storage_type;
 } ngf_buffer_t;
 
@@ -355,24 +384,17 @@ typedef struct ngf_texel_buffer_view_t {
 } ngf_texel_buffer_view_t;
 
 typedef struct ngf_image_t {
-  ngfvk_alloc         alloc;
-  VkImageView         vkview;
-  VkFormat            vk_fmt;
-  ngf_extent3d        extent;
-  ngf_image_type      type;
-  ngfvk_sync_state    curr_state;
-  uint32_t            usage_flags;
-  ngfvk_barrier_masks barrier_masks;
-  uint32_t            nlevels;
-  uint32_t            nlayers;
-  bool                owns_backing_resource;
+  ngfvk_alloc      alloc;
+  VkImageView      vkview;
+  VkFormat         vk_fmt;
+  ngf_extent3d     extent;
+  ngf_image_type   type;
+  ngfvk_sync_state sync_state;
+  uint32_t         usage_flags;
+  uint32_t         nlevels;
+  uint32_t         nlayers;
+  bool             owns_backing_resource;
 } ngf_image_t;
-
-// Singleton class for holding on to RenderDoc API
-struct {
-  RENDERDOC_API_1_6_0* api;
-  bool                 is_capturing_next_frame;
-} _renderdoc;
 
 typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
@@ -818,14 +840,13 @@ static bool ngfvk_format_is_stencil(VkFormat image_format) {
 
 static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
   static VkColorSpaceKHR color_spaces[NGF_COLORSPACE_COUNT] = {
-    VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
-    VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT,
-    VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
-    VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
-    VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
-    VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT,
-    VK_COLOR_SPACE_BT2020_LINEAR_EXT
-  };
+      VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+      VK_COLOR_SPACE_EXTENDED_SRGB_NONLINEAR_EXT,
+      VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT,
+      VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
+      VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
+      VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT,
+      VK_COLOR_SPACE_BT2020_LINEAR_EXT};
   return color_spaces[colorspace];
 }
 
@@ -834,7 +855,7 @@ static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
 #pragma region internal_funcs
 
 #define NGFVK_RETIRE_OBJECT(frame_res, obj_type_idx, obj) \
- ngfi_chnklist_append(&((frame_res)->retire_objs[(obj_type_idx)]), &(obj), sizeof(obj))
+  ngfi_chnklist_append(&((frame_res)->retire_objs[(obj_type_idx)]), &(obj), sizeof(obj))
 
 ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
@@ -949,20 +970,19 @@ static ngf_error ngfvk_create_image(
     goto ngfvk_create_image_exit;
   }
 
-  const bool is_cubemap               = info->type == NGF_IMAGE_TYPE_CUBE;
-  (*result)->alloc                    = *backing_resource_alloc;
-  (*result)->extent.width             = NGFI_MAX(1, info->extent.width);
-  (*result)->extent.height            = NGFI_MAX(1, info->extent.height);
-  (*result)->extent.depth             = NGFI_MAX(1, info->extent.depth);
-  (*result)->nlayers                  = info->nlayers * (is_cubemap ? 6u : 1u);
-  (*result)->nlevels                  = info->nmips;
-  (*result)->type                     = info->type;
-  (*result)->usage_flags              = info->usage_hint;
-  (*result)->vk_fmt                   = get_vk_image_format(info->format);
-  (*result)->owns_backing_resource    = owns_backing_resource;
-  (*result)->curr_state.access.stages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-  (*result)->curr_state.access.types  = 0u;
-  (*result)->curr_state.layout        = VK_IMAGE_LAYOUT_UNDEFINED;
+  const bool is_cubemap            = info->type == NGF_IMAGE_TYPE_CUBE;
+  (*result)->alloc                 = *backing_resource_alloc;
+  (*result)->extent.width          = NGFI_MAX(1, info->extent.width);
+  (*result)->extent.height         = NGFI_MAX(1, info->extent.height);
+  (*result)->extent.depth          = NGFI_MAX(1, info->extent.depth);
+  (*result)->nlayers               = info->nlayers * (is_cubemap ? 6u : 1u);
+  (*result)->nlevels               = info->nmips;
+  (*result)->type                  = info->type;
+  (*result)->usage_flags           = info->usage_hint;
+  (*result)->vk_fmt                = get_vk_image_format(info->format);
+  (*result)->owns_backing_resource = owns_backing_resource;
+  memset(&(*result)->sync_state, 0, sizeof((*result)->sync_state));
+  (*result)->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   if (owns_backing_resource) {
     err = ngfvk_create_vk_image_view(
@@ -975,38 +995,6 @@ static ngf_error ngfvk_create_image(
   }
 
   if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
-
-  memset(&(*result)->barrier_masks, 0u, sizeof((*result)->barrier_masks));
-  static struct {
-    ngf_image_usage     hint;
-    ngfvk_barrier_masks masks;
-  } img_hint_to_barrier_masks[] = {
-      {NGF_IMAGE_USAGE_ATTACHMENT,
-       {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
-            VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
-            VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT}},
-      {NGF_IMAGE_USAGE_SAMPLE_FROM,
-       {VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT}},
-      {NGF_IMAGE_USAGE_STORAGE,
-       {VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT}},
-      {NGF_IMAGE_USAGE_XFER_DST, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
-      {NGF_IMAGE_USAGE_XFER_SRC, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT}},
-      {NGF_IMAGE_USAGE_MIPMAP_GENERATION,
-       {VK_PIPELINE_STAGE_TRANSFER_BIT,
-        VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT}}};
-  for (size_t i = 0u; i < sizeof(img_hint_to_barrier_masks) / sizeof(img_hint_to_barrier_masks[0]);
-       ++i) {
-    if ((*result)->usage_flags & img_hint_to_barrier_masks[i].hint) {
-      (*result)->barrier_masks.access_mask |= img_hint_to_barrier_masks[i].masks.access_mask;
-      (*result)->barrier_masks.pipeline_stage_mask |=
-          img_hint_to_barrier_masks[i].masks.pipeline_stage_mask;
-    }
-  }
 
 ngfvk_create_image_exit:
   return err;
@@ -1364,8 +1352,8 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
     frame_res->nwait_fences = 0;
   }
 
-  for (size_t i = 0u; i < (size_t)NGFVK_RETIRE_OBJ_COUNT; ++i) { 
-    ngfi_chnklist* retire_objs_chnklist = &frame_res->retire_objs[i];
+  for (size_t i = 0u; i < (size_t)NGFVK_RETIRE_OBJ_COUNT; ++i) {
+    ngfi_chnklist* retire_objs_chnklist  = &frame_res->retire_objs[i];
     ngfi_chnk_hdr* retire_objs_firstchnk = retire_objs_chnklist->firstchnk;
     if (retire_objs_firstchnk) {
       NGFI_LIST_FOR_EACH(&(retire_objs_firstchnk->clnode), n) {
@@ -1379,7 +1367,7 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
 static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
   ngfi_chnklist_clear(&cmd_buf->pending_bind_ops);
   cmd_buf->npending_bind_ops = 0u;
- }
+}
 
 static ngf_error ngfvk_encoder_start(ngf_cmd_buffer cmd_buf) {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
@@ -1392,12 +1380,9 @@ ngfvk_initialize_generic_encoder(ngf_cmd_buffer cmd_buf, struct ngfi_private_enc
   return NGF_ERROR_OK;
 }
 
-static ngf_error ngfvk_encoder_end(
-    ngf_cmd_buffer                    cmd_buf,
-    struct ngfi_private_encoder_data* generic_enc,
-    VkPipelineStageFlags              stage_mask) {
+static ngf_error
+ngfvk_encoder_end(ngf_cmd_buffer cmd_buf, struct ngfi_private_encoder_data* generic_enc) {
   (void)generic_enc;
-  (void)stage_mask;
   ngfvk_cleanup_pending_binds(cmd_buf);
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
   return NGF_ERROR_OK;
@@ -1985,14 +1970,14 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
 }
 
 static int ngfvk_binding_comparator(const void* a, const void* b) {
-  const SpvReflectDescriptorBinding* a_binding = a;
-  const SpvReflectDescriptorBinding* b_binding = b;
-  if (a_binding->set < b_binding->set)
+  const ngfvk_reflect_binding_and_stage_mask* a_binding = a;
+  const ngfvk_reflect_binding_and_stage_mask* b_binding = b;
+  if (a_binding->binding_data.set < b_binding->binding_data.set)
     return -1;
-  else if (a_binding->set == b_binding->set) {
-    if (a_binding->binding < b_binding->binding)
+  else if (a_binding->binding_data.set == b_binding->binding_data.set) {
+    if (a_binding->binding_data.binding < b_binding->binding_data.binding)
       return -1;
-    else if (a_binding->binding == b_binding->binding)
+    else if (a_binding->binding_data.binding == b_binding->binding_data.binding)
       return 0;
   }
   return 1;
@@ -2037,8 +2022,8 @@ static VkResult ngfvk_create_instance(
     VkInstance* instance_ptr,
     bool*       validation_enabled) {
   // Scan through the list of instance-level extensions, determine which are supported.
-  bool swapchain_colorspace_supported = false;
-  uint32_t ninst_exts = 0u;
+  bool     swapchain_colorspace_supported = false;
+  uint32_t ninst_exts                     = 0u;
   vkEnumerateInstanceExtensionProperties(NULL, &ninst_exts, NULL);
   VkExtensionProperties* ext_props = malloc(sizeof(VkExtensionProperties) * ninst_exts);
   if (ext_props == NULL) { return VK_ERROR_OUT_OF_HOST_MEMORY; }
@@ -2188,29 +2173,48 @@ ngf_error ngfvk_create_pipeline_layout(
   for (uint32_t i = 0u; i < nshader_stages; ++i) {
     ntotal_bindings += shader_stages[i]->spv_reflect_module.descriptor_binding_count;
   }
-  SpvReflectDescriptorBinding* bindings = NGFI_SALLOC(SpvReflectDescriptorBinding, ntotal_bindings);
+  ngfvk_reflect_binding_and_stage_mask* bindings =
+      NGFI_SALLOC(ngfvk_reflect_binding_and_stage_mask, ntotal_bindings);
 
   uint32_t bindings_offset = 0u;
   for (uint32_t i = 0u; i < nshader_stages; ++i) {
     const SpvReflectShaderModule* spv_module    = &shader_stages[i]->spv_reflect_module;
     const uint32_t                binding_count = spv_module->descriptor_binding_count;
-    memcpy(
-        &bindings[bindings_offset],
-        spv_module->descriptor_bindings,
-        sizeof(SpvReflectDescriptorBinding) * binding_count);
+    for (size_t j = bindings_offset; j < bindings_offset + binding_count; ++j) {
+      bindings[j].binding_data = spv_module->descriptor_bindings[j - bindings_offset];
+      switch (spv_module->entry_points[0].shader_stage) {
+      case SPV_REFLECT_SHADER_STAGE_VERTEX_BIT:
+        bindings[j].mask = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+        break;
+      case SPV_REFLECT_SHADER_STAGE_FRAGMENT_BIT:
+        bindings[j].mask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        break;
+      case SPV_REFLECT_SHADER_STAGE_COMPUTE_BIT:
+        bindings[j].mask = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        break;
+      default:
+        assert(false);
+        break;
+      }
+    }
     bindings_offset += binding_count;
   }
-  qsort(bindings, ntotal_bindings, sizeof(SpvReflectDescriptorBinding), ngfvk_binding_comparator);
+  qsort(
+      bindings,
+      ntotal_bindings,
+      sizeof(ngfvk_reflect_binding_and_stage_mask),
+      ngfvk_binding_comparator);
   uint32_t  nunique_bindings      = 0u;
   uint32_t  max_set_id            = 0u;
   uint32_t* nall_bindings_per_set = NULL;
   uint32_t  nall_sets = 0u;  // number of ALL desc sets in layout (including unused slots).
   for (uint32_t cur = 0u; cur < ntotal_bindings; ++cur) {
     if (nunique_bindings == 0 ||
-        (bindings[nunique_bindings - 1].set != bindings[cur].set ||
-         bindings[nunique_bindings - 1].binding != bindings[cur].binding)) {
+        (bindings[nunique_bindings - 1].binding_data.set != bindings[cur].binding_data.set ||
+         bindings[nunique_bindings - 1].binding_data.binding !=
+             bindings[cur].binding_data.binding)) {
       bindings[nunique_bindings++] = bindings[cur];
-      max_set_id                   = NGFI_MAX(max_set_id, bindings[cur].set);
+      max_set_id                   = NGFI_MAX(max_set_id, bindings[cur].binding_data.set);
       const uint32_t new_nall_sets = NGFI_MAX(nall_sets, max_set_id + 1);
       if (new_nall_sets > nall_sets || nall_bindings_per_set == NULL) {
         const uint32_t nnew_sets = new_nall_sets - nall_sets;
@@ -2219,9 +2223,12 @@ ngf_error ngfvk_create_pipeline_layout(
         memset(new_binding_counters, 0, sizeof(uint32_t) * nnew_sets);
         if (nall_bindings_per_set == NULL) { nall_bindings_per_set = new_binding_counters; }
       }
-      nall_bindings_per_set[bindings[cur].set] =
-          NGFI_MAX(nall_bindings_per_set[bindings[cur].set], bindings[cur].binding + 1u);
+      nall_bindings_per_set[bindings[cur].binding_data.set] = NGFI_MAX(
+          nall_bindings_per_set[bindings[cur].binding_data.set],
+          bindings[cur].binding_data.binding + 1u);
       nall_sets = new_nall_sets;
+    } else {
+      bindings[nunique_bindings - 1].mask |= bindings[cur].mask;
     }
   }
 
@@ -2232,7 +2239,7 @@ ngf_error ngfvk_create_pipeline_layout(
   for (uint32_t cur = 0u; cur < nunique_bindings;) {
     ngfvk_desc_set_layout set_layout;
     memset(&set_layout, 0, sizeof(set_layout));
-    const uint32_t current_set_id = bindings[cur].set;
+    const uint32_t current_set_id = bindings[cur].binding_data.set;
     if (last_set_id == ~0 || current_set_id - last_set_id > 1u) {
       // there is a gap in descriptor sets, fill it in with empty layouts;
       for (uint32_t i = last_set_id == ~0 ? 0u : last_set_id + 1; i < current_set_id; ++i) {
@@ -2248,21 +2255,27 @@ ngf_error ngfvk_create_pipeline_layout(
       }
     }
     memset(&set_layout, 0, sizeof(set_layout));
-    set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].set];
+    set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
     if (set_layout.nall_bindings > 0u) {
-      set_layout.readonly_bindings = NGFI_ALLOCN(bool, sizeof(bool) * set_layout.nall_bindings);
+      set_layout.readonly_bindings = NGFI_ALLOCN(bool, set_layout.nall_bindings);
+      set_layout.stage_accessors   = NGFI_ALLOCN(VkPipelineStageFlags, set_layout.nall_bindings);
       memset(set_layout.readonly_bindings, 0, sizeof(bool) * set_layout.nall_bindings);
+      memset(
+          set_layout.stage_accessors,
+          0,
+          sizeof(VkPipelineStageFlags) * set_layout.nall_bindings);
     }
     const uint32_t first_binding_in_set = cur;
-    while (cur < nunique_bindings && current_set_id == bindings[cur].set) cur++;
+    while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
     const uint32_t                nbindings_in_set = cur - first_binding_in_set;
     VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
         ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorSetLayoutBinding) * nbindings_in_set);
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
       VkDescriptorSetLayoutBinding*      vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
-      const SpvReflectDescriptorBinding* d    = &bindings[i];
+      const SpvReflectDescriptorBinding* d    = &bindings[i].binding_data;
       set_layout.readonly_bindings[d->binding] =
           (d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
+      set_layout.stage_accessors[d->binding]  = bindings[i].mask;
       const ngf_descriptor_type ngf_desc_type = ngfvk_get_ngf_descriptor_type(d->descriptor_type);
       if (ngf_desc_type == NGF_DESCRIPTOR_TYPE_COUNT) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
       vk_d->binding            = d->binding;
@@ -2408,7 +2421,6 @@ static void ngfvk_reset_renderpass_cache(ngf_context ctx) {
 
 static void ngfvk_cmd_buf_reset_render_cmds(ngf_cmd_buffer cmd_buf) {
   ngfi_chnklist_clear(&cmd_buf->in_pass_cmd_chnks);
-  ngfi_chnklist_clear(&cmd_buf->pre_pass_cmd_chnks);
 }
 
 static void ngfvk_cmd_buf_add_render_cmd(
@@ -2418,113 +2430,263 @@ static void ngfvk_cmd_buf_add_render_cmd(
   if (in_renderpass) {
     ngfi_chnklist_append(&cmd_buf->in_pass_cmd_chnks, cmd, sizeof(*cmd));
   } else {
-    ngfi_chnklist_append(&cmd_buf->pre_pass_cmd_chnks, cmd, sizeof(*cmd));
+    assert(false);
   }
-}
-
-// Look up resource state in a given cmd buffer.
-// If an entry corresponding to the resource doesn't already exist, it gets created.
-static bool ngfvk_cmd_buf_lookup_res(
-    ngf_cmd_buffer          cmd_buf,
-    uintptr_t               key,
-    const ngfvk_sync_res*   res_data,
-    const ngfvk_sync_state* init_sync_state,
-    ngfvk_sync_res_state**  state) {
-  ngfvk_sync_res_state new_res_state;
-  new_res_state.res           = *res_data;
-  new_res_state.initial_state = *init_sync_state;
-  new_res_state.final_state   = *init_sync_state;
-  new_res_state.last_rpass_id = 0u;
-  new_res_state.last_rpass_id = ~new_res_state.last_rpass_id;
-  new_res_state.first_use     = true;
-
-  *state = ngfi_dict_get(&cmd_buf->local_res_states, key, &new_res_state);
-
-  return (*state)->first_use;
 }
 
 static void ngfvk_cmd_buf_reset_res_states(ngf_cmd_buffer cmd_buf) {
   ngfi_dict_clear(cmd_buf->local_res_states);
 }
 
-// Returns true if the access specified in the given sync state implies writes to the resource.
-static bool ngfvk_sync_state_is_write(const ngfvk_sync_state* state) {
-  const VkAccessFlags write_access_mask =
-      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-  return (state->access.types & write_access_mask) != 0u;
+static ngfvk_sync_res ngfvk_sync_res_from_buf(ngf_buffer buffer) {
+  ngfvk_sync_res sync_res = {.data = {.buf = buffer}, .type = NGFVK_SYNC_RES_BUFFER};
+  return sync_res;
 }
 
-// Checks whether a barrier is needed when transitioning between the two given sync states.
+static ngfvk_sync_res ngfvk_sync_res_from_img(ngf_image img) {
+  ngfvk_sync_res sync_res = {.data = {.img = img}, .type = NGFVK_SYNC_RES_IMAGE};
+  return sync_res;
+}
+
+static uintptr_t ngfvk_handle_from_sync_res(const ngfvk_sync_res* res) {
+  return res->type == NGFVK_SYNC_RES_BUFFER ? (uintptr_t)res->data.img : (uintptr_t)res->data.buf;
+}
+
+// Look up resource state in a given cmd buffer.
+// If an entry corresponding to the resource doesn't already exist, it gets created.
+static bool ngfvk_cmd_buf_lookup_res(
+    ngf_cmd_buffer        cmd_buf,
+    uintptr_t             key,
+    const ngfvk_sync_res* default_res_data,
+    ngfvk_sync_res_data** state) {
+  ngfvk_sync_res_data new_res_state;
+
+  memset(&new_res_state, 0, sizeof(new_res_state));
+  new_res_state.initial_layout       = VK_IMAGE_LAYOUT_UNDEFINED;
+  if (default_res_data) {
+    new_res_state.res_handle           = ngfvk_handle_from_sync_res(default_res_data);
+    new_res_state.res_type             = default_res_data->type;
+    new_res_state.pending_sync_req_idx = ~0u;
+  }
+
+  bool new_res = false;
+
+  *state = ngfi_dict_get(&cmd_buf->local_res_states, key, &new_res_state, &new_res);
+
+  return new_res;
+}
+
+// Checks whether a barrier is needed before performing an operation on a resource, given its
+// sync state.
 // If a barrier is not needed, returns false. Otherwise, populates the barrier data appropriately
 // and returns true.
 static bool ngfvk_sync_barrier(
-    const ngfvk_sync_state* src_state,
-    const ngfvk_sync_state* dst_state,
-    const ngfvk_sync_res*   res,
-    ngfvk_barrier_data*     barrier) {
-  const bool is_image      = res->type == NGFVK_SYNC_RES_IMAGE;
-  const bool needs_barrier = ngfvk_sync_state_is_write(src_state) ||
-                             (src_state->access.types != 0u && src_state->access.stages != 0u &&
-                              ngfvk_sync_state_is_write(dst_state)) ||
-                             (is_image && src_state->layout != dst_state->layout);
-  const ngfvk_barrier_masks* barrier_masks = res->type == NGFVK_SYNC_RES_BUFFER
-                                                   ? &(res->data.buf->barrier_masks)
-                                                   : &(res->data.img->barrier_masks);
-  if (needs_barrier) {
-    barrier->res             = *res;
-    barrier->src_access_mask = src_state->access.types;
-    barrier->dst_access_mask = barrier_masks->access_mask;
-    barrier->src_stage_mask  = src_state->access.stages;
-    barrier->dst_stage_mask  = barrier_masks->pipeline_stage_mask;
-    barrier->src_layout      = src_state->layout;
-    barrier->dst_layout      = dst_state->layout;
+    ngfvk_sync_state*    sync_state,
+    VkPipelineStageFlags dst_stage_mask,
+    VkAccessFlagBits     dst_access_mask,
+    VkImageLayout        dst_layout,
+    ngfvk_barrier_data*  barrier) {
+  // Mask of all accesses we care about, that perform writes.
+  static const VkAccessFlags all_write_accesses_mask =
+      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+  // Reset all barrier data.
+  memset(barrier, 0, sizeof(*barrier));
+
+  // Decide if the requested operation necessitates a write to the resource.
+  // Layout transitions are read-modify-write operations, thus if a layout transition is required
+  // for the operation, we _always_ need a write, even if the actual requested access type
+  // specified in `dst_access_mask` is read-only.
+  const bool need_layout_transition = dst_layout != sync_state->layout;
+  const bool dst_stages_want_write  = (all_write_accesses_mask & dst_access_mask);
+  const bool need_write             = dst_stages_want_write || need_layout_transition;
+
+  if (!need_write) {
+    // Case for read-only operations.
+    // Those can run concurrently with other read-only operations, and only need to wait for
+    // any outstanding writes to complete.
+
+    if (sync_state->last_writer_stage != VK_PIPELINE_STAGE_NONE &&
+        (sync_state->active_readers_stage_mask & dst_stage_mask) != dst_stage_mask) {
+      // If there was a preceding write, and the stage requesting the read-only operation
+      // hasn't consumed it yet, a barrier is necessary.
+      barrier->src_stage_mask |= sync_state->last_writer_stage;
+      barrier->src_access_mask |= sync_state->last_writer_access_mask & all_write_accesses_mask;
+    }
+    // Add the requested operation to the mask of ongoing reads.
+    sync_state->active_readers_stage_mask |= dst_stage_mask;
+    sync_state->active_readers_access_mask |= dst_access_mask;
+  } else {
+    // Case for modifying operations.
+    // No more than a single modifying operation may be in progress at a given time.
+    // Modifying operations have to wait for all outstanding reads and writes to complete.
+
+    // Add any outstanding readers to the barrier's source mask.
+    barrier->src_stage_mask |= sync_state->active_readers_stage_mask;
+    barrier->src_access_mask |= sync_state->active_readers_access_mask;
+
+    // No active readers remain after a modifying op, so zero out their corresponding masks.
+    sync_state->active_readers_stage_mask  = 0u;
+    sync_state->active_readers_access_mask = 0u;
+
+    // If there is an outstanding write, emit a barrier for it.
+    // Note that we skip this if there were any outsdtanding reads, those already depend on the
+    // write to finish, so it's sufficient to just depend on them.
+    if (barrier->src_stage_mask == 0 && sync_state->last_writer_stage != VK_PIPELINE_STAGE_NONE) {
+      barrier->src_stage_mask |= sync_state->last_writer_stage;
+      barrier->src_access_mask |= sync_state->last_writer_access_mask;
+    }
+
+    // Update last writer stage and access mask.
+    sync_state->last_writer_stage       = dst_stage_mask;
+    sync_state->last_writer_access_mask = dst_access_mask;
+
+    // If the requested access was actually readonly, mark it as synced with the last write
+    // since in that context the last write is made by the layout transition, the results of which
+    // are made available and visible to the destination stage automatically.
+    if ((dst_access_mask & all_write_accesses_mask) == 0u) {
+      sync_state->active_readers_stage_mask |= dst_stage_mask;
+      sync_state->active_readers_access_mask |= dst_access_mask;
+    }
   }
 
-  return needs_barrier;
+  // We need a barrier if we found any source stages to wait on, or if a layout transition was
+  // necessary.
+  const bool need_barrier = barrier->src_stage_mask != 0u || need_layout_transition;
+
+  if (need_barrier) {
+    barrier->dst_access_mask = dst_access_mask;
+    barrier->dst_stage_mask  = dst_stage_mask;
+    barrier->src_stage_mask =
+        barrier->src_stage_mask ? barrier->src_stage_mask : VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    barrier->src_layout = sync_state->layout;
+    barrier->dst_layout = dst_layout;
+  }
+
+  // Update the layout in synchronization state.
+  sync_state->layout = dst_layout;
+
+  return need_barrier;
 }
 
-// Actually records memory barriers described by the given barrier data into the given command
-// buffer.
-static void ngfvk_cmd_buf_record_barriers(
-    VkCommandBuffer           cmd_buf,
-    const ngfvk_barrier_data* barriers,
-    size_t                    nbuffer_barriers,
-    size_t                    nimage_barriers) {
-  const size_t          nbarriers = nbuffer_barriers + nimage_barriers;
-  VkImageMemoryBarrier* image_barriers =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkImageMemoryBarrier) * nimage_barriers);
-  VkBufferMemoryBarrier* buffer_barriers =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkBufferMemoryBarrier) * nbuffer_barriers);
-  VkPipelineStageFlags src_stage_mask     = 0u;
-  VkPipelineStageFlags dst_stage_mask     = 0u;
-  size_t               image_barrier_idx  = 0u;
-  size_t               buffer_barrier_idx = 0u;
-  for (size_t i = 0u; i < nbarriers; ++i) {
-    const ngfvk_barrier_data* barrier = &barriers[i];
-    if (barrier->res.type == NGFVK_SYNC_RES_IMAGE) {
-      VkImageMemoryBarrier* image_barrier = &image_barriers[image_barrier_idx++];
-      image_barrier->sType                = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-      image_barrier->pNext                = NULL;
-      image_barrier->srcQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-      image_barrier->dstQueueFamilyIndex  = VK_QUEUE_FAMILY_IGNORED;
-      image_barrier->srcAccessMask        = barrier->src_access_mask;
-      image_barrier->dstAccessMask        = barrier->dst_access_mask;
-      image_barrier->oldLayout            = barrier->src_layout;
-      image_barrier->newLayout            = barrier->dst_layout;
-      image_barrier->image                = (VkImage)barrier->res.data.img->alloc.obj_handle;
+static void ngfvk_sync_req_batch_init(uint32_t nmax_sync_reqs, ngfvk_sync_req_batch* result) {
+  memset(result, 0, sizeof(*result));
+  result->pending_sync_reqs  = NGFI_SALLOC(ngfvk_sync_req, nmax_sync_reqs);
+  result->sync_res_data_keys = NGFI_SALLOC(uintptr_t, nmax_sync_reqs);
+  result->freshness          = NGFI_SALLOC(bool, nmax_sync_reqs);
+  memset(result->freshness, 0, sizeof(bool) * nmax_sync_reqs);
+}
+
+// Merges a given sync request with the resource's already pending sync request. Returns `false` and
+// does nothing if the operation requested by the given sync request is incompatible with the
+// pending sync request.
+static bool ngfvk_sync_req_merge(ngfvk_sync_req* dst_sync_req, const ngfvk_sync_req* sync_req) {
+  static const VkAccessFlags NGFVK_ALL_WRITE_ACCESSES_MASK =
+      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+      VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  const bool write_requested =
+      ((sync_req->barrier_masks.access_mask & NGFVK_ALL_WRITE_ACCESSES_MASK) != 0);
+  const bool write_pending =
+      ((dst_sync_req->barrier_masks.access_mask & NGFVK_ALL_WRITE_ACCESSES_MASK) != 0);
+  const bool read_pending = !write_pending && (dst_sync_req->barrier_masks.access_mask != 0);
+  const bool layout_incompatible =
+      dst_sync_req->layout != VK_IMAGE_LAYOUT_UNDEFINED && dst_sync_req->layout != sync_req->layout;
+  if ((write_requested && (write_pending || read_pending)) || (!write_requested && write_pending) ||
+      layout_incompatible) {
+    NGFI_DIAG_ERROR("Attempt to use a resource with incompatible accesses within a single "
+                    "draw/dispatch. Ignoring.");
+    return false;
+  }
+
+  dst_sync_req->barrier_masks.access_mask |= sync_req->barrier_masks.access_mask;
+  dst_sync_req->barrier_masks.stage_mask |= sync_req->barrier_masks.stage_mask;
+  dst_sync_req->layout = sync_req->layout;
+
+  return true;
+}
+
+static bool ngfvk_sync_req_batch_add(
+    ngfvk_sync_req_batch* batch,
+    ngfvk_sync_res_data*  sync_res_data,
+    bool                  fresh,
+    const ngfvk_sync_req* sync_req) {
+  if (sync_res_data->pending_sync_req_idx == ~0u) {
+    sync_res_data->pending_sync_req_idx = batch->npending_sync_reqs++;
+    if (sync_res_data->res_type == NGFVK_SYNC_RES_BUFFER) {
+      batch->nbuffer_sync_reqs++;
+    } else if (sync_res_data->res_type == NGFVK_SYNC_RES_IMAGE) {
+      batch->nimage_sync_reqs++;
+    }
+    memset(
+        &batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx],
+        0,
+        sizeof(batch->pending_sync_reqs[0]));
+    batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx].layout =
+        VK_IMAGE_LAYOUT_UNDEFINED;
+    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx] = sync_res_data->res_handle;
+  } 
+  if (fresh && sync_res_data->pending_sync_req_idx < batch->npending_sync_reqs) {
+    batch->freshness[sync_res_data->pending_sync_req_idx] = true;
+  }
+  return ngfvk_sync_req_merge(
+      &batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx],
+      sync_req);
+}
+
+static bool ngfvk_sync_req_batch_add_with_lookup(
+    ngfvk_sync_req_batch* batch,
+    ngf_cmd_buffer        cmd_buf,
+    const ngfvk_sync_res* res,
+    const ngfvk_sync_req* sync_req) {
+  ngfvk_sync_res_data* sync_res_data;
+  const bool           fresh = ngfvk_cmd_buf_lookup_res(cmd_buf, ngfvk_handle_from_sync_res(res), res, &sync_res_data);
+  return ngfvk_sync_req_batch_add(batch, sync_res_data, fresh, sync_req);
+}
+
+static void ngfvk_sync_commit_pending_barriers_legacy(
+    ngfvk_pending_barrier_list* pending_bars,
+    VkCommandBuffer             cmd_buf) {
+  VkImageMemoryBarrier* img_bars =
+      NGFI_SALLOC(VkImageMemoryBarrier, pending_bars->npending_img_bars);
+  VkBufferMemoryBarrier* buf_bars =
+      NGFI_SALLOC(VkBufferMemoryBarrier, pending_bars->npending_buf_bars);
+  VkPipelineStageFlags src_stage_mask = 0u;
+  VkPipelineStageFlags dst_stage_mask = 0u;
+  uint32_t             nimg_bars      = 0u;
+  uint32_t             nbuf_bars      = 0u;
+
+  NGFI_CHNKLIST_FOR_EACH(pending_bars->chnklist, ngfvk_barrier_data, barrier) {
+    src_stage_mask |= barrier->src_stage_mask;
+    dst_stage_mask |= barrier->dst_stage_mask;
+    switch (barrier->res.type) {
+    case NGFVK_SYNC_RES_IMAGE: {
+      const ngf_image       img                      = barrier->res.data.img;
+      VkImageMemoryBarrier* image_barrier            = &img_bars[nimg_bars++];
+      image_barrier->sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+      image_barrier->pNext                           = NULL;
+      image_barrier->srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->srcAccessMask                   = barrier->src_access_mask;
+      image_barrier->dstAccessMask                   = barrier->dst_access_mask;
+      image_barrier->oldLayout                       = barrier->src_layout;
+      image_barrier->newLayout                       = barrier->dst_layout;
+      image_barrier->image                           = (VkImage)img->alloc.obj_handle;
       image_barrier->subresourceRange.baseArrayLayer = 0u;
       image_barrier->subresourceRange.baseMipLevel   = 0u;
-      image_barrier->subresourceRange.layerCount     = barrier->res.data.img->nlayers;
-      image_barrier->subresourceRange.levelCount     = barrier->res.data.img->nlevels;
-      const bool is_depth   = ngfvk_format_is_depth(barrier->res.data.img->vk_fmt);
-      const bool is_stencil = ngfvk_format_is_stencil(barrier->res.data.img->vk_fmt);
+      image_barrier->subresourceRange.layerCount     = img->nlayers;
+      image_barrier->subresourceRange.levelCount     = img->nlevels;
+      const bool is_depth                            = ngfvk_format_is_depth(img->vk_fmt);
+      const bool is_stencil                          = ngfvk_format_is_stencil(img->vk_fmt);
       image_barrier->subresourceRange.aspectMask =
           (is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
           (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0u) |
           ((!is_depth && !is_stencil) ? VK_IMAGE_ASPECT_COLOR_BIT : 0u);
-    } else if (barrier->res.type == NGFVK_SYNC_RES_BUFFER) {
-      VkBufferMemoryBarrier* buffer_barrier = &buffer_barriers[buffer_barrier_idx++];
+      break;
+    }
+    case NGFVK_SYNC_RES_BUFFER: {
+      const ngf_buffer       buf            = barrier->res.data.buf;
+      VkBufferMemoryBarrier* buffer_barrier = &buf_bars[nbuf_bars++];
       buffer_barrier->sType                 = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
       buffer_barrier->pNext                 = NULL;
       buffer_barrier->srcQueueFamilyIndex   = VK_QUEUE_FAMILY_IGNORED;
@@ -2532,151 +2694,277 @@ static void ngfvk_cmd_buf_record_barriers(
       buffer_barrier->srcAccessMask         = barrier->src_access_mask;
       buffer_barrier->dstAccessMask         = barrier->dst_access_mask;
       buffer_barrier->offset                = 0u;
-      buffer_barrier->buffer                = (VkBuffer)barrier->res.data.buf->alloc.obj_handle;
-      buffer_barrier->size                  = barrier->res.data.buf->size;
-    } else {
-      assert(0);
+      buffer_barrier->buffer                = (VkBuffer)buf->alloc.obj_handle;
+      buffer_barrier->size                  = buf->size;
+      break;
+    default:
+      assert(false);
+      break;
     }
-    src_stage_mask |= barrier->src_stage_mask;
-    dst_stage_mask |= barrier->dst_stage_mask;
-  }
-
-  assert(image_barrier_idx == nimage_barriers);
-  assert(buffer_barrier_idx == nbuffer_barriers);
-  vkCmdPipelineBarrier(
-      cmd_buf,
-      src_stage_mask ? src_stage_mask : VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-      dst_stage_mask,
-      0u,
-      0u,
-      NULL,
-      (uint32_t)nbuffer_barriers,
-      buffer_barriers,
-      (uint32_t)nimage_barriers,
-      image_barriers);
-}
-
-// Emits a barrier for a resource, if necessary.
-static void ngfvk_cmd_buf_barrier(
-    ngf_cmd_buffer          cmd_buf,
-    uintptr_t               res_ptr,
-    bool                    is_image,
-    const ngfvk_sync_state* dst_state) {
-  ngfvk_sync_res_state* sync_state;
-  ngfvk_sync_res        res;
-  res.type = is_image ? NGFVK_SYNC_RES_IMAGE : NGFVK_SYNC_RES_BUFFER;
-  if (is_image) {
-    res.data.img = (ngf_image)res_ptr;
-  } else {
-    res.data.buf = (ngf_buffer)res_ptr;
-  }
-  bool is_new_res = ngfvk_cmd_buf_lookup_res(cmd_buf, res_ptr, &res, dst_state, &sync_state);
-  if (!is_new_res) {
-    const ngfvk_sync_state* src_state = &sync_state->final_state;
-    ngfvk_render_cmd        barriercmd;
-    barriercmd.type = NGFVK_RENDER_CMD_BARRIER;
-    if (ngfvk_sync_barrier(src_state, dst_state, &res, &barriercmd.data.barrier)) {
-      ngfvk_cmd_buf_add_render_cmd(
-          cmd_buf,
-          &barriercmd,
-          cmd_buf->renderpass_active && sync_state->last_rpass_id == cmd_buf->curr_rpass_id);
-      sync_state->final_state = *dst_state;
-    } else {
-      sync_state->final_state.access.types |= dst_state->access.types;
-      sync_state->final_state.access.stages |= dst_state->access.stages;
     }
-    if (cmd_buf->renderpass_active) { sync_state->last_rpass_id = cmd_buf->curr_rpass_id; }
-  } else {
-    sync_state->first_use = false;
+  }
+  ngfi_chnklist_clear(&pending_bars->chnklist);
+  pending_bars->npending_buf_bars = 0u;
+  pending_bars->npending_img_bars = 0u;
+  if (nbuf_bars > 0 || nimg_bars > 0) {
+    vkCmdPipelineBarrier(
+        cmd_buf,
+        src_stage_mask,
+        dst_stage_mask,
+        0u,
+        0u,
+        NULL,
+        nbuf_bars,
+        buf_bars,
+        nimg_bars,
+        img_bars);
   }
 }
 
-// Emits a barrier (if necessary) for the resources referenced in the given bind ops.
-static void ngfvk_cmd_buf_barrier_for_bindop(
-    ngf_cmd_buffer                cmd_buf,
+static void ngfvk_sync_commit_pending_barriers_sync2(
+    ngfvk_pending_barrier_list* pending_bars,
+    VkCommandBuffer             cmd_buf) {
+  VkImageMemoryBarrier2* img_bars =
+      NGFI_SALLOC(VkImageMemoryBarrier2, pending_bars->npending_img_bars);
+  VkBufferMemoryBarrier2* buf_bars =
+      NGFI_SALLOC(VkBufferMemoryBarrier2, pending_bars->npending_buf_bars);
+  uint32_t             nimg_bars      = 0u;
+  uint32_t             nbuf_bars      = 0u;
+  NGFI_CHNKLIST_FOR_EACH(pending_bars->chnklist, ngfvk_barrier_data, barrier) {
+    switch (barrier->res.type) {
+    case NGFVK_SYNC_RES_IMAGE: {
+      const ngf_image        img                     = barrier->res.data.img;
+      VkImageMemoryBarrier2* image_barrier           = &img_bars[nimg_bars++];
+      image_barrier->sType                           = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+      image_barrier->pNext                           = NULL;
+      image_barrier->srcQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->dstQueueFamilyIndex             = VK_QUEUE_FAMILY_IGNORED;
+      image_barrier->srcStageMask                    = barrier->src_stage_mask;
+      image_barrier->dstStageMask                    = barrier->dst_stage_mask;
+      image_barrier->srcAccessMask                   = barrier->src_access_mask;
+      image_barrier->dstAccessMask                   = barrier->dst_access_mask;
+      image_barrier->oldLayout                       = barrier->src_layout;
+      image_barrier->newLayout                       = barrier->dst_layout;
+      image_barrier->image                           = (VkImage)img->alloc.obj_handle;
+      image_barrier->subresourceRange.baseArrayLayer = 0u;
+      image_barrier->subresourceRange.baseMipLevel   = 0u;
+      image_barrier->subresourceRange.layerCount     = img->nlayers;
+      image_barrier->subresourceRange.levelCount     = img->nlevels;
+      const bool is_depth                            = ngfvk_format_is_depth(img->vk_fmt);
+      const bool is_stencil                          = ngfvk_format_is_stencil(img->vk_fmt);
+      image_barrier->subresourceRange.aspectMask =
+          (is_depth ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
+          (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0u) |
+          ((!is_depth && !is_stencil) ? VK_IMAGE_ASPECT_COLOR_BIT : 0u);
+      break;
+    }
+    case NGFVK_SYNC_RES_BUFFER: {
+      const ngf_buffer        buf            = barrier->res.data.buf;
+      VkBufferMemoryBarrier2* buffer_barrier = &buf_bars[nbuf_bars++];
+      buffer_barrier->sType                  = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+      buffer_barrier->pNext                  = NULL;
+      buffer_barrier->srcStageMask           = barrier->src_stage_mask;
+      buffer_barrier->dstStageMask           = barrier->dst_stage_mask;
+      buffer_barrier->srcQueueFamilyIndex    = VK_QUEUE_FAMILY_IGNORED;
+      buffer_barrier->dstQueueFamilyIndex    = VK_QUEUE_FAMILY_IGNORED;
+      buffer_barrier->srcAccessMask          = barrier->src_access_mask;
+      buffer_barrier->dstAccessMask          = barrier->dst_access_mask;
+      buffer_barrier->offset                 = 0u;
+      buffer_barrier->buffer                 = (VkBuffer)buf->alloc.obj_handle;
+      buffer_barrier->size                   = buf->size;
+      break;
+    }
+    default:
+      assert(false);
+      break;
+    }
+  }
+  ngfi_chnklist_clear(&pending_bars->chnklist);
+  pending_bars->npending_buf_bars = 0u;
+  pending_bars->npending_img_bars = 0u;
+  if (nbuf_bars > 0 || nimg_bars > 0) {
+    const VkDependencyInfo dep_info = {
+        .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
+        .pNext                    = NULL,
+        .dependencyFlags          = 0u,
+        .bufferMemoryBarrierCount = nbuf_bars,
+        .imageMemoryBarrierCount  = nimg_bars,
+        .memoryBarrierCount       = 0u,
+        .pBufferMemoryBarriers    = buf_bars,
+        .pImageMemoryBarriers     = img_bars,
+        .pMemoryBarriers          = NULL
+    };
+    vkCmdPipelineBarrier2(cmd_buf, &dep_info);
+  }
+}
+
+static void ngfvk_sync_commit_pending_barriers(
+    ngfvk_pending_barrier_list* pending_bars,
+    VkCommandBuffer             cmd_buf) {
+  if (vkCmdPipelineBarrier2) {
+    ngfvk_sync_commit_pending_barriers_sync2(pending_bars, cmd_buf);
+  } else {
+    ngfvk_sync_commit_pending_barriers_legacy(pending_bars, cmd_buf);
+  }
+}
+
+static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_buffer cmd_buf) {
+  for (size_t i = 0u; i < batch->npending_sync_reqs; ++i) {
+    ngfvk_sync_res_data* sync_res_data = NULL;
+    ngfvk_cmd_buf_lookup_res(cmd_buf, batch->sync_res_data_keys[i], NULL, &sync_res_data);
+    if (!sync_res_data) {
+      NGFI_DIAG_WARNING(
+          "Internal error - resource missing from cmd buffer's synchronization table?");
+      assert(false);
+    }
+
+    const ngfvk_sync_res_type res_type       = sync_res_data->res_type;
+    const ngfvk_sync_req*     sync_req       = &batch->pending_sync_reqs[i];
+    const bool                fresh          = batch->freshness[i];
+    ngfvk_barrier_data        barrier_data;
+    const bool                barrier_needed = ngfvk_sync_barrier(
+        &sync_res_data->sync_state,
+        sync_req->barrier_masks.stage_mask,
+        sync_req->barrier_masks.access_mask,
+        (res_type == NGFVK_SYNC_RES_IMAGE) ? sync_req->layout : VK_IMAGE_LAYOUT_UNDEFINED,
+        &barrier_data);
+    if (barrier_needed && !fresh) {
+      barrier_data.res.type = sync_res_data->res_type;
+      if (barrier_data.res.type == NGFVK_SYNC_RES_IMAGE) {
+        barrier_data.res.data.img = (ngf_image)sync_res_data->res_handle;
+        ++cmd_buf->pending_barriers.npending_img_bars;
+      } else {
+        barrier_data.res.data.buf = (ngf_buffer)sync_res_data->res_handle;
+        ++cmd_buf->pending_barriers.npending_buf_bars;
+      }
+      ngfi_chnklist_append(
+          &cmd_buf->pending_barriers.chnklist,
+          &barrier_data,
+          sizeof(barrier_data));
+    }
+    sync_res_data->pending_sync_req_idx = ~0u;
+    if ((sync_res_data->accessor_stages & sync_req->barrier_masks.stage_mask) !=
+        sync_req->barrier_masks.stage_mask) {
+      // If this is the first time this resource is being accessed by these stages within this cmd
+      // buffer, make a note of the requested access mask.
+      sync_res_data->accessor_stages |= sync_req->barrier_masks.stage_mask;
+      sync_res_data->initial_accesses |= sync_req->barrier_masks.access_mask;
+    }
+    // Make note of the initial layout with which the resource is expected to be used.
+    if (sync_res_data->initial_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+      sync_res_data->initial_layout = sync_req->layout;
+    }
+  }
+}
+
+static void ngfvk_sync_req_batch_commit(ngfvk_sync_req_batch* batch, ngf_cmd_buffer cmd_buf) {
+  ngfvk_sync_req_batch_process(batch, cmd_buf);
+  ngfvk_sync_commit_pending_barriers(&cmd_buf->pending_barriers, cmd_buf->vk_cmd_buffer);
+}
+
+static void ngfvk_handle_single_sync_req(
+    ngf_cmd_buffer        cmd_buf,
+    const ngfvk_sync_res* res,
+    const ngfvk_sync_req* sync_req) {
+  bool                 fresh             = false;
+  uintptr_t sync_res_data_key = 0;
+  ngfvk_sync_req empty_sync_req = {.barrier_masks = {0u, 0u}, .layout = VK_IMAGE_LAYOUT_UNDEFINED};
+
+  ngfvk_sync_req_batch batch = {
+      .sync_res_data_keys = &sync_res_data_key,
+      .pending_sync_reqs  = &empty_sync_req,
+      .freshness          = &fresh,
+      .npending_sync_reqs = 0,
+      .nbuffer_sync_reqs  = 0,
+      .nimage_sync_reqs   = 0};
+
+  ngfvk_sync_req_batch_add_with_lookup(&batch, cmd_buf, res, sync_req);
+  ngfvk_sync_req_batch_commit(&batch, cmd_buf);
+}
+
+static ngfvk_sync_res ngfvk_sync_res_from_bind_op(const ngf_resource_bind_op* bind_op) {
+  switch (bind_op->type) {
+  case NGF_DESCRIPTOR_IMAGE:
+  case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER:
+  case NGF_DESCRIPTOR_STORAGE_IMAGE:
+    return ngfvk_sync_res_from_img(bind_op->info.image_sampler.image);
+    break;
+  case NGF_DESCRIPTOR_STORAGE_BUFFER:
+  case NGF_DESCRIPTOR_UNIFORM_BUFFER:
+    return ngfvk_sync_res_from_buf(bind_op->info.buffer.buffer);
+    break;
+  case NGF_DESCRIPTOR_TEXEL_BUFFER:
+    return ngfvk_sync_res_from_buf(bind_op->info.texel_buffer_view->buffer);
+    break;
+  default:
+    break;
+  }
+  const ngfvk_sync_res none = {
+      .type = NGFVK_SYNC_RES_COUNT, .data = {.buf = NULL}};
+  return none;
+}
+
+// Returns a sync request corresponding to the given bind operation.
+static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
     const ngf_resource_bind_op*   bind_op,
     const ngfvk_generic_pipeline* pipeline) {
-  ngfvk_sync_state dst_state;
-  uintptr_t        res_ptr  = 0u;
-  bool             is_image = false;
-  dst_state.access.stages =
-      cmd_buf->compute_pass_active
-          ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-          : (VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT);
+  ngfvk_sync_req sync_req;
+  memset(&sync_req, 0, sizeof(sync_req));
+  sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   const bool is_read_only = NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
                                 .readonly_bindings[bind_op->target_binding];
+
+  sync_req.barrier_masks.stage_mask =
+      NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
+          .stage_accessors[bind_op->target_binding];
+
   switch (bind_op->type) {
   case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
-    dst_state.access.types = VK_ACCESS_UNIFORM_READ_BIT;
-    res_ptr                = (uintptr_t)bind_op->info.buffer.buffer;
+    sync_req.barrier_masks.access_mask = VK_ACCESS_UNIFORM_READ_BIT;
     break;
   }
   case NGF_DESCRIPTOR_IMAGE:
   case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
-    dst_state.access.types = VK_ACCESS_SHADER_READ_BIT;
-    dst_state.layout       = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    res_ptr                = (uintptr_t)bind_op->info.image_sampler.image;
-    is_image               = true;
+    sync_req.barrier_masks.access_mask = VK_ACCESS_SHADER_READ_BIT;
+    sync_req.layout                    = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     break;
   }
   case NGF_DESCRIPTOR_STORAGE_BUFFER: {
-    dst_state.access.types =
+    sync_req.barrier_masks.access_mask =
         VK_ACCESS_SHADER_READ_BIT | (is_read_only ? 0u : VK_ACCESS_SHADER_WRITE_BIT);
-    res_ptr = (uintptr_t)bind_op->info.buffer.buffer;
     break;
   }
   case NGF_DESCRIPTOR_STORAGE_IMAGE: {
-    dst_state.access.types =
+    sync_req.barrier_masks.access_mask =
         VK_ACCESS_SHADER_READ_BIT | (is_read_only ? 0u : VK_ACCESS_SHADER_WRITE_BIT);
-    dst_state.layout = VK_IMAGE_LAYOUT_GENERAL;
-    res_ptr          = (uintptr_t)bind_op->info.image_sampler.image;
-    is_image         = true;
+    sync_req.layout = VK_IMAGE_LAYOUT_GENERAL;
     break;
   }
   case NGF_DESCRIPTOR_TEXEL_BUFFER: {
-    dst_state.access.types = VK_ACCESS_SHADER_READ_BIT;
-    res_ptr                = (uintptr_t)bind_op->info.texel_buffer_view->buffer;
+    sync_req.barrier_masks.access_mask = VK_ACCESS_SHADER_READ_BIT;
     break;
   }
   case NGF_DESCRIPTOR_SAMPLER:
-    return;
+    sync_req.barrier_masks.stage_mask = 0u;
+    break;
   default:
     assert(0);
   }
-  assert(res_ptr);
-  ngfvk_cmd_buf_barrier(cmd_buf, res_ptr, is_image, &dst_state);
+  return sync_req;
 }
 
 // Actually records renderpass commands into a command buffer.
 static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnklist* cmd_list) {
-  bool                recording_barriers = false;
-  ngfvk_barrier_data* barrier_cmds       = NULL;
-  size_t              nimage_barriers    = 0u;
-  size_t              nbuffer_barriers   = 0u;
   ngfi_sa_reset(ngfi_tmp_store());
 
   NGFI_CHNKLIST_FOR_EACH((*cmd_list), ngfvk_render_cmd, cmd) {
-    if (recording_barriers && cmd->type != NGFVK_RENDER_CMD_BARRIER) {
-      ngfvk_cmd_buf_record_barriers(
-          buf->vk_cmd_buffer,
-          barrier_cmds,
-          nbuffer_barriers,
-          nimage_barriers);
-      recording_barriers = false;
-      nbuffer_barriers   = 0u;
-      nimage_barriers    = 0u;
-      ngfi_sa_reset(ngfi_tmp_store());
-      barrier_cmds = NULL;
-    }
     switch (cmd->type) {
     case NGFVK_RENDER_CMD_BIND_PIPELINE: {
       // If we had a pipeline bound for which there have been resources bound, but no draw call
       // executed, commit those resources to actual descriptor sets and bind them so that the next
       // pipeline is able to "see" those resources, provided that it's compatible.
-      if (buf->active_gfx_pipe && buf->npending_bind_ops > 0u) {
-        ngfvk_execute_pending_binds(buf);
-      }
+      if (buf->active_gfx_pipe && buf->npending_bind_ops > 0u) { ngfvk_execute_pending_binds(buf); }
       buf->active_gfx_pipe = cmd->data.pipeline;
       vkCmdBindPipeline(
           buf->vk_cmd_buffer,
@@ -2781,34 +3069,26 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
       }
       break;
     }
-    case NGFVK_RENDER_CMD_BARRIER: {
-      ngfvk_barrier_data* bcmd = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngfvk_barrier_data));
-      *bcmd                    = cmd->data.barrier;
-      if (!recording_barriers) {
-        recording_barriers = true;
-        barrier_cmds       = bcmd;
-      }
-      if (bcmd->res.type == NGFVK_SYNC_RES_IMAGE) {
-        ++nimage_barriers;
-      } else {
-        ++nbuffer_barriers;
-      }
-      break;
-    }
     default:
       assert(false);
     }
   }
-
-  if (recording_barriers) {
-    ngfvk_cmd_buf_record_barriers(
-        buf->vk_cmd_buffer,
-        barrier_cmds,
-        nbuffer_barriers,
-        nimage_barriers);
-  }
-
   ngfi_sa_reset(ngfi_tmp_store());
+}
+
+static void ngfvk_debug_label_begin(VkCommandBuffer b, const char* name) {
+  if (vkCmdBeginDebugUtilsLabelEXT) {
+    const VkDebugUtilsLabelEXT label = {
+        .color      = {0.f, 0.f, 0.f, 0.f},
+        .pLabelName = name,
+        .pNext      = NULL,
+        .sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+    vkCmdBeginDebugUtilsLabelEXT(b, &label);
+  }
+}
+
+static void ngfvk_debug_label_end(VkCommandBuffer b) {
+  if (vkCmdEndDebugUtilsLabelEXT) { vkCmdEndDebugUtilsLabelEXT(b); }
 }
 
 // Submits all pending command buffers for the current frame.
@@ -2822,51 +3102,65 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       ngfi_sa_alloc(ngfi_frame_store(), sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 1u);
   uint32_t submitted_cmd_buf_handles_idx = 0u;
 
+  ngfvk_pending_barrier_list pending_patch_barriers;
+  memset(&pending_patch_barriers, 0, sizeof(pending_patch_barriers));
+  pending_patch_barriers.chnklist.blkalloc = CURRENT_CONTEXT->blkalloc;
+
   NGFI_DARRAY_FOREACH(frame_res->submitted_cmd_bufs, c) {
-    ngf_cmd_buffer      cmd_buf          = NGFI_DARRAY_AT(frame_res->submitted_cmd_bufs, c);
-    uint32_t            nimage_barriers  = 0u;
-    uint32_t            nbuffer_barriers = 0u;
-    ngfvk_barrier_data* barrier_list     = NULL;
+    ngf_cmd_buffer cmd_buf = NGFI_DARRAY_AT(frame_res->submitted_cmd_bufs, c);
     ngfi_sa_reset(ngfi_tmp_store());
+
     NGFI_DICT_FOREACH(cmd_buf->local_res_states, r_it) {
-      const ngfvk_sync_res_state* cmd_buf_res_state =
-          (const ngfvk_sync_res_state*)ngfi_dict_itval(cmd_buf->local_res_states, r_it);
-      const bool         is_image      = cmd_buf_res_state->res.type == NGFVK_SYNC_RES_IMAGE;
-      ngfvk_sync_state*  src_res_state = is_image ? &(cmd_buf_res_state->res.data.img->curr_state)
-                                                  : &(cmd_buf_res_state->res.data.buf->curr_state);
-      ngfvk_barrier_data barrier;
-      const bool         needs_barrier = ngfvk_sync_barrier(
-          src_res_state,
-          &cmd_buf_res_state->initial_state,
-          &cmd_buf_res_state->res,
-          &barrier);
-      if (needs_barrier) {
-        if (is_image) {
-          ++nimage_barriers;
+      ngfvk_sync_res_data* cmd_buf_res_state =
+          (ngfvk_sync_res_data*)ngfi_dict_itval(cmd_buf->local_res_states, r_it);
+      ngfvk_sync_state* global_sync_state =
+          cmd_buf_res_state->res_type == NGFVK_SYNC_RES_IMAGE
+              ? &(((ngf_image)cmd_buf_res_state->res_handle)->sync_state)
+              : &(((ngf_buffer)cmd_buf_res_state->res_handle)->sync_state);
+      ngfvk_barrier_data patch_barrier_data;
+      if (ngfvk_sync_barrier(
+              global_sync_state,
+              cmd_buf_res_state->accessor_stages,
+              cmd_buf_res_state->initial_accesses,
+              cmd_buf_res_state->initial_layout,
+              &patch_barrier_data)) {
+        patch_barrier_data.res.type = cmd_buf_res_state->res_type;
+        if (patch_barrier_data.res.type == NGFVK_SYNC_RES_IMAGE) {
+          patch_barrier_data.res.data.img = (ngf_image)cmd_buf_res_state->res_handle;
+          pending_patch_barriers.npending_img_bars++;
         } else {
-          ++nbuffer_barriers;
+          patch_barrier_data.res.data.buf = (ngf_buffer)cmd_buf_res_state->res_handle;
+          pending_patch_barriers.npending_buf_bars++;
         }
-        ngfvk_barrier_data* barrier_cmd =
-            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngfvk_barrier_data));
-        *barrier_cmd = barrier;
-        if (barrier_list == NULL) barrier_list = barrier_cmd;
+        ngfi_chnklist_append(
+            &pending_patch_barriers.chnklist,
+            &patch_barrier_data,
+            sizeof(patch_barrier_data));
       }
-      *src_res_state = cmd_buf_res_state->final_state;
+      if (cmd_buf_res_state->sync_state.last_writer_access_mask != 0) {
+        *global_sync_state = cmd_buf_res_state->sync_state;
+      } else {
+        global_sync_state->active_readers_access_mask |=
+            cmd_buf_res_state->sync_state.active_readers_access_mask;
+      }
     }
-    if (nimage_barriers > 0u || nbuffer_barriers > 0u) {
+    if (pending_patch_barriers.npending_buf_bars + pending_patch_barriers.npending_img_bars > 0u) {
       VkCommandBuffer aux_cmd_buf;
       VkCommandPool   aux_cmd_pool;
       ngfvk_cmd_buffer_allocate_for_frame(
           CURRENT_CONTEXT->current_frame_token,
           &aux_cmd_pool,
           &aux_cmd_buf);
-      ngfvk_cmd_buf_record_barriers(aux_cmd_buf, barrier_list, nbuffer_barriers, nimage_barriers);
+      ngfvk_debug_label_begin(aux_cmd_buf, "ngf - patch barrier cmd buffer");
+      ngfvk_sync_commit_pending_barriers(&pending_patch_barriers, aux_cmd_buf);
+      ngfvk_debug_label_end(aux_cmd_buf);
       vkEndCommandBuffer(aux_cmd_buf);
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
 
       ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
       NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, aux_buf_pool);
     }
+    ngfi_chnklist_clear(&pending_patch_barriers.chnklist);
     submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = cmd_buf->vk_cmd_buffer;
     NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_SUBMITTED);
     cmd_buf->active_gfx_pipe     = NULL;
@@ -2875,7 +3169,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
     ngfvk_cmd_buf_reset_res_states(cmd_buf);
     ngfvk_cmd_buf_with_pool buf_pool = {cmd_buf->vk_cmd_buffer, cmd_buf->vk_cmd_pool};
     NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, buf_pool);
-    
+
     cmd_buf->vk_cmd_buffer = VK_NULL_HANDLE;
     cmd_buf->vk_cmd_pool   = VK_NULL_HANDLE;
     if (cmd_buf->destroy_on_submit) { ngf_destroy_cmd_buffer(cmd_buf); }
@@ -2887,7 +3181,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   if (needs_present) {
     ngf_image swapchain_image =
         CURRENT_CONTEXT->swapchain.wrapper_imgs[CURRENT_CONTEXT->swapchain.image_idx];
-    if (swapchain_image->curr_state.layout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+    if (swapchain_image->sync_state.layout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
       VkCommandBuffer aux_cmd_buf;
       VkCommandPool   aux_cmd_pool;
       ngfvk_cmd_buffer_allocate_for_frame(
@@ -2897,9 +3191,9 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       const VkImageMemoryBarrier swapchain_mem_bar = {
           .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .pNext               = NULL,
-          .srcAccessMask       = swapchain_image->curr_state.access.types,
+          .srcAccessMask       = swapchain_image->sync_state.last_writer_access_mask,
           .dstAccessMask       = 0u,
-          .oldLayout           = swapchain_image->curr_state.layout,
+          .oldLayout           = swapchain_image->sync_state.layout,
           .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -2912,7 +3206,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
                  .levelCount     = 1u}};
       vkCmdPipelineBarrier(
           aux_cmd_buf,
-          swapchain_image->curr_state.access.stages,
+          swapchain_image->sync_state.last_writer_stage,
           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
           0u,
           0u,
@@ -2922,11 +3216,10 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
           1u,
           &swapchain_mem_bar);
       vkEndCommandBuffer(aux_cmd_buf);
-      swapchain_image->curr_state.access.types  = 0u;
-      swapchain_image->curr_state.access.stages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-      swapchain_image->curr_state.layout        = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      memset(&swapchain_image->sync_state, 0, sizeof(swapchain_image->sync_state));
+      swapchain_image->sync_state.layout                         = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
-      ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
+      ngfvk_cmd_buf_with_pool aux_buf_pool                       = {aux_cmd_buf, aux_cmd_pool};
       NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, aux_buf_pool);
     }
   }
@@ -2950,10 +3243,10 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   return err;
 }
 
-#define NGFVK_VK_OBJECT_DTOR(obj_type) \
-static void ngfvk_Vk##obj_type##_dtor(ngfi_chnk_hdr* chunk) {                         \
-  NGFI_CHNK_FOR_EACH(chunk, Vk##obj_type, obj) vkDestroy##obj_type(_vk.device, *obj, NULL); \
-}
+#define NGFVK_VK_OBJECT_DTOR(obj_type)                                                        \
+  static void ngfvk_Vk##obj_type##_dtor(ngfi_chnk_hdr* chunk) {                               \
+    NGFI_CHNK_FOR_EACH(chunk, Vk##obj_type, obj) vkDestroy##obj_type(_vk.device, *obj, NULL); \
+  }
 
 NGFVK_VK_OBJECT_DTOR(Pipeline);
 NGFVK_VK_OBJECT_DTOR(PipelineLayout);
@@ -3269,10 +3562,20 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const char*    device_exts[]   = {
       "VK_KHR_maintenance1",
       "VK_KHR_swapchain",
-      "VK_KHR_shader_float16_int8"};
-  const uint32_t device_exts_count = sizeof(device_exts) / sizeof(const char*);
+      NULL,
+      NULL };
+  const uint32_t nmandatory_exts        = 2u;
+  uint32_t       nsupported_optional_exts = 0u;
   const bool     shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
+  const bool     sync2_supported = ngfvk_phys_dev_extension_supported("VK_KHR_synchronization2");
+  if (shader_float16_int8_supported) {
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_shader_float16_int8";
+  }
+  if (sync2_supported) {
+    NGFI_DIAG_INFO("VK sync2 support enabled");
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_synchronization2";
+  }
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
@@ -3283,25 +3586,36 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .pNext         = NULL,
       .shaderFloat16 = false,
       .shaderInt8    = false};
+  VkPhysicalDeviceSynchronization2Features sync2_features = {
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, .pNext = &sf16_features };
+
+  void* features_structs = NULL;
+  if (shader_float16_int8_supported) {
+    sf16_features.pNext = features_structs;
+    features_structs    = &sf16_features;
+  }
+  if (sync2_supported) {
+    sync2_features.pNext = features_structs;
+    features_structs     = &sync2_features;
+  }
 
   if (vkGetPhysicalDeviceFeatures2KHR) {
     VkPhysicalDeviceFeatures2KHR phys_features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &sf16_features};
+        .pNext = features_structs};
     vkGetPhysicalDeviceFeatures2KHR(_vk.phys_dev, &phys_features);
   }
 
   const VkDeviceCreateInfo dev_info = {
       .sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext                = &sf16_features,
+      .pNext                = features_structs,
       .flags                = 0,
       .queueCreateInfoCount = num_queue_infos,
       .pQueueCreateInfos    = &queue_infos[same_gfx_and_present ? 1u : 0u],
       .enabledLayerCount    = 0,
       .ppEnabledLayerNames  = NULL,
       .pEnabledFeatures     = &required_features,
-      .enabledExtensionCount =
-          shader_float16_int8_supported ? device_exts_count : device_exts_count - 1,
+      .enabledExtensionCount = nmandatory_exts + nsupported_optional_exts,
       .ppEnabledExtensionNames = device_exts};
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
   if (vk_err != VK_SUCCESS) {
@@ -3310,7 +3624,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   }
 
   // Load device-level entry points.
-  vkl_init_device(_vk.device);
+  vkl_init_device(_vk.device, sync2_supported);
 
   // Obtain queue handles.
   vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
@@ -3556,11 +3870,11 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   } else {
     ctx->default_render_target = NULL;
   }
- 
+
   // Initialize block allocator for this context.
   ctx->blkalloc = ngfi_blkalloc_create(
-      1024, // 1K per block
-      16u); // 16 blocks per pool
+      1024,  // 1K per block
+      16u);  // 16 blocks per pool
   if (ctx->blkalloc == NULL) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_context_cleanup;
@@ -3607,7 +3921,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     }
   }
 
-  ctx->frame_id = 0u;
+  ctx->frame_id            = 0u;
   ctx->current_frame_token = ~0u;
 
   NGFI_DARRAY_RESET(ctx->command_superpools, 3);
@@ -3695,37 +4009,38 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   cmd_buf->state                          = NGFI_CMD_BUFFER_NEW;
   cmd_buf->active_gfx_pipe                = NULL;
   cmd_buf->active_compute_pipe            = NULL;
+  cmd_buf->active_attr_buf                = NULL;
+  cmd_buf->active_idx_buf                 = NULL;
   cmd_buf->renderpass_active              = false;
   cmd_buf->compute_pass_active            = false;
   cmd_buf->destroy_on_submit              = false;
   cmd_buf->active_rt                      = NULL;
   cmd_buf->desc_pools_list                = NULL;
-  cmd_buf->curr_rpass_id                  = 0u;
   cmd_buf->vk_cmd_buffer                  = VK_NULL_HANDLE;
   cmd_buf->vk_cmd_pool                    = VK_NULL_HANDLE;
   cmd_buf->pending_bind_ops.firstchnk     = NULL;
   cmd_buf->pending_bind_ops.blkalloc      = CURRENT_CONTEXT->blkalloc;
   cmd_buf->in_pass_cmd_chnks.blkalloc     = CURRENT_CONTEXT->blkalloc;
   cmd_buf->in_pass_cmd_chnks.firstchnk    = NULL;
-  cmd_buf->pre_pass_cmd_chnks.blkalloc    = CURRENT_CONTEXT->blkalloc;
-  cmd_buf->pre_pass_cmd_chnks.firstchnk   = NULL;
   cmd_buf->virt_bind_ops_ranges.blkalloc  = CURRENT_CONTEXT->blkalloc;
   cmd_buf->virt_bind_ops_ranges.firstchnk = NULL;
+  memset(&cmd_buf->pending_barriers, 0, sizeof(cmd_buf->pending_barriers));
+  cmd_buf->pending_barriers.chnklist.blkalloc = CURRENT_CONTEXT->blkalloc;
 
-  cmd_buf->local_res_states = ngfi_dict_create(100u, sizeof(ngfvk_sync_res_state));
+  cmd_buf->local_res_states = ngfi_dict_create(100u, sizeof(ngfvk_sync_res_data));
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_begin_render_pass_simple(
-    ngf_cmd_buffer                   cmd_buf,
-    ngf_render_target                rt,
-    float                            clear_color_r,
-    float                            clear_color_g,
-    float                            clear_color_b,
-    float                            clear_color_a,
-    float                            clear_depth,
-    uint32_t                         clear_stencil,
-    ngf_render_encoder*              enc) {
+    ngf_cmd_buffer      cmd_buf,
+    ngf_render_target   rt,
+    float               clear_color_r,
+    float               clear_color_g,
+    float               clear_color_b,
+    float               clear_color_a,
+    float               clear_depth,
+    uint32_t            clear_stencil,
+    ngf_render_encoder* enc) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_attachment_load_op* load_ops =
       ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_load_op) * rt->nattachments);
@@ -3755,11 +4070,11 @@ ngf_error ngf_cmd_begin_render_pass_simple(
                                                         : NGF_STORE_OP_DONTCARE;
   }
   const ngf_render_pass_info pass_info = {
-      .render_target          = rt,
-      .load_ops               = load_ops,
-      .store_ops              = store_ops,
-      .clears                 = clears,
-   };
+      .render_target = rt,
+      .load_ops      = load_ops,
+      .store_ops     = store_ops,
+      .clears        = clears,
+  };
   return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
 }
 ngf_error ngf_cmd_begin_render_pass(
@@ -3773,6 +4088,8 @@ ngf_error ngf_cmd_begin_render_pass(
 
   err = ngfvk_initialize_generic_encoder(cmd_buf, &enc->pvt_data_donotuse);
   if (err != NGF_ERROR_OK) { return err; }
+
+  ngfi_sa_reset(ngfi_tmp_store());
 
   cmd_buf->active_rt         = pass_info->render_target;
   cmd_buf->renderpass_active = true;
@@ -3799,13 +4116,14 @@ ngf_error ngf_cmd_begin_render_pass(
       pass_info->store_ops,
       sizeof(ngf_attachment_store_op) * pass_info->render_target->nattachments);
 
-  uint32_t nclears = 0u;
-  uint32_t clear_idx = 0u;
-  ngf_clear* cloned_clears = ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
+  uint32_t   nclears   = 0u;
+  uint32_t   clear_idx = 0u;
+  ngf_clear* cloned_clears =
+      ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
   if (cloned_clears == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   for (uint32_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     if (cmd_buf->pending_render_pass_info.load_ops[i] == NGF_LOAD_OP_CLEAR) {
-      nclears = NGFI_MAX(nclears, i + 1);
+      nclears          = NGFI_MAX(nclears, i + 1);
       cloned_clears[i] = pass_info->clears[clear_idx++];
     }
   }
@@ -3815,7 +4133,10 @@ ngf_error ngf_cmd_begin_render_pass(
     cmd_buf->pending_render_pass_info.clears = NULL;
   }
   cmd_buf->pending_clear_value_count = (uint16_t)nclears;
-  cmd_buf->curr_rpass_id++;
+
+  ngfvk_sync_req_batch sync_req_batch;
+
+  ngfvk_sync_req_batch_init(pass_info->render_target->nattachments, &sync_req_batch);
 
   for (size_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     const ngf_attachment_type attachment_type = pass_info->render_target->attachment_descs[i].type;
@@ -3823,11 +4144,11 @@ ngf_error ngf_cmd_begin_render_pass(
         pass_info->render_target->attachment_descs[i].sample_count;
     switch (attachment_type) {
     case NGF_ATTACHMENT_COLOR: {
-      ngfvk_sync_state dst_state;
-      dst_state.access.types =
+      ngfvk_sync_req sync_req;
+      sync_req.barrier_masks.access_mask =
           VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-      dst_state.access.stages = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-      dst_state.layout        = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      sync_req.barrier_masks.stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+      sync_req.layout                   = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
       ngf_image color_image =
           cmd_buf->active_rt->is_default
               ? (attachment_sample_count == NGF_SAMPLE_COUNT_1
@@ -3835,21 +4156,23 @@ ngf_error ngf_cmd_begin_render_pass(
                      : CURRENT_CONTEXT->swapchain
                            .multisample_imgs[CURRENT_CONTEXT->swapchain.image_idx])
               : pass_info->render_target->attachment_images[i];
-      ngfvk_cmd_buf_barrier(cmd_buf, (uintptr_t)color_image, true, &dst_state);
+      ngfvk_sync_res res = ngfvk_sync_res_from_img(color_image);
+      ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &res, &sync_req);
       break;
     }
     case NGF_ATTACHMENT_DEPTH:
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
-      ngfvk_sync_state dst_state;
-      dst_state.access.types = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
-                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-      dst_state.access.stages =
+      ngfvk_sync_req sync_req;
+      sync_req.barrier_masks.access_mask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
+                                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+      sync_req.barrier_masks.stage_mask =
           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-      dst_state.layout              = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      ngf_image depth_stencil_image = cmd_buf->active_rt->is_default
-                                          ? CURRENT_CONTEXT->swapchain.depth_img
-                                          : pass_info->render_target->attachment_images[i];
-      ngfvk_cmd_buf_barrier(cmd_buf, (uintptr_t)depth_stencil_image, true, &dst_state);
+      sync_req.layout                    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      ngf_image      depth_stencil_image = cmd_buf->active_rt->is_default
+                                               ? CURRENT_CONTEXT->swapchain.depth_img
+                                               : pass_info->render_target->attachment_images[i];
+      ngfvk_sync_res res                 = ngfvk_sync_res_from_img(depth_stencil_image);
+      ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &res, &sync_req);
       break;
     }
 
@@ -3857,6 +4180,8 @@ ngf_error ngf_cmd_begin_render_pass(
       assert(0);
     }
   }
+  ngfvk_sync_req_batch_process(&sync_req_batch, cmd_buf);
+
   return NGF_ERROR_OK;
 }
 
@@ -3892,8 +4217,8 @@ ngf_error ngf_cmd_begin_compute_pass(
 ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
 
-  // Record pre-renderpass barriers.
-  ngfvk_cmd_buf_record_render_cmds(buf, &buf->pre_pass_cmd_chnks);
+  // Commit all the pending barriers.
+  ngfvk_sync_commit_pending_barriers(&buf->pending_barriers, buf->vk_cmd_buffer);
 
   // Begin the real render pass.
   const ngf_render_pass_info* pass_info   = &buf->pending_render_pass_info;
@@ -3962,18 +4287,18 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
   buf->renderpass_active = false;
   buf->active_rt         = NULL;
 
-  return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse, NGFVK_GFX_PIPELINE_STAGE_MASK);
+  return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse);
 }
 
 ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-  return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse, VK_PIPELINE_STAGE_TRANSFER_BIT);
+  return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse);
 }
 
 ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) {
   ngf_cmd_buffer cmd_buf       = NGFVK_ENC2CMDBUF(enc);
   cmd_buf->compute_pass_active = false;
-  return ngfvk_encoder_end(cmd_buf, &enc.pvt_data_donotuse, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+  return ngfvk_encoder_end(cmd_buf, &enc.pvt_data_donotuse);
 }
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
@@ -3988,10 +4313,12 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   cmd_buf->active_compute_pipe = NULL;
   cmd_buf->compute_pass_active = false;
   cmd_buf->renderpass_active   = false;
-  cmd_buf->curr_rpass_id       = 0u;
   cmd_buf->npending_bind_ops   = 0u;
 
   ngfi_chnklist_clear(&cmd_buf->virt_bind_ops_ranges);
+  ngfi_chnklist_clear(&cmd_buf->in_pass_cmd_chnks);
+  ngfi_chnklist_clear(&cmd_buf->pending_barriers.chnklist);
+  ngfi_dict_clear(cmd_buf->local_res_states);
 
   return ngfvk_cmd_buffer_allocate_for_frame(token, &cmd_buf->vk_cmd_pool, &cmd_buf->vk_cmd_buffer);
 }
@@ -4004,7 +4331,6 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
     ngfvk_cleanup_pending_binds(buffer);
     ngfi_dict_destroy(buffer->local_res_states);
     ngfi_chnklist_clear(&buffer->in_pass_cmd_chnks);
-    ngfi_chnklist_clear(&buffer->pre_pass_cmd_chnks);
     ngfi_chnklist_clear(&buffer->virt_bind_ops_ranges);
     NGFI_FREE(buffer);
   } else if (buffer) {
@@ -4730,14 +5056,23 @@ void ngf_cmd_dispatch(
     uint32_t            z_threadgroups) {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
 
+  ngfi_sa_reset(ngfi_tmp_store());
+
+  // Prepare a batch of sync requests by scanning all pending bind operations.
+  ngfvk_sync_req_batch sync_req_batch;
+  ngfvk_sync_req_batch_init(cmd_buf->npending_bind_ops, &sync_req_batch);
+
   NGFI_CHNKLIST_FOR_EACH(cmd_buf->pending_bind_ops, const ngf_resource_bind_op, bind_op) {
-    ngfvk_cmd_buf_barrier_for_bindop(
-        cmd_buf,
-        bind_op,
-        &cmd_buf->active_compute_pipe->generic_pipeline);
+    ngfvk_sync_req sync_req =
+        ngfvk_sync_req_for_bind_op(bind_op, &cmd_buf->active_compute_pipe->generic_pipeline);
+    if (sync_req.barrier_masks.stage_mask == 0u) { continue; }
+    const ngfvk_sync_res res = ngfvk_sync_res_from_bind_op(bind_op);
+    if (res.type == NGFVK_SYNC_RES_COUNT) { continue; }
+    ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &res, &sync_req);
   }
-  ngfvk_cmd_buf_record_render_cmds(cmd_buf, &cmd_buf->pre_pass_cmd_chnks);
-  ngfvk_cmd_buf_reset_render_cmds(cmd_buf);
+
+  // Emit the necessary barriers prior to dispatch.
+  ngfvk_sync_req_batch_commit(&sync_req_batch, cmd_buf);
 
   // Allocate and write descriptor sets.
   ngfvk_execute_pending_binds(cmd_buf);
@@ -4752,19 +5087,58 @@ void ngf_cmd_draw(
     uint32_t           nelements,
     uint32_t           ninstances) {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
+
+  uint32_t nmax_pending_sync_reqs = 2u;
+  NGFI_CHNKLIST_FOR_EACH(cmd_buf->virt_bind_ops_ranges, ngfi_chnk_range, r) {
+    nmax_pending_sync_reqs += r->size;
+  }
+
+  ngfvk_sync_req_batch sync_req_batch;
+  ngfvk_sync_req_batch_init(nmax_pending_sync_reqs, &sync_req_batch);
+
+  const ngfvk_sync_req attr_buf_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT},
+      .layout = VK_IMAGE_LAYOUT_UNDEFINED};
+  if (cmd_buf->active_attr_buf) {
+    const ngfvk_sync_res attr_buf_res = ngfvk_sync_res_from_buf(cmd_buf->active_attr_buf);
+    ngfvk_sync_req_batch_add_with_lookup(
+        &sync_req_batch,
+        cmd_buf,
+        &attr_buf_res,
+        &attr_buf_sync_req);
+  }
+  if (indexed && cmd_buf->active_idx_buf) {
+    const ngfvk_sync_req idx_buf_sync_req = {
+        .barrier_masks =
+            {
+                .access_mask = VK_ACCESS_INDEX_READ_BIT,
+                .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+            },
+        .layout = VK_IMAGE_LAYOUT_UNDEFINED};
+    const ngfvk_sync_res idx_buf_res = ngfvk_sync_res_from_buf(cmd_buf->active_idx_buf);
+    ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &idx_buf_res, &idx_buf_sync_req);
+  }
+  cmd_buf->active_attr_buf = NULL;
+  cmd_buf->active_idx_buf  = NULL;
+
   NGFI_CHNKLIST_FOR_EACH(cmd_buf->virt_bind_ops_ranges, ngfi_chnk_range, r) {
     const ngfvk_render_cmd* render_cmds =
         ngfi_chnk_data(r->chnk, r->start * sizeof(ngfvk_render_cmd));
     for (size_t j = 0u; j < r->size; ++j) {
       const ngfvk_render_cmd* render_cmd = &render_cmds[j];
       assert(render_cmd->type == NGFVK_RENDER_CMD_BIND_RESOURCE);
-      ngfvk_cmd_buf_barrier_for_bindop(
-          cmd_buf,
+      const ngfvk_sync_req sync_req = ngfvk_sync_req_for_bind_op(
           &render_cmd->data.bind_resource,
           &cmd_buf->active_gfx_pipe->generic_pipeline);
+      if (sync_req.barrier_masks.stage_mask == 0u) { continue; }
+      const ngfvk_sync_res sync_res = ngfvk_sync_res_from_bind_op(&render_cmd->data.bind_resource);
+      ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &sync_res, &sync_req);
     }
   }
   ngfi_chnklist_clear(&cmd_buf->virt_bind_ops_ranges);
+  ngfvk_sync_req_batch_process(&sync_req_batch, cmd_buf);
 
   const ngfvk_render_cmd cmd = {
       .type = NGFVK_RENDER_CMD_DRAW,
@@ -4802,7 +5176,9 @@ void ngf_cmd_bind_resources(
         ngfi_chnklist_append(&buf->in_pass_cmd_chnks, &cmd, sizeof(cmd));
     ngfi_chnk_hdr* last_chnk = NGFI_CHNK_FROM_NODE(buf->in_pass_cmd_chnks.firstchnk->clnode.prev);
     if (last_chnk != curr_range.chnk) {
-      if (curr_range.chnk) { ngfi_chnklist_append(&buf->virt_bind_ops_ranges, &curr_range, sizeof(curr_range)); }
+      if (curr_range.chnk) {
+        ngfi_chnklist_append(&buf->virt_bind_ops_ranges, &curr_range, sizeof(curr_range));
+      }
       curr_range.chnk = last_chnk;
       curr_range.start =
           (uint32_t)(cmd_data - (const ngfvk_render_cmd*)ngfi_chnk_data(last_chnk, 0u));
@@ -4810,7 +5186,9 @@ void ngf_cmd_bind_resources(
     }
     ++curr_range.size;
   }
-  if (curr_range.chnk) { ngfi_chnklist_append(&buf->virt_bind_ops_ranges, &curr_range, sizeof(curr_range)); }
+  if (curr_range.chnk) {
+    ngfi_chnklist_append(&buf->virt_bind_ops_ranges, &curr_range, sizeof(curr_range));
+  }
 }
 
 void ngf_cmd_bind_compute_resources(
@@ -4823,9 +5201,7 @@ void ngf_cmd_bind_compute_resources(
 
 void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
-  if (buf->active_compute_pipe && buf->npending_bind_ops > 0u) {
-    ngfvk_execute_pending_binds(buf);
-  }
+  if (buf->active_compute_pipe && buf->npending_bind_ops > 0u) { ngfvk_execute_pending_binds(buf); }
 
   buf->active_compute_pipe = pipeline;
   vkCmdBindPipeline(
@@ -4875,16 +5251,11 @@ void ngf_cmd_bind_attrib_buffer(
     ngf_buffer         abuf,
     uint32_t           binding,
     size_t             offset) {
-  ngf_cmd_buffer         buf       = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_sync_state dst_state = {
-      .access =
-          {.types  = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT,
-           .stages = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT},
-      .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)abuf, false, &dst_state);
+  ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
       .type = NGFVK_RENDER_CMD_BIND_ATTRIB_BUFFER,
       .data = {.bind_attrib_buffer = {.binding = binding, .buffer = abuf, .offset = offset}}};
+  buf->active_attr_buf = abuf;
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
@@ -4893,18 +5264,11 @@ void ngf_cmd_bind_index_buffer(
     ngf_buffer         ibuf,
     size_t             offset,
     ngf_type           index_type) {
-  ngf_cmd_buffer         buf       = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_sync_state dst_state = {
-      .access =
-          {
-              .types  = VK_ACCESS_INDEX_READ_BIT,
-              .stages = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
-          },
-      .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)ibuf, false, &dst_state);
+  ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
       .type = NGFVK_RENDER_CMD_BIND_INDEX_BUFFER,
       .data = {.bind_index_buffer = {.buffer = ibuf, .offset = offset, .type = index_type}}};
+  buf->active_idx_buf = ibuf;
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
@@ -4917,16 +5281,24 @@ void ngf_cmd_copy_buffer(
     size_t           dst_offset) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
-  const ngfvk_sync_state src_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_READ_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  ngfvk_sync_req_batch sync_req_batch;
+  ngfi_sa_reset(ngfi_tmp_store());
+  ngfvk_sync_req_batch_init(2, &sync_req_batch);
+  const ngfvk_sync_req src_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_READ_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)src, false, &src_dst_state);
-  const ngfvk_sync_state dst_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_WRITE_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  const ngfvk_sync_res src_sync_res = ngfvk_sync_res_from_buf(src);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, buf, &src_sync_res, &src_sync_req);
+  const ngfvk_sync_req dst_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_WRITE_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)dst, false, &dst_dst_state);
-  ngfvk_cmd_buf_record_render_cmds(buf, &buf->pre_pass_cmd_chnks);
-  ngfvk_cmd_buf_reset_render_cmds(buf);
+  const ngfvk_sync_res dst_sync_res = ngfvk_sync_res_from_buf(dst);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, buf, &dst_sync_res, &dst_sync_req);
+  ngfvk_sync_req_batch_commit(&sync_req_batch, buf);
 
   const VkBufferCopy copy_region = {.srcOffset = src_offset, .dstOffset = dst_offset, .size = size};
   vkCmdCopyBuffer(
@@ -4946,16 +5318,24 @@ void ngf_cmd_write_image(
   assert(cmd_buf);
   assert(nwrites == 0u || writes);
   if (nwrites == 0u) return;
-  const ngfvk_sync_state src_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_READ_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  ngfvk_sync_req_batch sync_req_batch;
+  ngfi_sa_reset(ngfi_tmp_store());
+  ngfvk_sync_req_batch_init(2, &sync_req_batch);
+  const ngfvk_sync_req src_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_READ_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(cmd_buf, (uintptr_t)src, false, &src_dst_state);
-  const ngfvk_sync_state dst_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_WRITE_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  const ngfvk_sync_res src_sync_res = ngfvk_sync_res_from_buf(src);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &src_sync_res, &src_sync_req);
+  const ngfvk_sync_req dst_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_WRITE_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL};
-  ngfvk_cmd_buf_barrier(cmd_buf, (uintptr_t)dst, true, &dst_dst_state);
-  ngfvk_cmd_buf_record_render_cmds(cmd_buf, &cmd_buf->pre_pass_cmd_chnks);
-  ngfvk_cmd_buf_reset_render_cmds(cmd_buf);
+  const ngfvk_sync_res dst_sync_res = ngfvk_sync_res_from_img(dst);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &dst_sync_res, &dst_sync_req);
+  ngfvk_sync_req_batch_commit(&sync_req_batch, cmd_buf);
 
   ngfi_sa_reset(ngfi_tmp_store());
   VkBufferImageCopy* vk_writes =
@@ -4999,16 +5379,24 @@ void ngf_cmd_copy_image_to_buffer(
     size_t              dst_offset) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
-  const ngfvk_sync_state src_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_READ_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  ngfvk_sync_req_batch sync_req_batch;
+  ngfi_sa_reset(ngfi_tmp_store());
+  ngfvk_sync_req_batch_init(2, &sync_req_batch);
+  const ngfvk_sync_req src_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_READ_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)src.image, true, &src_dst_state);
-  const ngfvk_sync_state dst_dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_WRITE_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  const ngfvk_sync_res src_sync_res = ngfvk_sync_res_from_img(src.image);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, buf, &src_sync_res, &src_sync_req);
+  const ngfvk_sync_req dst_sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_WRITE_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_UNDEFINED};
-  ngfvk_cmd_buf_barrier(buf, (uintptr_t)dst, false, &dst_dst_state);
-  ngfvk_cmd_buf_record_render_cmds(buf, &buf->pre_pass_cmd_chnks);
-  ngfvk_cmd_buf_reset_render_cmds(buf);
+  const ngfvk_sync_res dst_sync_res = ngfvk_sync_res_from_buf(dst);
+  ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, buf, &dst_sync_res, &dst_sync_req);
+  ngfvk_sync_req_batch_commit(&sync_req_batch, buf);
 
   const uint32_t src_layer =
       src.image->type == NGF_IMAGE_TYPE_CUBE ? 6u * src.layer + src.cubemap_face : src.layer;
@@ -5047,20 +5435,13 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   // TODO: ensure the pixel format is valid for mip generation.
   // TODO: hazard-track images on mip + level granularity.
 
-  ngfvk_sync_state dst_state = {
-      .access = {.types = VK_ACCESS_TRANSFER_WRITE_BIT, .stages = VK_PIPELINE_STAGE_TRANSFER_BIT},
+  ngfvk_sync_req sync_req = {
+      .barrier_masks =
+          {.access_mask = VK_ACCESS_TRANSFER_WRITE_BIT,
+           .stage_mask  = VK_PIPELINE_STAGE_TRANSFER_BIT},
       .layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL};
-  ngfvk_sync_res_state* img_state;
-  const ngfvk_sync_res  img_res = {.type = NGFVK_SYNC_RES_IMAGE, .data = {.img = img}};
-  bool first_use = ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, &img_res, &dst_state, &img_state);
-
-  if (!first_use) {
-    ngfvk_cmd_buf_barrier(buf, (uintptr_t)img, true, &dst_state);
-    ngfvk_cmd_buf_record_render_cmds(buf, &buf->pre_pass_cmd_chnks);
-    ngfvk_cmd_buf_reset_render_cmds(buf);
-  } else {
-    img_state->first_use = false;
-  }
+  ngfvk_sync_res img_res = ngfvk_sync_res_from_img(img);
+  ngfvk_handle_single_sync_req(buf, &img_res, &sync_req);
 
   uint32_t src_w = img->extent.width, src_h = img->extent.height, src_d = img->extent.depth,
            dst_w = 0, dst_h = 0, dst_d = 0;
@@ -5126,25 +5507,22 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
       src_d = dst_d;
     }
   }
-  img_state->final_state.access.types  = VK_ACCESS_TRANSFER_READ_BIT;
-  img_state->final_state.access.stages = VK_PIPELINE_STAGE_TRANSFER_BIT;
-  img_state->final_state.layout        = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+  ngfvk_sync_res       r = ngfvk_sync_res_from_img(img);
+  ngfvk_sync_res_data* sync_res_data;
+  ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, & r, &sync_res_data);
+  sync_res_data->sync_state.active_readers_stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+  sync_res_data->sync_state.active_readers_access_mask |= VK_ACCESS_TRANSFER_READ_BIT;
+  sync_res_data->sync_state.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+
   return NGF_ERROR_OK;
 }
 
 void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) {
-  if (vkCmdBeginDebugUtilsLabelEXT) {
-    const VkDebugUtilsLabelEXT label = {
-        .color      = {0.f, 0.f, 0.f, 0.f},
-        .pLabelName = name,
-        .pNext      = NULL,
-        .sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
-    vkCmdBeginDebugUtilsLabelEXT(cmd_buffer->vk_cmd_buffer, &label);
-  }
+  ngfvk_debug_label_begin(cmd_buffer->vk_cmd_buffer, name);
 }
 
 void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) {
-  if (vkCmdEndDebugUtilsLabelEXT) { vkCmdEndDebugUtilsLabelEXT(cmd_buffer->vk_cmd_buffer); }
+  ngfvk_debug_label_end(cmd_buffer->vk_cmd_buffer);
 }
 
 ngf_error ngf_create_texel_buffer_view(
@@ -5245,44 +5623,10 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
     buf->size = info->size;
   }
 
-  buf->storage_type             = info->storage_type;
-  buf->usage_flags              = info->buffer_usage;
-  buf->curr_state.access.types  = 0u;
-  buf->curr_state.access.stages = 0u;
-  buf->curr_state.layout        = VK_IMAGE_LAYOUT_UNDEFINED;
-
-  memset(&buf->barrier_masks, 0u, sizeof(buf->barrier_masks));
-  static struct {
-    ngf_buffer_usage    hint;
-    ngfvk_barrier_masks masks;
-  } buf_hint_to_barrier_masks[] = {
-      {NGF_BUFFER_USAGE_INDEX_BUFFER,
-       {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_INDEX_READ_BIT}},
-      {NGF_BUFFER_USAGE_VERTEX_BUFFER,
-       {VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT}},
-      {NGF_BUFFER_USAGE_STORAGE_BUFFER,
-       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT}},
-      {NGF_BUFFER_USAGE_TEXEL_BUFFER,
-       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        VK_ACCESS_SHADER_READ_BIT}},
-      {NGF_BUFFER_USAGE_UNIFORM_BUFFER,
-       {VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        VK_ACCESS_UNIFORM_READ_BIT}},
-      {NGF_BUFFER_USAGE_XFER_DST, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT}},
-      {NGF_BUFFER_USAGE_XFER_SRC, {VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT}},
-  };
-  for (size_t i = 0u; i < sizeof(buf_hint_to_barrier_masks) / sizeof(buf_hint_to_barrier_masks[0]);
-       ++i) {
-    if (buf->usage_flags & buf_hint_to_barrier_masks[i].hint) {
-      buf->barrier_masks.access_mask |= buf_hint_to_barrier_masks[i].masks.access_mask;
-      buf->barrier_masks.pipeline_stage_mask |=
-          buf_hint_to_barrier_masks[i].masks.pipeline_stage_mask;
-    }
-  }
+  buf->storage_type = info->storage_type;
+  buf->usage_flags  = info->buffer_usage;
+  memset(&buf->sync_state, 0, sizeof(buf->sync_state));
+  buf->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   return err;
 }

@@ -93,7 +93,7 @@ static void* ngfi_dict_rehash(ngfi_dict* d, uintptr_t k) {
   NGFI_DICT_FOREACH(*d, it) {
     size_t idx = *(size_t*)it;
     ngfi_dict_slot* s   = ngfi_dict_get_slot(*d, idx);
-    void* data = ngfi_dict_get(&new_d, s->key, s->val);
+    void* data = ngfi_dict_get(&new_d, s->key, s->val, NULL);
     if (k != NGFI_DICT_INVALID_KEY && s->key == k) { result = data; }
   }
   assert(ngfi_dict_count(*d) == ngfi_dict_count(new_d));
@@ -103,7 +103,7 @@ static void* ngfi_dict_rehash(ngfi_dict* d, uintptr_t k) {
   return result;
 }
 
-void* ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val) {
+void* ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val, bool* new_entry) {
   assert(dict);
   assert(*dict);
   assert(key != NGFI_DICT_INVALID_KEY);
@@ -135,6 +135,7 @@ void* ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val) {
   }
 
   if (default_val && slot->key == NGFI_DICT_INVALID_KEY) {
+    if (new_entry) *new_entry = true;
     /* inserting a new value */
     slot->key = key;
     memcpy(slot->val, default_val, (*dict)->val_size);
@@ -149,6 +150,7 @@ void* ngfi_dict_get(ngfi_dict* dict, ngfi_dict_key key, void* default_val) {
   } else if (slot->key == NGFI_DICT_INVALID_KEY) {
     return NULL;
   } else {
+    if (new_entry) *new_entry = false;
     return slot->val;
   }
 }
