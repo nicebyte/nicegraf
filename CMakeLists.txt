@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2023 nicegraf contributors
+Copyright (c) 2024 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -86,7 +86,7 @@ if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/layer.mm
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_LIBS}
-                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/metal-cpp
+                     PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/metal-cpp
                      COPTS "-fobjc-arc")
 else()
   nmk_header_library(NAME nicegraf-vk-headers
@@ -142,10 +142,6 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
-    nmk_header_library(NAME nicegraf
-                   PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/../../include
-                   PUB_DEPS ${NGF_BACKEND})
-
 
     # Ensure we have the required dependencies are available.
     if (TARGET glfw)
@@ -214,6 +210,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                             ${NGF_PLATFORM_SOURCE}
                        DEPS ngf-imgui glfw nicegraf-misc-common
                        PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath
+                                    ${CMAKE_CURRENT_LIST_DIR}/samples/common
                        PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
                                     ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
