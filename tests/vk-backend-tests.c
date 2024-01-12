@@ -44,8 +44,9 @@ static void test_barrier(
     VkImageLayout        expected_dst_layout) {
   ngfvk_barrier_data bar;
 
+  const ngfvk_sync_req sync_req = {{dst_access_mask, dst_stage_mask}, expected_dst_layout};
   const bool barrier_necessary =
-      ngfvk_sync_barrier(sync_state, dst_stage_mask, dst_access_mask, expected_dst_layout, &bar);
+      ngfvk_sync_barrier(sync_state, &sync_req, &bar);
   const bool barrier_expected =
       expected_src_stage_mask != 0 || (expected_src_layout != expected_dst_layout);
   if (!barrier_expected) {
