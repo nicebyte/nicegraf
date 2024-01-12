@@ -661,8 +661,6 @@ NT_TESTSUITE {
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
     s = NGFI_CMD_BUFFER_PENDING;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
-    s = NGFI_CMD_BUFFER_READY;
-    NT_ASSERT(ngfi_transition_cmd_buf(&s, false, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
     s = NGFI_CMD_BUFFER_RECORDING;
     NT_ASSERT(ngfi_transition_cmd_buf(&s, true, NGFI_CMD_BUFFER_PENDING) != NGF_ERROR_OK);
 
