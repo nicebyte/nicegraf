@@ -216,15 +216,6 @@ typedef struct ngfvk_generic_pipeline {
   VkSpecializationInfo vk_spec_info;
 } ngfvk_generic_pipeline;
 
-// Synchronization state of a resource within the context of a single command buffer.
-typedef struct ngfvk_sync_state {
-  VkPipelineStageFlags last_writer_stage;
-  VkAccessFlags        last_writer_access_mask;
-  VkPipelineStageFlags active_readers_stage_mask;
-  VkAccessFlags        active_readers_access_mask;
-  VkImageLayout        layout;
-} ngfvk_sync_state;
-
 // Describes how a resource is accessed within a synchronization scope.
 typedef struct ngfvk_sync_barrier_masks {
   VkAccessFlags        access_mask;  // < Ways in which the resource is accessed.
@@ -236,6 +227,13 @@ typedef struct ngfvk_sync_req {
   ngfvk_sync_barrier_masks barrier_masks;  // < Access/stage masks.
   VkImageLayout            layout;         // < For image resources only, current layout.
 } ngfvk_sync_req;
+
+// Synchronization state of a resource within the context of a single command buffer.
+typedef struct ngfvk_sync_state {
+  ngfvk_sync_barrier_masks last_writer_masks;
+  ngfvk_sync_barrier_masks active_readers_masks;
+  VkImageLayout        layout;
+} ngfvk_sync_state;
 
 // Type of synchronized resource.
 typedef enum ngfvk_sync_res_type {
@@ -2507,47 +2505,48 @@ static bool ngfvk_sync_barrier(
     // Those can run concurrently with other read-only operations, and only need to wait for
     // any outstanding writes to complete.
 
-    if (sync_state->last_writer_stage != VK_PIPELINE_STAGE_NONE &&
-        (sync_state->active_readers_stage_mask & dst_stage_mask) != dst_stage_mask) {
+    if (sync_state->last_writer_masks.stage_mask != VK_PIPELINE_STAGE_NONE &&
+        (sync_state->active_readers_masks.stage_mask & dst_stage_mask) != dst_stage_mask) {
       // If there was a preceding write, and the stage requesting the read-only operation
       // hasn't consumed it yet, a barrier is necessary.
-      barrier->src_stage_mask |= sync_state->last_writer_stage;
-      barrier->src_access_mask |= sync_state->last_writer_access_mask & all_write_accesses_mask;
+      barrier->src_stage_mask |= sync_state->last_writer_masks.stage_mask;
+      barrier->src_access_mask |= sync_state->last_writer_masks.access_mask & all_write_accesses_mask;
     }
     // Add the requested operation to the mask of ongoing reads.
-    sync_state->active_readers_stage_mask |= dst_stage_mask;
-    sync_state->active_readers_access_mask |= dst_access_mask;
+    sync_state->active_readers_masks.stage_mask |= dst_stage_mask;
+    sync_state->active_readers_masks.access_mask |= dst_access_mask;
   } else {
     // Case for modifying operations.
     // No more than a single modifying operation may be in progress at a given time.
     // Modifying operations have to wait for all outstanding reads and writes to complete.
 
     // Add any outstanding readers to the barrier's source mask.
-    barrier->src_stage_mask |= sync_state->active_readers_stage_mask;
-    barrier->src_access_mask |= sync_state->active_readers_access_mask;
+    barrier->src_stage_mask |= sync_state->active_readers_masks.stage_mask;
+    barrier->src_access_mask |= sync_state->active_readers_masks.access_mask;
 
     // No active readers remain after a modifying op, so zero out their corresponding masks.
-    sync_state->active_readers_stage_mask  = 0u;
-    sync_state->active_readers_access_mask = 0u;
+    sync_state->active_readers_masks.stage_mask  = 0u;
+    sync_state->active_readers_masks.access_mask = 0u;
 
     // If there is an outstanding write, emit a barrier for it.
     // Note that we skip this if there were any outsdtanding reads, those already depend on the
     // write to finish, so it's sufficient to just depend on them.
-    if (barrier->src_stage_mask == 0 && sync_state->last_writer_stage != VK_PIPELINE_STAGE_NONE) {
-      barrier->src_stage_mask |= sync_state->last_writer_stage;
-      barrier->src_access_mask |= sync_state->last_writer_access_mask;
+    if (barrier->src_stage_mask == 0 &&
+        sync_state->last_writer_masks.stage_mask != VK_PIPELINE_STAGE_NONE) {
+      barrier->src_stage_mask |= sync_state->last_writer_masks.stage_mask;
+      barrier->src_access_mask |= sync_state->last_writer_masks.access_mask;
     }
 
     // Update last writer stage and access mask.
-    sync_state->last_writer_stage       = dst_stage_mask;
-    sync_state->last_writer_access_mask = dst_access_mask;
+    sync_state->last_writer_masks.stage_mask  = dst_stage_mask;
+    sync_state->last_writer_masks.access_mask = dst_access_mask;
 
     // If the requested access was actually readonly, mark it as synced with the last write
     // since in that context the last write is made by the layout transition, the results of which
     // are made available and visible to the destination stage automatically.
     if ((dst_access_mask & all_write_accesses_mask) == 0u) {
-      sync_state->active_readers_stage_mask |= dst_stage_mask;
-      sync_state->active_readers_access_mask |= dst_access_mask;
+      sync_state->active_readers_masks.stage_mask |= dst_stage_mask;
+      sync_state->active_readers_masks.access_mask |= dst_access_mask;
     }
   }
 
@@ -3137,11 +3136,11 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
             &patch_barrier_data,
             sizeof(patch_barrier_data));
       }
-      if (cmd_buf_res_state->sync_state.last_writer_access_mask != 0) {
+      if (cmd_buf_res_state->sync_state.last_writer_masks.access_mask != 0) {
         *global_sync_state = cmd_buf_res_state->sync_state;
       } else {
-        global_sync_state->active_readers_access_mask |=
-            cmd_buf_res_state->sync_state.active_readers_access_mask;
+        global_sync_state->active_readers_masks.access_mask |=
+            cmd_buf_res_state->sync_state.active_readers_masks.access_mask;
       }
     }
     if (pending_patch_barriers.npending_buf_bars + pending_patch_barriers.npending_img_bars > 0u) {
@@ -3191,7 +3190,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       const VkImageMemoryBarrier swapchain_mem_bar = {
           .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
           .pNext               = NULL,
-          .srcAccessMask       = swapchain_image->sync_state.last_writer_access_mask,
+          .srcAccessMask       = swapchain_image->sync_state.last_writer_masks.access_mask,
           .dstAccessMask       = 0u,
           .oldLayout           = swapchain_image->sync_state.layout,
           .newLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
@@ -3206,7 +3205,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
                  .levelCount     = 1u}};
       vkCmdPipelineBarrier(
           aux_cmd_buf,
-          swapchain_image->sync_state.last_writer_stage,
+          swapchain_image->sync_state.last_writer_masks.stage_mask,
           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
           0u,
           0u,
@@ -5508,8 +5507,8 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   ngfvk_sync_res       r = ngfvk_sync_res_from_img(img);
   ngfvk_sync_res_data* sync_res_data;
   ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, & r, &sync_res_data);
-  sync_res_data->sync_state.active_readers_stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
-  sync_res_data->sync_state.active_readers_access_mask |= VK_ACCESS_TRANSFER_READ_BIT;
+  sync_res_data->sync_state.active_readers_masks.stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
+  sync_res_data->sync_state.active_readers_masks.access_mask |= VK_ACCESS_TRANSFER_READ_BIT;
   sync_res_data->sync_state.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 
   return NGF_ERROR_OK;
