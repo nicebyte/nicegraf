@@ -254,9 +254,7 @@ typedef struct ngfvk_sync_res {
 // Data associated with a particular synchronized resource within the context of a single cmd
 // buffer.
 typedef struct ngfvk_sync_res_data {
-  VkPipelineStageFlags accessor_stages;  // < Mask of all stages accessing this resource.
-  VkAccessFlags    initial_accesses;  // < Mask of first accesses requested by accessing each stage.
-  VkImageLayout    initial_layout;    // < For images only, initial layout.
+  ngfvk_sync_req   expected_sync_req; // < Expected sync state.
   ngfvk_sync_state sync_state;        // < Latest synchronization state.
   uint32_t         pending_sync_req_idx;
   ngfvk_sync_res_type res_type;
@@ -2460,7 +2458,7 @@ static bool ngfvk_cmd_buf_lookup_res(
   ngfvk_sync_res_data new_res_state;
 
   memset(&new_res_state, 0, sizeof(new_res_state));
-  new_res_state.initial_layout       = VK_IMAGE_LAYOUT_UNDEFINED;
+  new_res_state.expected_sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
   if (default_res_data) {
     new_res_state.res_handle           = ngfvk_handle_from_sync_res(default_res_data);
     new_res_state.res_type             = default_res_data->type;
@@ -2479,11 +2477,13 @@ static bool ngfvk_cmd_buf_lookup_res(
 // If a barrier is not needed, returns false. Otherwise, populates the barrier data appropriately
 // and returns true.
 static bool ngfvk_sync_barrier(
-    ngfvk_sync_state*    sync_state,
-    VkPipelineStageFlags dst_stage_mask,
-    VkAccessFlagBits     dst_access_mask,
-    VkImageLayout        dst_layout,
-    ngfvk_barrier_data*  barrier) {
+    ngfvk_sync_state*     sync_state,
+    const ngfvk_sync_req* sync_req,
+    ngfvk_barrier_data*   barrier) {
+  const VkPipelineStageFlags dst_stage_mask  = sync_req->barrier_masks.stage_mask;
+  const VkAccessFlags        dst_access_mask = sync_req->barrier_masks.access_mask;
+  const VkImageLayout        dst_layout      = sync_req->layout;
+
   // Mask of all accesses we care about, that perform writes.
   static const VkAccessFlags all_write_accesses_mask =
       VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
@@ -2510,7 +2510,8 @@ static bool ngfvk_sync_barrier(
       // If there was a preceding write, and the stage requesting the read-only operation
       // hasn't consumed it yet, a barrier is necessary.
       barrier->src_stage_mask |= sync_state->last_writer_masks.stage_mask;
-      barrier->src_access_mask |= sync_state->last_writer_masks.access_mask & all_write_accesses_mask;
+      barrier->src_access_mask |=
+          sync_state->last_writer_masks.access_mask & all_write_accesses_mask;
     }
     // Add the requested operation to the mask of ongoing reads.
     sync_state->active_readers_masks.stage_mask |= dst_stage_mask;
@@ -2817,16 +2818,11 @@ static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_bu
       assert(false);
     }
 
-    const ngfvk_sync_res_type res_type       = sync_res_data->res_type;
     const ngfvk_sync_req*     sync_req       = &batch->pending_sync_reqs[i];
     const bool                fresh          = batch->freshness[i];
     ngfvk_barrier_data        barrier_data;
     const bool                barrier_needed = ngfvk_sync_barrier(
-        &sync_res_data->sync_state,
-        sync_req->barrier_masks.stage_mask,
-        sync_req->barrier_masks.access_mask,
-        (res_type == NGFVK_SYNC_RES_IMAGE) ? sync_req->layout : VK_IMAGE_LAYOUT_UNDEFINED,
-        &barrier_data);
+        &sync_res_data->sync_state, sync_req, &barrier_data);
     if (barrier_needed && !fresh) {
       barrier_data.res.type = sync_res_data->res_type;
       if (barrier_data.res.type == NGFVK_SYNC_RES_IMAGE) {
@@ -2842,16 +2838,16 @@ static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_bu
           sizeof(barrier_data));
     }
     sync_res_data->pending_sync_req_idx = ~0u;
-    if ((sync_res_data->accessor_stages & sync_req->barrier_masks.stage_mask) !=
+    if ((sync_res_data->expected_sync_req.barrier_masks.stage_mask & sync_req->barrier_masks.stage_mask) !=
         sync_req->barrier_masks.stage_mask) {
       // If this is the first time this resource is being accessed by these stages within this cmd
       // buffer, make a note of the requested access mask.
-      sync_res_data->accessor_stages |= sync_req->barrier_masks.stage_mask;
-      sync_res_data->initial_accesses |= sync_req->barrier_masks.access_mask;
+      sync_res_data->expected_sync_req.barrier_masks.stage_mask |= sync_req->barrier_masks.stage_mask;
+      sync_res_data->expected_sync_req.barrier_masks.access_mask |= sync_req->barrier_masks.access_mask;
     }
     // Make note of the initial layout with which the resource is expected to be used.
-    if (sync_res_data->initial_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
-      sync_res_data->initial_layout = sync_req->layout;
+    if (sync_res_data->expected_sync_req.layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+      sync_res_data->expected_sync_req.layout = sync_req->layout;
     }
   }
 }
@@ -3119,9 +3115,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       ngfvk_barrier_data patch_barrier_data;
       if (ngfvk_sync_barrier(
               global_sync_state,
-              cmd_buf_res_state->accessor_stages,
-              cmd_buf_res_state->initial_accesses,
-              cmd_buf_res_state->initial_layout,
+              &cmd_buf_res_state->expected_sync_req,
               &patch_barrier_data)) {
         patch_barrier_data.res.type = cmd_buf_res_state->res_type;
         if (patch_barrier_data.res.type == NGFVK_SYNC_RES_IMAGE) {
