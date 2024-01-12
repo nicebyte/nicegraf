@@ -56,7 +56,7 @@ ngf_error ngfi_transition_cmd_buf(
     }
     break;
   case NGFI_CMD_BUFFER_PENDING:
-    if (*cur_state != NGFI_CMD_BUFFER_READY_TO_SUBMIT) {
+    if (*cur_state != NGFI_CMD_BUFFER_READY_TO_SUBMIT && *cur_state != NGFI_CMD_BUFFER_READY) {
       NGFI_DIAG_ERROR("command buffer not ready to be submitted");
       return NGF_ERROR_INVALID_OPERATION;
     }
