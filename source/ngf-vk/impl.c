@@ -4065,9 +4065,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     const bool needs_resolve = rt->attachment_descs[i].type == NGF_ATTACHMENT_COLOR &&
                                rt->have_resolve_attachments &&
                                rt->attachment_descs[i].sample_count > NGF_SAMPLE_COUNT_1;
-    store_ops[i] = needs_resolve                        ? NGF_STORE_OP_RESOLVE
-                   : rt->attachment_descs[i].is_sampled ? NGF_STORE_OP_STORE
-                                                        : NGF_STORE_OP_DONTCARE;
+    store_ops[i] = needs_resolve ? NGF_STORE_OP_RESOLVE : NGF_STORE_OP_STORE;
   }
   const ngf_render_pass_info pass_info = {
       .render_target = rt,
