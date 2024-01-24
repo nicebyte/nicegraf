@@ -4372,6 +4372,10 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   ngfi_sa_reset(ngfi_tmp_store());
   ngfi_sa_reset(ngfi_frame_store());
 
+  // Retire resources.
+  ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[fi];
+  ngfvk_retire_resources(next_frame_res);
+
   const bool needs_present = CURRENT_CONTEXT->swapchain.vk_swapchain != VK_NULL_HANDLE;
 
   if (needs_present) {
@@ -4386,10 +4390,6 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
       return NGF_ERROR_INVALID_OPERATION;
     }
   }
-
-  // Retire resources.
-  ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[fi];
-  ngfvk_retire_resources(next_frame_res);
 
   CURRENT_CONTEXT->current_frame_token = ngfi_encode_frame_token(
       (uint16_t)((uintptr_t)CURRENT_CONTEXT & 0xffff),
