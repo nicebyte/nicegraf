@@ -232,7 +232,8 @@ typedef struct ngfvk_sync_req {
 typedef struct ngfvk_sync_state {
   ngfvk_sync_barrier_masks last_writer_masks;
   ngfvk_sync_barrier_masks active_readers_masks;
-  VkImageLayout        layout;
+  uint32_t                 per_stage_readers_mask;
+  VkImageLayout            layout;
 } ngfvk_sync_state;
 
 // Type of synchronized resource.
@@ -254,20 +255,20 @@ typedef struct ngfvk_sync_res {
 // Data associated with a particular synchronized resource within the context of a single cmd
 // buffer.
 typedef struct ngfvk_sync_res_data {
-  ngfvk_sync_req   expected_sync_req; // < Expected sync state.
-  ngfvk_sync_state sync_state;        // < Latest synchronization state.
-  uint32_t         pending_sync_req_idx;
+  ngfvk_sync_req      expected_sync_req;  // < Expected sync state.
+  ngfvk_sync_state    sync_state;         // < Latest synchronization state.
+  uint32_t            pending_sync_req_idx;
   ngfvk_sync_res_type res_type;
   uintptr_t           res_handle;
 } ngfvk_sync_res_data;
 
 typedef struct ngfvk_sync_req_batch {
-  uintptr_t*            sync_res_data_keys;
-  ngfvk_sync_req*       pending_sync_reqs;
-  bool*                 freshness;
-  uint32_t              npending_sync_reqs;
-  uint32_t              nbuffer_sync_reqs;
-  uint32_t              nimage_sync_reqs;
+  uintptr_t*      sync_res_data_keys;
+  ngfvk_sync_req* pending_sync_reqs;
+  bool*           freshness;
+  uint32_t        npending_sync_reqs;
+  uint32_t        nbuffer_sync_reqs;
+  uint32_t        nimage_sync_reqs;
 } ngfvk_sync_req_batch;
 
 typedef enum ngfvk_render_cmd_type {
@@ -2472,6 +2473,101 @@ static bool ngfvk_cmd_buf_lookup_res(
   return new_res;
 }
 
+static uint32_t ngfvk_next_nonzero_bit(uint32_t* mask) {
+  const uint32_t old_mask = *mask;
+  return (*mask = old_mask & (old_mask - 1), *mask ^ old_mask);
+}
+
+static uint32_t ngfvk_stage_idx(VkPipelineStageFlagBits bit) {
+  switch (bit) {
+  case VK_PIPELINE_STAGE_VERTEX_INPUT_BIT:
+    return 0;
+  case VK_PIPELINE_STAGE_VERTEX_SHADER_BIT:
+    return 1;
+  case VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT:
+    return 2;
+  case VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT:
+    return 3;
+  case VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT:
+    return 4;
+  case VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT:
+    return 5;
+  case VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT:
+    return 6;
+  case VK_PIPELINE_STAGE_TRANSFER_BIT:
+    return 7;
+  default:
+    assert(false);
+  }
+  return ~0u;
+}
+
+static uint32_t ngfvk_access_idx(VkAccessFlagBits bit) {
+  switch (bit) {
+  case VK_ACCESS_SHADER_READ_BIT:
+    return 0u;
+  case VK_ACCESS_SHADER_WRITE_BIT:
+    return 1u;
+  case VK_ACCESS_UNIFORM_READ_BIT:
+    return 2u;
+  case VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT:
+    return 0u;
+  case VK_ACCESS_INDEX_READ_BIT:
+    return 1u;
+  case VK_ACCESS_COLOR_ATTACHMENT_READ_BIT:
+    return 0u;
+  case VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT:
+    return 1u;
+  case VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT:
+    return 0u;
+  case VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT:
+    return 1u;
+  case VK_ACCESS_TRANSFER_READ_BIT:
+    return 0u;
+  case VK_ACCESS_TRANSFER_WRITE_BIT:
+    return 1u;
+  default:
+    assert(false);
+  }
+  return ~0u;
+}
+
+static uint32_t ngfvk_per_stage_access_mask(const ngfvk_sync_barrier_masks* barrier_masks) {
+  static const VkAccessFlags valid_access_flags[] = {
+      VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT,  // VERTEX_INPUT
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT,          // VERTEX_SHADER
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT,          // FRAGMENT_SHADER
+      VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+          VK_ACCESS_SHADER_WRITE_BIT,  // COMPUTE_SHADER
+      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,  // EARLY_FRAGMENT_TESTS
+      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
+          VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,  // LATE_FRAGMENT_TESTS
+      VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
+          VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,                   // COLOR_ATTACHMENT_OUTPUT
+      VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT  // TRANSFER
+  };
+  static const uint32_t bits_per_stage = 3u;
+
+  uint32_t stage_mask = (uint32_t)barrier_masks->stage_mask;
+  uint32_t result     = 0u;
+
+  while (stage_mask) {
+    const VkPipelineStageFlagBits stage_bit =
+        (VkPipelineStageFlagBits)ngfvk_next_nonzero_bit(&stage_mask);
+    const uint32_t stg_idx     = ngfvk_stage_idx(stage_bit);
+    uint32_t       access_mask = (uint32_t)barrier_masks->access_mask;
+    while (access_mask) {
+      const VkAccessFlagBits access_bit = (VkAccessFlagBits)ngfvk_next_nonzero_bit(&access_mask);
+      if (valid_access_flags[stg_idx] & access_bit) {
+        const uint32_t acc_idx = ngfvk_access_idx(access_bit);
+        result |= (1 << (bits_per_stage * stg_idx + acc_idx));
+      }
+    }
+  }
+  return result;
+}
+
 // Checks whether a barrier is needed before performing an operation on a resource, given its
 // sync state.
 // If a barrier is not needed, returns false. Otherwise, populates the barrier data appropriately
@@ -2505,8 +2601,12 @@ static bool ngfvk_sync_barrier(
     // Those can run concurrently with other read-only operations, and only need to wait for
     // any outstanding writes to complete.
 
+    const uint32_t per_stg_acc_mask = ngfvk_per_stage_access_mask(&sync_req->barrier_masks);
+    const bool     accesses_seen_write =
+        ((sync_state->per_stage_readers_mask & per_stg_acc_mask) == per_stg_acc_mask);
+
     if (sync_state->last_writer_masks.stage_mask != VK_PIPELINE_STAGE_NONE &&
-        (sync_state->active_readers_masks.stage_mask & dst_stage_mask) != dst_stage_mask) {
+        !accesses_seen_write) {
       // If there was a preceding write, and the stage requesting the read-only operation
       // hasn't consumed it yet, a barrier is necessary.
       barrier->src_stage_mask |= sync_state->last_writer_masks.stage_mask;
@@ -2516,6 +2616,7 @@ static bool ngfvk_sync_barrier(
     // Add the requested operation to the mask of ongoing reads.
     sync_state->active_readers_masks.stage_mask |= dst_stage_mask;
     sync_state->active_readers_masks.access_mask |= dst_access_mask;
+    sync_state->per_stage_readers_mask |= per_stg_acc_mask;
   } else {
     // Case for modifying operations.
     // No more than a single modifying operation may be in progress at a given time.
@@ -2528,6 +2629,7 @@ static bool ngfvk_sync_barrier(
     // No active readers remain after a modifying op, so zero out their corresponding masks.
     sync_state->active_readers_masks.stage_mask  = 0u;
     sync_state->active_readers_masks.access_mask = 0u;
+    sync_state->per_stage_readers_mask           = 0u;
 
     // If there is an outstanding write, emit a barrier for it.
     // Note that we skip this if there were any outsdtanding reads, those already depend on the
@@ -2548,6 +2650,7 @@ static bool ngfvk_sync_barrier(
     if ((dst_access_mask & all_write_accesses_mask) == 0u) {
       sync_state->active_readers_masks.stage_mask |= dst_stage_mask;
       sync_state->active_readers_masks.access_mask |= dst_access_mask;
+      sync_state->per_stage_readers_mask |= ngfvk_per_stage_access_mask(&sync_req->barrier_masks);
     }
   }
 
@@ -2625,7 +2728,7 @@ static bool ngfvk_sync_req_batch_add(
     batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx].layout =
         VK_IMAGE_LAYOUT_UNDEFINED;
     batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx] = sync_res_data->res_handle;
-  } 
+  }
   if (fresh && sync_res_data->pending_sync_req_idx < batch->npending_sync_reqs) {
     batch->freshness[sync_res_data->pending_sync_req_idx] = true;
   }
@@ -2640,7 +2743,8 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
   ngfvk_sync_res_data* sync_res_data;
-  const bool           fresh = ngfvk_cmd_buf_lookup_res(cmd_buf, ngfvk_handle_from_sync_res(res), res, &sync_res_data);
+  const bool           fresh =
+      ngfvk_cmd_buf_lookup_res(cmd_buf, ngfvk_handle_from_sync_res(res), res, &sync_res_data);
   return ngfvk_sync_req_batch_add(batch, sync_res_data, fresh, sync_req);
 }
 
@@ -2728,8 +2832,8 @@ static void ngfvk_sync_commit_pending_barriers_sync2(
       NGFI_SALLOC(VkImageMemoryBarrier2, pending_bars->npending_img_bars);
   VkBufferMemoryBarrier2* buf_bars =
       NGFI_SALLOC(VkBufferMemoryBarrier2, pending_bars->npending_buf_bars);
-  uint32_t             nimg_bars      = 0u;
-  uint32_t             nbuf_bars      = 0u;
+  uint32_t nimg_bars = 0u;
+  uint32_t nbuf_bars = 0u;
   NGFI_CHNKLIST_FOR_EACH(pending_bars->chnklist, ngfvk_barrier_data, barrier) {
     switch (barrier->res.type) {
     case NGFVK_SYNC_RES_IMAGE: {
@@ -2792,8 +2896,7 @@ static void ngfvk_sync_commit_pending_barriers_sync2(
         .memoryBarrierCount       = 0u,
         .pBufferMemoryBarriers    = buf_bars,
         .pImageMemoryBarriers     = img_bars,
-        .pMemoryBarriers          = NULL
-    };
+        .pMemoryBarriers          = NULL};
     vkCmdPipelineBarrier2(cmd_buf, &dep_info);
   }
 }
@@ -2818,11 +2921,11 @@ static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_bu
       assert(false);
     }
 
-    const ngfvk_sync_req*     sync_req       = &batch->pending_sync_reqs[i];
-    const bool                fresh          = batch->freshness[i];
-    ngfvk_barrier_data        barrier_data;
-    const bool                barrier_needed = ngfvk_sync_barrier(
-        &sync_res_data->sync_state, sync_req, &barrier_data);
+    const ngfvk_sync_req* sync_req = &batch->pending_sync_reqs[i];
+    const bool            fresh    = batch->freshness[i];
+    ngfvk_barrier_data    barrier_data;
+    const bool            barrier_needed =
+        ngfvk_sync_barrier(&sync_res_data->sync_state, sync_req, &barrier_data);
     if (barrier_needed && !fresh) {
       barrier_data.res.type = sync_res_data->res_type;
       if (barrier_data.res.type == NGFVK_SYNC_RES_IMAGE) {
@@ -2838,12 +2941,14 @@ static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_bu
           sizeof(barrier_data));
     }
     sync_res_data->pending_sync_req_idx = ~0u;
-    if ((sync_res_data->expected_sync_req.barrier_masks.stage_mask & sync_req->barrier_masks.stage_mask) !=
-        sync_req->barrier_masks.stage_mask) {
+    if ((sync_res_data->expected_sync_req.barrier_masks.stage_mask &
+         sync_req->barrier_masks.stage_mask) != sync_req->barrier_masks.stage_mask) {
       // If this is the first time this resource is being accessed by these stages within this cmd
       // buffer, make a note of the requested access mask.
-      sync_res_data->expected_sync_req.barrier_masks.stage_mask |= sync_req->barrier_masks.stage_mask;
-      sync_res_data->expected_sync_req.barrier_masks.access_mask |= sync_req->barrier_masks.access_mask;
+      sync_res_data->expected_sync_req.barrier_masks.stage_mask |=
+          sync_req->barrier_masks.stage_mask;
+      sync_res_data->expected_sync_req.barrier_masks.access_mask |=
+          sync_req->barrier_masks.access_mask;
     }
     // Make note of the initial layout with which the resource is expected to be used.
     if (sync_res_data->expected_sync_req.layout == VK_IMAGE_LAYOUT_UNDEFINED) {
@@ -2861,8 +2966,8 @@ static void ngfvk_handle_single_sync_req(
     ngf_cmd_buffer        cmd_buf,
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
-  bool                 fresh             = false;
-  uintptr_t sync_res_data_key = 0;
+  bool           fresh             = false;
+  uintptr_t      sync_res_data_key = 0;
   ngfvk_sync_req empty_sync_req = {.barrier_masks = {0u, 0u}, .layout = VK_IMAGE_LAYOUT_UNDEFINED};
 
   ngfvk_sync_req_batch batch = {
@@ -2894,8 +2999,7 @@ static ngfvk_sync_res ngfvk_sync_res_from_bind_op(const ngf_resource_bind_op* bi
   default:
     break;
   }
-  const ngfvk_sync_res none = {
-      .type = NGFVK_SYNC_RES_COUNT, .data = {.buf = NULL}};
+  const ngfvk_sync_res none = {.type = NGFVK_SYNC_RES_COUNT, .data = {.buf = NULL}};
   return none;
 }
 
@@ -3135,6 +3239,8 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       } else {
         global_sync_state->active_readers_masks.access_mask |=
             cmd_buf_res_state->sync_state.active_readers_masks.access_mask;
+        global_sync_state->per_stage_readers_mask |=
+            cmd_buf_res_state->sync_state.per_stage_readers_mask;
       }
     }
     if (pending_patch_barriers.npending_buf_bars + pending_patch_barriers.npending_img_bars > 0u) {
@@ -3551,17 +3657,13 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
               .queueFamilyIndex = _vk.gfx_family_idx,
               .queueCount       = 1,
               .pQueuePriorities = &queue_prio}};
-  const uint32_t num_queue_infos = (same_gfx_and_present ? 1u : 2u);
-  const char*    device_exts[]   = {
-      "VK_KHR_maintenance1",
-      "VK_KHR_swapchain",
-      NULL,
-      NULL };
-  const uint32_t nmandatory_exts        = 2u;
+  const uint32_t num_queue_infos          = (same_gfx_and_present ? 1u : 2u);
+  const char*    device_exts[]            = {"VK_KHR_maintenance1", "VK_KHR_swapchain", NULL, NULL};
+  const uint32_t nmandatory_exts          = 2u;
   uint32_t       nsupported_optional_exts = 0u;
   const bool     shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
-  const bool     sync2_supported = ngfvk_phys_dev_extension_supported("VK_KHR_synchronization2");
+  const bool sync2_supported = ngfvk_phys_dev_extension_supported("VK_KHR_synchronization2");
   if (shader_float16_int8_supported) {
     device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_shader_float16_int8";
   }
@@ -3580,7 +3682,8 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .shaderFloat16 = false,
       .shaderInt8    = false};
   VkPhysicalDeviceSynchronization2Features sync2_features = {
-      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES, .pNext = &sf16_features };
+      .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES,
+      .pNext = &sf16_features};
 
   void* features_structs = NULL;
   if (shader_float16_int8_supported) {
@@ -3600,15 +3703,15 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   }
 
   const VkDeviceCreateInfo dev_info = {
-      .sType                = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-      .pNext                = features_structs,
-      .flags                = 0,
-      .queueCreateInfoCount = num_queue_infos,
-      .pQueueCreateInfos    = &queue_infos[same_gfx_and_present ? 1u : 0u],
-      .enabledLayerCount    = 0,
-      .ppEnabledLayerNames  = NULL,
-      .pEnabledFeatures     = &required_features,
-      .enabledExtensionCount = nmandatory_exts + nsupported_optional_exts,
+      .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext                   = features_structs,
+      .flags                   = 0,
+      .queueCreateInfoCount    = num_queue_infos,
+      .pQueueCreateInfos       = &queue_infos[same_gfx_and_present ? 1u : 0u],
+      .enabledLayerCount       = 0,
+      .ppEnabledLayerNames     = NULL,
+      .pEnabledFeatures        = &required_features,
+      .enabledExtensionCount   = nmandatory_exts + nsupported_optional_exts,
       .ppEnabledExtensionNames = device_exts};
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
   if (vk_err != VK_SUCCESS) {
@@ -4355,7 +4458,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
 }
 
 ngf_error ngf_begin_frame(ngf_frame_token* token) {
-  ngf_error  err = NGF_ERROR_OK;
+  ngf_error err = NGF_ERROR_OK;
 
   // increment frame id.
   const uint32_t fi = (CURRENT_CONTEXT->frame_id + 1u) % CURRENT_CONTEXT->max_inflight_frames;
@@ -5500,7 +5603,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   }
   ngfvk_sync_res       r = ngfvk_sync_res_from_img(img);
   ngfvk_sync_res_data* sync_res_data;
-  ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, & r, &sync_res_data);
+  ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, &r, &sync_res_data);
   sync_res_data->sync_state.active_readers_masks.stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
   sync_res_data->sync_state.active_readers_masks.access_mask |= VK_ACCESS_TRANSFER_READ_BIT;
   sync_res_data->sync_state.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;

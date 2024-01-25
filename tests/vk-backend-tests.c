@@ -34,6 +34,15 @@ static ngfvk_sync_state empty_sync_state() {
   return result;
 }
 
+static void test_stg_access_mask(
+    uint32_t             expected_result,
+    VkPipelineStageFlags stages,
+    VkAccessFlags        accesses) {
+  const ngfvk_sync_barrier_masks m      = {accesses, stages};
+  const uint32_t                 result = ngfvk_per_stage_access_mask(&m);
+  NT_ASSERT(result == expected_result);
+}
+
 static void test_barrier(
     ngfvk_sync_state*    sync_state,
     VkPipelineStageFlags dst_stage_mask,
@@ -564,6 +573,69 @@ NT_TESTSUITE {
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_ACCESS_SHADER_READ_BIT,
         VK_IMAGE_LAYOUT_GENERAL);
+  }
+
+  NT_TESTCASE("stg access map") {
+#define BITMASK3x8(b7, b6, b5, b4, b3, b2, b1, b0) (((b7) << 21) | ((b6) << 18) | ((b5) << 15) | ((b4) << 12) | ((b3) << 9) | ((b2) << 6) | ((b1) << 3) | (b0) )
+    // clang-format: off
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b001),
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b010),
+        VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_INDEX_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b001, 0b000),
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b101, 0b000),
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b101, 0b101, 0b000),
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b101, 0b101, 0b000),
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b111, 0b101, 0b101, 0b000),
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b011, 0b011, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b011, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b001, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b010, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b011, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_TRANSFER_BIT,
+        VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT);
+    test_stg_access_mask(
+        BITMASK3x8(0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000, 0b000),
+        VK_PIPELINE_STAGE_TRANSFER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+        VK_ACCESS_SHADER_READ_BIT);
+#undef BITMASK3x8
+    // clang-format: on
   }
 
  }
