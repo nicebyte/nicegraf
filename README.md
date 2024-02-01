@@ -7,11 +7,20 @@ nicegraf
 <img src="https://github.com/nicebyte/nicegraf/blob/master/docs/logo.png?raw=true" width="256"/>
 </p>
 <p align="center">
-An abstraction layer for low-level platform-specific GPU APIs.
+An abstraction layer for GPU APIs.
 </p>
 <p align="center">
 <a href="https://discord.gg/VArYv64D">Discord</a> · <a href="http://wiki.gpfault.net/docs/nicegraf">Reference Documentation</a> · <a href="https://github.com/nicebyte/nicegraf/tree/master/samples">Sample Code</a>
 </p>
+
+# platform support matrix
+
+|   | 🟦 | 🐧 | 🍏 |
+|---|---|---|---|
+| 🌋 | 🟩 | 🟩 | 🟨 |
+| 🤘 | 🟥 | 🟥 | 🟩 |
+
+
 
 
 # credits
