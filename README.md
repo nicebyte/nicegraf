@@ -10,7 +10,7 @@ nicegraf
 An abstraction layer for low-level platform-specific GPU APIs.
 </p>
 <p align="center">
-<a href="http://wiki.gpfault.net/docs/nicegraf">Reference Documentation</a> · <a href="https://github.com/nicebyte/nicegraf/tree/master/samples">Sample Code</a>
+<a href="https://discord.gg/VArYv64D">Discord</a> · <a href="http://wiki.gpfault.net/docs/nicegraf">Reference Documentation</a> · <a href="https://github.com/nicebyte/nicegraf/tree/master/samples">Sample Code</a>
 </p>
 
 
