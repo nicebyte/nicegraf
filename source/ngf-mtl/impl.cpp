@@ -2264,6 +2264,16 @@ void ngf_cmd_bind_resources(
   }
 }
 
+static std::optional<ngf_image_format> get_regular_format_from_srgb(const ngf_image_format f) {
+  switch (f) {
+    case NGF_IMAGE_FORMAT_SRGB8: return NGF_IMAGE_FORMAT_RGB8;
+    case NGF_IMAGE_FORMAT_SRGBA8: return NGF_IMAGE_FORMAT_RGBA8;
+    case NGF_IMAGE_FORMAT_BGR8_SRGB: return NGF_IMAGE_FORMAT_BGR8;
+    case NGF_IMAGE_FORMAT_BGRA8_SRGB: return NGF_IMAGE_FORMAT_BGRA8;
+    default: return std::nullopt;
+  }
+}
+
 void ngf_cmd_bind_compute_resources(
     ngf_compute_encoder         enc,
     const ngf_resource_bind_op* bind_ops,
@@ -2317,7 +2327,13 @@ void ngf_cmd_bind_compute_resources(
     case NGF_DESCRIPTOR_STORAGE_IMAGE:
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
+        if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.image->format) ) {
+          const auto view = img_bind_op.image->texture.get()->newTextureView(
+            get_mtl_pixel_format(maybe_format.value()).format);
+          cmd_buf->active_cce->setTexture(view, native_binding);
+        } else {
+          cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
+        }
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
