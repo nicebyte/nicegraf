@@ -651,6 +651,7 @@ struct ngf_sampler_t {
 
 struct ngf_image_t {
   ngf_id<MTL::Texture> texture = nullptr;
+  ngf_id<MTL::Texture> view = nullptr;
   ngf_image_format     format;
   uint32_t             usage_flags = 0u;
 };
@@ -2328,9 +2329,10 @@ void ngf_cmd_bind_compute_resources(
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
         if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.image->format) ) {
-          const auto view = img_bind_op.image->texture.get()->newTextureView(
-            get_mtl_pixel_format(maybe_format.value()).format);
-          cmd_buf->active_cce->setTexture(view, native_binding);
+          if (!img_bind_op.image->view)
+            img_bind_op.image->view = img_bind_op.image->texture.get()->newTextureView(
+                get_mtl_pixel_format(maybe_format.value()).format);
+          cmd_buf->active_cce->setTexture(img_bind_op.image->view.get(), native_binding);
         } else {
           cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
         }
