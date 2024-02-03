@@ -651,7 +651,10 @@ struct ngf_sampler_t {
 
 struct ngf_image_t {
   ngf_id<MTL::Texture> texture = nullptr;
-  ngf_id<MTL::Texture> view = nullptr;
+
+  // Workaround for binding srgb images as writeable storage images.
+  ngf_id<MTL::Texture> non_srgb_view = nullptr;
+
   ngf_image_format     format;
   uint32_t             usage_flags = 0u;
 };
@@ -2329,10 +2332,10 @@ void ngf_cmd_bind_compute_resources(
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
         if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.image->format) ) {
-          if (!img_bind_op.image->view)
-            img_bind_op.image->view = img_bind_op.image->texture.get()->newTextureView(
+          if (!img_bind_op.image->non_srgb_view)
+            img_bind_op.image->non_srgb_view = img_bind_op.image->texture.get()->newTextureView(
                 get_mtl_pixel_format(maybe_format.value()).format);
-          cmd_buf->active_cce->setTexture(img_bind_op.image->view.get(), native_binding);
+          cmd_buf->active_cce->setTexture(img_bind_op.image->non_srgb_view.get(), native_binding);
         } else {
           cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
         }
