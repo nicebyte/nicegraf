@@ -260,6 +260,7 @@ typedef struct ngfvk_sync_res_data {
   uint32_t            pending_sync_req_idx;
   ngfvk_sync_res_type res_type;
   uintptr_t           res_handle;
+  bool                had_barrier;
 } ngfvk_sync_res_data;
 
 typedef struct ngfvk_sync_req_batch {
@@ -2939,20 +2940,19 @@ static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_bu
           &cmd_buf->pending_barriers.chnklist,
           &barrier_data,
           sizeof(barrier_data));
+      sync_res_data->had_barrier = true;
     }
     sync_res_data->pending_sync_req_idx = ~0u;
-    if ((sync_res_data->expected_sync_req.barrier_masks.stage_mask &
-         sync_req->barrier_masks.stage_mask) != sync_req->barrier_masks.stage_mask) {
-      // If this is the first time this resource is being accessed by these stages within this cmd
-      // buffer, make a note of the requested access mask.
+
+    if (!sync_res_data->had_barrier) {
       sync_res_data->expected_sync_req.barrier_masks.stage_mask |=
           sync_req->barrier_masks.stage_mask;
       sync_res_data->expected_sync_req.barrier_masks.access_mask |=
           sync_req->barrier_masks.access_mask;
-    }
-    // Make note of the initial layout with which the resource is expected to be used.
-    if (sync_res_data->expected_sync_req.layout == VK_IMAGE_LAYOUT_UNDEFINED) {
-      sync_res_data->expected_sync_req.layout = sync_req->layout;
+      // Make note of the initial layout with which the resource is expected to be used.
+      if (sync_res_data->expected_sync_req.layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+        sync_res_data->expected_sync_req.layout = sync_req->layout;
+      }
     }
   }
 }
@@ -3338,7 +3338,6 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   VkResult submit_result = vkQueueSubmit(_vk.gfx_queue, 1, &submit_info, signal_fence);
 
   if (submit_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
-
   return err;
 }
 
