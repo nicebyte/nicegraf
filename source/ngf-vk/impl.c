@@ -250,6 +250,7 @@ typedef struct ngfvk_sync_res {
     ngf_buffer buf;
   } data;
   ngfvk_sync_res_type type;
+  uint64_t            hash;
 } ngfvk_sync_res;
 
 // Data associated with a particular synchronized resource within the context of a single cmd
@@ -264,12 +265,12 @@ typedef struct ngfvk_sync_res_data {
 } ngfvk_sync_res_data;
 
 typedef struct ngfvk_sync_req_batch {
-  uintptr_t*      sync_res_data_keys;
-  ngfvk_sync_req* pending_sync_reqs;
-  bool*           freshness;
-  uint32_t        npending_sync_reqs;
-  uint32_t        nbuffer_sync_reqs;
-  uint32_t        nimage_sync_reqs;
+  ngfi_dict_keyhash* sync_res_data_keys;
+  ngfvk_sync_req*    pending_sync_reqs;
+  bool*              freshness;
+  uint32_t           npending_sync_reqs;
+  uint32_t           nbuffer_sync_reqs;
+  uint32_t           nimage_sync_reqs;
 } ngfvk_sync_req_batch;
 
 typedef enum ngfvk_render_cmd_type {
@@ -372,6 +373,7 @@ typedef struct ngf_buffer_t {
   size_t                  size;
   size_t                  mapped_offset;
   ngfvk_sync_state        sync_state;
+  uint64_t                hash;
   uint32_t                usage_flags;
   ngf_buffer_storage_type storage_type;
 } ngf_buffer_t;
@@ -388,6 +390,7 @@ typedef struct ngf_image_t {
   ngf_extent3d     extent;
   ngf_image_type   type;
   ngfvk_sync_state sync_state;
+  uint64_t         hash;
   uint32_t         usage_flags;
   uint32_t         nlevels;
   uint32_t         nlayers;
@@ -2436,13 +2439,25 @@ static void ngfvk_cmd_buf_reset_res_states(ngf_cmd_buffer cmd_buf) {
   ngfi_dict_clear(cmd_buf->local_res_states);
 }
 
-static ngfvk_sync_res ngfvk_sync_res_from_buf(ngf_buffer buffer) {
-  ngfvk_sync_res sync_res = {.data = {.buf = buffer}, .type = NGFVK_SYNC_RES_BUFFER};
+static inline uint64_t ngfvk_ptr_hash(void* data) {
+  uint64_t mmh3_out[2];
+  ngfi_mmh3_x64_128((uintptr_t)data, 0x9e3779b9, mmh3_out);
+  return mmh3_out[0]^mmh3_out[1];
+}
+
+static inline ngfvk_sync_res ngfvk_sync_res_from_buf(ngf_buffer buf) {
+  ngfvk_sync_res sync_res = {
+      .data = {.buf = buf},
+      .type = NGFVK_SYNC_RES_BUFFER,
+      .hash = buf->hash};
   return sync_res;
 }
 
-static ngfvk_sync_res ngfvk_sync_res_from_img(ngf_image img) {
-  ngfvk_sync_res sync_res = {.data = {.img = img}, .type = NGFVK_SYNC_RES_IMAGE};
+static inline ngfvk_sync_res ngfvk_sync_res_from_img(ngf_image img) {
+  ngfvk_sync_res sync_res = {
+      .data = {.img = img},
+      .type = NGFVK_SYNC_RES_IMAGE,
+      .hash = img->hash};
   return sync_res;
 }
 
@@ -2452,34 +2467,35 @@ static uintptr_t ngfvk_handle_from_sync_res(const ngfvk_sync_res* res) {
 
 // Look up resource state in a given cmd buffer.
 // If an entry corresponding to the resource doesn't already exist, it gets created.
-static bool ngfvk_cmd_buf_lookup_res(
+static bool ngfvk_cmd_buf_lookup_sync_res(
     ngf_cmd_buffer        cmd_buf,
-    uintptr_t             key,
-    const ngfvk_sync_res* default_res_data,
-    ngfvk_sync_res_data** state) {
-  ngfvk_sync_res_data new_res_state;
+    const ngfvk_sync_res* sync_res,
+    ngfvk_sync_res_data** sync_res_data_out) {
+  ngfvk_sync_res_data     new_res_state;
+  bool                    new_res = false;
+  const ngfi_dict_keyhash keyhash = {ngfvk_handle_from_sync_res(sync_res), sync_res->hash};
 
-  memset(&new_res_state, 0, sizeof(new_res_state));
-  new_res_state.expected_sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  if (default_res_data) {
-    new_res_state.res_handle           = ngfvk_handle_from_sync_res(default_res_data);
-    new_res_state.res_type             = default_res_data->type;
-    new_res_state.pending_sync_req_idx = ~0u;
+  *sync_res_data_out =
+      ngfi_dict_get_prehashed(&cmd_buf->local_res_states, &keyhash, &new_res_state, &new_res);
+
+  if (new_res) {
+    ngfvk_sync_res_data* sync_res_data = *sync_res_data_out;
+    memset(sync_res_data, 0, sizeof(new_res_state));
+    sync_res_data->expected_sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    sync_res_data->res_handle               = ngfvk_handle_from_sync_res(sync_res);
+    sync_res_data->res_type                 = sync_res->type;
+    sync_res_data->pending_sync_req_idx     = ~0u;
   }
-
-  bool new_res = false;
-
-  *state = ngfi_dict_get(&cmd_buf->local_res_states, key, &new_res_state, &new_res);
 
   return new_res;
 }
 
-static uint32_t ngfvk_next_nonzero_bit(uint32_t* mask) {
+static inline uint32_t ngfvk_next_nonzero_bit(uint32_t* mask) {
   const uint32_t old_mask = *mask;
   return (*mask = old_mask & (old_mask - 1), *mask ^ old_mask);
 }
 
-static uint32_t ngfvk_stage_idx(VkPipelineStageFlagBits bit) {
+static inline uint32_t ngfvk_stage_idx(VkPipelineStageFlagBits bit) {
   switch (bit) {
   case VK_PIPELINE_STAGE_VERTEX_INPUT_BIT:
     return 0;
@@ -2503,7 +2519,7 @@ static uint32_t ngfvk_stage_idx(VkPipelineStageFlagBits bit) {
   return ~0u;
 }
 
-static uint32_t ngfvk_access_idx(VkAccessFlagBits bit) {
+static inline uint32_t ngfvk_access_idx(VkAccessFlagBits bit) {
   switch (bit) {
   case VK_ACCESS_SHADER_READ_BIT:
     return 0u;
@@ -2677,7 +2693,7 @@ static bool ngfvk_sync_barrier(
 static void ngfvk_sync_req_batch_init(uint32_t nmax_sync_reqs, ngfvk_sync_req_batch* result) {
   memset(result, 0, sizeof(*result));
   result->pending_sync_reqs  = NGFI_SALLOC(ngfvk_sync_req, nmax_sync_reqs);
-  result->sync_res_data_keys = NGFI_SALLOC(uintptr_t, nmax_sync_reqs);
+  result->sync_res_data_keys = NGFI_SALLOC(ngfi_dict_keyhash, nmax_sync_reqs);
   result->freshness          = NGFI_SALLOC(bool, nmax_sync_reqs);
   memset(result->freshness, 0, sizeof(bool) * nmax_sync_reqs);
 }
@@ -2711,10 +2727,12 @@ static bool ngfvk_sync_req_merge(ngfvk_sync_req* dst_sync_req, const ngfvk_sync_
 }
 
 static bool ngfvk_sync_req_batch_add(
-    ngfvk_sync_req_batch* batch,
-    ngfvk_sync_res_data*  sync_res_data,
-    bool                  fresh,
-    const ngfvk_sync_req* sync_req) {
+    ngfvk_sync_req_batch*    batch,
+    ngfi_dict_key key,
+    uint64_t hash,
+    ngfvk_sync_res_data*     sync_res_data,
+    bool                     fresh,
+    const ngfvk_sync_req*    sync_req) {
   if (sync_res_data->pending_sync_req_idx == ~0u) {
     sync_res_data->pending_sync_req_idx = batch->npending_sync_reqs++;
     if (sync_res_data->res_type == NGFVK_SYNC_RES_BUFFER) {
@@ -2728,7 +2746,8 @@ static bool ngfvk_sync_req_batch_add(
         sizeof(batch->pending_sync_reqs[0]));
     batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx].layout =
         VK_IMAGE_LAYOUT_UNDEFINED;
-    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx] = sync_res_data->res_handle;
+    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx].key = key;
+    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx].hash = hash;
   }
   if (fresh && sync_res_data->pending_sync_req_idx < batch->npending_sync_reqs) {
     batch->freshness[sync_res_data->pending_sync_req_idx] = true;
@@ -2744,9 +2763,16 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
   ngfvk_sync_res_data* sync_res_data;
-  const bool           fresh =
-      ngfvk_cmd_buf_lookup_res(cmd_buf, ngfvk_handle_from_sync_res(res), res, &sync_res_data);
-  return ngfvk_sync_req_batch_add(batch, sync_res_data, fresh, sync_req);
+
+  const bool fresh = ngfvk_cmd_buf_lookup_sync_res(cmd_buf, res, &sync_res_data);
+
+  return ngfvk_sync_req_batch_add(
+      batch,
+      ngfvk_handle_from_sync_res(res),
+      res->hash,
+      sync_res_data,
+      fresh,
+      sync_req);
 }
 
 static void ngfvk_sync_commit_pending_barriers_legacy(
@@ -2914,8 +2940,11 @@ static void ngfvk_sync_commit_pending_barriers(
 
 static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_buffer cmd_buf) {
   for (size_t i = 0u; i < batch->npending_sync_reqs; ++i) {
-    ngfvk_sync_res_data* sync_res_data = NULL;
-    ngfvk_cmd_buf_lookup_res(cmd_buf, batch->sync_res_data_keys[i], NULL, &sync_res_data);
+    ngfvk_sync_res_data* sync_res_data = ngfi_dict_get_prehashed(
+        &cmd_buf->local_res_states,
+        &batch->sync_res_data_keys[i],
+        NULL,
+        NULL);
     if (!sync_res_data) {
       NGFI_DIAG_WARNING(
           "Internal error - resource missing from cmd buffer's synchronization table?");
@@ -2967,7 +2996,7 @@ static void ngfvk_handle_single_sync_req(
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
   bool           fresh             = false;
-  uintptr_t      sync_res_data_key = 0;
+  ngfi_dict_keyhash sync_res_data_key;
   ngfvk_sync_req empty_sync_req = {.barrier_masks = {0u, 0u}, .layout = VK_IMAGE_LAYOUT_UNDEFINED};
 
   ngfvk_sync_req_batch batch = {
@@ -5601,8 +5630,8 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
     }
   }
   ngfvk_sync_res       r = ngfvk_sync_res_from_img(img);
-  ngfvk_sync_res_data* sync_res_data;
-  ngfvk_cmd_buf_lookup_res(buf, (uintptr_t)img, &r, &sync_res_data);
+  ngfvk_sync_res_data* sync_res_data = NULL;
+  ngfvk_cmd_buf_lookup_sync_res(buf, &r, &sync_res_data);
   sync_res_data->sync_state.active_readers_masks.stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
   sync_res_data->sync_state.active_readers_masks.access_mask |= VK_ACCESS_TRANSFER_READ_BIT;
   sync_res_data->sync_state.layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -5718,6 +5747,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
 
   buf->storage_type = info->storage_type;
   buf->usage_flags  = info->buffer_usage;
+  buf->hash         = ngfvk_ptr_hash(buf);
   memset(&buf->sync_state, 0, sizeof(buf->sync_state));
   buf->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -5825,6 +5855,8 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
 
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
+
+  (*result)->hash = ngfvk_ptr_hash(*result);
 
 ngf_create_image_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_image(*result); }
