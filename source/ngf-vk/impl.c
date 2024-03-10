@@ -1188,7 +1188,7 @@ static ngf_error ngfvk_create_swapchain(
     ngfvk_create_image(&wrapper_image_info, &wrapper_alloc, false, &swapchain->wrapper_imgs[i]);
   }
 
-  const bool is_multisampled = swapchain_info->sample_count > 1u;
+  const bool is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
 
   // Create multisampled images, if necessary.
   if (is_multisampled) {
@@ -1279,7 +1279,7 @@ static ngf_error ngfvk_create_swapchain(
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngfvk_create_swapchain_cleanup;
   }
-  const bool     have_resolve_attachment      = swapchain_info->sample_count > 1u;
+  const bool     have_resolve_attachment      = (unsigned int)swapchain_info->sample_count > 1u;
   const uint32_t depth_stencil_attachment_idx = swapchain->depth_img ? 1u : VK_ATTACHMENT_UNUSED;
   const uint32_t resolve_attachment_idx =
       have_resolve_attachment ? (swapchain->depth_img ? 2u : 1u) : VK_ATTACHMENT_UNUSED;
@@ -2241,9 +2241,9 @@ ngf_error ngfvk_create_pipeline_layout(
     ngfvk_desc_set_layout set_layout;
     memset(&set_layout, 0, sizeof(set_layout));
     const uint32_t current_set_id = bindings[cur].binding_data.set;
-    if (last_set_id == ~0 || current_set_id - last_set_id > 1u) {
+    if (last_set_id == ~0u || current_set_id - last_set_id > 1u) {
       // there is a gap in descriptor sets, fill it in with empty layouts;
-      for (uint32_t i = last_set_id == ~0 ? 0u : last_set_id + 1; i < current_set_id; ++i) {
+      for (uint32_t i = last_set_id == ~0u ? 0u : last_set_id + 1; i < current_set_id; ++i) {
         const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
             .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .pNext        = NULL,
@@ -3897,7 +3897,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
     // Create the default rendertarget object.
     const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
-    const bool default_rt_is_multisampled = swapchain_info->sample_count > 1u;
+    const bool default_rt_is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
     const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
                                        swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
 

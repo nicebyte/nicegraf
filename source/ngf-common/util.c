@@ -99,6 +99,6 @@ const char* ngf_util_get_error_name(const ngf_error err) {
       "NGF_ERROR_INVALID_SIZE",
       "NGF_ERROR_INVALID_ENUM",
       "NGF_ERROR_INVALID_OPERATION"};
-  if (err > NGFI_ARRAYSIZE(ngf_error_names)) { return "invalid error code"; }
+  if ((size_t)err > NGFI_ARRAYSIZE(ngf_error_names)) { return "invalid error code"; }
   return ngf_error_names[err];
 }
