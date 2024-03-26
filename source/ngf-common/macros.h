@@ -33,10 +33,10 @@ extern "C" {
 extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 
 // Convenience macros for invoking custom memory allocation callbacks.
-#define NGFI_ALLOC(type)     ((type*)NGF_ALLOC_CB->allocate(sizeof(type), 1))
-#define NGFI_ALLOCN(type, n) ((type*)NGF_ALLOC_CB->allocate(sizeof(type), n))
-#define NGFI_FREE(ptr)       (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1))
-#define NGFI_FREEN(ptr, n)   (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n))
+#define NGFI_ALLOC(type)     ((type*)NGF_ALLOC_CB->allocate(sizeof(type), 1, NGF_ALLOC_CB->userdata))
+#define NGFI_ALLOCN(type, n) ((type*)NGF_ALLOC_CB->allocate(sizeof(type), n, NGF_ALLOC_CB->userdata))
+#define NGFI_FREE(ptr)       (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1, NGF_ALLOC_CB->userdata))
+#define NGFI_FREEN(ptr, n)   (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n, NGF_ALLOC_CB->userdata))
 
 // Macro for determining size of arrays.
 #if defined(_MSC_VER)
