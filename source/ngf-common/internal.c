@@ -36,23 +36,25 @@ ngf_diagnostic_info ngfi_diag_info = {
     .callback  = NULL};
 
 // Default allocation callbacks.
-void* ngf_default_alloc(size_t obj_size, size_t nobjs) {
+void* ngf_default_alloc(size_t obj_size, size_t nobjs, void* userdata) {
+  NGFI_IGNORE_VAR(userdata);
   pthread_mutex_lock(&ngfi_sys_alloc_stats.mut);
   ngfi_sys_alloc_stats.allocated_mem += obj_size * nobjs;
   pthread_mutex_unlock(&ngfi_sys_alloc_stats.mut);
   return malloc(obj_size * nobjs);
 }
 
-void ngf_default_free(void* ptr, size_t s, size_t n) {
+void ngf_default_free(void* ptr, size_t s, size_t n, void* userdata) {
   NGFI_IGNORE_VAR(s);
   NGFI_IGNORE_VAR(n);
+  NGFI_IGNORE_VAR(userdata);
   pthread_mutex_lock(&ngfi_sys_alloc_stats.mut);
   ngfi_sys_alloc_stats.allocated_mem -= s * n;
   pthread_mutex_unlock(&ngfi_sys_alloc_stats.mut);
   free(ptr);
 }
 
-const ngf_allocation_callbacks NGF_DEFAULT_ALLOC_CB = {ngf_default_alloc, ngf_default_free};
+const ngf_allocation_callbacks NGF_DEFAULT_ALLOC_CB = {ngf_default_alloc, ngf_default_free, NULL};
 
 const ngf_allocation_callbacks* NGF_ALLOC_CB = &NGF_DEFAULT_ALLOC_CB;
 

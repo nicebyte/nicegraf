@@ -202,13 +202,18 @@ typedef struct ngf_allocation_callbacks {
    * The starting address of the allocated region shall have the largest alignment for the
    * target platform.
    */
-  void* (*allocate)(size_t obj_size, size_t nobjs);
+  void* (*allocate)(size_t obj_size, size_t nobjs, void* userdata);
 
   /**
    * This callback shall free a region allocated by the custom allocator. The count
    * and size of objects in the region are supplied as additional parameters.
    */
-  void (*free)(void* ptr, size_t obj_size, size_t nobjs);
+  void (*free)(void* ptr, size_t obj_size, size_t nobjs, void* userdata);
+
+  /**
+   * An arbitrary pointer that will be passed as-is to the allocate and free callbacks.
+  */
+  void* userdata;
 } ngf_allocation_callbacks;
 
 /**

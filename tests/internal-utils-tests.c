@@ -48,15 +48,17 @@ static void ngft_bad_hashfn(uintptr_t key, uint32_t seed, void* out) {
 uint32_t allocs_called = 0u;
 uint32_t deallocs_called = 0u;
  
-void* ngft_counting_alloc(size_t obj_size, size_t nobjs) {
+void* ngft_counting_alloc(size_t obj_size, size_t nobjs, void* userdata) {
   allocs_called++;
+  (void)userdata;
   return malloc(obj_size * nobjs);
 }
 
-void ngft_counting_free(void* ptr, size_t obj_size, size_t nobjs) {
+void ngft_counting_free(void* ptr, size_t obj_size, size_t nobjs, void* userdata) {
   deallocs_called++;
   (void)obj_size;
   (void)nobjs;
+  (void)userdata;
   free(ptr);
 }
 
