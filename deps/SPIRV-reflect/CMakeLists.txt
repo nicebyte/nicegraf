@@ -4,7 +4,7 @@ project(spvreflect)
 set(CMAKE_C_STANDARD 99)
 
 add_library(spvreflect STATIC
-  ${CMAKE_CURRENT_LIST_DIR}/spirv.h
+  ${CMAKE_CURRENT_LIST_DIR}/include/spirv/unified1/spirv.h
   ${CMAKE_CURRENT_LIST_DIR}/spirv_reflect.h
   ${CMAKE_CURRENT_LIST_DIR}/spirv_reflect.c)
 
