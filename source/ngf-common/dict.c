@@ -28,7 +28,7 @@
 #include <string.h>
 
 void (*ngfi_dict_hashfn)(uintptr_t, uint32_t, void*) = NULL;
-uint32_t ngfi_dict_hashseed                          = 0x9e3779b9;
+static const uint32_t ngfi_dict_hashseed             = 0x9e3779b9;
 
 struct ngfi_dict_t {
   size_t nslots;
@@ -110,7 +110,7 @@ void* ngfi_dict_get(
   assert(*dict);
   assert(key != NGFI_DICT_INVALID_KEY);
 
-  uint64_t mmh3_out[2];
+  uint64_t mmh3_out[2] = {0, 0};
   if (ngfi_dict_hashfn == NULL) {
     ngfi_mmh3_x64_128(key, ngfi_dict_hashseed, mmh3_out);
   } else {

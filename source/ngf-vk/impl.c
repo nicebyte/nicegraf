@@ -958,6 +958,12 @@ static ngf_error ngfvk_create_vk_image_view(
   }
 }
 
+static inline uint64_t ngfvk_ptr_hash(void* data) {
+  uint64_t mmh3_out[2] = {0, 0};
+  ngfi_mmh3_x64_128((uintptr_t)data, 0x9e3779b9, mmh3_out);
+  return mmh3_out[0]^mmh3_out[1];
+}
+
 static ngf_error ngfvk_create_image(
     const ngf_image_info* info,
     const ngfvk_alloc*    backing_resource_alloc,
@@ -984,6 +990,7 @@ static ngf_error ngfvk_create_image(
   (*result)->owns_backing_resource = owns_backing_resource;
   memset(&(*result)->sync_state, 0, sizeof((*result)->sync_state));
   (*result)->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+  (*result)->hash = ngfvk_ptr_hash(*result);
 
   if (owns_backing_resource) {
     err = ngfvk_create_vk_image_view(
@@ -2437,12 +2444,6 @@ static void ngfvk_cmd_buf_add_render_cmd(
 
 static void ngfvk_cmd_buf_reset_res_states(ngf_cmd_buffer cmd_buf) {
   ngfi_dict_clear(cmd_buf->local_res_states);
-}
-
-static inline uint64_t ngfvk_ptr_hash(void* data) {
-  uint64_t mmh3_out[2];
-  ngfi_mmh3_x64_128((uintptr_t)data, 0x9e3779b9, mmh3_out);
-  return mmh3_out[0]^mmh3_out[1];
 }
 
 static inline ngfvk_sync_res ngfvk_sync_res_from_buf(ngf_buffer buf) {
@@ -5855,8 +5856,6 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
 
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
-
-  (*result)->hash = ngfvk_ptr_hash(*result);
 
 ngf_create_image_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_image(*result); }
