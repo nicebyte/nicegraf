@@ -2,7 +2,7 @@
 #include "TargetConditionals.h"
 #endif
 
-#if defined(TARGET_OS_IPHONE)
+#if TARGET_OS_IPHONE
 #include <MetalKit/MetalKit.h>
 using NGF_WINDOW_TYPE = MTKView;
 #else
@@ -27,7 +27,7 @@ void shutdown();
 // platform-specific functions
 void init_graphics_library();
 
-void init_imgui(const NGF_WINDOW_TYPE* window);
+void init_imgui(NGF_WINDOW_TYPE* window);
 
 void create_window(
     const uint32_t    width,
@@ -35,15 +35,15 @@ void create_window(
     const char*       title,
     NGF_WINDOW_TYPE*& window);
 
-uintptr_t get_native_handle(const NGF_WINDOW_TYPE* window);
+uintptr_t get_native_handle(NGF_WINDOW_TYPE* window);
 
-bool window_should_close(const NGF_WINDOW_TYPE* window);
+bool window_should_close(NGF_WINDOW_TYPE* window);
 
 void poll_events();
 
-int get_key(const NGF_WINDOW_TYPE* window, int key);
+int get_key(NGF_WINDOW_TYPE* window, int key);
 
-void get_framebuffer_size(const NGF_WINDOW_TYPE* window, int* width, int* height);
+void get_framebuffer_size(NGF_WINDOW_TYPE* window, int* width, int* height);
 
-void begin_imgui_frame(const NGF_WINDOW_TYPE* window);
+void begin_imgui_frame(NGF_WINDOW_TYPE* window);
 }  // namespace ngf_samples

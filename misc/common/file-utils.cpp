@@ -24,7 +24,7 @@
 #include "TargetConditionals.h"
 #endif
 
-#if defined(TARGET_OS_IPHONE)
+#if TARGET_OS_IPHONE
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -37,8 +37,16 @@
 namespace ngf_misc {
 
 std::vector<char> load_file(const char* file_name) {
-  const char* path_cstr = nullptr;
-#if defined(TARGET_OS_IPHONE)
+  std::string path_str = get_file_path(file_name);
+
+  std::basic_ifstream<char> fs(path_str, std::ios::binary | std::ios::in);
+  if (!fs.is_open()) { throw std::runtime_error {file_name}; }
+  return std::vector<char> {std::istreambuf_iterator<char>(fs), std::istreambuf_iterator<char>()};
+}
+
+std::string get_file_path(const char* file_name) {
+  std::string path_str = file_name;
+#if TARGET_OS_IPHONE
   CFBundleRef mainBundle = CFBundleGetMainBundle();
   if (!mainBundle) { throw std::runtime_error {"Failed to get the main bundle."}; }
 
@@ -56,14 +64,10 @@ std::vector<char> load_file(const char* file_name) {
   CFRelease(fileURL);
   CFRelease(fileNameCStr);
 
-  path_cstr = filePath;
-#else
-  path_cstr = file_name;
+  path_str = filePath;
 #endif
 
-  std::basic_ifstream<char> fs(path_cstr, std::ios::binary | std::ios::in);
-  if (!fs.is_open()) { throw std::runtime_error {file_name}; }
-  return std::vector<char> {std::istreambuf_iterator<char>(fs), std::istreambuf_iterator<char>()};
+  return path_str;
 }
 
 }  // namespace ngf_misc

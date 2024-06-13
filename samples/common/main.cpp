@@ -24,7 +24,7 @@
 #include "TargetConditionals.h"
 #endif
 
-#if defined(TARGET_OS_IPHONE)
+#if TARGET_OS_IPHONE
 #include "platform/ios/AppDelegate.h"
 
 #include <UIKit/UIKit.h>

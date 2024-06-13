@@ -20,7 +20,7 @@ void init_graphics_library() {
   glfwInit();
 }
 
-void init_imgui(const GLFWwindow* window) {
+void init_imgui(GLFWwindow* window) {
   ImGui_ImplGlfw_InitForOther(window, true);
 }
 
@@ -40,11 +40,11 @@ void create_window(
   window = glfwWindow;
 }
 
-uintptr_t get_native_handle(const GLFWwindow* window) {
+uintptr_t get_native_handle(GLFWwindow* window) {
   return (uintptr_t)ngf_samples::get_glfw_contentview(window);
 }
 
-bool window_should_close(const GLFWwindow* window) {
+bool window_should_close(GLFWwindow* window) {
   return glfwWindowShouldClose(window);
 }
 
@@ -52,15 +52,15 @@ void poll_events() {
   glfwPollEvents();
 }
 
-int get_key(const GLFWwindow* window, int key) {
+int get_key(GLFWwindow* window, int key) {
   return glfwGetKey(window, key);
 }
 
-void get_framebuffer_size(const GLFWwindow* window, int* width, int* height) {
+void get_framebuffer_size(GLFWwindow* window, int* width, int* height) {
   glfwGetFramebufferSize(window, width, height);
 }
 
-void begin_imgui_frame() {
+void begin_imgui_frame(GLFWwindow* window) {
   ImGui_ImplGlfw_NewFrame();
 }
 

@@ -35,4 +35,6 @@ namespace ngf_misc {
 
 std::vector<char> load_file(const char* file_name);
 
+std::string get_file_path(const char* file_name);
+
 }
