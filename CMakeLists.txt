@@ -33,7 +33,7 @@ include(${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake)
 if(MSVC)
     set(NICEMAKE_COMMON_COMPILE_OPTS "/W4" "/WX")
 else()
-    set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
+    set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment" "-Wno-nullability-completeness" "-Wno-deprecated-declarations")
 endif()
 
 set(NICEGRAF_COMMON_DEPS nicegraf-internal)
@@ -329,6 +329,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                 MACOSX_BUNDLE_SHORT_VERSION_STRING "0.0.1"
                 MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/ios/Info.plist.in
                 XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "T7V25MSAGB"
+                XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
             )
         endif()
     endfunction()
