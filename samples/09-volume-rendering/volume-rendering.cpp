@@ -64,7 +64,7 @@ void* sample_initialize(
   auto state = new volume_rendering::state {};
 
   /** Open the file containing the volume data and read in the dimensions. */
-    std::string path = get_file_path("assets/stag-beetle-volume.dat");
+  std::string path = get_file_path("assets/stag-beetle-volume.dat");
   FILE* volume_data_file = fopen(path.c_str(), "rb");
   if (volume_data_file == nullptr) {
     loge("failed to open the volume data file.");
