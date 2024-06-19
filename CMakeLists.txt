@@ -283,6 +283,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         set_target_properties(ngf-samples-common PROPERTIES XCODE_ATTRIBUTE_GCC_INPUT_FILETYPE "sourcecode.cpp.objcpp")
     endif()
 
+    include(${CMAKE_CURRENT_LIST_DIR}/assets.cmake)
     function (ngf_sample)
         cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
 
@@ -298,7 +299,6 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
             set(NGF_SAMPLE_RESOURCES_DIR "${NGF_SAMPLE_OUTPUT_DIR}/${SAMPLE_NAME}.app")
         endif()
 
-        include(${CMAKE_CURRENT_LIST_DIR}/assets.cmake)
         nmk_assets_target(
             NAME ${SAMPLE_NAME}-assets
             DEPS sample-shaders

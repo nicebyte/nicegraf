@@ -53,19 +53,25 @@ function(nmk_assets_target)
         COMMENT "Creating resource directories"
     )
 
-    file(GLOB_RECURSE IMGUI_FILES "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui*")
-
-    # Iterate over the shader files and add copy commands
-    foreach(IMGUI_SHADER_FILE ${IMGUI_FILES})
-        get_filename_component(IMGUI_SHADER_FILE_NAME ${IMGUI_SHADER_FILE} NAME)
-        add_custom_command(
-            TARGET ${ASSETS_TARGET_NAME}
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${IMGUI_SHADER_FILE}"
-                "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${IMGUI_SHADER_FILE_NAME}"
-            COMMENT "Copying ${IMGUI_SHADER_FILE_NAME} to shader resources"
-        )
-    endforeach(IMGUI_SHADER_FILE)
+    add_custom_command(
+        TARGET ${ASSETS_TARGET_NAME}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui.pipeline"
+            "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/imgui.pipeline"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui.ps.21.msl"
+            "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/imgui.ps.21.msl"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui.ps.spv"
+            "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/imgui.ps.spv"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui.vs.21.msl"
+            "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/imgui.vs.21.msl"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/imgui.vs.spv"
+            "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/imgui.vs.spv"
+        COMMENT "Copying imgui shader resources"
+    )
 
     # Iterate over the matches and extract the asset objects
     foreach(MATCH ${MATCHES})
@@ -93,30 +99,18 @@ function(nmk_assets_target)
             # Remove the extension from ASSET_FILE_PATH
             string(REGEX REPLACE "\\.[^.]*$" "" ASSET_FILE_NAME ${ASSET_FILE_PATH})
 
-            # Search for all files with the remaining string concatenated with the extension
-            file(GLOB_RECURSE SHADER_FILES "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/${ASSET_FILE_NAME}.${ASSET_EXTENSION}*")
-
-            # Iterate over the shader files and add copy commands
-            foreach(SHADER_FILE ${SHADER_FILES})
-                get_filename_component(SHADER_FILE_NAME ${SHADER_FILE} NAME)
-                add_custom_command(
-                    TARGET ${ASSETS_TARGET_NAME}
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                        "${SHADER_FILE}"
-                        "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${SHADER_FILE_NAME}"
-                    COMMENT "Copying ${SHADER_FILE_NAME} to shader resources"
-                )
-            endforeach(SHADER_FILE)
-
             add_custom_command(
                 TARGET ${ASSETS_TARGET_NAME}
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/${ASSET_FILE_NAME}.${ASSET_EXTENSION}.21.msl"
+                    "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${ASSET_FILE_NAME}.${ASSET_EXTENSION}.21.msl"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/${ASSET_FILE_NAME}.${ASSET_EXTENSION}.spv"
+                    "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${ASSET_FILE_NAME}.${ASSET_EXTENSION}.spv"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/${ASSET_FILE_NAME}.pipeline"
                     "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${ASSET_FILE_NAME}.pipeline"
-                # COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                #     "${ASSETS_TARGET_SOURCES_BASE_DIR}/shaders/${ASSET_FILE_NAME}_binding_consts.h"
-                #     "${ASSETS_TARGET_DESTINATION_BASE_DIR}/shaders/${ASSET_FILE_NAME}_binding_consts.h"
-                COMMENT "Copying pipeline to shader resources"
+                COMMENT "Copying shader resources"
             )
         else()
             # Copy the asset to the destination folder
