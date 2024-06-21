@@ -1,0 +1,12 @@
+{
+  "vertexShader": {
+    "type": "vertexShader",
+    "entryPoint": "VSMain",
+    "path": "polygon.hlsl"
+  },
+  "fragmentShader": {
+    "type": "fragmentShader",
+    "entryPoint": "PSMain",
+    "path": "polygon.hlsl"
+  }
+}

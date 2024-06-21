@@ -1,0 +1,17 @@
+{
+  "computeShader": {
+    "type": "computeShader",
+    "entry": "CSMain",
+    "path": "compute-demo.hlsl"
+  },
+  "vertexShader": {
+    "type": "vertexShader",
+    "entry": "VSMain",
+    "path": "simple-texture.hlsl"
+  },
+  "fragmentShader": {
+    "type": "fragmentShader",
+    "entry": "PSMain",
+    "path": "simple-texture.hlsl"
+  }
+}

@@ -31,6 +31,7 @@
 #include "sample-interface.h"
 #include "shader-loader.h"
 #include "mesh-loader.h"
+#include "file-utils.h"
 
 #include <stdio.h>
 
@@ -58,6 +59,7 @@ struct uniforms {
   camera_matrices cam_matrices;
   light_data    lights;
   material_data material;
+  nm::float3    _padding;
 };
 
 struct state {
@@ -183,7 +185,8 @@ void* sample_initialize(
   /**
    * Load the model from a file.
    */
-  state->bunny_mesh = load_mesh_from_file("assets/bunny.mesh", xfer_encoder);
+  std::string path = get_file_path("assets/bunny.mesh");
+  state->bunny_mesh = load_mesh_from_file(path.c_str(), xfer_encoder);
   NGF_MISC_ASSERT(state->bunny_mesh.have_normals);
   NGF_MISC_ASSERT(state->bunny_mesh.num_indices > 0u);
 

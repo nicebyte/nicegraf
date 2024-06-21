@@ -20,6 +20,10 @@
  * IN THE SOFTWARE.
  */
 
+#if defined(__APPLE__)
+#include "TargetConditionals.h"
+#endif
+
 #include "ngf-common/cmdbuf-state.h"
 #include "ngf-common/macros.h"
 #include "ngf-common/native-binding-map.h"
@@ -963,8 +967,13 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
     caps.uniform_buffer_offset_alignment = 256;
     caps.texel_buffer_offset_alignment   = 256;
   } else {
+    #if TARGET_OS_SIMULATOR
+    caps.uniform_buffer_offset_alignment = 256;
+    caps.texel_buffer_offset_alignment   = 256;
+    #else
     caps.uniform_buffer_offset_alignment = 4;
     caps.texel_buffer_offset_alignment   = 4;
+    #endif
   }
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyApple3)) {
