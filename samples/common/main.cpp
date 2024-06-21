@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
 
 #include "common.h"
 
-int main(int argc, char** argv) {
+int main(int, char**) {
   ngf_samples::init();
   ngf_samples::run_loop();
   ngf_samples::shutdown();

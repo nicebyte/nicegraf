@@ -33,8 +33,7 @@ void create_window(
     const char*    title,
     GLFWwindow*&   window) {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  GLFWwindow* glfwWindow =
-      glfwCreateWindow((int)width, (int)height, "nicegraf sample", nullptr, nullptr);
+  GLFWwindow* glfwWindow = glfwCreateWindow((int)width, (int)height, title, nullptr, nullptr);
 
   window = glfwWindow;
 }
@@ -59,7 +58,7 @@ void get_framebuffer_size(GLFWwindow* window, int* width, int* height) {
   glfwGetFramebufferSize(window, width, height);
 }
 
-void begin_imgui_frame(GLFWwindow* window) {
+void begin_imgui_frame(GLFWwindow*) {
   ImGui_ImplGlfw_NewFrame();
 }
 

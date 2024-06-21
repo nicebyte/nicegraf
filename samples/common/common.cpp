@@ -1,3 +1,5 @@
+#pragma warning(disable : 4244) // conversion from 'int' to 'float', possible loss of data
+
 #include "common.h"
 
 #include "check.h"
@@ -15,14 +17,6 @@
 
 #if defined(__APPLE__)
 #include "TargetConditionals.h"
-#endif
-
-#if TARGET_OS_IPHONE
-#include <MetalKit/MetalKit.h>
-using NGF_WINDOW_TYPE = MTKView;
-#else
-#include <GLFW/glfw3.h>
-using NGF_WINDOW_TYPE = GLFWwindow;
 #endif
 
 namespace ngf_samples {
@@ -54,6 +48,7 @@ void* sample_opaque_data = nullptr;
 
 std::chrono::time_point<std::chrono::system_clock> prev_frame_start;
 bool                                               first_frame;
+int fb_width, fb_height;
 
 int init() {
   /**
@@ -172,7 +167,6 @@ int init() {
     ngf_misc::loge("Failed to create a window, exiting.");
     return 0;
   }
-  int fb_width, fb_height;
   ngf_samples::get_framebuffer_size(window, &fb_width, &fb_height);
   ngf_misc::logi("created a window with client area of size size %d x %d.", fb_width, fb_height);
 
@@ -237,10 +231,8 @@ void run_loop() {
 }
 
 void draw_frame() {
-  int fb_width, fb_height;
-  ngf_samples::get_framebuffer_size(window, &fb_width, &fb_height);
-
   ngf_samples::poll_events();
+
   auto                               frame_start  = std::chrono::system_clock::now();
   const std::chrono::duration<float> time_delta   = frame_start - prev_frame_start;
   float                              time_delta_f = time_delta.count();

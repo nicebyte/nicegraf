@@ -32,7 +32,6 @@
 
 #include <fstream>
 #include <stdexcept>
-#include <string>
 
 namespace ngf_misc {
 

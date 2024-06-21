@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <string>
 
 #if defined(_WIN64) || defined(_WIN32)
 #define NGF_MISC_PATH_SEPARATOR "\\"
