@@ -215,12 +215,12 @@ void* sample_initialize(
    */
   const ngf_buffer_info vertex_buffer_info = {
       .size         = sizeof(vertex_attribs::vertex_data),
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
   };
   const ngf_buffer_info index_buffer_info = {
       .size         = sizeof(vertex_attribs::index_data),
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
   };
   const ngf_buffer_info vertex_staging_buffer_info = {
@@ -269,7 +269,7 @@ void* sample_initialize(
    */
   const ngf_buffer_info instance_data_buffer_info = {
       .size         = vertex_attribs::INSTANCE_DATA_SIZE,
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_TEXEL_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
   };
   const ngf_buffer_info instance_data_staging_buffer_info = {

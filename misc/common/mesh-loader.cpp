@@ -108,7 +108,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
    */
   const ngf_buffer_info vertex_data_buffer_info = {
       .size         = vertex_data_staging_buffer_info.size,
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
   };
   NGF_MISC_CHECK_NGF_ERROR(result.vertex_data.initialize(vertex_data_buffer_info));
@@ -122,7 +122,7 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   if (result.num_indices > 0) {
     const ngf_buffer_info index_data_buffer_info = {
         .size         = sizeof(uint32_t) * result.num_indices,
-        .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+        .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
         .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
     };
     NGF_MISC_CHECK_NGF_ERROR(result.index_data.initialize(index_data_buffer_info));

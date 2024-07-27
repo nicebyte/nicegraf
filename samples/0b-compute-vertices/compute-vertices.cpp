@@ -143,7 +143,7 @@ void* sample_initialize(
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC};
   const ngf_buffer_info index_buffer_info {
       .size         = compute_verts::ntotal_indices * sizeof(uint32_t),
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_DST | NGF_BUFFER_USAGE_INDEX_BUFFER};
   ngf::buffer staging_index_buffer;
   NGF_MISC_CHECK_NGF_ERROR(staging_index_buffer.initialize(staging_index_buffer_info));
@@ -176,7 +176,7 @@ void* sample_initialize(
    */
   const ngf_buffer_info vertex_buffer_info {
       .size         = compute_verts::ntotal_verts * (4u * sizeof(float)) * 2,
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
       .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_STORAGE_BUFFER};
   NGF_MISC_CHECK_NGF_ERROR(state->vertex_buffer.initialize(vertex_buffer_info));
   state->compute_buffer_slice.buffer = state->vertex_buffer.get();

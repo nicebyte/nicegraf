@@ -1938,11 +1938,15 @@ typedef enum ngf_buffer_storage_type {
   /**
    * \ingroup ngf
    *
-   * Private memory that cannot be accessed by the host directly. The contents of a
+   * Memory that is local to the device (GPU). Depending on device capabilities,
+   * this memory may or may not be accessed by the host directly. See 
+   * \ref ngf_device_capabilities::device_local_memory_is_host_visible.
+   * 
+   * When the device-local memory isn't host-visible, the contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * \ref ngf_cmd_copy_buffer.
    */
-  NGF_BUFFER_STORAGE_PRIVATE
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL
 } ngf_buffer_storage_type;
 
 /**
@@ -2444,6 +2448,16 @@ typedef struct ngf_device_capabilities {
    * This value is derived from \ref texture_depth_sample_counts.
    */
   ngf_sample_count max_supported_texture_depth_sample_count;
+
+  /**
+   * Indicates whether the device-local storage is also host visible.
+   * Examples of cases where this may be supported are iGPU systems with unified memory,
+   * or discrete GPUs with ReBAR enabled.
+   * On systems with this capability, device-local storage can be mapped directly into
+   * the host address space, removing the need for host-visible staging buffers in certain
+   * cases.
+   */
+  bool device_local_memory_is_host_visible;
 } ngf_device_capabilities;
 
 /**

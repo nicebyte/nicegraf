@@ -810,7 +810,7 @@ static VkMemoryPropertyFlags get_vk_memory_flags(ngf_buffer_storage_type s) {
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
     return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-  case NGF_BUFFER_STORAGE_PRIVATE:
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL:
     return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
   }
   return 0;
@@ -3525,6 +3525,8 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
           ngfi_get_highest_sample_count(devcaps->texture_color_sample_counts);
       devcaps->max_supported_texture_depth_sample_count =
           ngfi_get_highest_sample_count(devcaps->texture_depth_sample_counts);
+
+      devcaps->device_local_memory_is_host_visible = false; // TODO
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
@@ -5702,7 +5704,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   const VkBufferUsageFlags    vk_usage_flags = get_vk_buffer_usage(info->buffer_usage);
   const VkMemoryPropertyFlags vk_mem_flags   = get_vk_memory_flags(info->storage_type);
   const bool     vk_mem_is_host_visible      = vk_mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-  const uint32_t vma_usage_flags             = info->storage_type == NGF_BUFFER_STORAGE_PRIVATE
+  const uint32_t vma_usage_flags             = info->storage_type == NGF_BUFFER_STORAGE_DEVICE_LOCAL
                                                    ? VMA_MEMORY_USAGE_GPU_ONLY
                                                    : VMA_MEMORY_USAGE_CPU_ONLY;
   ngf_error      err                         = NGF_ERROR_OK;

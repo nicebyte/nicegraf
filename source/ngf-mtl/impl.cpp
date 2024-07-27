@@ -939,6 +939,7 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
   caps.max_3d_image_dimension                   = 2048;
   caps.max_image_layers                         = 2048;
   caps.max_uniform_buffer_range                 = NGF_DEVICE_LIMIT_UNKNOWN;
+  caps.device_local_memory_is_host_visible      = false; // TODO
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyApple6)) {
     caps.max_sampled_images_per_stage = 128;
@@ -1655,7 +1656,7 @@ ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
     options = MTL::ResourceCPUCacheModeWriteCombined | MTL::ResourceStorageModeShared;
     break;
-  case NGF_BUFFER_STORAGE_PRIVATE:
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL:
     options = MTL::ResourceStorageModePrivate;
     break;
   default:
