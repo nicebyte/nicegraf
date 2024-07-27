@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2024 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -3448,6 +3448,9 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
             vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceProperties");
     PFN_vkGetPhysicalDeviceFeatures get_vk_phys_dev_features = (PFN_vkGetPhysicalDeviceFeatures)
         vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceFeatures");
+    PFN_vkGetPhysicalDeviceMemoryProperties get_vk_phys_dev_mem_props = (PFN_vkGetPhysicalDeviceMemoryProperties)
+        vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceMemoryProperties");
+
     PFN_vkDestroyInstance destroy_vk_instance =
         (PFN_vkDestroyInstance)vkGetInstanceProcAddr(tmp_instance, "vkDestroyInstance");
     vk_err = enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, NULL);
@@ -3468,8 +3471,10 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
     for (size_t i = 0; i < NGFVK_DEVICE_COUNT; ++i) {
       VkPhysicalDeviceProperties dev_props;
       VkPhysicalDeviceFeatures   dev_features;
+      VkPhysicalDeviceMemoryProperties mem_props;
       get_vk_phys_dev_properties(phys_devs[i], &dev_props);
       get_vk_phys_dev_features(phys_devs[i], &dev_features);
+      get_vk_phys_dev_mem_props(phys_devs[i], &mem_props);
       ngfvk_device_id* ngfdevid = &NGFVK_DEVICE_ID_LIST[i];
       ngfdevid->device_id       = dev_props.deviceID;
       ngfdevid->vendor_id       = dev_props.vendorID;
@@ -3526,7 +3531,20 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_supported_texture_depth_sample_count =
           ngfi_get_highest_sample_count(devcaps->texture_depth_sample_counts);
 
-      devcaps->device_local_memory_is_host_visible = false; // TODO
+      devcaps->device_local_memory_is_host_visible = false;
+      /*for (size_t mem_type_idx = 0u; !devcaps->device_local_memory_is_host_visible &&
+                                     mem_type_idx < mem_props.memoryTypeCount;
+           ++mem_type_idx) {
+        const VkMemoryType*         mem_type = &mem_props.memoryTypes[mem_type_idx];
+        const VkMemoryPropertyFlags local_visible =
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+        if ((mem_type->propertyFlags & local_visible) == local_visible) {
+          // Some systems only expose <= 256M device-local host-visible memory, we don't want that.
+          // Only set the cap flag if a large region of device-local memory is also host-visible.
+          devcaps->device_local_memory_is_host_visible =
+              mem_props.memoryHeaps[mem_type->heapIndex].size > (256u * 1024u * 1024u);
+        }
+      }*/
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
@@ -3819,23 +3837,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
 
   // Set up VMA.
   VmaVulkanFunctions vma_vk_fns = {
-      .vkGetPhysicalDeviceProperties       = vkGetPhysicalDeviceProperties,
-      .vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties,
-      .vkAllocateMemory                    = vkAllocateMemory,
-      .vkFreeMemory                        = vkFreeMemory,
-      .vkMapMemory                         = vkMapMemory,
-      .vkUnmapMemory                       = vkUnmapMemory,
-      .vkFlushMappedMemoryRanges           = vkFlushMappedMemoryRanges,
-      .vkInvalidateMappedMemoryRanges      = vkInvalidateMappedMemoryRanges,
-      .vkBindBufferMemory                  = vkBindBufferMemory,
-      .vkBindImageMemory                   = vkBindImageMemory,
-      .vkGetBufferMemoryRequirements       = vkGetBufferMemoryRequirements,
-      .vkGetImageMemoryRequirements        = vkGetImageMemoryRequirements,
-      .vkCreateBuffer                      = vkCreateBuffer,
-      .vkDestroyBuffer                     = vkDestroyBuffer,
-      .vkCreateImage                       = vkCreateImage,
-      .vkDestroyImage                      = vkDestroyImage,
-      .vkCmdCopyBuffer                     = vkCmdCopyBuffer,
+      .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+      .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
   };
   VmaAllocatorCreateInfo vma_info = {
       .flags                       = 0u,
@@ -3844,10 +3847,8 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       .preferredLargeHeapBlockSize = 0u,
       .pAllocationCallbacks        = NULL,
       .pDeviceMemoryCallbacks      = NULL,
-      .frameInUseCount             = 0u,
       .pHeapSizeLimit              = NULL,
       .pVulkanFunctions            = &vma_vk_fns,
-      .pRecordSettings             = NULL,
       .instance                    = _vk.instance,
       .vulkanApiVersion            = 0};
   vk_err = vmaCreateAllocator(&vma_info, &ctx->allocator);
