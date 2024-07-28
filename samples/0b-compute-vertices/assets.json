@@ -1,0 +1,17 @@
+{
+  "computeShader": {
+    "type": "computeShader",
+    "entry": "CSMain",
+    "path": "compute-vertices.hlsl"
+  },
+  "vertexShader": {
+    "type": "vertexShader",
+    "entry": "VSMain",
+    "path": "render-vertices.hlsl"
+  },
+  "fragmentShader": {
+    "type": "fragmentShader",
+    "entry": "PSMain",
+    "path": "render-vertices.hlsl"
+  }
+}

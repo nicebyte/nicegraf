@@ -1,0 +1,16 @@
+{
+  "vertexShader": {
+    "type": "vertexShader",
+    "entryPoint": "VSMain",
+    "path": "blinn-phong.hlsl"
+  },
+  "fragmentShader": {
+    "type": "fragmentShader",
+    "entryPoint": "PSMain",
+    "path": "blinn-phong.hlsl"
+  },
+  "bunnyMesh": {
+    "type": "mesh",
+    "path": "bunny.mesh"
+  }
+}
