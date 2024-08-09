@@ -133,6 +133,10 @@ int main(int, char**) {
       .renderdoc_info       = (renderdoc_info.renderdoc_lib_path != NULL) ? &renderdoc_info : NULL};
   NGF_MISC_CHECK_NGF_ERROR(ngf_initialize(&init_info));
 
+  ngf_misc::logi(
+      "device-local memory is host-visible: %s",
+      ngf_get_device_capabilities()->device_local_memory_is_host_visible ? "YES" : "NO");
+
   /**
    * Initialize imgui and generate its font atlas.
    */
