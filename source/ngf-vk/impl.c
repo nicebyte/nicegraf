@@ -812,6 +812,32 @@ static VkMemoryPropertyFlags get_vk_memory_flags(ngf_buffer_storage_type s) {
     return VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   case NGF_BUFFER_STORAGE_DEVICE_LOCAL:
     return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE:
+    return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_READABLE_WRITEABLE:
+    return VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+           VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
+  }
+  return 0;
+}
+
+static VmaAllocatorCreateFlags ngfvk_get_vma_alloc_flags(ngf_buffer_storage_type storage_type) {
+  switch (storage_type) {
+  case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
+    return VMA_ALLOCATION_CREATE_MAPPED_BIT |
+           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+  case NGF_BUFFER_STORAGE_HOST_READABLE:
+  case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
+    return VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL:
+    return 0;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE:
+    return VMA_ALLOCATION_CREATE_MAPPED_BIT |
+           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+           VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_READABLE_WRITEABLE:
+    return VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT |
+           VMA_ALLOCATION_CREATE_HOST_ACCESS_ALLOW_TRANSFER_INSTEAD_BIT;
   }
   return 0;
 }
@@ -961,7 +987,7 @@ static ngf_error ngfvk_create_vk_image_view(
 static inline uint64_t ngfvk_ptr_hash(void* data) {
   uint64_t mmh3_out[2] = {0, 0};
   ngfi_mmh3_x64_128((uintptr_t)data, 0x9e3779b9, mmh3_out);
-  return mmh3_out[0]^mmh3_out[1];
+  return mmh3_out[0] ^ mmh3_out[1];
 }
 
 static ngf_error ngfvk_create_image(
@@ -990,7 +1016,7 @@ static ngf_error ngfvk_create_image(
   (*result)->owns_backing_resource = owns_backing_resource;
   memset(&(*result)->sync_state, 0, sizeof((*result)->sync_state));
   (*result)->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  (*result)->hash = ngfvk_ptr_hash(*result);
+  (*result)->hash              = ngfvk_ptr_hash(*result);
 
   if (owns_backing_resource) {
     err = ngfvk_create_vk_image_view(
@@ -2455,10 +2481,7 @@ static inline ngfvk_sync_res ngfvk_sync_res_from_buf(ngf_buffer buf) {
 }
 
 static inline ngfvk_sync_res ngfvk_sync_res_from_img(ngf_image img) {
-  ngfvk_sync_res sync_res = {
-      .data = {.img = img},
-      .type = NGFVK_SYNC_RES_IMAGE,
-      .hash = img->hash};
+  ngfvk_sync_res sync_res = {.data = {.img = img}, .type = NGFVK_SYNC_RES_IMAGE, .hash = img->hash};
   return sync_res;
 }
 
@@ -2728,12 +2751,12 @@ static bool ngfvk_sync_req_merge(ngfvk_sync_req* dst_sync_req, const ngfvk_sync_
 }
 
 static bool ngfvk_sync_req_batch_add(
-    ngfvk_sync_req_batch*    batch,
-    ngfi_dict_key key,
-    uint64_t hash,
-    ngfvk_sync_res_data*     sync_res_data,
-    bool                     fresh,
-    const ngfvk_sync_req*    sync_req) {
+    ngfvk_sync_req_batch* batch,
+    ngfi_dict_key         key,
+    uint64_t              hash,
+    ngfvk_sync_res_data*  sync_res_data,
+    bool                  fresh,
+    const ngfvk_sync_req* sync_req) {
   if (sync_res_data->pending_sync_req_idx == ~0u) {
     sync_res_data->pending_sync_req_idx = batch->npending_sync_reqs++;
     if (sync_res_data->res_type == NGFVK_SYNC_RES_BUFFER) {
@@ -2747,7 +2770,7 @@ static bool ngfvk_sync_req_batch_add(
         sizeof(batch->pending_sync_reqs[0]));
     batch->pending_sync_reqs[sync_res_data->pending_sync_req_idx].layout =
         VK_IMAGE_LAYOUT_UNDEFINED;
-    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx].key = key;
+    batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx].key  = key;
     batch->sync_res_data_keys[sync_res_data->pending_sync_req_idx].hash = hash;
   }
   if (fresh && sync_res_data->pending_sync_req_idx < batch->npending_sync_reqs) {
@@ -2996,7 +3019,7 @@ static void ngfvk_handle_single_sync_req(
     ngf_cmd_buffer        cmd_buf,
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
-  bool           fresh             = false;
+  bool              fresh = false;
   ngfi_dict_keyhash sync_res_data_key;
   ngfvk_sync_req empty_sync_req = {.barrier_masks = {0u, 0u}, .layout = VK_IMAGE_LAYOUT_UNDEFINED};
 
@@ -3448,8 +3471,9 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
             vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceProperties");
     PFN_vkGetPhysicalDeviceFeatures get_vk_phys_dev_features = (PFN_vkGetPhysicalDeviceFeatures)
         vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceFeatures");
-    PFN_vkGetPhysicalDeviceMemoryProperties get_vk_phys_dev_mem_props = (PFN_vkGetPhysicalDeviceMemoryProperties)
-        vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceMemoryProperties");
+    PFN_vkGetPhysicalDeviceMemoryProperties get_vk_phys_dev_mem_props =
+        (PFN_vkGetPhysicalDeviceMemoryProperties)
+            vkGetInstanceProcAddr(tmp_instance, "vkGetPhysicalDeviceMemoryProperties");
 
     PFN_vkDestroyInstance destroy_vk_instance =
         (PFN_vkDestroyInstance)vkGetInstanceProcAddr(tmp_instance, "vkDestroyInstance");
@@ -3469,8 +3493,8 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
 
     enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, phys_devs);
     for (size_t i = 0; i < NGFVK_DEVICE_COUNT; ++i) {
-      VkPhysicalDeviceProperties dev_props;
-      VkPhysicalDeviceFeatures   dev_features;
+      VkPhysicalDeviceProperties       dev_props;
+      VkPhysicalDeviceFeatures         dev_features;
       VkPhysicalDeviceMemoryProperties mem_props;
       get_vk_phys_dev_properties(phys_devs[i], &dev_props);
       get_vk_phys_dev_features(phys_devs[i], &dev_features);
@@ -3531,8 +3555,9 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->max_supported_texture_depth_sample_count =
           ngfi_get_highest_sample_count(devcaps->texture_depth_sample_counts);
 
+      // Detect device-local host-visible memory.
       devcaps->device_local_memory_is_host_visible = false;
-      /*for (size_t mem_type_idx = 0u; !devcaps->device_local_memory_is_host_visible &&
+      for (size_t mem_type_idx = 0u; !devcaps->device_local_memory_is_host_visible &&
                                      mem_type_idx < mem_props.memoryTypeCount;
            ++mem_type_idx) {
         const VkMemoryType*         mem_type = &mem_props.memoryTypes[mem_type_idx];
@@ -3544,7 +3569,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
           devcaps->device_local_memory_is_host_visible =
               mem_props.memoryHeaps[mem_type->heapIndex].size > (256u * 1024u * 1024u);
         }
-      }*/
+      }
     }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
@@ -3838,7 +3863,7 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
   // Set up VMA.
   VmaVulkanFunctions vma_vk_fns = {
       .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-      .vkGetDeviceProcAddr = vkGetDeviceProcAddr,
+      .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
   };
   VmaAllocatorCreateInfo vma_info = {
       .flags                       = 0u,
@@ -5633,7 +5658,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
       src_d = dst_d;
     }
   }
-  ngfvk_sync_res       r = ngfvk_sync_res_from_img(img);
+  ngfvk_sync_res       r             = ngfvk_sync_res_from_img(img);
   ngfvk_sync_res_data* sync_res_data = NULL;
   ngfvk_cmd_buf_lookup_sync_res(buf, &r, &sync_res_data);
   sync_res_data->sync_state.active_readers_masks.stage_mask |= VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -5697,6 +5722,11 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
     NGFI_DIAG_ERROR("Buffer usage not specified.");
     return NGF_ERROR_INVALID_OPERATION;
   }
+  if (info->storage_type > NGF_BUFFER_STORAGE_DEVICE_LOCAL &&
+      !DEVICE_CAPS.device_local_memory_is_host_visible) {
+    NGFI_DIAG_ERROR("Host-visible device-local storage requested, but not supported.");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
 
   ngf_buffer buf = NGFI_ALLOC(ngf_buffer_t);
   *result        = buf;
@@ -5705,9 +5735,9 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   const VkBufferUsageFlags    vk_usage_flags = get_vk_buffer_usage(info->buffer_usage);
   const VkMemoryPropertyFlags vk_mem_flags   = get_vk_memory_flags(info->storage_type);
   const bool     vk_mem_is_host_visible      = vk_mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-  const uint32_t vma_usage_flags             = info->storage_type == NGF_BUFFER_STORAGE_DEVICE_LOCAL
-                                                   ? VMA_MEMORY_USAGE_GPU_ONLY
-                                                   : VMA_MEMORY_USAGE_CPU_ONLY;
+  const uint32_t vma_usage_flags             = info->storage_type >= NGF_BUFFER_STORAGE_DEVICE_LOCAL
+                                                   ? VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+                                                   : VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
   ngf_error      err                         = NGF_ERROR_OK;
   ngfvk_alloc*   alloc                       = &buf->alloc;
 
@@ -5722,7 +5752,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
       .pQueueFamilyIndices   = NULL};
 
   const VmaAllocationCreateInfo buf_alloc_info = {
-      .flags          = vk_mem_is_host_visible ? VMA_ALLOCATION_CREATE_MAPPED_BIT : 0u,
+      .flags          = ngfvk_get_vma_alloc_flags(info->storage_type),
       .usage          = vma_usage_flags,
       .requiredFlags  = vk_mem_flags,
       .preferredFlags = 0u,

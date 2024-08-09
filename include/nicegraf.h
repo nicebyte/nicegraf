@@ -1938,15 +1938,33 @@ typedef enum ngf_buffer_storage_type {
   /**
    * \ingroup ngf
    *
-   * Memory that is local to the device (GPU). Depending on device capabilities,
-   * this memory may or may not be accessed by the host directly. See 
-   * \ref ngf_device_capabilities::device_local_memory_is_host_visible.
-   * 
-   * When the device-local memory isn't host-visible, the contents of a
+   * Memory that is local to the device (GPU). Normally, this type of storage
+   * isn't accessible directly from the host and the contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * \ref ngf_cmd_copy_buffer.
    */
-  NGF_BUFFER_STORAGE_DEVICE_LOCAL
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL,
+
+  /**
+   * \ingroup ngf
+   * 
+   * Memory that is both local to the device (GPU) and mappable/writeable directly
+   * from host. This type of storage is available only when the capability
+   * \ref ngf_device_capabilities::device_local_memory_is_host_visible is supported.
+   * Examples of systems that may support this type of storage are iGPUs or discrete
+   * GPUs with ReBAR enabled.
+   * Using this type of backing storage allows the host to write bytes directly into
+   * the mapped memory, obviating the need for staging buffers in some cases.
+   */
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE,
+
+  /**
+   * \ingroup ngf
+   * 
+   * Same as \ref NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABALE, but additionally allows
+   * the host to read directly from mapped memory.
+   */
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_READABLE_WRITEABLE
 } ngf_buffer_storage_type;
 
 /**
