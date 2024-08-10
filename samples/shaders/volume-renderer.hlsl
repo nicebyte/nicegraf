@@ -8,6 +8,7 @@ struct VertexShaderInput {
 struct VolumeRendererUniforms {
   float4x4 transformMatrix;
   float    aspectRatio;
+  float3   padding;
 };
 
 [[vk::binding(0,1)]] ConstantBuffer<VolumeRendererUniforms> shaderUniforms;
