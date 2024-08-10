@@ -44,6 +44,7 @@ namespace cubemap {
 struct uniforms {
   nm::float4x4 rotation;
   float        aspect_ratio;
+  nm::float3   _padding;
 };
 
 struct state {

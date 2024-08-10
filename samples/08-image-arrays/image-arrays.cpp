@@ -45,6 +45,7 @@ struct img_array_uniforms {
   nm::float4x4 matrix;
   float        image_array_idx = 0.0f;
   uint32_t     index           = 0u;
+  float        _padding;
 };
 
 struct multiple_imgs_uniforms {
@@ -56,6 +57,7 @@ struct cube_array_uniforms {
   nm::float4x4 matrix;
   float        aspect    = 1.0f;
   float        array_idx = 0.0f;
+  nm::float2   _padding;
 };
 
 constexpr int NUM_IMAGE_LAYERS = 4;
