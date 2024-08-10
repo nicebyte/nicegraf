@@ -116,20 +116,13 @@ else()
                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c)
   if (NGF_USE_MVK STREQUAL "yes")
-<<<<<<< HEAD
     set(NICEGRAF_VK_SRCS ${NICEGRAF_VK_SRCS} ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)
-=======
-      set(NICEGRAF_VK_SRCS ${NICEGRAF_VK_SRCS} ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)
->>>>>>> a5a309b (cleanup cmake)
   endif()
 
   # Vulkan backend.
   nmk_static_library(NAME nicegraf-vk
                      SRCS ${NICEGRAF_VK_SRCS}
-<<<<<<< HEAD
                      PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/include
-=======
->>>>>>> a5a309b (cleanup cmake)
                      DEPS ${NICEGRAF_VK_DEPS})
 endif()
 
@@ -284,39 +277,37 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     set_target_properties(ngf-samples-common PROPERTIES XCODE_ATTRIBUTE_GCC_INPUT_FILETYPE "sourcecode.cpp.objcpp")
   endif()
 
-  include(${CMAKE_CURRENT_LIST_DIR}/assets.cmake)
   function (ngf_sample)
     cmake_parse_arguments(SAMPLE "" "NAME" "" ${ARGN})
 
     # Get the sample source files.
     file(GLOB_RECURSE SAMPLE_SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/*.cpp)
 
-    # Set the output directory for the sample
-    set(NGF_SAMPLE_OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}/${SAMPLE_NAME}")
-
     # Set the output directory for the resources
     set(NGF_SAMPLE_RESOURCES_DIR ${NGF_SAMPLE_OUTPUT_DIR})
     if (${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
-      set(NGF_SAMPLE_RESOURCES_DIR "${NGF_SAMPLE_OUTPUT_DIR}/${SAMPLE_NAME}.app")
+      set(NGF_SAMPLE_RESOURCES_DIR "${NGF_SAMPLES_OUTPUT_DIR}/${SAMPLE_NAME}.app")
     endif()
-
-    nmk_assets_target(
-        NAME ${SAMPLE_NAME}-assets
-        DEPS sample-shaders
-        JSON_PATH ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}/assets.json
-        SOURCES_BASE_DIR ${NGF_SAMPLES_OUTPUT_DIR}
-        DESTINATION_BASE_DIR ${NGF_SAMPLE_RESOURCES_DIR}
-        PROPERTIES FOLDER "samples/${SAMPLE_NAME}"
-    )
 
     nmk_binary(NAME ${SAMPLE_NAME}
                SRCS ${SAMPLE_SRCS}
                DEPS nicegraf ngf-samples-common nicegraf-misc-common nicegraf-util ngf-imgui
                PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}
                PVT_DEFINES ${NGF_SAMPLES_PVT_DEFINES}
-               OUTPUT_DIR ${NGF_SAMPLE_OUTPUT_DIR})
+               OUTPUT_DIR ${NGF_SAMPLES_OUTPUT_DIR})
 
-    add_dependencies(${SAMPLE_NAME} ${SAMPLE_NAME}-assets)                   
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
+      add_custom_command(TARGET ${SAMPLE_NAME}
+                         PRE_BUILD
+                         COMMAND ${CMAKE_COMMAND} -E copy_directory
+                           "${CMAKE_CURRENT_LIST_DIR}/samples/binaries/shaders"
+                           "${NGF_SAMPLE_RESOURCES_DIR}/shaders")
+      add_custom_command(TARGET ${SAMPLE_NAME}
+                         PRE_BUILD
+                         COMMAND ${CMAKE_COMMAND} -E copy_directory
+                           "${CMAKE_CURRENT_LIST_DIR}/samples/binaries/assets"
+                           "${NGF_SAMPLE_RESOURCES_DIR}/assets")
+    endif()
     set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples/${SAMPLE_NAME}")
 
     if (${CMAKE_SYSTEM_NAME} STREQUAL "iOS")
