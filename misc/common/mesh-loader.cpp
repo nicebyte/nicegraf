@@ -29,10 +29,22 @@
 
 namespace ngf_misc {
 
+static void read_into_mapped_buffer(FILE* f, ngf_buffer buf, size_t data_size) {
+  void* mapped_buffer_mem = ngf_buffer_map_range(buf, 0u, data_size);
+  const size_t read_elements =
+      fread(mapped_buffer_mem, sizeof(char), data_size, f);
+  NGF_MISC_ASSERT(read_elements == data_size);
+  ngf_buffer_flush_range(buf, 0, data_size);
+  ngf_buffer_unmap(buf);
+}
+
 mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   mesh  result;
   FILE* mesh_file = fopen(mesh_file_name, "rb");
   NGF_MISC_ASSERT(mesh_file != NULL);
+
+  /* Indicates to skip staging buffers and copy directly to device-local memory if possible. */
+  const bool skip_staging = ngf_get_device_capabilities()->device_local_memory_is_host_visible;
 
   /**
    * Read the "file header" - 4-byte field with the lowest bit indicating
@@ -47,8 +59,8 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   result.have_uvs     = header & 2;
 
   /**
-   * Read the total size of the vertex data, create a staging buffer, and
-   * read the vertex data directly into the staging buffer.
+   * Read the total size of the vertex data. Depending on device capabilities,
+   * read it all directly into the GPU buffer, or read into a staging buffer.
    */
   uint32_t vertex_data_size = 0u;
   read_elements             = fread(&vertex_data_size, sizeof(vertex_data_size), 1u, mesh_file);
@@ -59,15 +71,21 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
   };
   ngf::buffer vertex_data_staging_buffer;
-  NGF_MISC_CHECK_NGF_ERROR(
-      vertex_data_staging_buffer.initialize(vertex_data_staging_buffer_info));
-  void* mapped_vertex_data_staging_buffer =
-      ngf_buffer_map_range(vertex_data_staging_buffer.get(), 0u, vertex_data_size);
-  read_elements =
-      fread(mapped_vertex_data_staging_buffer, sizeof(char), vertex_data_size, mesh_file);
-  NGF_MISC_ASSERT(read_elements == vertex_data_size);
-  ngf_buffer_flush_range(vertex_data_staging_buffer.get(), 0, vertex_data_size);
-  ngf_buffer_unmap(vertex_data_staging_buffer.get());
+  if (!skip_staging) {
+    NGF_MISC_CHECK_NGF_ERROR(
+        vertex_data_staging_buffer.initialize(vertex_data_staging_buffer_info));
+  }
+  const ngf_buffer_info vertex_data_buffer_info = {
+      .size         = vertex_data_staging_buffer_info.size,
+      .storage_type = skip_staging ? NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE : NGF_BUFFER_STORAGE_DEVICE_LOCAL,
+      .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
+  };
+  NGF_MISC_CHECK_NGF_ERROR(result.vertex_data.initialize(vertex_data_buffer_info));
+
+  read_into_mapped_buffer(
+      mesh_file,
+      skip_staging ? result.vertex_data.get() : vertex_data_staging_buffer.get(),
+      vertex_data_size);
 
   /**
    * Read the number of indices in the mesh. If number of indices is 0, the
@@ -78,61 +96,53 @@ mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
   NGF_MISC_ASSERT(read_elements == 1u);
 
   /**
-   * Allocate a staging buffer for the index data, and read the index data
-   * directly into that buffer.
+   * Allocate buffer(s) for the index data, and read the index data.
+   * As before, we try to read directly into the GPU buffer if the device allows it.
    */
-
   ngf::buffer index_data_staging_buffer;
+  const ngf_buffer_info index_data_staging_buffer_info = {
+      .size         = sizeof(uint32_t) * result.num_indices,
+      .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
+      .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
+  };
+  const ngf_buffer_info index_data_buffer_info = {
+      .size         = sizeof(uint32_t) * result.num_indices,
+      .storage_type = skip_staging ? NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE
+                                   : NGF_BUFFER_STORAGE_DEVICE_LOCAL,
+      .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
+  };
   if (result.num_indices > 0) {
-    const ngf_buffer_info index_data_staging_buffer_info = {
-        .size         = sizeof(uint32_t) * result.num_indices,
-        .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
-        .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC,
-    };
-    NGF_MISC_CHECK_NGF_ERROR(
-        index_data_staging_buffer.initialize(index_data_staging_buffer_info));
-    void* mapped_index_data_staging_buffer = ngf_buffer_map_range(
-        index_data_staging_buffer.get(),
-        0,
+    NGF_MISC_CHECK_NGF_ERROR(result.index_data.initialize(index_data_buffer_info));
+    if (!skip_staging) {
+      NGF_MISC_CHECK_NGF_ERROR(
+          index_data_staging_buffer.initialize(index_data_staging_buffer_info));
+    }
+    read_into_mapped_buffer(
+        mesh_file,
+        skip_staging ? result.index_data.get() : index_data_staging_buffer.get(),
         index_data_staging_buffer_info.size);
-    read_elements =
-        fread(mapped_index_data_staging_buffer, sizeof(uint32_t), result.num_indices, mesh_file);
-    NGF_MISC_ASSERT(read_elements == result.num_indices);
-    ngf_buffer_flush_range(index_data_staging_buffer.get(), 0, index_data_staging_buffer_info.size);
-    ngf_buffer_unmap(index_data_staging_buffer.get());
   }
 
   /**
-   * Create the GPU buffers mesh buffers, and record commands to upload the data
-   * from staging buffers into them.
+   * Record commands to upload staging data if we have to.
    */
-  const ngf_buffer_info vertex_data_buffer_info = {
-      .size         = vertex_data_staging_buffer_info.size,
-      .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
-      .buffer_usage = NGF_BUFFER_USAGE_VERTEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
-  };
-  NGF_MISC_CHECK_NGF_ERROR(result.vertex_data.initialize(vertex_data_buffer_info));
-  ngf_cmd_copy_buffer(
-      xfenc,
-      vertex_data_staging_buffer.get(),
-      result.vertex_data.get(),
-      vertex_data_buffer_info.size,
-      0u,
-      0u);
-  if (result.num_indices > 0) {
-    const ngf_buffer_info index_data_buffer_info = {
-        .size         = sizeof(uint32_t) * result.num_indices,
-        .storage_type = NGF_BUFFER_STORAGE_PRIVATE,
-        .buffer_usage = NGF_BUFFER_USAGE_INDEX_BUFFER | NGF_BUFFER_USAGE_XFER_DST,
-    };
-    NGF_MISC_CHECK_NGF_ERROR(result.index_data.initialize(index_data_buffer_info));
+  if (!skip_staging) {
     ngf_cmd_copy_buffer(
         xfenc,
-        index_data_staging_buffer.get(),
-        result.index_data.get(),
-        index_data_buffer_info.size,
+        vertex_data_staging_buffer.get(),
+        result.vertex_data.get(),
+        vertex_data_buffer_info.size,
         0u,
         0u);
+    if (result.num_indices > 0) {
+      ngf_cmd_copy_buffer(
+          xfenc,
+          index_data_staging_buffer.get(),
+          result.index_data.get(),
+          index_data_staging_buffer_info.size,
+          0u,
+          0u);
+    }
   }
 
   return result;

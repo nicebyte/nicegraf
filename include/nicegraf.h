@@ -1938,11 +1938,33 @@ typedef enum ngf_buffer_storage_type {
   /**
    * \ingroup ngf
    *
-   * Private memory that cannot be accessed by the host directly. The contents of a
+   * Memory that is local to the device (GPU). Normally, this type of storage
+   * isn't accessible directly from the host and the contents of a
    * buffer backed by this type of memory can only be modified by executing a
    * \ref ngf_cmd_copy_buffer.
    */
-  NGF_BUFFER_STORAGE_PRIVATE
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL,
+
+  /**
+   * \ingroup ngf
+   * 
+   * Memory that is both local to the device (GPU) and mappable/writeable directly
+   * from host. This type of storage is available only when the capability
+   * \ref ngf_device_capabilities::device_local_memory_is_host_visible is supported.
+   * Examples of systems that may support this type of storage are iGPUs or discrete
+   * GPUs with ReBAR enabled.
+   * Using this type of backing storage allows the host to write bytes directly into
+   * the mapped memory, obviating the need for staging buffers in some cases.
+   */
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE,
+
+  /**
+   * \ingroup ngf
+   * 
+   * Same as \ref NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABALE, but additionally allows
+   * the host to read directly from mapped memory.
+   */
+  NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_READABLE_WRITEABLE
 } ngf_buffer_storage_type;
 
 /**
@@ -2444,6 +2466,16 @@ typedef struct ngf_device_capabilities {
    * This value is derived from \ref texture_depth_sample_counts.
    */
   ngf_sample_count max_supported_texture_depth_sample_count;
+
+  /**
+   * Indicates whether the device-local storage is also host visible.
+   * Examples of cases where this may be supported are iGPU systems with unified memory,
+   * or discrete GPUs with ReBAR enabled.
+   * On systems with this capability, device-local storage can be mapped directly into
+   * the host address space, removing the need for host-visible staging buffers in certain
+   * cases.
+   */
+  bool device_local_memory_is_host_visible;
 } ngf_device_capabilities;
 
 /**

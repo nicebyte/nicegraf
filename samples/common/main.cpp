@@ -34,6 +34,7 @@ int main(int argc, char** argv) {
     return UIApplicationMain(argc, argv, nil, NSStringFromClass([AppDelegate class]));
   }
 }
+
 #else
 
 #include "common.h"
@@ -42,7 +43,6 @@ int main(int, char**) {
   ngf_samples::init();
   ngf_samples::run_loop();
   ngf_samples::shutdown();
-
   return 0;
 }
 
