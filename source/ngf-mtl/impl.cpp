@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2024 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -939,7 +939,7 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
   caps.max_3d_image_dimension                   = 2048;
   caps.max_image_layers                         = 2048;
   caps.max_uniform_buffer_range                 = NGF_DEVICE_LIMIT_UNKNOWN;
-  caps.device_local_memory_is_host_visible      = false; // TODO
+  caps.device_local_memory_is_host_visible      = mtldev->hasUnifiedMemory();
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyApple6)) {
     caps.max_sampled_images_per_stage = 128;
@@ -1651,8 +1651,10 @@ ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   switch (info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_READABLE_WRITEABLE:
     options = MTL::ResourceCPUCacheModeDefaultCache | MTL::ResourceStorageModeShared;
     break;
+  case NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABLE:
   case NGF_BUFFER_STORAGE_HOST_WRITEABLE:
     options = MTL::ResourceCPUCacheModeWriteCombined | MTL::ResourceStorageModeShared;
     break;
@@ -1700,6 +1702,10 @@ void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT 
 
 ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
   NGFMTL_NURSERY(buffer, buf);
+  if (info->storage_type > NGF_BUFFER_STORAGE_DEVICE_LOCAL && !DEVICE_CAPS.device_local_memory_is_host_visible) {
+    NGFI_DIAG_ERROR("Host-visible device-local memory requested, but not supported.");
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
   buf->mtl_buffer = ngfmtl_create_buffer(*info);
   *result         = buf.release();
   return NGF_ERROR_OK;
