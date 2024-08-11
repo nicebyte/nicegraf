@@ -77,6 +77,7 @@ struct {
   VkInstance               instance;
   VkPhysicalDevice         phys_dev;
   VkDevice                 device;
+  VmaAllocator             allocator;
   VkQueue                  gfx_queue;
   VkQueue                  present_queue;
   uint32_t                 gfx_family_idx;
@@ -117,7 +118,6 @@ typedef struct ngfvk_swapchain {
 } ngfvk_swapchain;
 
 typedef struct {
-  VmaAllocator  parent_allocator;
   uintptr_t     obj_handle;
   VmaAllocation vma_alloc;
   void*         mapped_data;
@@ -401,7 +401,6 @@ typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
   ngfvk_swapchain             swapchain;
   ngf_swapchain_info          swapchain_info;
-  VmaAllocator                allocator;
   VkSurfaceKHR                surface;
   uint32_t                    frame_id;
   uint32_t                    max_inflight_frames;
@@ -3423,7 +3422,7 @@ static void ngfvk_img_dtor(ngfi_chnk_hdr* chunk) {
     if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
     if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
       vmaDestroyImage(
-          img->alloc.parent_allocator,
+          _vk.allocator,
           (VkImage)img->alloc.obj_handle,
           img->alloc.vma_alloc);
     }
@@ -3435,7 +3434,7 @@ static void ngfvk_buf_dtor(ngfi_chnk_hdr* chunk) {
   NGFI_CHNK_FOR_EACH(chunk, ngf_buffer, buf_ptr) {
     ngf_buffer buf = *buf_ptr;
     vmaDestroyBuffer(
-        buf->alloc.parent_allocator,
+        _vk.allocator,
         (VkBuffer)buf->alloc.obj_handle,
         buf->alloc.vma_alloc);
     NGFI_FREE(buf);
@@ -3796,6 +3795,24 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   // Load device-level entry points.
   vkl_init_device(_vk.device, sync2_supported);
 
+  // Set up VMA.
+  VmaVulkanFunctions vma_vk_fns = {
+      .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
+      .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
+  };
+  VmaAllocatorCreateInfo vma_info = {
+      .flags                       = 0u,
+      .physicalDevice              = _vk.phys_dev,
+      .device                      = _vk.device,
+      .preferredLargeHeapBlockSize = 0u,
+      .pAllocationCallbacks        = NULL,
+      .pDeviceMemoryCallbacks      = NULL,
+      .pHeapSizeLimit              = NULL,
+      .pVulkanFunctions            = &vma_vk_fns,
+      .instance                    = _vk.instance,
+      .vulkanApiVersion            = 0};
+  vk_err = vmaCreateAllocator(&vma_info, &_vk.allocator);
+
   // Obtain queue handles.
   vkGetDeviceQueue(_vk.device, _vk.gfx_family_idx, 0, &_vk.gfx_queue);
   vkGetDeviceQueue(_vk.device, _vk.present_family_idx, 0, &_vk.present_queue);
@@ -3828,6 +3845,8 @@ void ngf_shutdown(void) {
 
   if (CURRENT_CONTEXT != NULL) { NGFI_DIAG_ERROR("Context not destroyed before shutdown.") }
 
+  if (_vk.allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(_vk.allocator); }
+
   vkDestroyDevice(_vk.device, NULL);
   if (_vk.validation_enabled) {
     vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
@@ -3859,24 +3878,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     goto ngf_create_context_cleanup;
   }
   memset(ctx, 0, sizeof(struct ngf_context_t));
-
-  // Set up VMA.
-  VmaVulkanFunctions vma_vk_fns = {
-      .vkGetInstanceProcAddr = vkGetInstanceProcAddr,
-      .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
-  };
-  VmaAllocatorCreateInfo vma_info = {
-      .flags                       = 0u,
-      .physicalDevice              = _vk.phys_dev,
-      .device                      = _vk.device,
-      .preferredLargeHeapBlockSize = 0u,
-      .pAllocationCallbacks        = NULL,
-      .pDeviceMemoryCallbacks      = NULL,
-      .pHeapSizeLimit              = NULL,
-      .pVulkanFunctions            = &vma_vk_fns,
-      .instance                    = _vk.instance,
-      .vulkanApiVersion            = 0};
-  vk_err = vmaCreateAllocator(&vma_info, &ctx->allocator);
 
   // Create swapchain if necessary.
   if (swapchain_info != NULL) {
@@ -4136,7 +4137,6 @@ void ngf_destroy_context(ngf_context ctx) {
     }
     NGFI_DARRAY_DESTROY(ctx->command_superpools);
 
-    if (ctx->allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(ctx->allocator); }
     if (ctx->frame_res != NULL) { NGFI_FREEN(ctx->frame_res, ctx->max_inflight_frames); }
     if (ctx->blkalloc) { ngfi_blkalloc_destroy(ctx->blkalloc); }
 
@@ -5763,13 +5763,12 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   VmaAllocationInfo alloc_info;
   alloc_info.pMappedData = NULL;
   VkResult vkresult      = vmaCreateBuffer(
-      CURRENT_CONTEXT->allocator,
+      _vk.allocator,
       &buf_vk_info,
       &buf_alloc_info,
       (VkBuffer*)&alloc->obj_handle,
       &alloc->vma_alloc,
       &alloc_info);
-  alloc->parent_allocator = CURRENT_CONTEXT->allocator;
   alloc->mapped_data      = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
   err                     = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 
@@ -5803,7 +5802,7 @@ void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) {
 
 void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
   vmaFlushAllocation(
-      CURRENT_CONTEXT->allocator,
+      _vk.allocator,
       buf->alloc.vma_alloc,
       buf->mapped_offset + offset,
       size);
@@ -5871,10 +5870,9 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .pUserData      = NULL};
 
   ngfvk_alloc alloc;
-  alloc.parent_allocator = CURRENT_CONTEXT->allocator;
 
   const VkResult create_alloc_vkerr = vmaCreateImage(
-      CURRENT_CONTEXT->allocator,
+      _vk.allocator,
       &vk_image_info,
       &vma_alloc_info,
       (VkImage*)&alloc.obj_handle,
