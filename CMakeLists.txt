@@ -119,6 +119,7 @@ else()
   # Vulkan backend.
   nmk_static_library(NAME nicegraf-vk
                      SRCS ${NICEGRAF_VK_SRCS}
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/include
                      DEPS ${NICEGRAF_VK_DEPS})
 endif()
 
@@ -137,10 +138,10 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
              DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
 endif()
 
-add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
 
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
 
     # Ensure we have the required dependencies are available.
