@@ -3852,6 +3852,7 @@ void ngf_shutdown(void) {
     vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
   }
   vkDestroyInstance(_vk.instance, NULL);
+  _vk.instance = VK_NULL_HANDLE;
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
