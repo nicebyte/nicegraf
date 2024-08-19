@@ -3625,11 +3625,15 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 
   // Create vk instance, attempting to enable api validation according to user preference.
   const bool request_validation = ngfi_diag_info.verbosity == NGF_DIAGNOSTICS_VERBOSITY_DETAILED;
-  ngfvk_create_instance(
+  const VkResult instance_create_result = ngfvk_create_instance(
       request_validation,
       ngfi_diag_info.enable_debug_groups,
       &_vk.instance,
       &_vk.validation_enabled);
+  if (instance_create_result != VK_SUCCESS) {
+    NGFI_DIAG_INFO("Failed to set up a new vulkan instance.");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
   vkl_init_instance(
       _vk.instance);  // load instance-level Vulkan functions into the global namespace.
   // If validation was requested, and successfully enabled, install a debug callback to forward
@@ -3847,12 +3851,25 @@ void ngf_shutdown(void) {
 
   if (_vk.allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(_vk.allocator); }
 
+  if (_vk.device != VK_NULL_HANDLE) {
   vkDestroyDevice(_vk.device, NULL);
+  }
   if (_vk.validation_enabled) {
     vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
   }
+  if (_vk.instance != VK_NULL_HANDLE) {
   vkDestroyInstance(_vk.instance, NULL);
+  }
   _vk.instance = VK_NULL_HANDLE;
+  if (NGFVK_DEVICE_LIST) { free(NGFVK_DEVICE_LIST); NGFVK_DEVICE_LIST = NULL; }
+  if (NGFVK_DEVICE_ID_LIST) { free(NGFVK_DEVICE_ID_LIST); NGFVK_DEVICE_ID_LIST = NULL;}
+#if defined(__linux__)
+  if (_vk.xcb_connection) {
+    xcb_disconnect(_vk.xcb_connection);
+    _vk.xcb_visualid = 0;
+    _vk.xcb_connection = NULL;
+  }
+#endif
 }
 
 const ngf_device_capabilities* ngf_get_device_capabilities(void) {
