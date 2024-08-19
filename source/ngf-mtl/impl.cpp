@@ -1182,18 +1182,13 @@ ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF
 }
 
 ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
-  if (CURRENT_CONTEXT == ctx) {
-    NGFI_DIAG_WARNING("Attempt to set a context that is already "
-                      "current on the calling thread");
-    return NGF_ERROR_OK;
-  } else if (CURRENT_CONTEXT) {
-    NGFI_DIAG_ERROR("Attempt to set a context when the calling thread "
-                    "already has a current context.")
-    return NGF_ERROR_INVALID_OPERATION;
-  }
   CURRENT_CONTEXT = ctx;
   ctx->is_current = true;
   return NGF_ERROR_OK;
+}
+
+ngf_context ngf_get_context() {
+  return CURRENT_CONTEXT;
 }
 
 ngf_error

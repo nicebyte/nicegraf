@@ -4168,6 +4168,10 @@ ngf_error ngf_set_context(ngf_context ctx) {
   return NGF_ERROR_OK;
 }
 
+ngf_context ngf_get_context() {
+  return CURRENT_CONTEXT;
+}
+
 ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) {
   assert(info);
   assert(result);

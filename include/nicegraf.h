@@ -2614,6 +2614,14 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
+ * Get the active nicegraf context associated with the calling thread.
+ * 
+ * Returns NULL if no context associated with the calling thread exists.
+ */
+ngf_context ngf_get_context() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
  *
  * Begin a frame of rendering.
  *
