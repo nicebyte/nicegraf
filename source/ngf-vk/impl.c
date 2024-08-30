@@ -4714,8 +4714,8 @@ ngf_error ngf_create_graphics_pipeline(
     VkVertexInputBindingDescription*   vk_binding_desc = &vk_binding_descs[i];
     const ngf_vertex_buf_binding_desc* binding_desc    = &info->input_info->vert_buf_bindings[i];
     vk_binding_desc->binding                           = binding_desc->binding;
-    vk_binding_descs->stride                           = binding_desc->stride;
-    vk_binding_descs->inputRate = get_vk_input_rate(binding_desc->input_rate);
+    vk_binding_desc->stride                            = binding_desc->stride;
+    vk_binding_desc->inputRate = get_vk_input_rate(binding_desc->input_rate);
   }
 
   for (uint32_t i = 0u; i < info->input_info->nattribs; ++i) {
