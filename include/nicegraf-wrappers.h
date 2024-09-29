@@ -92,7 +92,9 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   /** Creates a new handle using the provided configuration, and takes ownership of it. */
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
     destroy_if_necessary();
-    return ObjectManagementFuncs::create(&info, &handle_);
+    const ngf_error err = ObjectManagementFuncs::create(&info, &handle_);
+    if (err != NGF_ERROR_OK) handle_ = nullptr;
+    return err;
   }
 
   /** @return The raw handle to the wrapped object. */
