@@ -96,7 +96,8 @@ struct {
 // Singleton for holding on to RenderDoc API
 struct {
   RENDERDOC_API_1_6_0* api;
-  bool                 is_capturing_next_frame;
+  bool                 capture_next;
+  bool                 is_capturing;
 } _renderdoc;
 
 // Swapchain state.
@@ -3595,7 +3596,8 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
         _renderdoc.api->SetCaptureFilePathTemplate(
             init_info->renderdoc_info->renderdoc_destination_template);
       }
-      _renderdoc.is_capturing_next_frame = false;
+      _renderdoc.is_capturing = false;
+      _renderdoc.capture_next = false;
     }
   }
 
@@ -4544,7 +4546,9 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   CURRENT_CONTEXT->frame_id = fi;
 
   // setup frame capture
-  if (_renderdoc.api && _renderdoc.is_capturing_next_frame) {
+  if (_renderdoc.api && _renderdoc.capture_next) {
+    _renderdoc.capture_next = false;
+    _renderdoc.is_capturing = true;
     _renderdoc.api->StartFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
         (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
@@ -4626,11 +4630,12 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   }
 
   // end frame capture
-  if (_renderdoc.api && _renderdoc.is_capturing_next_frame) {
+  if (_renderdoc.api && _renderdoc.is_capturing) {
     _renderdoc.api->EndFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
         (RENDERDOC_WindowHandle)CURRENT_CONTEXT->swapchain_info.native_handle);
-    _renderdoc.is_capturing_next_frame = false;
+    _renderdoc.is_capturing = false;
+    _renderdoc.capture_next = false;
   }
   return err;
 }
@@ -4713,8 +4718,8 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < info->input_info->nvert_buf_bindings; ++i) {
     VkVertexInputBindingDescription*   vk_binding_desc = &vk_binding_descs[i];
     const ngf_vertex_buf_binding_desc* binding_desc    = &info->input_info->vert_buf_bindings[i];
-    vk_binding_desc->binding                           = binding_desc->binding;
-    vk_binding_desc->stride                            = binding_desc->stride;
+    vk_binding_desc->binding                          = binding_desc->binding;
+    vk_binding_desc->stride                           = binding_desc->stride;
     vk_binding_desc->inputRate = get_vk_input_rate(binding_desc->input_rate);
   }
 
@@ -5287,7 +5292,7 @@ void ngf_cmd_draw(
         .barrier_masks =
             {
                 .access_mask = VK_ACCESS_INDEX_READ_BIT,
-                .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
+                .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
             },
         .layout = VK_IMAGE_LAYOUT_UNDEFINED};
     const ngfvk_sync_res idx_buf_res = ngfvk_sync_res_from_buf(cmd_buf->active_idx_buf);
@@ -5977,7 +5982,7 @@ void ngf_finish(void) {
 }
 
 void ngf_renderdoc_capture_next_frame() {
-  if (_renderdoc.api) _renderdoc.is_capturing_next_frame = true;
+  if (_renderdoc.api) _renderdoc.capture_next = true;
 }
 
 void ngf_renderdoc_capture_begin() {
