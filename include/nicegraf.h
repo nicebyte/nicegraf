@@ -988,8 +988,7 @@ typedef struct ngf_vertex_buf_binding_desc {
 
   /**
    * Specifies the distance (in bytes) between the starting bytes of two consecutive attribute
-   * values. When set to 0, the attribute values are assumed to be tightly packed (i.e. the next
-   * value of the attribute immediately follows the previous with no gaps).
+   * values.
    *
    * As an example, assume the buffer contains data for a single attribute, such as the position of
    * a vertex in three-dimensional space. Each component of the position is a 32-bit floating point
@@ -1004,8 +1003,6 @@ typedef struct ngf_vertex_buf_binding_desc {
    * ```
    * In this case, the stride is 3*4 = 12 bytes - the distance from the beginning of the first
    * attribute to the beginning of the next attribute is equal to the size of one attribute value.
-   * However, it can be set to 0, because in this case the attribute values are tightly packed - the
-   * next immediately follows the previous.
    *
    * Now consider a different case, where we have two attributes: a three-dimensional position and
    * an RGB color, and the buffer first lists all the attribute values for the first vertex,
@@ -1019,10 +1016,10 @@ typedef struct ngf_vertex_buf_binding_desc {
    *
    * ```
    *
-   * In this case, the stride has to be nonzero because the position of the next vertex does
-   * not immediately follow the position previous one - there is the value of the color attribute in
-   * between. In this case, assuming the attribute components use a 32-bit floating point, the
-   * stride would have to be `3 * 4 + 3 * 4 = 24` bytes.
+   * In this case, the position of the next vertex does not immediately follow the position previous
+   * one - there is the value of the color attribute in between. In this case, assuming the
+   * attribute components use a 32-bit floating point, the stride would have to be
+   * `3 * 4 + 3 * 4 = 24` bytes.
    */
   uint32_t stride;
 
@@ -1306,7 +1303,7 @@ typedef struct ngf_constant_specialization {
  * during execution.
  */
 typedef struct ngf_specialization_info {
-  const ngf_constant_specialization* specializations;  /**< List of specialization entries. */
+  const ngf_constant_specialization*  specializations;  /**< List of specialization entries. */
   uint32_t                           nspecializations; /**< Number of specialization entries. */
   const void* value_buffer; /**< Pointer to a buffer containing the values for the
                            specialization constants. */
