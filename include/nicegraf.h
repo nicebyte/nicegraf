@@ -2316,6 +2316,11 @@ typedef struct ngf_device_capabilities {
   size_t uniform_buffer_offset_alignment;
 
   /**
+   * When binding storage buffers, the specified offset must be a multiple of this number.
+   */
+  size_t storage_buffer_offset_alignment;
+
+  /**
    * When binding a uniform buffer, the specified range must not exceed
    * this value.
    */

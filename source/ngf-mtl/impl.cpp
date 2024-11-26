@@ -961,12 +961,12 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
   }
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyMac2)) {
-    caps.uniform_buffer_offset_alignment = 256;
-    caps.texel_buffer_offset_alignment   = 256;
+    caps.uniform_buffer_offset_alignment = 32;
   } else {
     caps.uniform_buffer_offset_alignment = 4;
-    caps.texel_buffer_offset_alignment   = 4;
   }
+  caps.storage_buffer_offset_alignment = 64;
+  caps.texel_buffer_offset_alignment   = 64;
 
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyApple3)) {
     caps.max_1d_image_dimension   = 16384;
