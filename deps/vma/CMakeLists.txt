@@ -10,3 +10,4 @@ add_library(vma STATIC
 target_include_directories(vma PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../vulkan-headers)
 target_include_directories(vma PUBLIC
     ${CMAKE_CURRENT_LIST_DIR}/src)
+target_compile_definitions(vma PUBLIC VMA_STATS_STRING_ENABLED=0)
