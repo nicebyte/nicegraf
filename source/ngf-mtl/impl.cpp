@@ -1187,7 +1187,7 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-ngf_context ngf_get_context() {
+ngf_context ngf_get_context() NGF_NOEXCEPT {
   return CURRENT_CONTEXT;
 }
 
