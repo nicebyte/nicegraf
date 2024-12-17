@@ -1446,9 +1446,18 @@ ngf_error ngf_create_compute_pipeline(
       info->shader_stage->entry_point_name.c_str(),
       func_const_values.get());
   if (!function) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+
+  ngf_id<MTL::ComputePipelineDescriptor> mtl_compute_desc = id_default;
+  mtl_compute_desc->setComputeFunction(function.get());
+
+  if (info->debug_name != nullptr) {
+    mtl_compute_desc->setLabel(NS::String::string(info->debug_name, NS::UTF8StringEncoding));
+  }
+
   NS::Error*                        err = nullptr;
   ngf_id<MTL::ComputePipelineState> computePSO =
-      CURRENT_CONTEXT->device->newComputePipelineState(function.get(), &err);
+      CURRENT_CONTEXT->device->newComputePipelineState(mtl_compute_desc.get(), MTL::PipelineOptionNone, nullptr, &err);
+
   if (err) {
     NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return NGF_ERROR_OBJECT_CREATION_FAILED;

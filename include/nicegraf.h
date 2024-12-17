@@ -1389,6 +1389,7 @@ typedef struct ngf_compute_pipeline_info {
   ngf_shader_stage shader_stage; /**< The (only) stage for this pipeline. */
   const ngf_specialization_info*
       spec_info; /**< Specifies the value of  specialization consts used by this pipeline. */
+      const char* debug_name;
 } ngf_compute_pipeline_info;
 
 /**
