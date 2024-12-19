@@ -2094,7 +2094,7 @@ static VkResult ngfvk_create_instance(
                                       .pApplicationName = NULL,  // TODO: allow specifying app name.
                                       .pEngineName      = "nicegraf",
                                       .engineVersion = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
-                                      .apiVersion    = VK_MAKE_VERSION(1, 0, 9)};
+                                      .apiVersion    = VK_MAKE_VERSION(1, 1, 0)};
 
   // Names of instance layers to enable.
   const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
