@@ -1715,15 +1715,11 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     // Ensure that a valid descriptor set is referenced by this
     // bind operation.
     if (bind_op->target_set >= ndesc_set_layouts) {
-      NGFI_DIAG_ERROR(
-          "invalid descriptor set %d referenced by bind operation (max. "
-          "allowed is %d)",
       NGFI_DIAG_WARNING(
           "invalid descriptor set %d referenced by bind operation (pipeline has "
           "%d sets) - ignoring",
           bind_op->target_set,
           ndesc_set_layouts);
-      return;
       continue;
     }
     // Find the corresponding descriptor set layout.
@@ -3442,10 +3438,7 @@ static void ngfvk_img_dtor(ngfi_chnk_hdr* chunk) {
     ngf_image img = *img_ptr;
     if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
     if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
-      vmaDestroyImage(
-          _vk.allocator,
-          (VkImage)img->alloc.obj_handle,
-          img->alloc.vma_alloc);
+      vmaDestroyImage(_vk.allocator, (VkImage)img->alloc.obj_handle, img->alloc.vma_alloc);
     }
     NGFI_FREE(img);
   }
@@ -3454,10 +3447,7 @@ static void ngfvk_img_dtor(ngfi_chnk_hdr* chunk) {
 static void ngfvk_buf_dtor(ngfi_chnk_hdr* chunk) {
   NGFI_CHNK_FOR_EACH(chunk, ngf_buffer, buf_ptr) {
     ngf_buffer buf = *buf_ptr;
-    vmaDestroyBuffer(
-        _vk.allocator,
-        (VkBuffer)buf->alloc.obj_handle,
-        buf->alloc.vma_alloc);
+    vmaDestroyBuffer(_vk.allocator, (VkBuffer)buf->alloc.obj_handle, buf->alloc.vma_alloc);
     NGFI_FREE(buf);
   }
 }
@@ -3544,7 +3534,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
       devcaps->clipspace_z_zero_to_one          = true;
       devcaps->uniform_buffer_offset_alignment =
           (size_t)vkdevlimits->minUniformBufferOffsetAlignment;
-      devcaps->storage_buffer_offset_alignment = 
+      devcaps->storage_buffer_offset_alignment =
           (size_t)vkdevlimits->minStorageBufferOffsetAlignment;
       devcaps->texel_buffer_offset_alignment = (size_t)vkdevlimits->minTexelBufferOffsetAlignment;
       devcaps->max_vertex_input_attributes_per_pipeline = vkdevlimits->maxVertexInputAttributes;
@@ -3875,22 +3865,24 @@ void ngf_shutdown(void) {
 
   if (_vk.allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(_vk.allocator); }
 
-  if (_vk.device != VK_NULL_HANDLE) {
-  vkDestroyDevice(_vk.device, NULL);
-  }
+  if (_vk.device != VK_NULL_HANDLE) { vkDestroyDevice(_vk.device, NULL); }
   if (_vk.validation_enabled) {
     vkDestroyDebugUtilsMessengerEXT(_vk.instance, _vk.debug_messenger, NULL);
   }
-  if (_vk.instance != VK_NULL_HANDLE) {
-  vkDestroyInstance(_vk.instance, NULL);
-  }
+  if (_vk.instance != VK_NULL_HANDLE) { vkDestroyInstance(_vk.instance, NULL); }
   _vk.instance = VK_NULL_HANDLE;
-  if (NGFVK_DEVICE_LIST) { free(NGFVK_DEVICE_LIST); NGFVK_DEVICE_LIST = NULL; }
-  if (NGFVK_DEVICE_ID_LIST) { free(NGFVK_DEVICE_ID_LIST); NGFVK_DEVICE_ID_LIST = NULL;}
+  if (NGFVK_DEVICE_LIST) {
+    free(NGFVK_DEVICE_LIST);
+    NGFVK_DEVICE_LIST = NULL;
+  }
+  if (NGFVK_DEVICE_ID_LIST) {
+    free(NGFVK_DEVICE_ID_LIST);
+    NGFVK_DEVICE_ID_LIST = NULL;
+  }
 #if defined(__linux__)
   if (_vk.xcb_connection) {
     xcb_disconnect(_vk.xcb_connection);
-    _vk.xcb_visualid = 0;
+    _vk.xcb_visualid   = 0;
     _vk.xcb_connection = NULL;
   }
 #endif
@@ -4740,8 +4732,8 @@ ngf_error ngf_create_graphics_pipeline(
   for (uint32_t i = 0u; i < info->input_info->nvert_buf_bindings; ++i) {
     VkVertexInputBindingDescription*   vk_binding_desc = &vk_binding_descs[i];
     const ngf_vertex_buf_binding_desc* binding_desc    = &info->input_info->vert_buf_bindings[i];
-    vk_binding_desc->binding                          = binding_desc->binding;
-    vk_binding_desc->stride                           = binding_desc->stride;
+    vk_binding_desc->binding                           = binding_desc->binding;
+    vk_binding_desc->stride                            = binding_desc->stride;
     vk_binding_desc->inputRate = get_vk_input_rate(binding_desc->input_rate);
   }
 
@@ -5312,10 +5304,8 @@ void ngf_cmd_draw(
   if (indexed && cmd_buf->active_idx_buf) {
     const ngfvk_sync_req idx_buf_sync_req = {
         .barrier_masks =
-            {
-                .access_mask = VK_ACCESS_INDEX_READ_BIT,
-                .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT
-            },
+            {.access_mask = VK_ACCESS_INDEX_READ_BIT,
+             .stage_mask  = VK_PIPELINE_STAGE_VERTEX_INPUT_BIT},
         .layout = VK_IMAGE_LAYOUT_UNDEFINED};
     const ngfvk_sync_res idx_buf_res = ngfvk_sync_res_from_buf(cmd_buf->active_idx_buf);
     ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &idx_buf_res, &idx_buf_sync_req);
@@ -5366,7 +5356,6 @@ void ngf_cmd_bind_resources(
     uint32_t                    nbind_operations) {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   if (nbind_operations <= 0u) { return; }
-
   ngfi_chnk_range curr_range = {.chnk = NULL};
   for (size_t i = 0u; i < nbind_operations; ++i) {
     const ngfvk_render_cmd cmd = {
@@ -5818,8 +5807,8 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
       (VkBuffer*)&alloc->obj_handle,
       &alloc->vma_alloc,
       &alloc_info);
-  alloc->mapped_data      = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
-  err                     = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+  alloc->mapped_data = vk_mem_is_host_visible ? alloc_info.pMappedData : NULL;
+  err                = (vkresult == VK_SUCCESS) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 
   if (err != NGF_ERROR_OK) {
     NGFI_FREE(buf);
@@ -5850,11 +5839,7 @@ void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) {
 }
 
 void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
-  vmaFlushAllocation(
-      _vk.allocator,
-      buf->alloc.vma_alloc,
-      buf->mapped_offset + offset,
-      size);
+  vmaFlushAllocation(_vk.allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
 }
 
 void ngf_buffer_unmap(ngf_buffer buf) {
