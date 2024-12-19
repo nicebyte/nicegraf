@@ -1718,20 +1718,32 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       NGFI_DIAG_ERROR(
           "invalid descriptor set %d referenced by bind operation (max. "
           "allowed is %d)",
+      NGFI_DIAG_WARNING(
+          "invalid descriptor set %d referenced by bind operation (pipeline has "
+          "%d sets) - ignoring",
           bind_op->target_set,
           ndesc_set_layouts);
       return;
+      continue;
+    }
+    // Find the corresponding descriptor set layout.
+    const ngfvk_desc_set_layout* set_layout =
+          &NGFI_DARRAY_AT(pipeline_data->descriptor_set_layouts, bind_op->target_set);
+    // Ensure that a valid binding is referenced by this bind operation.
+    if (bind_op->target_binding >= set_layout->nall_bindings) {
+      NGFI_DIAG_WARNING(
+          "invalid binding %d referenced by bind operation (descriptor set has %d bindings) - ignoring",
+          bind_op->target_binding,
+          set_layout->nall_bindings);
+      continue;
     }
 
     // Allocate a new descriptor set if necessary.
     const bool need_new_desc_set = vk_desc_sets[bind_op->target_set] == VK_NULL_HANDLE;
     if (need_new_desc_set) {
-      // Find the corresponding descriptor set layout.
-      const ngfvk_desc_set_layout* set_layout =
-          &NGFI_DARRAY_AT(pipeline_data->descriptor_set_layouts, bind_op->target_set);
       VkDescriptorSet set = ngfvk_desc_pools_list_allocate_set(pools, set_layout);
       if (set == VK_NULL_HANDLE) {
-        NGFI_DIAG_WARNING("Failed to bind graphics resources - could not allocate descriptor set");
+        NGFI_DIAG_ERROR("Failed to bind graphics resources - could not allocate descriptor set");
         return;
       }
       vk_desc_sets[bind_op->target_set] = set;
@@ -1743,7 +1755,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
 
     // Construct a vulkan descriptor set write corresponding to this bind
     // operation.
-    VkWriteDescriptorSet* vk_write = &vk_writes[descriptor_write_idx++];
+    VkWriteDescriptorSet* vk_write = &vk_writes[descriptor_write_idx];
 
     vk_write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     vk_write->pNext           = NULL;
@@ -1773,7 +1785,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     }
     case NGF_DESCRIPTOR_STORAGE_IMAGE:
       if (cmd_buf->renderpass_active) {
-        NGFI_DIAG_ERROR("Binding storage images to non-compute shader is currently unsupported.");
+        NGFI_DIAG_WARNING("Binding storage images to non-compute shader is currently unsupported.");
         continue;
       }
     /* break omitted intentionally */
@@ -1805,10 +1817,11 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     default:
       assert(false);
     }
+    ++descriptor_write_idx;
   }
   // perform all the vulkan descriptor set write operations to populate the
   // newly allocated descriptor sets.
-  vkUpdateDescriptorSets(_vk.device, cmd_buf->npending_bind_ops, vk_writes, 0, NULL);
+  vkUpdateDescriptorSets(_vk.device, descriptor_write_idx, vk_writes, 0, NULL);
 
   // bind each of the descriptor sets individually (this ensures that desc.
   // sets bound for a compatible pipeline earlier in this command buffer
@@ -3066,8 +3079,13 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
   memset(&sync_req, 0, sizeof(sync_req));
   sync_req.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  const bool is_read_only = NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
-                                .readonly_bindings[bind_op->target_binding];
+  // Bind ops that target non-existent sets/bindings should be disregarded.
+  if (bind_op->target_set >= NGFI_DARRAY_SIZE(pipeline->descriptor_set_layouts)) return sync_req;
+  const ngfvk_desc_set_layout* layout =
+      &NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set);
+  if (bind_op->target_binding >= layout->nall_bindings) return sync_req;
+
+  const bool is_read_only = layout->readonly_bindings[bind_op->target_binding];
 
   sync_req.barrier_masks.stage_mask =
       NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
