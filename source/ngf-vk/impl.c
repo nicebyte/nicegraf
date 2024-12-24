@@ -415,6 +415,7 @@ typedef struct ngf_context_t {
   NGFI_DARRAY_OF(ngfvk_command_superpool) command_superpools;
   NGFI_DARRAY_OF(ngfvk_desc_superpool) desc_superpools;
   NGFI_DARRAY_OF(ngfvk_renderpass_cache_entry) renderpass_cache;
+  bool being_destroyed;
 } ngf_context_t;
 
 typedef struct ngf_shader_stage_t {
@@ -3989,7 +3990,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     ngf_attachment_description* color_attachment_desc =
         &ctx->default_render_target->attachment_descs[attachment_desc_idx];
     color_attachment_desc->format       = swapchain_info->color_format;
-    color_attachment_desc->is_sampled   = false;
     color_attachment_desc->sample_count = swapchain_info->sample_count;
     color_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
     color_attachment_desc->is_resolve   = false;
@@ -4007,7 +4007,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       ngf_attachment_description* depth_attachment_desc =
           &ctx->default_render_target->attachment_descs[attachment_desc_idx];
       depth_attachment_desc->format       = swapchain_info->depth_format;
-      depth_attachment_desc->is_sampled   = false;
       depth_attachment_desc->sample_count = swapchain_info->sample_count;
       depth_attachment_desc->type =
           default_rt_no_stencil ? NGF_ATTACHMENT_DEPTH : NGF_ATTACHMENT_DEPTH_STENCIL;
@@ -4027,7 +4026,6 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
       ngf_attachment_description* resolve_attachment_desc =
           &ctx->default_render_target->attachment_descs[attachment_desc_idx];
       resolve_attachment_desc->format       = swapchain_info->color_format;
-      resolve_attachment_desc->is_sampled   = false;
       resolve_attachment_desc->sample_count = NGF_SAMPLE_COUNT_1;
       resolve_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
       resolve_attachment_desc->is_resolve   = true;
@@ -4139,6 +4137,7 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
 
 void ngf_destroy_context(ngf_context ctx) {
   if (ctx != NULL) {
+    ctx->being_destroyed = true;
     vkDeviceWaitIdle(_vk.device);
 
     if (ctx->default_render_target) {
@@ -5211,7 +5210,11 @@ ngf_create_render_target_cleanup:
 }
 
 void ngf_destroy_render_target(ngf_render_target target) {
-  if (target) {
+  if (target && (!target->is_default || CURRENT_CONTEXT->being_destroyed)) {
+    if (target->is_default && CURRENT_CONTEXT->default_render_target != target) {
+      NGFI_DIAG_ERROR("default RT can only be destroyed by owning context\n");
+      return;
+    }
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     if (!target->is_default) {
       if (target->frame_buffer != VK_NULL_HANDLE) {
@@ -5232,8 +5235,8 @@ void ngf_destroy_render_target(ngf_render_target target) {
     if (target->attachment_compat_pass_descs) {
       NGFI_FREEN(target->attachment_compat_pass_descs, target->nattachments);
     }
+    if (target->is_default) CURRENT_CONTEXT->default_render_target = NULL;
     NGFI_FREE(target);
-
     // clear out the entire renderpass cache to make sure the entries associated
     // with this target don't stick around.
     // TODO: clear out all caches across all contexts.

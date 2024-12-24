@@ -66,7 +66,6 @@ void* sample_initialize(
     .type = NGF_ATTACHMENT_COLOR,
     .format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
     .sample_count = NGF_SAMPLE_COUNT_1,
-    .is_sampled = true
   };
   const ngf_attachment_descriptions attachments_list = {
     .descs = &offscreen_color_attachment_description,

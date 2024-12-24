@@ -1220,8 +1220,6 @@ typedef struct ngf_attachment_description {
   ngf_image_format format;  /**< Format of the associated image. Note that it must be valid for the
                                given attachment type. */
   ngf_sample_count sample_count; /**< Number of samples per pixel in the associated image. */
-  bool is_sampled; /**< Whether the image associated with this attachment is sampled from a shader
-                      at any point. */
   bool is_resolve; /**< Whether the image associated with this attachment is used as an MSAA resolve
                       target. */
 } ngf_attachment_description;
@@ -1389,7 +1387,6 @@ typedef struct ngf_compute_pipeline_info {
   ngf_shader_stage shader_stage; /**< The (only) stage for this pipeline. */
   const ngf_specialization_info*
       spec_info; /**< Specifies the value of  specialization consts used by this pipeline. */
-      const char* debug_name;
 } ngf_compute_pipeline_info;
 
 /**

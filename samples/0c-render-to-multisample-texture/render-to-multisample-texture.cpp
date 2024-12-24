@@ -78,7 +78,6 @@ void* sample_initialize(
       .type         = NGF_ATTACHMENT_COLOR,
       .format       = NGF_IMAGE_FORMAT_BGRA8_SRGB,
       .sample_count = NGF_SAMPLE_COUNT_1,
-      .is_sampled   = true,
       .is_resolve   = false};
 
   const ngf_image_ref offscreen_img_ref = {
@@ -99,12 +98,10 @@ void* sample_initialize(
       {.type         = NGF_ATTACHMENT_COLOR,
        .format       = NGF_IMAGE_FORMAT_BGRA8_SRGB,
        .sample_count = main_render_target_sample_count,
-       .is_sampled   = false,
        .is_resolve   = false},
       {.type         = NGF_ATTACHMENT_COLOR,
        .format       = NGF_IMAGE_FORMAT_BGRA8_SRGB,
        .sample_count = NGF_SAMPLE_COUNT_1,
-       .is_sampled   = true,
        .is_resolve   = true}};
 
   const ngf_attachment_descriptions offscreen_multisample_attachments_list = {

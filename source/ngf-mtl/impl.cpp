@@ -1129,14 +1129,12 @@ ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) 
     attachment_descs.descs     = desc_array;
     attachment_descs.ndescs    = 1;
     desc_array[0].format       = ctx->swapchain_info.color_format;
-    desc_array[0].is_sampled   = false;
     desc_array[0].type         = NGF_ATTACHMENT_COLOR;
     desc_array[0].sample_count = ctx->swapchain_info.sample_count;
     desc_array[0].is_resolve   = false;
     if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
       attachment_descs.ndescs++;
       desc_array[1].format     = ctx->swapchain_info.depth_format;
-      desc_array[1].is_sampled = false;
       desc_array[1].type = ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8
                                ? NGF_ATTACHMENT_DEPTH_STENCIL
                                : NGF_ATTACHMENT_DEPTH;
