@@ -5878,25 +5878,37 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       (is_xfer_src ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u) |
       (enable_auto_mips ? (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : 0u);
 
-  ngf_error               err           = NGF_ERROR_OK;
-  const bool              is_cubemap    = info->type == NGF_IMAGE_TYPE_CUBE;
+  ngf_error                err             = NGF_ERROR_OK;
+  const bool               is_cubemap      = info->type == NGF_IMAGE_TYPE_CUBE;
+  const VkFormat           vk_image_format = get_vk_image_format(info->format);
+  const VkImageType        vk_image_type   = get_vk_image_type(info->type);
+  const VkImageCreateFlags create_flags    = is_cubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0u;
+  VkImageFormatProperties  dummy_props;
+  const bool               optimal_tiling_supported = vkGetPhysicalDeviceImageFormatProperties(
+                                            _vk.phys_dev,
+                                            vk_image_format,
+                                            vk_image_type,
+                                            VK_IMAGE_TILING_OPTIMAL,
+                                            usage_flags,
+                                            create_flags,
+                                            &dummy_props) == VK_SUCCESS;
   const VkImageCreateInfo vk_image_info = {
       .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
       .pNext     = NULL,
-      .flags     = is_cubemap ? VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT : 0u,
-      .imageType = get_vk_image_type(info->type),
+      .flags     = create_flags,
+      .imageType = vk_image_type,
       .extent =
           {.width = info->extent.width, .height = info->extent.height, .depth = info->extent.depth},
-      .format                = get_vk_image_format(info->format),
+      .format                = vk_image_format,
       .mipLevels             = info->nmips,
       .arrayLayers           = info->nlayers * (!is_cubemap ? 1u : 6u),
       .samples               = get_vk_sample_count(info->sample_count),
       .usage                 = usage_flags,
       .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
-      .tiling                = VK_IMAGE_TILING_OPTIMAL,
-      .pQueueFamilyIndices   = NULL,
-      .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED};
+      .tiling = optimal_tiling_supported ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR,
+      .pQueueFamilyIndices = NULL,
+      .initialLayout       = VK_IMAGE_LAYOUT_UNDEFINED};
 
   VmaAllocationCreateInfo vma_alloc_info = {
       .flags          = 0u,
