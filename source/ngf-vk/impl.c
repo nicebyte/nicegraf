@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -3766,6 +3766,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
+      .independentBlend  = VK_TRUE,
       .samplerAnisotropy = VK_TRUE,
       .imageCubeArray    = enable_cubemap_arrays};
   VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
