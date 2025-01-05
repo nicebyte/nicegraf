@@ -1542,10 +1542,13 @@ typedef struct ngf_sampler_info {
                    *  the largest dimensions.
                    */
   float lod_bias; /**< A bias to add to the mip level calculated during the sample operation. */
-  float max_anisotropy;   /**< Max allowed degree of anisotropy. Ignored if \ref
-                           * ngf_sampler_info::enable_anisotropy is false.
-                           */
-  bool enable_anisotropy; /**< Whether to allow anisotropic filtering. */
+  float max_anisotropy;             /**< Max allowed degree of anisotropy. Ignored if \ref
+                                     * ngf_sampler_info::enable_anisotropy is false.
+                                     */
+  bool           enable_anisotropy; /**< Whether to allow anisotropic filtering. */
+  ngf_compare_op compare_op; /**< The comparison to use when comparing depth texture samples to a
+                              * reference value. Set to \ref ngf_compare_op::NGF_COMPARE_OP_NEVER to
+                              * disable comparison for the sampler. */
 } ngf_sampler_info;
 
 /**
