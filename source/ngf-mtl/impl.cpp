@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -1749,6 +1749,10 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
   sampler_desc->setMaxAnisotropy(info->enable_anisotropy ? (NS::UInteger)info->max_anisotropy : 1);
   sampler_desc->setLodMinClamp(info->lod_min);
   sampler_desc->setLodMaxClamp(info->lod_max);
+  if (info->compare_op != NGF_COMPARE_OP_NEVER) {
+    sampler_desc->setCompareFunction(get_mtl_compare_function(info->compare_op));
+  }
+    
   NGFMTL_NURSERY(sampler, sampler);
   sampler->sampler = CURRENT_CONTEXT->device->newSamplerState(sampler_desc.get());
   *result          = sampler.release();
