@@ -67,7 +67,7 @@ void* sample_initialize(
   /**
    * Create the compute pipeline.
    */
-  ngf_compute_pipeline_info pipeline_info;
+  ngf_compute_pipeline_info pipeline_info{};
   pipeline_info.shader_stage = compute_shader.get();
   pipeline_info.spec_info    = nullptr;
   NGF_MISC_CHECK_NGF_ERROR(state->compute_pipeline.initialize(pipeline_info));
