@@ -544,6 +544,8 @@ typedef struct ngf_rasterization_info {
   ngf_polygon_mode    polygon_mode; /**< How to draw polygons.*/
   ngf_cull_mode       cull_mode;    /**< Which polygons to cull.*/
   ngf_front_face_mode front_face;   /**< Which winding counts as front-facing.*/
+  bool                enable_depth_bias; /**< Controls whether to enable depth bias. See also: \ref
+                                            ngf_cmd_set_depth_bias */
 } ngf_rasterization_info;
 
 /**
@@ -3123,6 +3125,29 @@ void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32
  * Sets the stencil write mask.
  */
 void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *  
+ * Configures a bias value to be added to the depth of each rasterized fragment.
+ * Unclamped bias `b` is computed as follows:
+ * 
+ *  `b = const_scale * r + max_slope * slope_scale`
+ * 
+ * where:
+ *  - `r` is a constant value dependent on the format of the depth buffer and other factors,
+ * representing the minimum absolute difference between two rasterized depth values.
+ *  - `max_slope` is ideally the length of the depth function's gradient vector at the point
+ * corresponding to the fragment (but can be approximated by `max(|dZ/dx|, |dZ/dy|)`.
+ * 
+ * The final bias `B`, which is added to the fragment depth, is computed as follows:
+ * 
+ * `B = clamp > 0.0f ? min(clamp, b) : (clamp < 0.0f ? max(clamp, b) : b)`
+ * 
+ * Requires the bound pipeline to have depth bias enabled to have effect. 
+ * See \ref ngf_rasterization_info::enable_depth_bias.
+ */
+void ngf_cmd_set_depth_bias(ngf_render_encoder enc, float const_scale, float slope_scale, float clamp) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

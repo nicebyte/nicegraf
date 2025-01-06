@@ -286,6 +286,7 @@ typedef enum ngfvk_render_cmd_type {
   NGFVK_RENDER_CMD_BIND_RESOURCE,
   NGFVK_RENDER_CMD_BIND_ATTRIB_BUFFER,
   NGFVK_RENDER_CMD_BIND_INDEX_BUFFER,
+  NGFVK_RENDER_CMD_SET_DEPTH_BIAS,
   NGFVK_RENDER_CMD_DRAW,
 } ngfvk_render_cmd_type;
 
@@ -324,6 +325,11 @@ typedef struct ngfvk_render_cmd {
       uint32_t ninstances;
       bool     indexed;
     } draw;
+    struct {
+        float const_factor;
+        float slope_factor;
+        float clamp;
+    } depth_bias;
   } data;
   ngfvk_render_cmd_type type : 8;
 } ngfvk_render_cmd;
@@ -3191,6 +3197,14 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
           cmd->data.stencil_values.back);
       break;
     }
+    case NGFVK_RENDER_CMD_SET_DEPTH_BIAS: {
+      vkCmdSetDepthBias(
+          buf->vk_cmd_buffer,
+          cmd->data.depth_bias.const_factor,
+          cmd->data.depth_bias.clamp,
+          cmd->data.depth_bias.slope_factor);
+      break;
+    }
     case NGFVK_RENDER_CMD_BIND_RESOURCE: {
       ngfvk_cmd_bind_resources(buf, &cmd->data.bind_resource, 1u);
       break;
@@ -4796,7 +4810,7 @@ ngf_error ngf_create_graphics_pipeline(
       .polygonMode             = get_vk_polygon_mode(info->rasterization->polygon_mode),
       .cullMode                = get_vk_cull_mode(info->rasterization->cull_mode),
       .frontFace               = get_vk_front_face(info->rasterization->front_face),
-      .depthBiasEnable         = VK_FALSE,
+      .depthBiasEnable         = info->rasterization->enable_depth_bias ? VK_TRUE : VK_FALSE,
       .depthBiasConstantFactor = 0.0f,
       .depthBiasClamp          = 0.0f,
       .depthBiasSlopeFactor    = 0.0f,
@@ -4910,7 +4924,8 @@ ngf_error ngf_create_graphics_pipeline(
   const VkDynamicState dynamic_states[] = {
       VK_DYNAMIC_STATE_VIEWPORT,
       VK_DYNAMIC_STATE_SCISSOR,
-      VK_DYNAMIC_STATE_DEPTH_BOUNDS};
+      VK_DYNAMIC_STATE_DEPTH_BOUNDS,
+      VK_DYNAMIC_STATE_DEPTH_BIAS};
   const uint32_t                   ndynamic_states = NGFI_ARRAYSIZE(dynamic_states);
   VkPipelineDynamicStateCreateInfo dynamic_state   = {
         .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
@@ -5438,6 +5453,20 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   const ngfvk_render_cmd cmd = {
       .type = NGFVK_RENDER_CMD_SET_STENCIL_WRITE_MASK,
       .data = {.stencil_values = {.front = front, .back = back}}};
+  ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
+}
+
+void ngf_cmd_set_depth_bias(
+    ngf_render_encoder enc,
+    float              const_scale,
+    float              slope_scale,
+    float              clamp) {
+  ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
+  const ngfvk_render_cmd cmd = {
+      .type = NGFVK_RENDER_CMD_SET_DEPTH_BIAS,
+      .data = {
+          .depth_bias =
+              {.const_factor = const_scale, .slope_factor = slope_scale, .clamp = clamp}}};
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
