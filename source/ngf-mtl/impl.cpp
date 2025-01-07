@@ -999,11 +999,12 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
   if (gpu_family_idx >= ngfmtl_gpufam_idx(MTL::GPUFamilyMac2)) {
     caps.uniform_buffer_offset_alignment = 32;
   } else {
-    #if TARGET_OS_SIMULATOR
+#if TARGET_OS_SIMULATOR
     caps.uniform_buffer_offset_alignment = 256;
     caps.texel_buffer_offset_alignment   = 256;
-    #else
+#else
     caps.uniform_buffer_offset_alignment = 4;
+#endif
   }
   caps.storage_buffer_offset_alignment = 64;
   caps.texel_buffer_offset_alignment   = 64;
