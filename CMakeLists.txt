@@ -300,7 +300,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
       set_target_properties(${SAMPLE_NAME} PROPERTIES
           MACOSX_BUNDLE TRUE
           MACOSX_BUNDLE_BUNDLE_NAME ${SAMPLE_NAME}
-          MACOSX_BUNDLE_GUI_IDENTIFIER "com.snowblaze.${SAMPLE_NAME}"
+          MACOSX_BUNDLE_GUI_IDENTIFIER "com.yourname.${SAMPLE_NAME}"
           MACOSX_BUNDLE_BUNDLE_VERSION "0.0.1"
           MACOSX_BUNDLE_SHORT_VERSION_STRING "0.0.1"
           MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_LIST_DIR}/samples/common/platform/ios/Info.plist.in
