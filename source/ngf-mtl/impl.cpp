@@ -2531,6 +2531,11 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   cmd_buf->active_rce->setDepthStencilState(depth_stencil_state.get());
 }
 
+void ngf_cmd_set_depth_bias(ngf_render_encoder enc, float const_scale, float slope_scale, float clamp) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  cmd_buf->active_rce->setDepthBias(const_scale, slope_scale, clamp);
+}
+
 void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buf,  const char* name) NGF_NOEXCEPT {
   auto name_nsstr = NS::String::string(name, NS::ASCIIStringEncoding);
   cmd_buf->mtl_cmd_buffer->pushDebugGroup(name_nsstr);
