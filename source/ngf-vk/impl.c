@@ -1426,7 +1426,6 @@ ngfvk_initialize_generic_encoder(ngf_cmd_buffer cmd_buf, struct ngfi_private_enc
 static ngf_error
 ngfvk_encoder_end(ngf_cmd_buffer cmd_buf, struct ngfi_private_encoder_data* generic_enc) {
   (void)generic_enc;
-  ngfvk_cleanup_pending_binds(cmd_buf);
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
   return NGF_ERROR_OK;
 }
@@ -1843,7 +1842,6 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
           NULL);
     }
   }
-
   ngfvk_cleanup_pending_binds(cmd_buf);
 }
 
@@ -4524,6 +4522,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   ngfi_chnklist_clear(&cmd_buf->in_pass_cmd_chnks);
   ngfi_chnklist_clear(&cmd_buf->pending_barriers.chnklist);
   ngfi_dict_clear(cmd_buf->local_res_states);
+  ngfvk_cleanup_pending_binds(cmd_buf);
 
   return ngfvk_cmd_buffer_allocate_for_frame(token, &cmd_buf->vk_cmd_pool, &cmd_buf->vk_cmd_buffer);
 }
@@ -5965,8 +5964,6 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   }
 
   err = ngfvk_create_image(info, &alloc, true, result);
-  if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
-
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
 
 ngf_create_image_cleanup:
