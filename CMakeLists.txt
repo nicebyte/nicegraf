@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2024 nicegraf contributors
+Copyright (c) 2025 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -144,29 +144,15 @@ endif()
 
 # Build samples only if explicitly requested.
 if (NGF_BUILD_SAMPLES STREQUAL "yes")
-<<<<<<< HEAD
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
-    if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS")
-        add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
-
-        # Ensure we have the required dependencies are available.
-        if (TARGET glfw)
-            set_target_properties(glfw PROPERTIES FOLDER "samples")
-        else()
-            message(FATAL_ERROR "Dependencies required for building samples not found. Make sure to run `git submodule update` from the repo root.")
-        endif()
-    endif()
-=======
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/misc/common)
   if (NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "iOS")
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
->>>>>>> a5a309b (cleanup cmake)
-
-    # Ensure we have the required dependencies are available.
-    if (TARGET glfw)
-        set_target_properties(glfw PROPERTIES FOLDER "samples")
-    else()
-        message(FATAL_ERROR "Dependencies required for building samples not found. Make sure to run `git submodule update` from the repo root.")
-    endif()
+      # Don't import GLFW if building samples for iOS.
+      add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/samples/deps/glfw)
+      if (TARGET glfw)
+          set_target_properties(glfw PROPERTIES FOLDER "samples")
+      else()
+          message(FATAL_ERROR "Dependencies required for building samples not found. Make sure to run `git submodule update` from the repo root.")
+      endif()
   endif()
 
   # Determine the backend to build the samples with based on the platform, and
