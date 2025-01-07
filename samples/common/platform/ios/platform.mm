@@ -40,8 +40,8 @@ int get_key(MTKView* window, int key) {
 };
 
 void get_framebuffer_size(MTKView* window, int* width, int* height) {
-  *width  = (int)window.frame.size.width;
-  *height = (int)window.frame.size.height;
+  *width  = (int)window.drawableSize.width;
+  *height = (int)window.drawableSize.height;
 }
 
 void begin_imgui_frame(MTKView* window) {

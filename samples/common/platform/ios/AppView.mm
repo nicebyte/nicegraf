@@ -11,7 +11,6 @@
 
 - (instancetype)initWithFrame:(CGRect)frame {
   self        = [super initWithFrame:frame];
-  self.device = MTLCreateSystemDefaultDevice();
   if (self) {
     // Create and add the display link
     _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(update:)];
@@ -68,7 +67,8 @@
   CGPoint  touchLocation = [anyTouch locationInView:self];
   ImGuiIO& io            = ImGui::GetIO();
   io.AddMouseSourceEvent(ImGuiMouseSource_TouchScreen);
-  io.AddMousePosEvent((float)touchLocation.x, (float)touchLocation.y);
+  const float s = (float)[[UIScreen mainScreen] scale];
+  io.AddMousePosEvent((float)touchLocation.x*s, (float)touchLocation.y*s);
 
   BOOL hasActiveTouch = NO;
   for (UITouch* touch in event.allTouches) {
