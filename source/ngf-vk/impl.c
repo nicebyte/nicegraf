@@ -1740,6 +1740,8 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       continue;
     }
 
+    // TODO: verify the descriptor type too
+
     // Allocate a new descriptor set if necessary.
     const bool need_new_desc_set = vk_desc_sets[bind_op->target_set] == VK_NULL_HANDLE;
     if (need_new_desc_set) {
@@ -3134,11 +3136,11 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
   NGFI_CHNKLIST_FOR_EACH((*cmd_list), ngfvk_render_cmd, cmd) {
     switch (cmd->type) {
     case NGFVK_RENDER_CMD_BIND_PIPELINE: {
+      buf->active_gfx_pipe = cmd->data.pipeline;
       // If we had a pipeline bound for which there have been resources bound, but no draw call
       // executed, commit those resources to actual descriptor sets and bind them so that the next
       // pipeline is able to "see" those resources, provided that it's compatible.
       if (buf->active_gfx_pipe && buf->npending_bind_ops > 0u) { ngfvk_execute_pending_binds(buf); }
-      buf->active_gfx_pipe = cmd->data.pipeline;
       vkCmdBindPipeline(
           buf->vk_cmd_buffer,
           VK_PIPELINE_BIND_POINT_GRAPHICS,
