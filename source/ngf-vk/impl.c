@@ -3780,6 +3780,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
+      .depthBiasClamp                       = VK_TRUE,
       .independentBlend                     = VK_TRUE,
       .samplerAnisotropy                    = VK_TRUE,
       .shaderStorageImageReadWithoutFormat  = VK_TRUE,
