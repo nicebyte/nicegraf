@@ -43,6 +43,7 @@ namespace vertex_attribs {
 struct uniforms {
   nm::float4x4 world_to_clip;
   float        timestamp;
+  nm::float3   _padding;
 };
 
 struct state {
