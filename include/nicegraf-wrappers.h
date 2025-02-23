@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -27,7 +27,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utility>
 
 /**
  * @file
@@ -37,6 +36,33 @@
  */
 
 namespace ngf {
+
+namespace detail {
+
+template<class T> struct remove_ref {
+  using Type = T;
+};
+template<class T> struct remove_ref<T&> {
+  using Type = T;
+};
+template<class T> struct remove_ref<T&&> {
+  using Type = T;
+};
+
+template<class T> using remove_ref_t = typename remove_ref<T>::Type;
+
+template<class T> constexpr T&& fwd(remove_ref_t<T>& x) noexcept {
+  return (T&&)x;
+}
+template<class T> constexpr T&& fwd(remove_ref_t<T>&& x) noexcept {
+  return (T&&)x;
+}
+
+template<class T> constexpr remove_ref_t<T>&& move(T&& x) noexcept {
+  return (remove_ref_t<T>&&)x;
+}
+
+}
 
 /**
  * \ingroup ngf_wrappers
@@ -69,7 +95,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
 
   ngf_handle(const ngf_handle&) = delete;
   ngf_handle(ngf_handle&& other) : handle_(nullptr) {
-    *this = std::move(other);
+    *this = detail::move(other);
   }
 
   /** Disposes of the owned handle, if it is not null. */
@@ -96,6 +122,18 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
     if (err != NGF_ERROR_OK) handle_ = nullptr;
     return err;
   }
+
+  struct make_result {
+    ngf_handle handle;
+    const ngf_error error;
+  };
+  static make_result make(const init_type& info) {
+    ngf_handle      handle;
+    const ngf_error error = handle.initialize(info);
+    return make_result {detail::move(handle), error};
+  }
+
+
 
   /** @return The raw handle to the wrapped object. */
   T get() {
@@ -306,7 +344,7 @@ class render_encoder {
   }
 
   render_encoder(render_encoder&& other) noexcept {
-    *this = std::move(other);
+    *this = detail::move(other);
   }
 
   render_encoder& operator=(render_encoder&& other) noexcept {
@@ -354,7 +392,7 @@ class xfer_encoder {
   }
 
   xfer_encoder(xfer_encoder&& other) noexcept {
-    *this = std::move(other);
+    *this = detail::move(other);
   }
 
   xfer_encoder& operator=(xfer_encoder&& other) noexcept {
@@ -413,7 +451,7 @@ class compute_encoder {
   }
 
   compute_encoder(compute_encoder&& other) noexcept {
-    *this = std::move(other);
+    *this = detail::move(other);
   }
 
   compute_encoder& operator=(compute_encoder&& other) noexcept {
@@ -575,7 +613,7 @@ template<uint32_t S> struct descriptor_set {
  * ```
  */
 template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {std::forward<const Args>(args)...};
+  const ngf_resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
   ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
 
@@ -593,7 +631,7 @@ template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Ar
  *
  */
 template<class... Args> void cmd_bind_resources(ngf_compute_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {std::forward<const Args>(args)...};
+  const ngf_resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
   ngf_cmd_bind_compute_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
 }
 
@@ -606,7 +644,7 @@ template<typename T> class uniform_multibuffer {
   public:
   uniform_multibuffer() = default;
   uniform_multibuffer(uniform_multibuffer&& other) {
-    *this = std::move(other);
+    *this = detail::move(other);
   }
   uniform_multibuffer(const uniform_multibuffer&) = delete;
 
