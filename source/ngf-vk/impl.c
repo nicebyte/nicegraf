@@ -73,6 +73,19 @@ typedef enum ngfvk_retire_obj {
 // Function pointer for Vulkan object destructors.
 typedef void (*ngfvk_retire_obj_dtor)(ngfi_chnk_hdr*);
 
+typedef struct ngfvk_dummy_resources {
+  ngf_image              img;
+  ngf_buffer             buf;
+  ngf_texel_buffer_view  tbuf;
+  ngf_sampler            samp;
+  VkDescriptorImageInfo  img_info;
+  VkDescriptorImageInfo  samp_info;
+  VkDescriptorImageInfo  imgsamp_info;
+  VkDescriptorBufferInfo buf_info;
+  pthread_mutex_t        img_mu;
+  bool                   image_transitioned;
+} ngfvk_dummy_resources;
+
 // Singleton for holding vulkan instance, device and queue handles.
 // This is shared by all contexts.
 struct {
@@ -93,6 +106,7 @@ struct {
   xcb_visualid_t    xcb_visualid;
 #endif
   ngfvk_retire_obj_dtor retire_obj_dtors[NGFVK_RETIRE_OBJ_COUNT];
+  ngfvk_dummy_resources dummy_res;
 } _vk;
 
 // Singleton for holding on to RenderDoc API
@@ -143,6 +157,7 @@ typedef struct ngfvk_desc_set_layout {
   ngfvk_desc_count      counts;
   uint32_t              nall_bindings;  // < Number of ALL bindings (incl. unused ones).
   bool*                 readonly_bindings;
+  VkDescriptorType*     desc_types;
   VkPipelineStageFlags* stage_accessors;
 } ngfvk_desc_set_layout;
 
@@ -1676,6 +1691,45 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   }
   pool->utilization.sets++;
 
+  // Bind dummy resources.
+  VkWriteDescriptorSet* dummy_writes = (VkWriteDescriptorSet*)ngfi_sa_alloc(
+      ngfi_tmp_store(),
+      sizeof(VkWriteDescriptorSet) * set_layout->nall_bindings);
+  uint32_t num_writes = 0u;
+  for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
+    if (set_layout->desc_types[b] == ~VK_DESCRIPTOR_TYPE_SAMPLER) continue;
+    VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
+    desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    desc_w->pNext                = NULL;
+    desc_w->descriptorCount      = 1u;
+    desc_w->descriptorType       = set_layout->desc_types[b];
+    desc_w->dstArrayElement      = 0u;
+    desc_w->dstBinding           = b;
+    desc_w->dstSet               = result;
+    switch (desc_w->descriptorType) {
+    case VK_DESCRIPTOR_TYPE_SAMPLER:
+      desc_w->pImageInfo = &_vk.dummy_res.samp_info;
+      break;
+    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+      desc_w->pImageInfo = &_vk.dummy_res.imgsamp_info;
+      break;
+    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+      desc_w->pImageInfo = &_vk.dummy_res.img_info;
+      break;
+    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+      desc_w->pBufferInfo = &_vk.dummy_res.buf_info;
+      break;
+    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+      desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
+      break;
+    default:
+      assert(false);
+    }
+  }
+  vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);
+
   return result;
 }
 
@@ -2311,11 +2365,13 @@ ngf_error ngfvk_create_pipeline_layout(
     if (set_layout.nall_bindings > 0u) {
       set_layout.readonly_bindings = NGFI_ALLOCN(bool, set_layout.nall_bindings);
       set_layout.stage_accessors   = NGFI_ALLOCN(VkPipelineStageFlags, set_layout.nall_bindings);
+      set_layout.desc_types        = NGFI_ALLOCN(VkDescriptorType, set_layout.nall_bindings);
       memset(set_layout.readonly_bindings, 0, sizeof(bool) * set_layout.nall_bindings);
       memset(
           set_layout.stage_accessors,
           0,
           sizeof(VkPipelineStageFlags) * set_layout.nall_bindings);
+      memset(set_layout.desc_types, 0xff, sizeof(VkDescriptorType) * set_layout.nall_bindings);
     }
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
@@ -2335,6 +2391,7 @@ ngf_error ngfvk_create_pipeline_layout(
       vk_d->descriptorType     = get_vk_descriptor_type(ngf_desc_type);
       vk_d->stageFlags         = VK_SHADER_STAGE_ALL;
       vk_d->pImmutableSamplers = NULL;
+      set_layout.desc_types[d->binding] = vk_d->descriptorType;
       set_layout.counts[ngf_desc_type]++;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
@@ -2402,8 +2459,12 @@ ngfi_destroy_generic_pipeline_data(ngfvk_frame_resources* res, ngfvk_generic_pip
     ngfvk_desc_set_layout* layout    = &NGFI_DARRAY_AT(data->descriptor_set_layouts, l);
     VkDescriptorSetLayout  vk_layout = layout->vk_handle;
     NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_DSET_LAYOUT, vk_layout);
-    if (layout->readonly_bindings && layout->nall_bindings > 0u) {
-      NGFI_FREEN(layout->readonly_bindings, layout->nall_bindings);
+    if (layout->nall_bindings > 0u) {
+      if (layout->readonly_bindings) {
+        NGFI_FREEN(layout->readonly_bindings, layout->nall_bindings);
+      }
+      if (layout->stage_accessors) { NGFI_FREEN(layout->stage_accessors, layout->nall_bindings); }
+      if (layout->desc_types) { NGFI_FREEN(layout->desc_types, layout->nall_bindings); }
     }
   }
   NGFI_DARRAY_DESTROY(data->descriptor_set_layouts);
@@ -3279,11 +3340,49 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
     ngfvk_frame_resources* frame_res,
     VkSemaphore            wait_semaphore,
     VkFence                signal_fence) {
+
   ngf_error        err       = NGF_ERROR_OK;
   const uint32_t   ncmd_bufs = NGFI_DARRAY_SIZE(frame_res->submitted_cmd_bufs);
   VkCommandBuffer* submitted_cmd_buf_handles =
-      ngfi_sa_alloc(ngfi_frame_store(), sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 1u);
+      ngfi_sa_alloc(ngfi_frame_store(), sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 2u);
   uint32_t submitted_cmd_buf_handles_idx = 0u;
+
+  {
+    // Check if dummy image needs to be transitioned from UNDEFINED to GENERAL layout,
+    // submit and aux command buffer with the appropriate barrier if so.
+    pthread_mutex_lock(&_vk.dummy_res.img_mu);
+    if (!_vk.dummy_res.image_transitioned) {
+      _vk.dummy_res.image_transitioned = true;
+      VkCommandBuffer aux_cmd_buf;
+      VkCommandPool   aux_cmd_pool;
+      ngfvk_cmd_buffer_allocate_for_frame(
+          CURRENT_CONTEXT->current_frame_token,
+          &aux_cmd_pool,
+          &aux_cmd_buf);
+      const VkImageMemoryBarrier bar = {
+          .sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+          .pNext         = NULL,
+          .image         = (VkImage)_vk.dummy_res.img->alloc.obj_handle,
+          .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
+          .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+          .srcAccessMask = 0,
+          .dstAccessMask = 0,
+          .subresourceRange =
+              {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+               .baseArrayLayer = 0u,
+               .baseMipLevel   = 0u,
+               .layerCount     = 1u,
+               .levelCount     = 1u},
+          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED};
+      vkCmdPipelineBarrier(aux_cmd_buf, 0, 0, 0, 0, NULL, 0, NULL, 1, &bar);
+      vkEndCommandBuffer(aux_cmd_buf);
+      submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
+      ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
+      NGFVK_RETIRE_OBJECT(frame_res, NGFVK_RETIRE_OBJ_CMDBUF_WITH_POOL, aux_buf_pool);
+    }
+    pthread_mutex_unlock(&_vk.dummy_res.img_mu);
+  }
 
   ngfvk_pending_barrier_list pending_patch_barriers;
   memset(&pending_patch_barriers, 0, sizeof(pending_patch_barriers));
@@ -3448,22 +3547,28 @@ static void ngfvk_cmd_buf_dtor(ngfi_chnk_hdr* chunk) {
   }
 }
 
+static void ngfvk_destroy_image(ngf_image img) {
+  if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
+  if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
+    vmaDestroyImage(_vk.allocator, (VkImage)img->alloc.obj_handle, img->alloc.vma_alloc);
+  }
+  NGFI_FREE(img);
+}
+
 static void ngfvk_img_dtor(ngfi_chnk_hdr* chunk) {
   NGFI_CHNK_FOR_EACH(chunk, ngf_image, img_ptr) {
-    ngf_image img = *img_ptr;
-    if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
-    if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
-      vmaDestroyImage(_vk.allocator, (VkImage)img->alloc.obj_handle, img->alloc.vma_alloc);
-    }
-    NGFI_FREE(img);
+    ngfvk_destroy_image(*img_ptr);
   }
+}
+
+static void ngfvk_destroy_buffer(ngf_buffer buf) {
+  vmaDestroyBuffer(_vk.allocator, (VkBuffer)buf->alloc.obj_handle, buf->alloc.vma_alloc);
+  NGFI_FREE(buf);
 }
 
 static void ngfvk_buf_dtor(ngfi_chnk_hdr* chunk) {
   NGFI_CHNK_FOR_EACH(chunk, ngf_buffer, buf_ptr) {
-    ngf_buffer buf = *buf_ptr;
-    vmaDestroyBuffer(_vk.allocator, (VkBuffer)buf->alloc.obj_handle, buf->alloc.vma_alloc);
-    NGFI_FREE(buf);
+    ngfvk_destroy_buffer(*buf_ptr);
   }
 }
 
@@ -3872,6 +3977,43 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_BUF]              = ngfvk_buf_dtor;
   _vk.retire_obj_dtors[NGFVK_RETIRE_OBJ_DESC_POOL_LIST]   = ngfvk_desc_pools_list_dtor;
 
+  // Create dummy objects to pre-bind in fresh descriptor sets.
+  const ngf_image_info dummy_img_info = {
+      .extent       = {1u, 1u, 1u},
+      .format       = NGF_IMAGE_FORMAT_R8,
+      .nlayers      = 1u,
+      .nmips        = 1u,
+      .sample_count = NGF_SAMPLE_COUNT_1,
+      .type         = NGF_IMAGE_TYPE_IMAGE_2D,
+      .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE};
+  const ngf_buffer_info dummy_buf_info = {
+      .buffer_usage = NGF_BUFFER_USAGE_STORAGE_BUFFER | NGF_BUFFER_USAGE_UNIFORM_BUFFER |
+                      NGF_BUFFER_USAGE_TEXEL_BUFFER,
+      .size         = 1u,
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL};
+  ngf_sampler_info dummy_samp_info;
+  memset(&dummy_samp_info, 0, sizeof(dummy_samp_info));
+  ngf_create_image(&dummy_img_info, &_vk.dummy_res.img);
+  ngf_create_buffer(&dummy_buf_info, &_vk.dummy_res.buf);
+  ngf_create_sampler(&dummy_samp_info, &_vk.dummy_res.samp);
+  const ngf_texel_buffer_view_info tbuf_info =
+      {.buffer = _vk.dummy_res.buf, .offset = 0u, .size = 1u, .texel_format = NGF_IMAGE_FORMAT_R8};
+  ngf_create_texel_buffer_view(&tbuf_info, &_vk.dummy_res.tbuf);
+  _vk.dummy_res.buf_info.buffer          = (VkBuffer)_vk.dummy_res.buf->alloc.obj_handle;
+  _vk.dummy_res.buf_info.offset          = 0u;
+  _vk.dummy_res.buf_info.range           = 1u;
+  _vk.dummy_res.img_info.imageLayout     = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.img_info.imageView       = _vk.dummy_res.img->vkview;
+  _vk.dummy_res.img_info.sampler         = VK_NULL_HANDLE;
+  _vk.dummy_res.samp_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.samp_info.imageView      = VK_NULL_HANDLE;
+  _vk.dummy_res.samp_info.sampler        = _vk.dummy_res.samp->vksampler;
+  _vk.dummy_res.imgsamp_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.imgsamp_info.imageView   = _vk.dummy_res.img->vkview;
+  _vk.dummy_res.imgsamp_info.sampler     = _vk.dummy_res.samp->vksampler;
+  _vk.dummy_res.image_transitioned       = false;
+  pthread_mutex_init(&_vk.dummy_res.img_mu, NULL);
+
   // Done!
 
   return NGF_ERROR_OK;
@@ -3881,6 +4023,11 @@ void ngf_shutdown(void) {
   NGFI_DIAG_INFO("Shutting down nicegraf.");
 
   if (CURRENT_CONTEXT != NULL) { NGFI_DIAG_ERROR("Context not destroyed before shutdown.") }
+  vkDestroyBufferView(_vk.device, _vk.dummy_res.tbuf->vk_buf_view, NULL);
+  NGFI_FREE(_vk.dummy_res.tbuf);
+  ngfvk_destroy_image(_vk.dummy_res.img);
+  ngfvk_destroy_buffer(_vk.dummy_res.buf);
+  vkDestroySampler(_vk.device, _vk.dummy_res.samp->vksampler, NULL);
 
   if (_vk.allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(_vk.allocator); }
 
@@ -6030,8 +6177,10 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
 }
 
 void ngf_finish(void) {
-  ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
-  ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
+  if (CURRENT_CONTEXT->current_frame_token != ~0u) {
+    ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
+    ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
+  }
   vkDeviceWaitIdle(_vk.device);
 }
 
