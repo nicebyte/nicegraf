@@ -44,12 +44,14 @@ namespace image_arrays {
 struct img_array_uniforms {
   nm::float4x4 matrix;
   float        image_array_idx = 0.0f;
+  nm::float3   _padding;
 };
 
 struct cube_array_uniforms {
   nm::float4x4 matrix;
   float        aspect    = 1.0f;
   float        array_idx = 0.0f;
+  nm::float2   _padding;
 };
 
 struct state {
