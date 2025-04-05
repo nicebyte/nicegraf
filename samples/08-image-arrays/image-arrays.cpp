@@ -73,7 +73,7 @@ struct state {
   float                                            dolly             = -5.0f;
   float                                            image_array_idx   = 0.0f;
   float                                            cubemap_array_idx = 0.0f;
-  int                                              image_idx         = 0;
+  uint32_t                                         image_idx         = 0;
   float                                            yaw               = 0.0f;
   float                                            pitch             = 0.0f;
 };
@@ -393,7 +393,7 @@ void sample_draw_ui(void* userdata) {
   ImGui::DragFloat("dolly", &data->dolly, 0.01f, -70.0f, 0.11f);
   ImGui::DragFloat("image array index", &data->image_array_idx, 0.1f, 0.0f, 3.0f);
   ImGui::DragFloat("cubemap array index", &data->cubemap_array_idx, 0.1f, 0.0f, 3.0f);
-  ImGui::DragInt("image index", &data->image_idx, .1f, 0, 3);
+  ImGui::DragInt("image index", (int*)&data->image_idx, .1f, 0, 3);
   ImGui::SliderFloat("cubemap pitch", &data->pitch, -nm::PI, nm::PI);
   ImGui::SliderFloat("cubemap yaw", &data->yaw, -nm::PI, nm::PI);
   ImGui::End();
