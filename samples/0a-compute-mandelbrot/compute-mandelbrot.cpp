@@ -164,7 +164,7 @@ void sample_post_draw_frame(
   ngf_compute_encoder compute_enc;
   NGF_MISC_CHECK_NGF_ERROR(
       ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc));
-  ngf_resource_bind_op bind_op;
+  ngf_resource_bind_op bind_op{};
   bind_op.info.image_sampler.image = state->image;
   bind_op.target_set               = 0;
   bind_op.target_binding           = 0;

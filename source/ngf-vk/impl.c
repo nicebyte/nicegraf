@@ -156,8 +156,10 @@ typedef struct ngfvk_desc_set_layout {
   VkDescriptorSetLayout vk_handle;
   ngfvk_desc_count      counts;
   uint32_t              nall_bindings;  // < Number of ALL bindings (incl. unused ones).
+  uint32_t              nall_descs; // < Total number of descriptors across all bindings.
   bool*                 readonly_bindings;
   VkDescriptorType*     desc_types;
+  uint32_t*             ndescs_in_binding;
   VkPipelineStageFlags* stage_accessors;
 } ngfvk_desc_set_layout;
 
@@ -1694,38 +1696,40 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   // Bind dummy resources.
   VkWriteDescriptorSet* dummy_writes = (VkWriteDescriptorSet*)ngfi_sa_alloc(
       ngfi_tmp_store(),
-      sizeof(VkWriteDescriptorSet) * set_layout->nall_bindings);
+      sizeof(VkWriteDescriptorSet) * set_layout->nall_descs);
   uint32_t num_writes = 0u;
   for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
     if (set_layout->desc_types[b] == ~VK_DESCRIPTOR_TYPE_SAMPLER) continue;
-    VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
-    desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    desc_w->pNext                = NULL;
-    desc_w->descriptorCount      = 1u;
-    desc_w->descriptorType       = set_layout->desc_types[b];
-    desc_w->dstArrayElement      = 0u;
-    desc_w->dstBinding           = b;
-    desc_w->dstSet               = result;
-    switch (desc_w->descriptorType) {
-    case VK_DESCRIPTOR_TYPE_SAMPLER:
-      desc_w->pImageInfo = &_vk.dummy_res.samp_info;
-      break;
-    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-      desc_w->pImageInfo = &_vk.dummy_res.imgsamp_info;
-      break;
-    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-      desc_w->pImageInfo = &_vk.dummy_res.img_info;
-      break;
-    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-      desc_w->pBufferInfo = &_vk.dummy_res.buf_info;
-      break;
-    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-      desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
-      break;
-    default:
-      assert(false);
+    for (uint32_t array_idx = 0u; array_idx < set_layout->ndescs_in_binding[b]; ++array_idx) {
+      VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
+      desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      desc_w->pNext                = NULL;
+      desc_w->descriptorCount      = 1u;
+      desc_w->descriptorType       = set_layout->desc_types[b];
+      desc_w->dstArrayElement      = array_idx;
+      desc_w->dstBinding           = b;
+      desc_w->dstSet               = result;
+      switch (desc_w->descriptorType) {
+      case VK_DESCRIPTOR_TYPE_SAMPLER:
+        desc_w->pImageInfo = &_vk.dummy_res.samp_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        desc_w->pImageInfo = &_vk.dummy_res.imgsamp_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+      case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+        desc_w->pImageInfo = &_vk.dummy_res.img_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        desc_w->pBufferInfo = &_vk.dummy_res.buf_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+        desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
+        break;
+      default:
+        assert(false);
+      }
     }
   }
   vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);
@@ -1820,7 +1824,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     vk_write->dstSet          = set;
     vk_write->dstBinding      = bind_op->target_binding;
     vk_write->descriptorCount = 1u;
-    vk_write->dstArrayElement = 0u;
+    vk_write->dstArrayElement = bind_op->array_index;
     vk_write->descriptorType  = get_vk_descriptor_type(bind_op->type);
 
     switch (bind_op->type) {
@@ -2366,12 +2370,14 @@ ngf_error ngfvk_create_pipeline_layout(
       set_layout.readonly_bindings = NGFI_ALLOCN(bool, set_layout.nall_bindings);
       set_layout.stage_accessors   = NGFI_ALLOCN(VkPipelineStageFlags, set_layout.nall_bindings);
       set_layout.desc_types        = NGFI_ALLOCN(VkDescriptorType, set_layout.nall_bindings);
+      set_layout.ndescs_in_binding = NGFI_ALLOCN(uint32_t, set_layout.nall_bindings);
       memset(set_layout.readonly_bindings, 0, sizeof(bool) * set_layout.nall_bindings);
       memset(
           set_layout.stage_accessors,
           0,
           sizeof(VkPipelineStageFlags) * set_layout.nall_bindings);
       memset(set_layout.desc_types, 0xff, sizeof(VkDescriptorType) * set_layout.nall_bindings);
+      memset(set_layout.ndescs_in_binding, 0, sizeof(uint32_t) * set_layout.nall_bindings);
     }
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
@@ -2392,7 +2398,9 @@ ngf_error ngfvk_create_pipeline_layout(
       vk_d->stageFlags         = VK_SHADER_STAGE_ALL;
       vk_d->pImmutableSamplers = NULL;
       set_layout.desc_types[d->binding] = vk_d->descriptorType;
+      set_layout.ndescs_in_binding[d->binding] = vk_d->descriptorCount;
       set_layout.counts[ngf_desc_type]++;
+      set_layout.nall_descs += vk_d->descriptorCount;
     }
     const VkDescriptorSetLayoutCreateInfo vk_ds_info = {
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -2465,6 +2473,7 @@ ngfi_destroy_generic_pipeline_data(ngfvk_frame_resources* res, ngfvk_generic_pip
       }
       if (layout->stage_accessors) { NGFI_FREEN(layout->stage_accessors, layout->nall_bindings); }
       if (layout->desc_types) { NGFI_FREEN(layout->desc_types, layout->nall_bindings); }
+      if (layout->ndescs_in_binding) { NGFI_FREEN(layout->ndescs_in_binding, layout->nall_bindings); }
     }
   }
   NGFI_DARRAY_DESTROY(data->descriptor_set_layouts);

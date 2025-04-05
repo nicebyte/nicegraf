@@ -44,6 +44,12 @@ namespace image_arrays {
 struct img_array_uniforms {
   nm::float4x4 matrix;
   float        image_array_idx = 0.0f;
+  uint32_t     index           = 0u;
+};
+
+struct multiple_imgs_uniforms {
+  nm::float4x4 matrix;
+  uint32_t     index = 0u;
 };
 
 struct cube_array_uniforms {
@@ -52,19 +58,24 @@ struct cube_array_uniforms {
   float        array_idx = 0.0f;
 };
 
+constexpr int NUM_IMAGE_LAYERS = 4;
 struct state {
-  ngf::graphics_pipeline                        img_array_pipeline;
-  ngf::graphics_pipeline                        cubemap_array_pipeline;
-  ngf::image                                    image_array;
-  ngf::image                                    cubemap_array;
-  ngf::sampler                                  image_sampler;
-  ngf::uniform_multibuffer<img_array_uniforms>  img_array_uniforms_multibuf;
-  ngf::uniform_multibuffer<cube_array_uniforms> cube_array_uniforms_multibuf;
-  float                                         dolly             = -5.0f;
-  float                                         image_array_idx   = 0.0f;
-  float                                         cubemap_array_idx = 0.0f;
-  float                                         yaw               = 0.0f;
-  float                                         pitch             = 0.0f;
+  ngf::graphics_pipeline                           img_array_pipeline;
+  ngf::graphics_pipeline                           cubemap_array_pipeline;
+  ngf::graphics_pipeline                           multiple_images_pipeline;
+  ngf::image                                       image_array;
+  ngf::image                                       cubemap_array;
+  ngf::image                                       multiple_images[NUM_IMAGE_LAYERS];
+  ngf::sampler                                     image_sampler;
+  ngf::uniform_multibuffer<img_array_uniforms>     img_array_uniforms_multibuf;
+  ngf::uniform_multibuffer<cube_array_uniforms>    cube_array_uniforms_multibuf;
+  ngf::uniform_multibuffer<multiple_imgs_uniforms> multi_img_uniforms_multibuf;
+  float                                            dolly             = -5.0f;
+  float                                            image_array_idx   = 0.0f;
+  float                                            cubemap_array_idx = 0.0f;
+  int                                              image_idx         = 0;
+  float                                            yaw               = 0.0f;
+  float                                            pitch             = 0.0f;
 };
 
 }  // namespace image_arrays
@@ -79,10 +90,9 @@ void* sample_initialize(
   /**
    * Create staging buffers for all the layers in the array.
    */
-  constexpr int NUM_IMAGE_LAYERS = 4;
-  staging_image staging_images[NUM_IMAGE_LAYERS];
+  staging_image staging_images[image_arrays::NUM_IMAGE_LAYERS];
   uint32_t      image_array_width = 0, image_array_height = 0, nmips = 0;
-  for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
+  for (uint32_t i = 0; i < image_arrays::NUM_IMAGE_LAYERS; ++i) {
     const std::string file_name = std::string("assets/imgarr") + std::to_string(i) + ".tga";
     staging_images[i]           = create_staging_image_from_tga(file_name.c_str());
     /** Ensure the dimensions of the image are valid. */
@@ -109,7 +119,7 @@ void* sample_initialize(
               .depth  = 1u,
           },
       .nmips        = nmips,
-      .nlayers      = NUM_IMAGE_LAYERS,
+      .nlayers      = image_arrays::NUM_IMAGE_LAYERS,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
@@ -117,19 +127,42 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(state->image_array.initialize(image_array_info));
 
   /**
-   * Populate the first mip level for each layer.
+   * Initialize individual array members for the descriptor with multiple images.
    */
-  for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
-    const ngf_image_write img_write = {
-        .src_offset = 0u, .dst_offset = {0,0,0}, .extent = {image_array_width, image_array_height, 1u},
-        .dst_base_layer = i, .nlayers =1u
-    };
+  image_array_info.nlayers = 1u;
+  for (uint32_t i = 0u; i < image_arrays::NUM_IMAGE_LAYERS; ++i) {
+    NGF_MISC_CHECK_NGF_ERROR(state->multiple_images[i].initialize(image_array_info));
+  }
+
+  /**
+   * Populate the first mip level for each layer of each image.
+   */
+  for (uint32_t i = 0; i < image_arrays::NUM_IMAGE_LAYERS; ++i) {
+    const ngf_image_write img_array_write = {
+        .src_offset     = 0u,
+        .dst_offset     = {0, 0, 0},
+        .extent         = {image_array_width, image_array_height, 1u},
+        .dst_base_layer = i,
+        .nlayers        = 1u};
     ngf_cmd_write_image(
         xfer_encoder,
         staging_images[i].staging_buffer.get(),
         state->image_array.get(),
+        &img_array_write,
+        1u);
+    const ngf_image_write img_write = {
+        .src_offset     = 0u,
+        .dst_offset     = {0, 0, 0},
+        .extent         = {image_array_width, image_array_height, 1u},
+        .dst_base_layer = 0,
+        .nlayers        = 1u};
+    ngf_cmd_write_image(
+        xfer_encoder,
+        staging_images[i].staging_buffer.get(),
+        state->multiple_images[i].get(),
         &img_write,
         1u);
+    ngf_cmd_generate_mipmaps(xfer_encoder, state->multiple_images[i].get());
   }
 
   /** Populate the rest of the mip levels automatically. **/
@@ -145,7 +178,7 @@ void* sample_initialize(
               .depth  = 1u,
           },
       .nmips        = nmips,
-      .nlayers      = NUM_IMAGE_LAYERS,
+      .nlayers      = image_arrays::NUM_IMAGE_LAYERS,
       .format       = NGF_IMAGE_FORMAT_SRGBA8,
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_MIPMAP_GENERATION | NGF_IMAGE_USAGE_SAMPLE_FROM |
@@ -153,7 +186,7 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(state->cubemap_array.initialize(cubemap_array_info));
 
   /** Upload the first mip level for each layer on each face. */
-  for (uint32_t i = 0; i < NUM_IMAGE_LAYERS; ++i) {
+  for (uint32_t i = 0; i < image_arrays::NUM_IMAGE_LAYERS; ++i) {
     for (uint32_t face = NGF_CUBEMAP_FACE_POSITIVE_X; face < NGF_CUBEMAP_FACE_COUNT; ++face) {
       const ngf_image_write img_write = {
           .src_offset     = 0u,
@@ -225,6 +258,24 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(state->img_array_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
+   * Load the shader stages for the multiple images pipeline.
+   */
+  const ngf::shader_stage multiple_images_vertex_shader_stage =
+      load_shader_stage("textured-quad-multiple-images", "VSMain", NGF_STAGE_VERTEX);
+  const ngf::shader_stage multiple_images_fragment_shader_stage =
+      load_shader_stage("textured-quad-multiple-images", "PSMain", NGF_STAGE_FRAGMENT);
+  /**
+   * Set shader stages.
+   */
+  pipeline_data.pipeline_info.shader_stages[0] = multiple_images_vertex_shader_stage.get();
+  pipeline_data.pipeline_info.shader_stages[1] = multiple_images_fragment_shader_stage.get();
+
+  /**
+   * Initialize the multiple images pipeline object.
+   */
+  NGF_MISC_CHECK_NGF_ERROR(state->multiple_images_pipeline.initialize(pipeline_data.pipeline_info));
+
+  /**
    * Load the shader stages for the cubemap array pipeline.
    */
   const ngf::shader_stage cubemap_vertex_shader_stage =
@@ -240,14 +291,14 @@ void* sample_initialize(
   /**
    * Initialize the cubemap array pipeline object.
    */
-  NGF_MISC_CHECK_NGF_ERROR(
-      state->cubemap_array_pipeline.initialize(pipeline_data.pipeline_info));
+  NGF_MISC_CHECK_NGF_ERROR(state->cubemap_array_pipeline.initialize(pipeline_data.pipeline_info));
 
   /**
    * Create the uniform buffers.
    */
   NGF_MISC_CHECK_NGF_ERROR(state->img_array_uniforms_multibuf.initialize(3));
   NGF_MISC_CHECK_NGF_ERROR(state->cube_array_uniforms_multibuf.initialize(3));
+  NGF_MISC_CHECK_NGF_ERROR(state->multi_img_uniforms_multibuf.initialize(3));
 
   return static_cast<void*>(state);
 }
@@ -269,12 +320,17 @@ void sample_draw_frame(
       0.01f,
       100.0f);
   /* Build the world-to-camera transform for the current frame. */
-  nm::float4x4 world_to_camera = nm::translation(nm::float3 {0.0, 0.0f, state->dolly});
+  nm::float4x4 world_to_camera = nm::translation(nm::float3 {-3.0f, 0.0f, state->dolly});
 
   image_arrays::img_array_uniforms img_arr_uniforms;
   img_arr_uniforms.matrix          = camera_to_clip * world_to_camera;
   img_arr_uniforms.image_array_idx = state->image_array_idx;
   state->img_array_uniforms_multibuf.write(img_arr_uniforms);
+
+  image_arrays::multiple_imgs_uniforms multiimg_uniforms;
+  multiimg_uniforms.matrix = camera_to_clip * nm::translation(nm::float3{3.0f, 0.0f, state->dolly});
+  multiimg_uniforms.index = state->image_idx;
+  state->multi_img_uniforms_multibuf.write(multiimg_uniforms);
 
   image_arrays::cube_array_uniforms cube_arr_uniforms;
   cube_arr_uniforms.aspect    = (float)w / (float)h;
@@ -294,6 +350,22 @@ void sample_draw_frame(
       ngf::descriptor_set<0>::binding<2>::sampler(state->image_sampler.get()));
   ngf_cmd_draw(main_render_pass, false, 0u, 3u, 1u);
 
+  
+  ngf_cmd_bind_gfx_pipeline(main_render_pass, state->multiple_images_pipeline);
+  ngf_cmd_viewport(main_render_pass, &viewport);
+  ngf_cmd_scissor(main_render_pass, &viewport);
+  ngf::cmd_bind_resources(
+      main_render_pass,
+      state->multi_img_uniforms_multibuf
+          .bind_op_at_current_offset(0, 0, 0, sizeof(image_arrays::multiple_imgs_uniforms)),
+      ngf::descriptor_set<0>::binding<1>::sampler(state->image_sampler),
+      ngf::descriptor_set<1>::binding<0>::texture(state->multiple_images[0], 0),
+      ngf::descriptor_set<1>::binding<0>::texture(state->multiple_images[1], 1),
+      ngf::descriptor_set<1>::binding<0>::texture(state->multiple_images[2], 2),
+      ngf::descriptor_set<1>::binding<0>::texture(state->multiple_images[3], 3));
+  ngf_cmd_draw(main_render_pass, false, 0, 6, 1);
+
+  
   ngf_cmd_bind_gfx_pipeline(main_render_pass, state->img_array_pipeline);
   ngf_cmd_viewport(main_render_pass, &viewport);
   ngf_cmd_scissor(main_render_pass, &viewport);
@@ -321,6 +393,7 @@ void sample_draw_ui(void* userdata) {
   ImGui::DragFloat("dolly", &data->dolly, 0.01f, -70.0f, 0.11f);
   ImGui::DragFloat("image array index", &data->image_array_idx, 0.1f, 0.0f, 3.0f);
   ImGui::DragFloat("cubemap array index", &data->cubemap_array_idx, 0.1f, 0.0f, 3.0f);
+  ImGui::DragInt("image index", &data->image_idx, .1f, 0, 3);
   ImGui::SliderFloat("cubemap pitch", &data->pitch, -nm::PI, nm::PI);
   ImGui::SliderFloat("cubemap yaw", &data->yaw, -nm::PI, nm::PI);
   ImGui::End();

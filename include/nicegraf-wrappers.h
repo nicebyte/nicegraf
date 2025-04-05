@@ -62,7 +62,7 @@ template<class T> constexpr remove_ref_t<T>&& move(T&& x) noexcept {
   return (remove_ref_t<T>&&)x;
 }
 
-}
+}  // namespace detail
 
 /**
  * \ingroup ngf_wrappers
@@ -124,7 +124,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   }
 
   struct make_result {
-    ngf_handle handle;
+    ngf_handle      handle;
     const ngf_error error;
   };
   static make_result make(const init_type& info) {
@@ -132,8 +132,6 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
     const ngf_error error = handle.initialize(info);
     return make_result {detail::move(handle), error};
   }
-
-
 
   /** @return The raw handle to the wrapped object. */
   T get() {
@@ -185,13 +183,15 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   T handle_;
 };
 
-#define NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(name)                          \
-  struct ngf_##name##_ManagementFuncs {                                    \
-    using InitType = ngf_##name##_info;                                    \
-    static ngf_error create(const InitType* info, ngf_##name* r) {         \
-      return ngf_create_##name(info, r);                                   \
-    }                                                                      \
-    static void destroy(ngf_##name handle) { ngf_destroy_##name(handle); } \
+#define NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(name)                  \
+  struct ngf_##name##_ManagementFuncs {                            \
+    using InitType = ngf_##name##_info;                            \
+    static ngf_error create(const InitType* info, ngf_##name* r) { \
+      return ngf_create_##name(info, r);                           \
+    }                                                              \
+    static void destroy(ngf_##name handle) {                       \
+      ngf_destroy_##name(handle);                                  \
+    }                                                              \
   };
 
 #define NGF_DEFINE_WRAPPER_TYPE(name) \
@@ -489,13 +489,16 @@ template<uint32_t S> struct descriptor_set {
      * Creates a \ref ngf_resource_bind_op for a \ref ngf_image.
      *
      * @param image The image to bind.
+     * @param array_index If the descriptor is an array, specifies the index of the array element to
+     * bind the object to.
      */
-    static ngf_resource_bind_op texture(const ngf_image image) {
+    static ngf_resource_bind_op texture(const ngf_image image, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type                     = NGF_DESCRIPTOR_IMAGE;
       op.target_binding           = B;
       op.target_set               = S;
       op.info.image_sampler.image = image;
+      op.array_index              = array_index;
       return op;
     }
 
@@ -505,12 +508,13 @@ template<uint32_t S> struct descriptor_set {
      *
      * @param image The image to bind.
      */
-    static ngf_resource_bind_op storage_image(const ngf_image image) {
+    static ngf_resource_bind_op storage_image(const ngf_image image, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type                     = NGF_DESCRIPTOR_STORAGE_IMAGE;
       op.target_binding           = B;
       op.target_set               = S;
       op.info.image_sampler.image = image;
+      op.array_index              = array_index;
       return op;
     }
 
@@ -521,7 +525,8 @@ template<uint32_t S> struct descriptor_set {
      * @param offset The offset at which to bind the buffer.
      * @param range The extent of the bound memory.
      */
-    static ngf_resource_bind_op storage_buffer(const ngf_buffer buf, size_t offset, size_t range) {
+    static ngf_resource_bind_op
+    storage_buffer(const ngf_buffer buf, size_t offset, size_t range, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_STORAGE_BUFFER;
       op.target_binding     = B;
@@ -529,6 +534,7 @@ template<uint32_t S> struct descriptor_set {
       op.info.buffer.buffer = buf;
       op.info.buffer.offset = offset;
       op.info.buffer.range  = range;
+      op.array_index        = array_index;
       return op;
     }
 
@@ -539,7 +545,8 @@ template<uint32_t S> struct descriptor_set {
      * @param offset The offset at which to bind the buffer.
      * @param range The extent of the bound memory.
      */
-    static ngf_resource_bind_op uniform_buffer(const ngf_buffer buf, size_t offset, size_t range) {
+    static ngf_resource_bind_op
+    uniform_buffer(const ngf_buffer buf, size_t offset, size_t range, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding     = B;
@@ -547,6 +554,7 @@ template<uint32_t S> struct descriptor_set {
       op.info.buffer.buffer = buf;
       op.info.buffer.offset = offset;
       op.info.buffer.range  = range;
+      op.array_index        = array_index;
       return op;
     }
 
@@ -558,12 +566,14 @@ template<uint32_t S> struct descriptor_set {
      * @param range The extent of the bound memory.
      * @param fmt The texel format expected by the shader.
      */
-    static ngf_resource_bind_op texel_buffer(const ngf_texel_buffer_view buf_view) {
+    static ngf_resource_bind_op
+    texel_buffer(const ngf_texel_buffer_view buf_view, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type                   = NGF_DESCRIPTOR_TEXEL_BUFFER;
       op.target_binding         = B;
       op.target_set             = S;
       op.info.texel_buffer_view = buf_view;
+      op.array_index            = array_index;
       return op;
     }
 
@@ -572,12 +582,13 @@ template<uint32_t S> struct descriptor_set {
      *
      * @param sampler The sampler to use.
      */
-    static ngf_resource_bind_op sampler(const ngf_sampler sampler) {
+    static ngf_resource_bind_op sampler(const ngf_sampler sampler, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_SAMPLER;
       op.target_binding             = B;
       op.target_set                 = S;
       op.info.image_sampler.sampler = sampler;
+      op.array_index                = array_index;
       return op;
     }
 
@@ -587,14 +598,17 @@ template<uint32_t S> struct descriptor_set {
      * @param image The image part of the combined image + sampler.
      * @param sampler The sampler part of the combined image + sampler.
      */
-    static ngf_resource_bind_op
-    texture_and_sampler(const ngf_image image, const ngf_sampler sampler) {
+    static ngf_resource_bind_op texture_and_sampler(
+        const ngf_image   image,
+        const ngf_sampler sampler,
+        uint32_t          array_index = 0u) {
       ngf_resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
       op.target_binding             = B;
       op.target_set                 = S;
       op.info.image_sampler.image   = image;
       op.info.image_sampler.sampler = sampler;
+      op.array_index                = array_index;
       return op;
     }
   };
@@ -677,7 +691,7 @@ template<typename T> class uniform_multibuffer {
       uint32_t binding,
       size_t   additional_offset = 0,
       size_t   range             = 0) const {
-    ngf_resource_bind_op op;
+    ngf_resource_bind_op op {};
     op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding     = binding;
     op.target_set         = set;

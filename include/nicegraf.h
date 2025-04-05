@@ -2103,7 +2103,8 @@ typedef struct ngf_resource_bind_op {
     ngf_buffer_bind_info        buffer;
     ngf_texel_buffer_view       texel_buffer_view;
     ngf_image_sampler_bind_info image_sampler;
-  } info; /**< The details about the resource being bound, depending on type. */
+  } info;               /**< The details about the resource being bound, depending on type. */
+  uint32_t array_index; /**< Specifies the destination array index for bindings that are arrays. */
 } ngf_resource_bind_op;
 
 /**
