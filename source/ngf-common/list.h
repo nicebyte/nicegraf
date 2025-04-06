@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -74,7 +74,7 @@ static inline void ngfi_list_init(ngfi_list_node* node) {
 /**
  * Obtains ptr to the structure containing the given list node field.
  */
-#define NGFI_LIST_CONTAINER_OF(ptr, type, node_name) (type*)((char*)((ptr)-offsetof(type, node_name)))
+#define NGFI_LIST_CONTAINER_OF(ptr, type, node_name) (type*)((char*)(ptr)-offsetof(type, node_name))
 
 /**
  * Iterates over all the elements in the list in order, starting at the given one.
