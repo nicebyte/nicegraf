@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -128,29 +128,20 @@ static void ngfi_blkalloc_add_pool(ngfi_block_allocator* allocator) {
 }
 
 ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32_t nblocks) {
-#if !defined(NDEBUG)
-  static NGFI_THREADLOCAL uint32_t next_tag = 0u;
-  if (next_tag == 0u) {
-    srand((unsigned int)time(NULL));
-    uint32_t threadid = (uint32_t)rand();
-    next_tag          = (~IN_USE_BLOCK_MARKER_MASK) & (threadid << 16);
-  }
-#endif
-
   ngfi_block_allocator* allocator = NGFI_ALLOC(ngfi_block_allocator);
   if (allocator == NULL) { return NULL; }
   memset(allocator, 0, sizeof(*allocator));
 
-  const uint32_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
-  const uint32_t q = unaligned_block_size & (~(NGFI_MAX_ALIGNMENT - 1u));
-  const uint32_t r = unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u);
-  const uint32_t aligned_block_size = q + ((r == 0u) ? 0u : NGFI_MAX_ALIGNMENT);
+  const size_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
+  const size_t q                    = unaligned_block_size & (~(NGFI_MAX_ALIGNMENT - 1u));
+  const size_t r                    = unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u);
+  const size_t aligned_block_size   = q + ((r == 0u) ? 0u : NGFI_MAX_ALIGNMENT);
 
-  allocator->block_size       = aligned_block_size;
+  allocator->block_size       = (uint32_t)aligned_block_size;
   allocator->block_size_user  = requested_block_size;
   allocator->nblocks_per_pool = nblocks;
 #if !defined(NDEBUG)
-  allocator->tag = (~IN_USE_BLOCK_MARKER_MASK) & (next_tag++);
+  allocator->tag = (~IN_USE_BLOCK_MARKER_MASK) & ((intptr_t)allocator);
 #endif
   NGFI_DARRAY_RESET(allocator->pools, 8u);
   NGFI_DARRAY_RESET(allocator->pool_usage, 8u);
@@ -182,7 +173,8 @@ void* ngfi_blkalloc_alloc(ngfi_block_allocator* alloc) {
     result          = blk->data;
     alloc->nblocks_free--;
     pool_usage->nactive_blocks++;
-    alloc->max_concurrent_allocs = NGFI_MAX(alloc->nblocks_total - alloc->nblocks_free, alloc->max_concurrent_allocs);
+    alloc->max_concurrent_allocs =
+        NGFI_MAX(alloc->nblocks_total - alloc->nblocks_free, alloc->max_concurrent_allocs);
 #if !defined(NDEBUG)
     ngfi_blkalloc_mark_block_inuse(blk);
 #endif
@@ -226,13 +218,11 @@ uint32_t ngfi_blkalloc_blksize(ngfi_block_allocator* alloc) {
 }
 
 void ngfi_blkalloc_cleanup(ngfi_block_allocator* alloc) {
-
   // Compute the current over-allocation factor.
   const uint32_t max_concurrent_allocs = NGFI_MAX(1u, alloc->max_concurrent_allocs);
-  const uint32_t nrequired_pools =
-      (max_concurrent_allocs / alloc->nblocks_per_pool) +
-      (max_concurrent_allocs % alloc->nblocks_per_pool ? 1u : 0u);
-  const float    over_alloc_factor = (float)alloc->nactive_pools /  (float)nrequired_pools;
+  const uint32_t nrequired_pools       = (max_concurrent_allocs / alloc->nblocks_per_pool) +
+                                   (max_concurrent_allocs % alloc->nblocks_per_pool ? 1u : 0u);
+  const float over_alloc_factor = (float)alloc->nactive_pools / (float)nrequired_pools;
 
   // If we are over-allocating, add the factor to history buffer.
   if (over_alloc_factor > 1.f) {
@@ -278,7 +268,9 @@ void ngfi_blkalloc_cleanup(ngfi_block_allocator* alloc) {
     }
   }
   if (released_mem > 0u) {
-    NGFI_DIAG_INFO("Block allocator released %.3fK back to system\n", (float)released_mem / 1024.0f);
+    NGFI_DIAG_INFO(
+        "Block allocator released %.3fK back to system\n",
+        (float)released_mem / 1024.0f);
   }
   alloc->max_concurrent_allocs = 0u;
 }
@@ -292,10 +284,7 @@ void ngfi_blkalloc_dump_dbgstats(ngfi_block_allocator* alloc, FILE* out) {
       alloc->block_size);
   fprintf(out, "Total mem:\t%d\n", alloc->block_size * alloc->nblocks_total);
   fprintf(out, "Avail mem:\t%d\n", alloc->block_size * alloc->nblocks_free);
-  fprintf(
-      out,
-      "Used mem:\t%d\n",
-      alloc->block_size * (alloc->nblocks_total - alloc->nblocks_free));
+  fprintf(out, "Used mem:\t%d\n", alloc->block_size * (alloc->nblocks_total - alloc->nblocks_free));
   fprintf(out, "Active pools:\t%d\n", NGFI_DARRAY_SIZE(alloc->pools));
   fprintf(out, "Blks per pool:\t%d\n", alloc->nblocks_per_pool);
 }
