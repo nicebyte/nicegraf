@@ -2216,7 +2216,7 @@ void ngf_cmd_bind_resources(
     }
     const uint32_t native_binding =
         cmd_buf->active_gfx_pipe->niceshade_metadata
-            .native_binding_map[bind_op.target_set][bind_op.target_binding];
+      .native_binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
@@ -2312,7 +2312,7 @@ void ngf_cmd_bind_compute_resources(
     }
     const uint32_t native_binding =
         cmd_buf->active_compute_pipe->niceshade_metadata
-            .native_binding_map[bind_op.target_set][bind_op.target_binding];
+      .native_binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
