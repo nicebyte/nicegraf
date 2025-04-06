@@ -133,9 +133,7 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
   memset(allocator, 0, sizeof(*allocator));
 
   const size_t unaligned_block_size = requested_block_size + sizeof(ngfi_blkalloc_block);
-  const size_t q                    = unaligned_block_size & (~(NGFI_MAX_ALIGNMENT - 1u));
-  const size_t r                    = unaligned_block_size & (NGFI_MAX_ALIGNMENT - 1u);
-  const size_t aligned_block_size   = q + ((r == 0u) ? 0u : NGFI_MAX_ALIGNMENT);
+  const size_t aligned_block_size   = ngfi_align_size(unaligned_block_size);
 
   allocator->block_size       = (uint32_t)aligned_block_size;
   allocator->block_size_user  = requested_block_size;

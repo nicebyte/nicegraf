@@ -1,5 +1,5 @@
 /**
-Copyright (c) 2021 nicegraf contributors
+Copyright (c) 2025 nicegraf contributors
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
 the Software without restriction, including without limitation the rights to
@@ -27,10 +27,10 @@ extern "C" {
 #endif
 
 typedef struct ngfi_sa_t {
-  uint8_t* ptr;
-  size_t   capacity;
-  size_t   total_consumed;
-  size_t   total_allocd;
+  uint8_t*          ptr;
+  size_t            capacity;
+  size_t            total_consumed;
+  size_t            total_allocd;
   struct ngfi_sa_t* next_block;
   struct ngfi_sa_t* active_block;
 #pragma warning(push)
