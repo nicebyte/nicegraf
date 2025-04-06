@@ -141,7 +141,7 @@ ngfi_block_allocator* ngfi_blkalloc_create(uint32_t requested_block_size, uint32
   allocator->block_size_user  = requested_block_size;
   allocator->nblocks_per_pool = nblocks;
 #if !defined(NDEBUG)
-  allocator->tag = (~IN_USE_BLOCK_MARKER_MASK) & ((intptr_t)allocator);
+  allocator->tag = (uint32_t)((~IN_USE_BLOCK_MARKER_MASK) & ((intptr_t)allocator));
 #endif
   NGFI_DARRAY_RESET(allocator->pools, 8u);
   NGFI_DARRAY_RESET(allocator->pool_usage, 8u);
