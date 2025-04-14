@@ -152,15 +152,20 @@ typedef struct {
   ngfvk_desc_count descriptors;
 } ngfvk_desc_pool_capacity;
 
+typedef struct ngfvk_desc_binding {
+  VkDescriptorType     type;
+  VkPipelineStageFlags stage_accessors;
+  bool                 readonly;
+  bool                 is_multilayered_image;
+  uint32_t             ndescs_in_binding;
+} ngfvk_desc_binding;
+
 typedef struct ngfvk_desc_set_layout {
   VkDescriptorSetLayout vk_handle;
   ngfvk_desc_count      counts;
   uint32_t              nall_bindings;  // < Number of ALL bindings (incl. unused ones).
   uint32_t              nall_descs; // < Total number of descriptors across all bindings.
-  bool*                 readonly_bindings;
-  VkDescriptorType*     desc_types;
-  uint32_t*             ndescs_in_binding;
-  VkPipelineStageFlags* stage_accessors;
+  ngfvk_desc_binding*   binding_properties;
 } ngfvk_desc_set_layout;
 
 typedef struct ngfvk_desc_pool {
@@ -1699,13 +1704,13 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       sizeof(VkWriteDescriptorSet) * set_layout->nall_descs);
   uint32_t num_writes = 0u;
   for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
-    if (set_layout->desc_types[b] == ~VK_DESCRIPTOR_TYPE_SAMPLER) continue;
-    for (uint32_t array_idx = 0u; array_idx < set_layout->ndescs_in_binding[b]; ++array_idx) {
+    if (set_layout->binding_properties[b].type == ~VK_DESCRIPTOR_TYPE_SAMPLER) continue;
+    for (uint32_t array_idx = 0u; array_idx < set_layout->binding_properties[b].ndescs_in_binding; ++array_idx) {
       VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
       desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
       desc_w->pNext                = NULL;
       desc_w->descriptorCount      = 1u;
-      desc_w->descriptorType       = set_layout->desc_types[b];
+      desc_w->descriptorType       = set_layout->binding_properties[b].type;
       desc_w->dstArrayElement      = array_idx;
       desc_w->dstBinding           = b;
       desc_w->dstSet               = result;
@@ -2367,17 +2372,9 @@ ngf_error ngfvk_create_pipeline_layout(
     memset(&set_layout, 0, sizeof(set_layout));
     set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
     if (set_layout.nall_bindings > 0u) {
-      set_layout.readonly_bindings = NGFI_ALLOCN(bool, set_layout.nall_bindings);
-      set_layout.stage_accessors   = NGFI_ALLOCN(VkPipelineStageFlags, set_layout.nall_bindings);
-      set_layout.desc_types        = NGFI_ALLOCN(VkDescriptorType, set_layout.nall_bindings);
-      set_layout.ndescs_in_binding = NGFI_ALLOCN(uint32_t, set_layout.nall_bindings);
-      memset(set_layout.readonly_bindings, 0, sizeof(bool) * set_layout.nall_bindings);
-      memset(
-          set_layout.stage_accessors,
-          0,
-          sizeof(VkPipelineStageFlags) * set_layout.nall_bindings);
-      memset(set_layout.desc_types, 0xff, sizeof(VkDescriptorType) * set_layout.nall_bindings);
-      memset(set_layout.ndescs_in_binding, 0, sizeof(uint32_t) * set_layout.nall_bindings);
+      set_layout.binding_properties = NGFI_ALLOCN(ngfvk_desc_binding, set_layout.nall_bindings);
+      for (size_t i = 0u; i < set_layout.nall_bindings; ++i) { set_layout.binding_properties[i].type = ~(VK_DESCRIPTOR_TYPE_SAMPLER); }
+      memset(set_layout.binding_properties, 0, sizeof(ngfvk_desc_binding) * set_layout.nall_bindings);
     }
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
@@ -2387,9 +2384,6 @@ ngf_error ngfvk_create_pipeline_layout(
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
       VkDescriptorSetLayoutBinding*      vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
       const SpvReflectDescriptorBinding* d    = &bindings[i].binding_data;
-      set_layout.readonly_bindings[d->binding] =
-          (d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE);
-      set_layout.stage_accessors[d->binding]  = bindings[i].mask;
       const ngf_descriptor_type ngf_desc_type = ngfvk_get_ngf_descriptor_type(d->descriptor_type);
       if (ngf_desc_type == NGF_DESCRIPTOR_TYPE_COUNT) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
       vk_d->binding            = d->binding;
@@ -2397,8 +2391,13 @@ ngf_error ngfvk_create_pipeline_layout(
       vk_d->descriptorType     = get_vk_descriptor_type(ngf_desc_type);
       vk_d->stageFlags         = VK_SHADER_STAGE_ALL;
       vk_d->pImmutableSamplers = NULL;
-      set_layout.desc_types[d->binding] = vk_d->descriptorType;
-      set_layout.ndescs_in_binding[d->binding] = vk_d->descriptorCount;
+      const ngfvk_desc_binding binding_properties = {
+          .type              = vk_d->descriptorType,
+          .stage_accessors   = bindings[i].mask,
+          .readonly          = (d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE),
+          .ndescs_in_binding = vk_d->descriptorCount,
+          .is_multilayered_image = (d->image.arrayed != 0)};
+      set_layout.binding_properties[d->binding] = binding_properties;
       set_layout.counts[ngf_desc_type]++;
       set_layout.nall_descs += vk_d->descriptorCount;
     }
@@ -2468,12 +2467,7 @@ ngfi_destroy_generic_pipeline_data(ngfvk_frame_resources* res, ngfvk_generic_pip
     VkDescriptorSetLayout  vk_layout = layout->vk_handle;
     NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_DSET_LAYOUT, vk_layout);
     if (layout->nall_bindings > 0u) {
-      if (layout->readonly_bindings) {
-        NGFI_FREEN(layout->readonly_bindings, layout->nall_bindings);
-      }
-      if (layout->stage_accessors) { NGFI_FREEN(layout->stage_accessors, layout->nall_bindings); }
-      if (layout->desc_types) { NGFI_FREEN(layout->desc_types, layout->nall_bindings); }
-      if (layout->ndescs_in_binding) { NGFI_FREEN(layout->ndescs_in_binding, layout->nall_bindings); }
+      if (layout->binding_properties) { NGFI_FREEN(layout->binding_properties, layout->nall_bindings); }
     }
   }
   NGFI_DARRAY_DESTROY(data->descriptor_set_layouts);
@@ -3158,11 +3152,11 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
       &NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set);
   if (bind_op->target_binding >= layout->nall_bindings) return sync_req;
 
-  const bool is_read_only = layout->readonly_bindings[bind_op->target_binding];
+  const bool is_read_only = layout->binding_properties[bind_op->target_binding].readonly;
 
   sync_req.barrier_masks.stage_mask =
       NGFI_DARRAY_AT(pipeline->descriptor_set_layouts, bind_op->target_set)
-          .stage_accessors[bind_op->target_binding];
+          .binding_properties[bind_op->target_binding].stage_accessors;
 
   switch (bind_op->type) {
   case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
