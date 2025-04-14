@@ -79,8 +79,10 @@ typedef struct ngfvk_dummy_resources {
   ngf_texel_buffer_view  tbuf;
   ngf_sampler            samp;
   VkDescriptorImageInfo  img_info;
+  VkDescriptorImageInfo  img_arr_info;
   VkDescriptorImageInfo  samp_info;
   VkDescriptorImageInfo  imgsamp_info;
+  VkDescriptorImageInfo  imgsamp_arr_info;
   VkDescriptorBufferInfo buf_info;
   pthread_mutex_t        img_mu;
   bool                   image_transitioned;
@@ -417,6 +419,7 @@ typedef struct ngf_texel_buffer_view_t {
 typedef struct ngf_image_t {
   ngfvk_alloc      alloc;
   VkImageView      vkview;
+  VkImageView      vkview_arrayed;
   VkFormat         vk_fmt;
   ngf_extent3d     extent;
   ngf_image_type   type;
@@ -1057,6 +1060,13 @@ static ngf_error ngfvk_create_image(
         (*result)->nlevels,
         (*result)->nlayers,
         &(*result)->vkview);
+    err = ngfvk_create_vk_image_view(
+        (VkImage)(*result)->alloc.obj_handle,
+        get_vk_image_view_type(info->type, 2u), // force _ARRAY type view
+        (*result)->vk_fmt,
+        (*result)->nlevels,
+        (*result)->nlayers,
+        &(*result)->vkview_arrayed);
   }
 
   if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
@@ -1714,16 +1724,21 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       desc_w->dstArrayElement      = array_idx;
       desc_w->dstBinding           = b;
       desc_w->dstSet               = result;
+
+      const bool is_multilayered_image = set_layout->binding_properties[b].is_multilayered_image;
+
       switch (desc_w->descriptorType) {
       case VK_DESCRIPTOR_TYPE_SAMPLER:
         desc_w->pImageInfo = &_vk.dummy_res.samp_info;
         break;
       case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        desc_w->pImageInfo = &_vk.dummy_res.imgsamp_info;
+        desc_w->pImageInfo =
+            is_multilayered_image ? &_vk.dummy_res.imgsamp_arr_info : &_vk.dummy_res.imgsamp_info;
         break;
       case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
       case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-        desc_w->pImageInfo = &_vk.dummy_res.img_info;
+        desc_w->pImageInfo =
+            is_multilayered_image ? &_vk.dummy_res.img_arr_info : &_vk.dummy_res.img_info;
         break;
       case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
       case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
@@ -1860,17 +1875,26 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     case NGF_DESCRIPTOR_SAMPLER:
     case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
       const ngf_image_sampler_bind_info* bind_info = &bind_op->info.image_sampler;
-      VkDescriptorImageInfo*             vk_bind_info =
+      const bool                         is_multilayered_image =
+          set_layout->binding_properties[bind_op->target_binding].is_multilayered_image;
+      VkImageView image_view = VK_NULL_HANDLE;
+      if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
+          bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE ||
+          bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
+        image_view =
+            is_multilayered_image ? bind_info->image->vkview_arrayed : bind_info->image->vkview;
+      }
+      VkDescriptorImageInfo* vk_bind_info =
           ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
       vk_bind_info->imageView   = VK_NULL_HANDLE;
       vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       vk_bind_info->sampler     = VK_NULL_HANDLE;
       if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
           bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
-        vk_bind_info->imageView   = bind_info->image->vkview;
+        vk_bind_info->imageView   = image_view;
         vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       } else if (bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE) {
-        vk_bind_info->imageView   = bind_info->image->vkview;
+        vk_bind_info->imageView   = image_view;
         vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
       } else if (
           bind_op->type == NGF_DESCRIPTOR_SAMPLER ||
@@ -3552,6 +3576,7 @@ static void ngfvk_cmd_buf_dtor(ngfi_chnk_hdr* chunk) {
 
 static void ngfvk_destroy_image(ngf_image img) {
   if (img->vkview) { vkDestroyImageView(_vk.device, img->vkview, NULL); }
+  if (img->vkview_arrayed) { vkDestroyImageView(_vk.device, img->vkview_arrayed, NULL); }
   if (img->owns_backing_resource && img->alloc.obj_handle != (uintptr_t)VK_NULL_HANDLE) {
     vmaDestroyImage(_vk.allocator, (VkImage)img->alloc.obj_handle, img->alloc.vma_alloc);
   }
@@ -4002,19 +4027,23 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const ngf_texel_buffer_view_info tbuf_info =
       {.buffer = _vk.dummy_res.buf, .offset = 0u, .size = 1u, .texel_format = NGF_IMAGE_FORMAT_R8};
   ngf_create_texel_buffer_view(&tbuf_info, &_vk.dummy_res.tbuf);
-  _vk.dummy_res.buf_info.buffer          = (VkBuffer)_vk.dummy_res.buf->alloc.obj_handle;
-  _vk.dummy_res.buf_info.offset          = 0u;
-  _vk.dummy_res.buf_info.range           = 1u;
-  _vk.dummy_res.img_info.imageLayout     = VK_IMAGE_LAYOUT_GENERAL;
-  _vk.dummy_res.img_info.imageView       = _vk.dummy_res.img->vkview;
-  _vk.dummy_res.img_info.sampler         = VK_NULL_HANDLE;
-  _vk.dummy_res.samp_info.imageLayout    = VK_IMAGE_LAYOUT_GENERAL;
-  _vk.dummy_res.samp_info.imageView      = VK_NULL_HANDLE;
-  _vk.dummy_res.samp_info.sampler        = _vk.dummy_res.samp->vksampler;
-  _vk.dummy_res.imgsamp_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-  _vk.dummy_res.imgsamp_info.imageView   = _vk.dummy_res.img->vkview;
-  _vk.dummy_res.imgsamp_info.sampler     = _vk.dummy_res.samp->vksampler;
-  _vk.dummy_res.image_transitioned       = false;
+  _vk.dummy_res.buf_info.buffer            = (VkBuffer)_vk.dummy_res.buf->alloc.obj_handle;
+  _vk.dummy_res.buf_info.offset            = 0u;
+  _vk.dummy_res.buf_info.range             = 1u;
+  _vk.dummy_res.img_info.imageLayout       = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.img_info.imageView         = _vk.dummy_res.img->vkview;
+  _vk.dummy_res.img_info.sampler           = VK_NULL_HANDLE;
+  _vk.dummy_res.img_arr_info               = _vk.dummy_res.img_info;
+  _vk.dummy_res.img_arr_info.imageView     = _vk.dummy_res.img->vkview_arrayed;
+  _vk.dummy_res.samp_info.imageLayout      = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.samp_info.imageView        = VK_NULL_HANDLE;
+  _vk.dummy_res.samp_info.sampler          = _vk.dummy_res.samp->vksampler;
+  _vk.dummy_res.imgsamp_info.imageLayout   = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.imgsamp_info.imageView     = _vk.dummy_res.img->vkview;
+  _vk.dummy_res.imgsamp_info.sampler       = _vk.dummy_res.samp->vksampler;
+  _vk.dummy_res.imgsamp_arr_info           = _vk.dummy_res.imgsamp_info;
+  _vk.dummy_res.imgsamp_arr_info.imageView = _vk.dummy_res.img->vkview_arrayed;
+  _vk.dummy_res.image_transitioned         = false;
   pthread_mutex_init(&_vk.dummy_res.img_mu, NULL);
 
   // Done!
