@@ -2343,31 +2343,28 @@ ngf_error ngfvk_create_pipeline_layout(
       ntotal_bindings,
       sizeof(ngfvk_reflect_binding_and_stage_mask),
       ngfvk_binding_comparator);
+  const uint32_t last_binding_idx = ntotal_bindings > 0 ? ntotal_bindings - 1u : 0u;
+  const uint32_t max_set_id = ntotal_bindings > 0 ? bindings[last_binding_idx].binding_data.set : 0u;
+  const uint32_t nall_sets = ntotal_bindings > 0 ? max_set_id + 1u : 0u;
+  const uint32_t binding_counter_buf_size = sizeof(uint32_t) * nall_sets;
+  uint32_t* nall_bindings_per_set = ngfi_sa_alloc(ngfi_tmp_store(), binding_counter_buf_size);
+  memset(nall_bindings_per_set, 0, binding_counter_buf_size);
   uint32_t  nunique_bindings      = 0u;
-  uint32_t  max_set_id            = 0u;
-  uint32_t* nall_bindings_per_set = NULL;
-  uint32_t  nall_sets = 0u;  // number of ALL desc sets in layout (including unused slots).
   for (uint32_t cur = 0u; cur < ntotal_bindings; ++cur) {
-    if (nunique_bindings == 0 ||
-        (bindings[nunique_bindings - 1].binding_data.set != bindings[cur].binding_data.set ||
-         bindings[nunique_bindings - 1].binding_data.binding !=
-             bindings[cur].binding_data.binding)) {
-      bindings[nunique_bindings++] = bindings[cur];
-      max_set_id                   = NGFI_MAX(max_set_id, bindings[cur].binding_data.set);
-      const uint32_t new_nall_sets = NGFI_MAX(nall_sets, max_set_id + 1);
-      if (new_nall_sets > nall_sets || nall_bindings_per_set == NULL) {
-        const uint32_t nnew_sets = new_nall_sets - nall_sets;
-        uint32_t*      new_binding_counters =
-            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(uint32_t) * nnew_sets);
-        memset(new_binding_counters, 0, sizeof(uint32_t) * nnew_sets);
-        if (nall_bindings_per_set == NULL) { nall_bindings_per_set = new_binding_counters; }
-      }
-      nall_bindings_per_set[bindings[cur].binding_data.set] = NGFI_MAX(
-          nall_bindings_per_set[bindings[cur].binding_data.set],
-          bindings[cur].binding_data.binding + 1u);
-      nall_sets = new_nall_sets;
+    const ngfvk_reflect_binding_and_stage_mask* cur_binding = &bindings[cur];
+    ngfvk_reflect_binding_and_stage_mask*       last_unique_binding =
+        nunique_bindings == 0 ? NULL : &bindings[nunique_bindings - 1];
+    const SpvReflectDescriptorBinding* last_unique_binding_data =
+        !last_unique_binding ? NULL : &last_unique_binding->binding_data;
+    const SpvReflectDescriptorBinding*          cur_binding_data = &cur_binding->binding_data;
+    if (!last_unique_binding_data ||
+        (last_unique_binding_data->set != cur_binding_data->set ||
+         last_unique_binding_data->binding != cur_binding_data->binding)) {
+      bindings[nunique_bindings++] = *cur_binding;
+      nall_bindings_per_set[cur_binding_data->set] =
+          NGFI_MAX(nall_bindings_per_set[cur_binding_data->set], cur_binding_data->binding + 1u);
     } else {
-      bindings[nunique_bindings - 1].mask |= bindings[cur].mask;
+     last_unique_binding->mask |= cur_binding->mask;
     }
   }
 
@@ -2393,7 +2390,6 @@ ngf_error ngfvk_create_pipeline_layout(
         vk_set_layouts[i] = set_layout.vk_handle;
       }
     }
-    memset(&set_layout, 0, sizeof(set_layout));
     set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
     if (set_layout.nall_bindings > 0u) {
       set_layout.binding_properties = NGFI_ALLOCN(ngfvk_desc_binding, set_layout.nall_bindings);
