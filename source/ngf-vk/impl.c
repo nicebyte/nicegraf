@@ -1714,7 +1714,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       sizeof(VkWriteDescriptorSet) * set_layout->nall_descs);
   uint32_t num_writes = 0u;
   for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
-    if (set_layout->binding_properties[b].type == ~VK_DESCRIPTOR_TYPE_SAMPLER) continue;
+    if (set_layout->binding_properties[b].type == VK_DESCRIPTOR_TYPE_MAX_ENUM) continue;
     for (uint32_t array_idx = 0u; array_idx < set_layout->binding_properties[b].ndescs_in_binding; ++array_idx) {
       VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
       desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -2393,7 +2393,7 @@ ngf_error ngfvk_create_pipeline_layout(
     set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
     if (set_layout.nall_bindings > 0u) {
       set_layout.binding_properties = NGFI_ALLOCN(ngfvk_desc_binding, set_layout.nall_bindings);
-      for (size_t i = 0u; i < set_layout.nall_bindings; ++i) { set_layout.binding_properties[i].type = ~(VK_DESCRIPTOR_TYPE_SAMPLER); }
+      for (size_t i = 0u; i < set_layout.nall_bindings; ++i) { set_layout.binding_properties[i].type = VK_DESCRIPTOR_TYPE_MAX_ENUM; }
       memset(set_layout.binding_properties, 0, sizeof(ngfvk_desc_binding) * set_layout.nall_bindings);
     }
     const uint32_t first_binding_in_set = cur;
