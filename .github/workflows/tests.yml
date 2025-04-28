@@ -5,7 +5,10 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
-
+env:
+  CC: /usr/bin/clang
+  CXX: /usr/bin/clang++
+  
 jobs:
   build:
 
