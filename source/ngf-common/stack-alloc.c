@@ -44,8 +44,6 @@ ngfi_sa* ngfi_sa_create(size_t capacity) {
 void* ngfi_sa_alloc(ngfi_sa* allocator, size_t nbytes) {
   assert(allocator);
 
-  nbytes = ngfi_align_size(nbytes);
-
   ngfi_sa* alloc_block = allocator->active_block;
 
   void*           result             = NULL;
