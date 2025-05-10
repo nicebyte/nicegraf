@@ -1361,36 +1361,29 @@ ngf_error ngfmtl_parse_niceshade_metadata(
     uint32_t binding;
     uint32_t native_binding;
   };
-  ngfi_sa_reset(ngfi_tmp_store());
-  auto tmp_binding_map_entries =
-      (ngfmtl_binding_map_entry*)ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngfmtl_binding_map_entry));
-  ngfmtl_binding_map_entry* current_binding_map_entry = tmp_binding_map_entries;
-  uint32_t                  num_entries               = 0u;
+  
+  std::vector<ngfmtl_binding_map_entry> tmp_binding_map_entries;
   uint32_t                  consumed_input_bytes;
   uint32_t                  max_set     = 0u;
   uint32_t                  max_binding = 0u;
+  ngfmtl_binding_map_entry current_binding_map_entry;
   while (sscanf(
              serialized_binding_map,
              " ( %d %d ) : %d%n",
-             &current_binding_map_entry->set,
-             &current_binding_map_entry->binding,
-             &current_binding_map_entry->native_binding,
+             &current_binding_map_entry.set,
+             &current_binding_map_entry.binding,
+             &current_binding_map_entry.native_binding,
              &consumed_input_bytes) == 3 &&
-         current_binding_map_entry->set != -1 && current_binding_map_entry->binding != -1 &&
-         current_binding_map_entry->native_binding != -1) {
+         current_binding_map_entry.set != -1 && current_binding_map_entry.binding != -1 &&
+         current_binding_map_entry.native_binding != -1) {
     serialized_binding_map += consumed_input_bytes;
-    max_set                   = std::max(max_set, current_binding_map_entry->set);
-    max_binding               = std::max(max_binding, current_binding_map_entry->binding);
-    current_binding_map_entry = (ngfmtl_binding_map_entry*)ngfi_sa_alloc(
-        ngfi_tmp_store(),
-        sizeof(ngfmtl_binding_map_entry));
-    ++num_entries;
+    max_set                   = std::max(max_set, current_binding_map_entry.set);
+    max_binding               = std::max(max_binding, current_binding_map_entry.binding);
+    tmp_binding_map_entries.emplace_back(current_binding_map_entry);
   }
 
-  std::vector<std::vector<uint32_t>> native_binding_map(
-      max_set + 1,
-      std::vector<uint32_t>(max_binding + 1, ~0u));
-  for (uint32_t e = 0u; e < num_entries; ++e) {
+  std::vector<std::vector<uint32_t>> native_binding_map(max_set + 1, std::vector<uint32_t>(max_binding + 1, ~0u));
+  for (uint32_t e = 0u; e < tmp_binding_map_entries.size(); ++e) {
     native_binding_map[tmp_binding_map_entries[e].set][tmp_binding_map_entries[e].binding] =
         tmp_binding_map_entries[e].native_binding;
   }
