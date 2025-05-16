@@ -144,9 +144,14 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
 #if TARGET_OS_OSX
     {MTL::PixelFormatBC7_RGBAUnorm, 128, false, 4, 4},
     {MTL::PixelFormatBC7_RGBAUnorm_sRGB, 128, true, 4, 4},
+    {MTL::PixelFormatBC6H_RGBFloat, 128, false, 4, 4},
+    {MTL::PixelFormatBC6H_RGBUfloat, 128, false, 4, 4},
 #else
+    // BCn formats unsupported un iOS until 16.4
     {},
-    {},  // BC7, unsupported on iOS
+    {},
+    {},
+    {},
 #endif
 #if TARGET_OS_OSX && __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ < 110000
     // ASTC is not supported till macOS 11.0
