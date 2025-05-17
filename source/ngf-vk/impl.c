@@ -75,11 +75,14 @@ typedef void (*ngfvk_retire_obj_dtor)(ngfi_chnk_hdr*);
 
 typedef struct ngfvk_dummy_resources {
   ngf_image              img;
+  ngf_image              cube;
   ngf_buffer             buf;
   ngf_texel_buffer_view  tbuf;
   ngf_sampler            samp;
   VkDescriptorImageInfo  img_info;
+  VkDescriptorImageInfo  cube_info;
   VkDescriptorImageInfo  img_arr_info;
+  VkDescriptorImageInfo  cube_arr_info;
   VkDescriptorImageInfo  samp_info;
   VkDescriptorImageInfo  imgsamp_info;
   VkDescriptorImageInfo  imgsamp_arr_info;
@@ -159,6 +162,7 @@ typedef struct ngfvk_desc_binding {
   VkPipelineStageFlags stage_accessors;
   bool                 readonly;
   bool                 is_multilayered_image;
+  bool                 is_cubemap;
   uint32_t             ndescs_in_binding;
 } ngfvk_desc_binding;
 
@@ -1728,6 +1732,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       desc_w->dstSet               = result;
 
       const bool is_multilayered_image = set_layout->binding_properties[b].is_multilayered_image;
+      const bool is_cubemap = set_layout->binding_properties[b].is_cubemap;
 
       switch (desc_w->descriptorType) {
       case VK_DESCRIPTOR_TYPE_SAMPLER:
@@ -1739,8 +1744,13 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
         break;
       case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
       case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-        desc_w->pImageInfo =
-            is_multilayered_image ? &_vk.dummy_res.img_arr_info : &_vk.dummy_res.img_info;
+        if (!is_cubemap) {
+          desc_w->pImageInfo =
+              is_multilayered_image ? &_vk.dummy_res.img_arr_info : &_vk.dummy_res.img_info;
+        } else {
+          desc_w->pImageInfo =
+              is_multilayered_image ? &_vk.dummy_res.cube_arr_info : &_vk.dummy_res.cube_info;
+        }
         break;
       case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
       case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
@@ -2418,6 +2428,7 @@ ngf_error ngfvk_create_pipeline_layout(
           .stage_accessors   = bindings[i].mask,
           .readonly          = (d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE),
           .ndescs_in_binding = vk_d->descriptorCount,
+          .is_cubemap        = (d->image.dim == SpvDimCube),
           .is_multilayered_image = (d->image.arrayed != 0)};
       set_layout.binding_properties[d->binding] = binding_properties;
       set_layout.counts[ngf_desc_type]++;
@@ -3384,23 +3395,38 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
           CURRENT_CONTEXT->current_frame_token,
           &aux_cmd_pool,
           &aux_cmd_buf);
-      const VkImageMemoryBarrier bar = {
-          .sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-          .pNext         = NULL,
-          .image         = (VkImage)_vk.dummy_res.img->alloc.obj_handle,
-          .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
-          .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
-          .srcAccessMask = 0,
-          .dstAccessMask = 0,
-          .subresourceRange =
-              {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-               .baseArrayLayer = 0u,
-               .baseMipLevel   = 0u,
-               .layerCount     = 1u,
-               .levelCount     = 1u},
-          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED};
-      vkCmdPipelineBarrier(aux_cmd_buf, 0, 0, 0, 0, NULL, 0, NULL, 1, &bar);
+      const VkImageMemoryBarrier bar[] = {
+          {.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+           .pNext         = NULL,
+           .image         = (VkImage)_vk.dummy_res.img->alloc.obj_handle,
+           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
+           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+           .srcAccessMask = 0,
+           .dstAccessMask = 0,
+           .subresourceRange =
+               {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseArrayLayer = 0u,
+                .baseMipLevel   = 0u,
+                .layerCount     = 1u,
+                .levelCount     = 1u},
+           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED},
+          {.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+           .pNext         = NULL,
+           .image         = (VkImage)_vk.dummy_res.cube->alloc.obj_handle,
+           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
+           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+           .srcAccessMask = 0,
+           .dstAccessMask = 0,
+           .subresourceRange =
+               {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseArrayLayer = 0u,
+                .baseMipLevel   = 0u,
+                .layerCount     = 6u,
+                .levelCount     = 1u},
+           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED}};
+      vkCmdPipelineBarrier(aux_cmd_buf, 0, 0, 0, 0, NULL, 0, NULL, 2, bar);
       vkEndCommandBuffer(aux_cmd_buf);
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
       ngfvk_cmd_buf_with_pool aux_buf_pool = {aux_cmd_buf, aux_cmd_pool};
@@ -4012,6 +4038,14 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .sample_count = NGF_SAMPLE_COUNT_1,
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE};
+  const ngf_image_info dummy_cube_info = {
+      .extent       = {1u, 1u, 1u},
+      .format       = NGF_IMAGE_FORMAT_R8,
+      .nlayers      = 1u,
+      .nmips        = 1u,
+      .sample_count = NGF_SAMPLE_COUNT_1,
+      .type         = NGF_IMAGE_TYPE_CUBE,
+      .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE};
   const ngf_buffer_info dummy_buf_info = {
       .buffer_usage = NGF_BUFFER_USAGE_STORAGE_BUFFER | NGF_BUFFER_USAGE_UNIFORM_BUFFER |
                       NGF_BUFFER_USAGE_TEXEL_BUFFER,
@@ -4020,6 +4054,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   ngf_sampler_info dummy_samp_info;
   memset(&dummy_samp_info, 0, sizeof(dummy_samp_info));
   ngf_create_image(&dummy_img_info, &_vk.dummy_res.img);
+  ngf_create_image(&dummy_cube_info, &_vk.dummy_res.cube);
   ngf_create_buffer(&dummy_buf_info, &_vk.dummy_res.buf);
   ngf_create_sampler(&dummy_samp_info, &_vk.dummy_res.samp);
   const ngf_texel_buffer_view_info tbuf_info =
@@ -4031,8 +4066,13 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   _vk.dummy_res.img_info.imageLayout       = VK_IMAGE_LAYOUT_GENERAL;
   _vk.dummy_res.img_info.imageView         = _vk.dummy_res.img->vkview;
   _vk.dummy_res.img_info.sampler           = VK_NULL_HANDLE;
+  _vk.dummy_res.cube_info.imageLayout      = VK_IMAGE_LAYOUT_GENERAL;
+  _vk.dummy_res.cube_info.imageView        = _vk.dummy_res.cube->vkview;
+  _vk.dummy_res.cube_info.sampler          = VK_NULL_HANDLE;
   _vk.dummy_res.img_arr_info               = _vk.dummy_res.img_info;
   _vk.dummy_res.img_arr_info.imageView     = _vk.dummy_res.img->vkview_arrayed;
+  _vk.dummy_res.cube_arr_info              = _vk.dummy_res.cube_info;
+  _vk.dummy_res.cube_arr_info.imageView    = _vk.dummy_res.cube->vkview_arrayed;
   _vk.dummy_res.samp_info.imageLayout      = VK_IMAGE_LAYOUT_GENERAL;
   _vk.dummy_res.samp_info.imageView        = VK_NULL_HANDLE;
   _vk.dummy_res.samp_info.sampler          = _vk.dummy_res.samp->vksampler;
@@ -4056,6 +4096,7 @@ void ngf_shutdown(void) {
   vkDestroyBufferView(_vk.device, _vk.dummy_res.tbuf->vk_buf_view, NULL);
   NGFI_FREE(_vk.dummy_res.tbuf);
   ngfvk_destroy_image(_vk.dummy_res.img);
+  ngfvk_destroy_image(_vk.dummy_res.cube);
   ngfvk_destroy_buffer(_vk.dummy_res.buf);
   vkDestroySampler(_vk.device, _vk.dummy_res.samp->vksampler, NULL);
 
