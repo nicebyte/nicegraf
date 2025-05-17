@@ -5323,6 +5323,7 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     const ngf_attachment_store_op store_op = NGF_STORE_OP_DONTCARE;
     attachment_pass_desc->load_op          = get_vk_load_op(load_op);
     attachment_pass_desc->store_op         = get_vk_store_op(store_op);
+    const bool attachment_is_cubemap       = attachment_img_ref->image->type == NGF_IMAGE_TYPE_CUBE;
 
     const VkImageAspectFlags subresource_aspect_flags =
         (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0u) |
@@ -5345,7 +5346,9 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
             },
         .format           = attachment_img->vk_fmt,
         .subresourceRange = {
-            .baseArrayLayer = attachment_img_ref->layer,
+            .baseArrayLayer = attachment_is_cubemap ? 6u * attachment_img_ref->layer +
+                                                          attachment_img_ref->cubemap_face
+                                                    : attachment_img_ref->layer,
             .baseMipLevel   = attachment_img_ref->mip_level,
             .layerCount     = 1u,
             .levelCount     = 1u,
