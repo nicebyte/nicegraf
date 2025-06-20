@@ -1830,7 +1830,12 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       continue;
     }
 
-    // TODO: verify the descriptor type too
+    if (set_layout->binding_properties[bind_op->target_binding].type != get_vk_descriptor_type(bind_op->type)) {
+        NGFI_DIAG_WARNING("attempting to bind descriptor with unmatching type (set %d binding %d) - ignoring",
+          bind_op->target_set,
+          bind_op->target_binding);
+      continue;
+    }
 
     // Allocate a new descriptor set if necessary.
     const bool need_new_desc_set = vk_desc_sets[bind_op->target_set] == VK_NULL_HANDLE;
