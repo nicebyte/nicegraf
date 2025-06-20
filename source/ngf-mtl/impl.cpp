@@ -145,7 +145,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTL::PixelFormatBC7_RGBAUnorm, 128, false, 4, 4},
     {MTL::PixelFormatBC7_RGBAUnorm_sRGB, 128, true, 4, 4},
     {MTL::PixelFormatBC6H_RGBFloat, 128, false, 4, 4},
-    {MTL::PixelFormatBC6H_RGBUFloat, 128, false, 4, 4},
+    {MTL::PixelFormatBC6H_RGBUfloat, 128, false, 4, 4},
 #else
     // BCn formats unsupported un iOS until 16.4
     {},
