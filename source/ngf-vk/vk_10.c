@@ -3,7 +3,6 @@
 
 #define TO_STRING(str) #str
 #define STRINGIFY(str) TO_STRING(str)
-
 #if defined(_WIN32) || defined(_WIN64)
 #define VK_LOADER_LIB "vulkan-1.dll"
 #else
@@ -13,6 +12,13 @@
 #define VK_LOADER_LIB "libvulkan.so.1"
 #endif
 #endif
+#ifdef __clang__
+#pragma clang diagnostic ignored "-Wnullability-completeness"
+#if __has_warning("-Wcast-function-type-mismatch")
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+#endif
+#endif
+
 
 PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
