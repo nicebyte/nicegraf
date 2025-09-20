@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -165,7 +165,8 @@ void sample_post_draw_frame(
   NGF_MISC_CHECK_NGF_ERROR(
       ngf_cmd_begin_compute_pass(cmd_buffer, &pass_info, &compute_enc));
   ngf_resource_bind_op bind_op{};
-  bind_op.info.image_sampler.image = state->image;
+  bind_op.info.image_sampler.is_image_view = false;
+  bind_op.info.image_sampler.resource.image = state->image;
   bind_op.target_set               = 0;
   bind_op.target_binding           = 0;
   bind_op.type                     = NGF_DESCRIPTOR_STORAGE_IMAGE;

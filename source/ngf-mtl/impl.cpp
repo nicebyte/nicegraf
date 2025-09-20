@@ -664,6 +664,10 @@ struct ngf_image_t {
   uint32_t             usage_flags = 0u;
 };
 
+struct ngf_image_view_t {
+  ngf_id<MTL::Texture> view = nullptr;
+};
+
 template<class NgfObjType, void (*Dtor)(NgfObjType*)> class ngfmtl_object_nursery {
   public:
   template<class... Args>
@@ -1770,6 +1774,53 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*, ngf_cmd_buffer* resu
   return NGF_ERROR_OK;
 }
 
+static ngf_sample_count get_ngf_sample_count(NS::UInteger sc) {
+  switch(sc) {
+    case 0:
+    case 1:
+      return NGF_SAMPLE_COUNT_1;
+      
+    case 2:
+      return NGF_SAMPLE_COUNT_2;
+    case 4:
+      return NGF_SAMPLE_COUNT_4;
+    case 8:
+      return NGF_SAMPLE_COUNT_8;
+    case 16:
+      return NGF_SAMPLE_COUNT_16;
+    case 32:
+      return NGF_SAMPLE_COUNT_32;
+    case 64:
+      return NGF_SAMPLE_COUNT_64;
+  }
+  return NGF_SAMPLE_COUNT_1;
+}
+
+ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) NGF_NOEXCEPT {
+  const auto maybe_texture_type = get_mtl_texture_type(info->view_type,
+                                                       info->nlayers,
+                                                       get_ngf_sample_count(info->src_image->texture->sampleCount()));
+  if (!maybe_texture_type) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  MTL::Texture* view = info->src_image->texture->newTextureView(
+                                           get_mtl_pixel_format(info->view_format).format,
+                                           maybe_texture_type.value(),
+                                           NS::Range(info->base_mip_level, info->nmips),
+                                           NS::Range(info->base_layer, info->nlayers));
+  if (!view) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  
+  NGFMTL_NURSERY(image_view, image_view);
+  image_view->view = view;
+  *result = image_view.release();
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_image_view(ngf_image_view view) NGF_NOEXCEPT {
+  if (view != nullptr) {
+    view->~ngf_image_view_t();
+    NGFI_FREE(view);
+  }
+}
+
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT {
   ngf_id<MTL::TextureDescriptor> mtl_img_desc = id_default;
 
@@ -2243,11 +2294,12 @@ void ngf_cmd_bind_resources(
     }
     case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      cmd_buf->active_rce->setVertexTexture(img_bind_op.image->texture.get(), native_binding);
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      cmd_buf->active_rce->setVertexTexture(t, native_binding);
       cmd_buf->active_rce->setVertexSamplerState(
           img_bind_op.sampler->sampler.get(),
           native_binding);
-      cmd_buf->active_rce->setFragmentTexture(img_bind_op.image->texture.get(), native_binding);
+      cmd_buf->active_rce->setFragmentTexture(t, native_binding);
       cmd_buf->active_rce->setFragmentSamplerState(
           img_bind_op.sampler->sampler.get(),
           native_binding);
@@ -2255,8 +2307,9 @@ void ngf_cmd_bind_resources(
     }
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      cmd_buf->active_rce->setVertexTexture(img_bind_op.image->texture.get(), native_binding);
-      cmd_buf->active_rce->setFragmentTexture(img_bind_op.image->texture.get(), native_binding);
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      cmd_buf->active_rce->setVertexTexture(t, native_binding);
+      cmd_buf->active_rce->setFragmentTexture(t, native_binding);
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
@@ -2335,21 +2388,26 @@ void ngf_cmd_bind_compute_resources(
     }
     case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      cmd_buf->active_cce->setTexture(t, native_binding);
       cmd_buf->active_cce->setSamplerState(img_bind_op.sampler->sampler.get(), native_binding);
       break;
     }
     case NGF_DESCRIPTOR_STORAGE_IMAGE:
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-        if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.image->format) ) {
-          if (!img_bind_op.image->non_srgb_view)
-            img_bind_op.image->non_srgb_view = img_bind_op.image->texture.get()->newTextureView(
-                get_mtl_pixel_format(maybe_format.value()).format);
-          cmd_buf->active_cce->setTexture(img_bind_op.image->non_srgb_view.get(), native_binding);
+      if (img_bind_op.is_image_view) {
+        cmd_buf->active_cce->setTexture(img_bind_op.resource.view->view.get(), native_binding);
+      } else {
+        if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.resource.image->format) ) {
+          if (!img_bind_op.resource.image->non_srgb_view)
+            img_bind_op.resource.image->non_srgb_view = img_bind_op.resource.image->texture.get()->newTextureView(
+                                                                                                get_mtl_pixel_format(maybe_format.value()).format);
+          cmd_buf->active_cce->setTexture(img_bind_op.resource.image->non_srgb_view.get(), native_binding);
         } else {
-          cmd_buf->active_cce->setTexture(img_bind_op.image->texture.get(), native_binding);
+          cmd_buf->active_cce->setTexture(img_bind_op.resource.image->texture.get(), native_binding);
         }
+      }
       break;
     }
     case NGF_DESCRIPTOR_SAMPLER: {
