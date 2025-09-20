@@ -55,7 +55,7 @@
  *   within them are automatically declared to have C linkage. Additionally,
  *   they are declared to be noexcept.
  *
- * \subsection object-model Objects 
+ * \subsection object-model Objects
  *
  * nicegraf objects, such as images, buffers, render targets, etc., are
  * represented using opaque handles. The objects are constructed and destroyed
@@ -152,7 +152,7 @@ typedef enum ngf_diagnostic_message_type {
 
 /**
  * @struct ngf_renderdoc_info
- * 
+ *
  * Information for initializing the RenderDoc API.
  */
 typedef struct ngf_renderdoc_info {
@@ -163,10 +163,10 @@ typedef struct ngf_renderdoc_info {
   const char* renderdoc_lib_path;
 
   /**
-   * Template for how RenderDoc captures are saved. If template is "example/capture", captures will be saved as
-   * "example/capture_1234.rdc".
+   * Template for how RenderDoc captures are saved. If template is "example/capture", captures will
+   * be saved as "example/capture_1234.rdc".
    */
-   const char* renderdoc_destination_template;
+  const char* renderdoc_destination_template;
 } ngf_renderdoc_info;
 
 /**
@@ -212,7 +212,7 @@ typedef struct ngf_allocation_callbacks {
 
   /**
    * An arbitrary pointer that will be passed as-is to the allocate and free callbacks.
-  */
+   */
   void* userdata;
 } ngf_allocation_callbacks;
 
@@ -268,7 +268,6 @@ typedef struct ngf_init_info {
    * If this pointer is set to `NULL`, standard malloc and free are used.
    */
   const ngf_allocation_callbacks* allocation_callbacks;
-
 
   /**
    * Handle for the rendering device that nicegraf shall execute rendering commands on.
@@ -541,9 +540,9 @@ typedef enum ngf_front_face_mode {
 typedef struct ngf_rasterization_info {
   bool discard; /**< Enable/disable rasterizer discard. Use this in pipelines that
                      don't write any fragment data.*/
-  ngf_polygon_mode    polygon_mode; /**< How to draw polygons.*/
-  ngf_cull_mode       cull_mode;    /**< Which polygons to cull.*/
-  ngf_front_face_mode front_face;   /**< Which winding counts as front-facing.*/
+  ngf_polygon_mode    polygon_mode;      /**< How to draw polygons.*/
+  ngf_cull_mode       cull_mode;         /**< Which polygons to cull.*/
+  ngf_front_face_mode front_face;        /**< Which winding counts as front-facing.*/
   bool                enable_depth_bias; /**< Controls whether to enable depth bias. See also: \ref
                                             ngf_cmd_set_depth_bias */
 } ngf_rasterization_info;
@@ -1305,7 +1304,7 @@ typedef struct ngf_constant_specialization {
  * during execution.
  */
 typedef struct ngf_specialization_info {
-  const ngf_constant_specialization*  specializations;  /**< List of specialization entries. */
+  const ngf_constant_specialization* specializations;  /**< List of specialization entries. */
   uint32_t                           nspecializations; /**< Number of specialization entries. */
   const void* value_buffer; /**< Pointer to a buffer containing the values for the
                            specialization constants. */
@@ -1713,6 +1712,56 @@ typedef struct ngf_image_ref {
 } ngf_image_ref;
 
 /**
+ * @struct ngf_image_view_info
+ * \ingroup ngf
+ *
+ * Information required to create an \ref ngf_image_view.
+ * Contains the definition of the sub-resource represented by the view as well as
+ * the view's corresponding type and format.
+ */
+typedef struct ngf_image_view_info {
+  ngf_image      src_image;      /**< References the source image. */
+  uint32_t       base_mip_level; /**< Specifies the first mip level represented in the view. */
+  uint32_t       nmips;          /**< Specifies the number of mip levels represented in the view. */
+  uint32_t       base_layer;     /**< Specifies the first image layer represented in the view. */
+  uint32_t       nlayers;        /**< Specifies the number of layers represented in the view. */
+  ngf_image_type view_type;      /**< The type to reinterpret the source image as.
+                                       Must be compatible with the source image type.*/
+  ngf_image_format view_format;  /**< The format to reinterpret the source image as.
+                                       Must be compatible with the source image format.*/
+} ngf_image_view_info;
+
+/**
+ * @struct ngf_image_view
+ * \ingroup ngf
+ *
+ * An opaque handle to an image view object.
+ *
+ * Image views provide a way to reinterpret different sub-parts of a source image as having a
+ * particular type and/or format. They can be bound and used in GPU programs just like regular
+ * images. Image views are backed by the memory of their corresponding source images and do not
+ * incur additional GPU allocations. They become invalid if their source image is destroyed.
+ *
+ * Image views can use a different type than the source image, however this is subject to
+ * compatibility rules defined in the table below:
+ *
+ * Source image type              | Compatible view types
+ * ------------------------------ | ----------------------------------------------------------
+ * \ref NGF_IMAGE_TYPE_IMAGE_2D   | \ref NGF_IMAGE_TYPE_IMAGE_2D, \ref NGF_IMAGE_TYPE_IMAGE_3D
+ * \ref NGF_IMAGE_TYPE_CUBE       | \ref NGF_IMAGE_TYPE_IMAGE_2D
+ * \ref NGF_IMAGE_TYPE_IMAGE_3D   | \ref NGF_IMAGE_TYPE_IMAGE_3D
+ *
+ * Attempting to create a view with a type that is not compatible with the source image type will
+ * result in an error.
+ *
+ * Image views can use a different pixel format from the source image (thus "type punning" or
+ * reinterpreting pixel data). However, the format must be compatible with the source image format.
+ * Format compatibility is platform-dependent. Attempting to create a view with a format that is not
+ * compatible with the source image format will result in an error.
+ */
+typedef struct ngf_image_view_t* ngf_image_view;
+
+/**
  * @struct ngf_render_target_info
  * \ingroup ngf
  * Information required to create a render target object.
@@ -1867,9 +1916,9 @@ typedef struct ngf_render_pass_info {
 
   /**
    * A pointer to a buffer of \ref ngf_load_op enumerators specifying the operation to perform at
-   * the start of the render pass for each attachment of \ref ngf_render_pass_info::render_target. The
-   * buffer must have at least the same number of elements as there are attachments in the render
-   * target. The `i`th element of the buffer corresponds to the `i`th attachment.
+   * the start of the render pass for each attachment of \ref ngf_render_pass_info::render_target.
+   * The buffer must have at least the same number of elements as there are attachments in the
+   * render target. The `i`th element of the buffer corresponds to the `i`th attachment.
    */
   const ngf_attachment_load_op* load_ops;
 
@@ -1895,7 +1944,7 @@ typedef struct ngf_render_pass_info {
 /**
  * @struct ngf_xfer_pass_info
  * \ingroup ngf
- * 
+ *
  * Information required to begin a transfer pass.
  */
 
@@ -1906,7 +1955,7 @@ typedef struct ngf_xfer_pass_info {
 /**
  * @struct ngf_compute_pass_info
  * \ingroup ngf
- * 
+ *
  * Information required to begin a compute pass.
  */
 typedef struct ngf_compute_pass_info {
@@ -1950,7 +1999,7 @@ typedef enum ngf_buffer_storage_type {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * Memory that is both local to the device (GPU) and mappable/writeable directly
    * from host. This type of storage is available only when the capability
    * \ref ngf_device_capabilities::device_local_memory_is_host_visible is supported.
@@ -1963,7 +2012,7 @@ typedef enum ngf_buffer_storage_type {
 
   /**
    * \ingroup ngf
-   * 
+   *
    * Same as \ref NGF_BUFFER_STORAGE_DEVICE_LOCAL_HOST_WRITEABALE, but additionally allows
    * the host to read directly from mapped memory.
    */
@@ -2066,9 +2115,9 @@ typedef struct ngf_texel_buffer_view_info {
  * Specifies a buffer resource bind operation.
  */
 typedef struct ngf_buffer_bind_info {
-  ngf_buffer       buffer; /**< Which buffer to bind.*/
-  size_t           offset; /**< Offset at which to bind the buffer.*/
-  size_t           range;  /**< Bound range.*/
+  ngf_buffer buffer; /**< Which buffer to bind.*/
+  size_t     offset; /**< Offset at which to bind the buffer.*/
+  size_t     range;  /**< Bound range.*/
 } ngf_buffer_bind_info;
 
 /**
@@ -2078,7 +2127,11 @@ typedef struct ngf_buffer_bind_info {
  * fields have to be set.
  */
 typedef struct ngf_image_sampler_bind_info {
-  ngf_image   image;   /**< The image to bind. Can be NULL if binding just a sampler. */
+  bool is_image_view;
+  union {
+    ngf_image      image;
+    ngf_image_view view;
+  } resource; /**< The image OR image view to bind. Can be NULL if binding just a sampler. */
   ngf_sampler sampler; /**< The sampler to bind. Can be NULL if binding just an image. */
 } ngf_image_sampler_bind_info;
 
@@ -2142,17 +2195,18 @@ typedef enum ngf_present_mode {
 
 /**
  * Enumerates color spaces for swapchain images.
- * Check \ref ngf_device_capabilities::colorspace_support to determine whether a particular color space is supported.
+ * Check \ref ngf_device_capabilities::colorspace_support to determine whether a particular color
+ * space is supported.
  */
 typedef enum ngf_colorspace {
-    NGF_COLORSPACE_SRGB_NONLINEAR = 0u,
-    NGF_COLORSPACE_EXTENDED_SRGB_NONLINEAR,
-    NGF_COLORSPACE_EXTENDED_SRGB_LINEAR,
-    NGF_COLORSPACE_DISPLAY_P3,
-    NGF_COLORSPACE_DISPLAY_P3_LINEAR,
-    NGF_COLORSPACE_DCI_P3,
-    NGF_COLORSPACE_ITUR_BT2020,
-    NGF_COLORSPACE_COUNT
+  NGF_COLORSPACE_SRGB_NONLINEAR = 0u,
+  NGF_COLORSPACE_EXTENDED_SRGB_NONLINEAR,
+  NGF_COLORSPACE_EXTENDED_SRGB_LINEAR,
+  NGF_COLORSPACE_DISPLAY_P3,
+  NGF_COLORSPACE_DISPLAY_P3_LINEAR,
+  NGF_COLORSPACE_DCI_P3,
+  NGF_COLORSPACE_ITUR_BT2020,
+  NGF_COLORSPACE_COUNT
 } ngf_colorspace;
 
 /**
@@ -2514,7 +2568,7 @@ typedef struct ngf_device {
 /**
  * @struct ngf_image_write
  * Specifies an operation writing data from a source buffer into a mip level of an image.
- * 
+ *
  * See \ref ngf_cmd_write_image.
  */
 typedef struct ngf_image_write {
@@ -2559,7 +2613,6 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
  * @param init_info Initialization parameters.
  */
 ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT;
-
 
 /*
  * \ingroup ngf
@@ -2624,7 +2677,7 @@ ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT;
 /**
  * \ingroup ngf
  * Get the active nicegraf context associated with the calling thread.
- * 
+ *
  * Returns NULL if no context associated with the calling thread exists.
  */
 ngf_context ngf_get_context() NGF_NOEXCEPT;
@@ -2740,6 +2793,26 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NO
  * @param image The handle to the image object to be destroyed.
  */
 void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Creates a new image view object.
+ *
+ * @param info Information required to construct the image view object.
+ * @param result Pointer to where the handle to the newly created object will be returned.
+ */
+ngf_error
+ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Destroys the given image view object.
+ *
+ * @param image The handle to the image view object to be destroyed.
+ */
+void ngf_destroy_image_view(ngf_image_view image_view) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2973,9 +3046,9 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
  *            commands associated with the renderpass must be recorder using that encoder.
  */
 ngf_error ngf_cmd_begin_render_pass(
-    ngf_cmd_buffer       buf,
+    ngf_cmd_buffer              buf,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*  enc) NGF_NOEXCEPT;
+    ngf_render_encoder*         enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3034,9 +3107,10 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT;
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
-ngf_error
-ngf_cmd_begin_xfer_pass(ngf_cmd_buffer buf, const ngf_xfer_pass_info* pass_info, ngf_xfer_encoder* enc)
-    NGF_NOEXCEPT;
+ngf_error ngf_cmd_begin_xfer_pass(
+    ngf_cmd_buffer            buf,
+    const ngf_xfer_pass_info* pass_info,
+    ngf_xfer_encoder*         enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3055,13 +3129,15 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
  *
  * @param buf The handle of the command buffer to operate on. Must be in the "ready"
  *             state, will be transitioned to the "recording" state.
- * @param pass_info A pointer to \ref ngf_compute_pass_info specifying details about this compute pass.
+ * @param pass_info A pointer to \ref ngf_compute_pass_info specifying details about this compute
+ * pass.
  * @param enc Pointer to memory where a handle to a transfer encoder shall be returned. All commands
  *            associated with the transfer pass must be recorded using that encoder.
  */
-ngf_error
-ngf_cmd_begin_compute_pass(ngf_cmd_buffer buf, const ngf_compute_pass_info* pass_info, ngf_compute_encoder* enc)
-    NGF_NOEXCEPT;
+ngf_error ngf_cmd_begin_compute_pass(
+    ngf_cmd_buffer               buf,
+    const ngf_compute_pass_info* pass_info,
+    ngf_compute_encoder*         enc) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3078,8 +3154,7 @@ ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT;
  *
  * Binds a graphics pipeline.
  */
-void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, ngf_graphics_pipeline pipeline)
-    NGF_NOEXCEPT;
+void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder buf, ngf_graphics_pipeline pipeline) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3131,26 +3206,30 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
 
 /**
  * \ingroup ngf
- *  
+ *
  * Configures a bias value to be added to the depth of each rasterized fragment.
  * Unclamped bias `b` is computed as follows:
- * 
+ *
  *  `b = const_scale * r + max_slope * slope_scale`
- * 
+ *
  * where:
  *  - `r` is a constant value dependent on the format of the depth buffer and other factors,
  * representing the minimum absolute difference between two rasterized depth values.
  *  - `max_slope` is ideally the length of the depth function's gradient vector at the point
  * corresponding to the fragment (but can be approximated by `max(|dZ/dx|, |dZ/dy|)`.
- * 
+ *
  * The final bias `B`, which is added to the fragment depth, is computed as follows:
- * 
+ *
  * `B = clamp > 0.0f ? min(clamp, b) : (clamp < 0.0f ? max(clamp, b) : b)`
- * 
- * Requires the bound pipeline to have depth bias enabled to have effect. 
+ *
+ * Requires the bound pipeline to have depth bias enabled to have effect.
  * See \ref ngf_rasterization_info::enable_depth_bias.
  */
-void ngf_cmd_set_depth_bias(ngf_render_encoder enc, float const_scale, float slope_scale, float clamp) NGF_NOEXCEPT;
+void ngf_cmd_set_depth_bias(
+    ngf_render_encoder enc,
+    float              const_scale,
+    float              slope_scale,
+    float              clamp) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3279,11 +3358,12 @@ void ngf_cmd_copy_buffer(
  * to last. For each layer, the first texel corresponds to the lower left corner of the image, and
  * the subsequent texels progress from left to right, through the remainder of the bottom row, and
  * from then on, through higher rows.
- * 
+ *
  * @param enc The handle to the transfer encoder object to record the command into.
  * @param src The handle to the buffer object to be copied from.
  * @param dst The image that the data from the buffer shall be written into.
- * @param writes A pointer to an array of \ref ngf_image_write objects, each describing a write to a mip level of the image to be written.
+ * @param writes A pointer to an array of \ref ngf_image_write objects, each describing a write to a
+ * mip level of the image to be written.
  * @param nwrites Number of objects in the `writes` array.
  */
 void ngf_cmd_write_image(
@@ -3331,16 +3411,16 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
 
 /**
  * \ingroup ngf
- * 
+ *
  * Records the beginning of a "debug group" into the given command buffer.
- * 
- * Debug groups are a way to group together related commands for easier vieweing in graphics debugging tools
- * such as RenderDoc. They do not have any other functional impact. Debug groups have to be enabled during
- * initialization. See \ref ngf_diagnostic_info.
- * 
- * This command records a marker into the given command buffer indicating that the subsequent commands
- * recorded into the buffer pertain to a certain debug group.
- * 
+ *
+ * Debug groups are a way to group together related commands for easier vieweing in graphics
+ * debugging tools such as RenderDoc. They do not have any other functional impact. Debug groups
+ * have to be enabled during initialization. See \ref ngf_diagnostic_info.
+ *
+ * This command records a marker into the given command buffer indicating that the subsequent
+ * commands recorded into the buffer pertain to a certain debug group.
+ *
  * @param cmd_buffer the command buffer to record the debug group start marker into.
  * @param name The name of the debug group that will appear in debugging tools.
  */
@@ -3348,13 +3428,13 @@ void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) NGF_
 
 /**
  * \ingroup ngf
- * 
+ *
  * Records the end of a "debug group" into the given command buffer.
- * 
- * This command records a marker into the given command buffer that terminates the current debug group
- * if there is one. Subsequent commands recorded into the buffer shall not pertain to any debug group until a new
- * one is started.
- * 
+ *
+ * This command records a marker into the given command buffer that terminates the current debug
+ * group if there is one. Subsequent commands recorded into the buffer shall not pertain to any
+ * debug group until a new one is started.
+ *
  * @param cmd_buffer The command buffer to record the debug group end marker into.
  */
 void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
@@ -3364,9 +3444,9 @@ void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
  * Triggers RenderDoc Capture.
  *
  * Captures the next frame from the active window in the current context.
- * If called, subsequent calls to \ref ngf_renderdoc_capture_begin and \ref ngf_renderdoc_capture_end
- * will do nothing until after the next frame that ngf_renderdoc_capture_next_frame 
- * was called (i.e. you cannot do nested captures).
+ * If called, subsequent calls to \ref ngf_renderdoc_capture_begin and \ref
+ * ngf_renderdoc_capture_end will do nothing until after the next frame that
+ * ngf_renderdoc_capture_next_frame was called (i.e. you cannot do nested captures).
  */
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT;
 
@@ -3386,7 +3466,6 @@ void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
  * Ends frame capture for the active window in the current context.
  */
 void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
-
 
 #ifdef _MSC_VER
 #pragma endregion

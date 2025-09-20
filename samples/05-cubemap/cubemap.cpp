@@ -149,7 +149,7 @@ void* sample_initialize(
       .lod_min           = 0.0f,
       .lod_bias          = 0.0f,
       .max_anisotropy    = 0.0f,
-      .enable_anisotropy = false}));
+      .enable_anisotropy = false, .compare_op = NGF_COMPARE_OP_NEVER}));
 
   /**
    * Load the shader stages.

@@ -442,6 +442,11 @@ typedef struct ngf_image_t {
   bool             owns_backing_resource;
 } ngf_image_t;
 
+typedef struct ngf_image_view_t {
+  VkImageView vk_view;
+  ngf_image   src;
+} ngf_image_view_t;
+
 typedef struct ngf_context_t {
   ngfvk_frame_resources*      frame_res;
   ngfvk_swapchain             swapchain;
@@ -568,7 +573,6 @@ static VkImageType get_vk_image_type(ngf_image_type t) {
   };
   return types[t];
 }
-
 static VkImageViewType get_vk_image_view_type(ngf_image_type t, size_t nlayers) {
   if (t == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1u) {
     return VK_IMAGE_VIEW_TYPE_2D;
@@ -1905,8 +1909,10 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       if (bind_op->type == NGF_DESCRIPTOR_IMAGE ||
           bind_op->type == NGF_DESCRIPTOR_STORAGE_IMAGE ||
           bind_op->type == NGF_DESCRIPTOR_IMAGE_AND_SAMPLER) {
-        image_view =
-            is_multilayered_image ? bind_info->image->vkview_arrayed : bind_info->image->vkview;
+        image_view = bind_info->is_image_view
+                         ? bind_info->resource.view->vk_view
+                         : (is_multilayered_image ? bind_info->resource.image->vkview_arrayed
+                                                  : bind_info->resource.image->vkview);
       }
       VkDescriptorImageInfo* vk_bind_info =
           ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
@@ -3167,7 +3173,9 @@ static ngfvk_sync_res ngfvk_sync_res_from_bind_op(const ngf_resource_bind_op* bi
   case NGF_DESCRIPTOR_IMAGE:
   case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER:
   case NGF_DESCRIPTOR_STORAGE_IMAGE:
-    return ngfvk_sync_res_from_img(bind_op->info.image_sampler.image);
+    return ngfvk_sync_res_from_img(
+        bind_op->info.image_sampler.is_image_view ? bind_op->info.image_sampler.resource.view->src
+                                                  : bind_op->info.image_sampler.resource.image);
     break;
   case NGF_DESCRIPTOR_STORAGE_BUFFER:
   case NGF_DESCRIPTOR_UNIFORM_BUFFER:
@@ -6115,6 +6123,56 @@ void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
 void ngf_buffer_unmap(ngf_buffer buf) {
   // vk buffers are persistently mapped.
   NGFI_IGNORE_VAR(buf);
+}
+
+ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) {
+  assert(info);
+  assert(result);
+
+  *result = NGFI_ALLOC(ngf_image_view_t);
+  if (*result == NULL) {
+    return NGF_ERROR_OUT_OF_MEM;
+  }
+
+  const VkImageViewCreateInfo vk_view_info = {
+    .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+    .pNext = NULL,
+    .flags = 0u,
+    .image = (VkImage)info->src_image->alloc.obj_handle,
+    .viewType = get_vk_image_view_type(info->view_type, info->nlayers),
+    .format = get_vk_image_format(info->view_format),
+    .components = {
+          .r = VK_COMPONENT_SWIZZLE_R,
+          .g = VK_COMPONENT_SWIZZLE_G,
+          .b = VK_COMPONENT_SWIZZLE_B,
+          .a = VK_COMPONENT_SWIZZLE_A},
+     .subresourceRange = {
+          .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+          .baseMipLevel = info->base_mip_level,
+          .levelCount = info->nmips,
+          .baseArrayLayer = info->base_layer,
+          .layerCount = info->nlayers
+     }
+  };
+
+  const VkResult vk_err = vkCreateImageView(_vk.device, &vk_view_info, NULL, &(*result)->vk_view);
+  if (vk_err != VK_SUCCESS) { 
+      NGFI_FREE(result);
+      return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
+  (*result)->src = info->src_image;
+
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_image_view(ngf_image_view view) {
+  if (view) {
+    if (view->vk_view) {
+      ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
+      NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_IMG_VIEW, view->vk_view);
+    }
+    NGFI_FREE(view);
+  }
 }
 
 ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {

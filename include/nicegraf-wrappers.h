@@ -201,6 +201,7 @@ NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(shader_stage);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(graphics_pipeline);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(compute_pipeline);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(image);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(image_view);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(sampler);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(buffer);
@@ -235,6 +236,14 @@ NGF_DEFINE_WRAPPER_TYPE(compute_pipeline);
  * A RAII wrapper for \ref ngf_image.
  */
 NGF_DEFINE_WRAPPER_TYPE(image);
+
+/**
+ * \ingroup ngf_wrappers
+ *
+ * A RAII wrapper for \ref ngf_image_view.
+ */
+NGF_DEFINE_WRAPPER_TYPE(image_view);
+
 
 /**
  * \ingroup ngf_wrappers
@@ -494,11 +503,12 @@ template<uint32_t S> struct descriptor_set {
      */
     static ngf_resource_bind_op texture(const ngf_image image, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
-      op.type                     = NGF_DESCRIPTOR_IMAGE;
-      op.target_binding           = B;
-      op.target_set               = S;
-      op.info.image_sampler.image = image;
-      op.array_index              = array_index;
+      op.type                              = NGF_DESCRIPTOR_IMAGE;
+      op.target_binding                    = B;
+      op.target_set                        = S;
+      op.info.image_sampler.is_image_view  = false;
+      op.info.image_sampler.resource.image = image;
+      op.array_index                       = array_index;
       return op;
     }
 
@@ -510,11 +520,48 @@ template<uint32_t S> struct descriptor_set {
      */
     static ngf_resource_bind_op storage_image(const ngf_image image, uint32_t array_index = 0u) {
       ngf_resource_bind_op op;
-      op.type                     = NGF_DESCRIPTOR_STORAGE_IMAGE;
-      op.target_binding           = B;
-      op.target_set               = S;
-      op.info.image_sampler.image = image;
-      op.array_index              = array_index;
+      op.type                              = NGF_DESCRIPTOR_STORAGE_IMAGE;
+      op.target_binding                    = B;
+      op.target_set                        = S;
+      op.info.image_sampler.is_image_view  = false;
+      op.info.image_sampler.resource.image = image;
+      op.array_index                       = array_index;
+      return op;
+    }
+
+    /**
+     * Creates a \ref ngf_resource_bind_op for a \ref ngf_image_view.
+     *
+     * @param view The view to bind.
+     * @param array_index If the descriptor is an array, specifies the index of the array element to
+     * bind the object to.
+     */
+    static ngf_resource_bind_op texture(const ngf_image_view view, uint32_t array_index = 0u) {
+      ngf_resource_bind_op op;
+      op.type                             = NGF_DESCRIPTOR_IMAGE;
+      op.target_binding                   = B;
+      op.target_set                       = S;
+      op.info.image_sampler.is_image_view = true;
+      op.info.image_sampler.resource.view = view;
+      op.array_index                      = array_index;
+      return op;
+    }
+
+    /**
+     * Creates a \ref ngf_resource_bind_op for an \ref ngf_image_view that is to be used as a
+     * storage image
+     *
+     * @param image The image to bind.
+     */
+    static ngf_resource_bind_op
+    storage_image(const ngf_image_view view, uint32_t array_index = 0u) {
+      ngf_resource_bind_op op;
+      op.type                             = NGF_DESCRIPTOR_STORAGE_IMAGE;
+      op.target_binding                   = B;
+      op.target_set                       = S;
+      op.info.image_sampler.is_image_view = true;
+      op.info.image_sampler.resource.view = view;
+      op.array_index                      = array_index;
       return op;
     }
 
@@ -603,12 +650,13 @@ template<uint32_t S> struct descriptor_set {
         const ngf_sampler sampler,
         uint32_t          array_index = 0u) {
       ngf_resource_bind_op op;
-      op.type                       = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
-      op.target_binding             = B;
-      op.target_set                 = S;
-      op.info.image_sampler.image   = image;
-      op.info.image_sampler.sampler = sampler;
-      op.array_index                = array_index;
+      op.type                              = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
+      op.target_binding                    = B;
+      op.target_set                        = S;
+      op.info.image_sampler.is_image_view  = false;
+      op.info.image_sampler.resource.image = image;
+      op.info.image_sampler.sampler        = sampler;
+      op.array_index                       = array_index;
       return op;
     }
   };

@@ -157,7 +157,7 @@ ngf_imgui::ngf_imgui(
       0.0f,
       0.0f,
       1.0f,
-      false};
+      false, NGF_COMPARE_OP_NEVER};
   tex_sampler_.initialize(sampler_info);
 #endif
 }
