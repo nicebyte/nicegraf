@@ -1119,6 +1119,7 @@ typedef struct ngf_multisample_info {
 typedef enum ngf_image_format {
   NGF_IMAGE_FORMAT_R8 = 0,
   NGF_IMAGE_FORMAT_RG8,
+  NGF_IMAGE_FORMAT_RG8_SNORM,
   NGF_IMAGE_FORMAT_RGB8,
   NGF_IMAGE_FORMAT_RGBA8,
   NGF_IMAGE_FORMAT_SRGB8,
