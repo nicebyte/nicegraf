@@ -2859,18 +2859,32 @@ static void ngfvk_sync_req_batch_init(uint32_t nmax_sync_reqs, ngfvk_sync_req_ba
 // does nothing if the operation requested by the given sync request is incompatible with the
 // pending sync request.
 static bool ngfvk_sync_req_merge(ngfvk_sync_req* dst_sync_req, const ngfvk_sync_req* sync_req) {
-  static const VkAccessFlags NGFVK_ALL_WRITE_ACCESSES_MASK =
-      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+  static const VkAccessFlags NGFVK_RENDER_ACCESSES_MASK =
       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+  static const VkAccessFlags NGFVK_WRITE_ACCESSES_MASK =
+      VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+  const bool render_requested =
+      ((sync_req->barrier_masks.access_mask & NGFVK_RENDER_ACCESSES_MASK) != 0);
   const bool write_requested =
-      ((sync_req->barrier_masks.access_mask & NGFVK_ALL_WRITE_ACCESSES_MASK) != 0);
+      ((sync_req->barrier_masks.access_mask & NGFVK_WRITE_ACCESSES_MASK) != 0);
+  const bool render_pending =
+      ((dst_sync_req->barrier_masks.access_mask & NGFVK_RENDER_ACCESSES_MASK) != 0);
   const bool write_pending =
-      ((dst_sync_req->barrier_masks.access_mask & NGFVK_ALL_WRITE_ACCESSES_MASK) != 0);
-  const bool read_pending = !write_pending && (dst_sync_req->barrier_masks.access_mask != 0);
-  const bool layout_incompatible =
-      dst_sync_req->layout != VK_IMAGE_LAYOUT_UNDEFINED && dst_sync_req->layout != sync_req->layout;
-  if ((write_requested && (write_pending || read_pending)) || (!write_requested && write_pending) ||
-      layout_incompatible) {
+      ((dst_sync_req->barrier_masks.access_mask & NGFVK_WRITE_ACCESSES_MASK) != 0);
+  const bool read_requested      = !write_requested && (sync_req->barrier_masks.access_mask != 0);
+  const bool read_pending        = !write_pending && (dst_sync_req->barrier_masks.access_mask != 0);
+  const bool layout_incompatible = dst_sync_req->layout != VK_IMAGE_LAYOUT_UNDEFINED &&
+                                   dst_sync_req->layout != VK_IMAGE_LAYOUT_GENERAL &&
+                                   sync_req->layout != VK_IMAGE_LAYOUT_GENERAL &&
+                                   dst_sync_req->layout != sync_req->layout;
+  // Using a resource as a render target is not compatible with any other type of access.
+  // Using a resource in a manner that requires it to be simultaneously in two incompatible layouts
+  // results in transitioning to the GENERAL layout which is compatible with all kinds of accesses.
+  // Merging modifying and non-modifying sync requests is allowed because the same resource might
+  // be accessed with different descriptors in a GPU program (e.g. an image can be accessed both
+  // as a sampled texture and as a storage image).
+  if ((render_requested && (write_pending || read_pending || render_pending)) ||
+      (render_pending && (write_requested || read_requested))) {
     NGFI_DIAG_ERROR("Attempt to use a resource with incompatible accesses within a single "
                     "draw/dispatch. Ignoring.");
     return false;
@@ -2878,8 +2892,10 @@ static bool ngfvk_sync_req_merge(ngfvk_sync_req* dst_sync_req, const ngfvk_sync_
 
   dst_sync_req->barrier_masks.access_mask |= sync_req->barrier_masks.access_mask;
   dst_sync_req->barrier_masks.stage_mask |= sync_req->barrier_masks.stage_mask;
-  dst_sync_req->layout = sync_req->layout;
-
+  const bool preserve_general_layout =
+      (dst_sync_req->layout == VK_IMAGE_LAYOUT_GENERAL ||
+       sync_req->layout == VK_IMAGE_LAYOUT_GENERAL);
+  dst_sync_req->layout = (preserve_general_layout || layout_incompatible) ? VK_IMAGE_LAYOUT_GENERAL : sync_req->layout;
   return true;
 }
 
