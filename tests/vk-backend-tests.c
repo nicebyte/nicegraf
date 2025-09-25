@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -512,7 +512,7 @@ NT_TESTSUITE {
     test_sync_req_merge(
         &dst_req,
         &sync_reqs[1],
-        false,
+        true,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_ACCESS_SHADER_WRITE_BIT,
         VK_IMAGE_LAYOUT_GENERAL);
@@ -541,7 +541,7 @@ NT_TESTSUITE {
     test_sync_req_merge(
         &dst_req,
         &sync_reqs[1],
-        false,
+        true,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_ACCESS_SHADER_READ_BIT,
         VK_IMAGE_LAYOUT_GENERAL);
@@ -569,7 +569,7 @@ NT_TESTSUITE {
     test_sync_req_merge(
         &dst_req,
         &sync_reqs[1],
-        false,
+        true,
         VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
         VK_ACCESS_SHADER_READ_BIT,
         VK_IMAGE_LAYOUT_GENERAL);
