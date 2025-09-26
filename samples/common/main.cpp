@@ -39,6 +39,8 @@
 #include "logging.h"
 #include "nicegraf-wrappers.h"
 #include "sample-interface.h"
+#include "metalfx.h"
+#include "shader-loader.h"
 
 #include <GLFW/glfw3native.h>
 #include <chrono>
@@ -198,12 +200,23 @@ int main(int, char**) {
   // Begin Context Scope
   {
     /**
+     * METALFX STUFF
+     */
+    ngf::image mtlfx_input_color_image; // Color image that will be rendered into.
+    ngf::image mtlfx_input_depth_image; // Depth image that will be rendered into.
+    ngf::image mtlfx_output_color_image; // Color image that will receive the upscaled frame.
+    ngf::render_target mtlfx_render_target; // Render target for rendering into mtlfx input texture.
+    ngf::sampler sampler;
+    ngf::graphics_pipeline blit_pipeline;
+    std::optional<mtlfx_scaler> scaler;
+    
+    /**
      * Configure the swapchain and create a nicegraf context.
      * Use an sRGB color attachment and a 32-bit float depth attachment. Enable MSAA with
      * the highest supported framebuffer sample count.
      */
     const ngf_sample_count main_render_target_sample_count =
-        ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
+      NGF_SAMPLE_COUNT_1; // ngf_get_device_capabilities()->max_supported_framebuffer_color_sample_count;
     const ngf_swapchain_info swapchain_info = {
         .color_format  = NGF_IMAGE_FORMAT_BGRA8_SRGB,
         .colorspace    = NGF_COLORSPACE_SRGB_NONLINEAR,
@@ -227,6 +240,36 @@ int main(int, char**) {
      */
     NGF_MISC_CHECK_NGF_ERROR(ngf_set_context(context));
 
+     /**
+     * Initialize blit pipeline and sampler.
+     */
+    const ngf::shader_stage blit_vertex_stage =
+      ngf_misc::load_shader_stage("simple-texture", "VSMain", NGF_STAGE_VERTEX);
+    const ngf::shader_stage blit_fragment_stage =
+      ngf_misc::load_shader_stage("simple-texture", "PSMain", NGF_STAGE_FRAGMENT);
+    ngf_util_graphics_pipeline_data blit_pipeline_data;
+    ngf_util_create_default_graphics_pipeline_data(&blit_pipeline_data);
+    blit_pipeline_data.multisample_info.sample_count = NGF_SAMPLE_COUNT_1;
+    ngf_graphics_pipeline_info& blit_pipe_info       = blit_pipeline_data.pipeline_info;
+    blit_pipe_info.nshader_stages                    = 2u;
+    blit_pipe_info.shader_stages[0]                  = blit_vertex_stage.get();
+    blit_pipe_info.shader_stages[1]                  = blit_fragment_stage.get();
+    blit_pipe_info.compatible_rt_attachment_descs    = ngf_default_render_target_attachment_descs();
+    blit_pipeline.initialize(blit_pipe_info);
+    const ngf_sampler_info samp_info {
+          NGF_FILTER_LINEAR,
+          NGF_FILTER_LINEAR,
+          NGF_FILTER_NEAREST,
+          NGF_WRAP_MODE_CLAMP_TO_EDGE,
+          NGF_WRAP_MODE_CLAMP_TO_EDGE,
+          NGF_WRAP_MODE_CLAMP_TO_EDGE,
+          0.0f,
+          0.0f,
+          0.0f,
+          1.0f,
+          false};
+    sampler.initialize(samp_info);
+      
     /**
      * This is the nicegraf-based rendering backend for ImGui - we will initialize it
      * on first frame.
@@ -264,9 +307,10 @@ int main(int, char**) {
        * Query the updated size of the window and handle resize events.
        */
       const int old_fb_width = fb_width, old_fb_height = fb_height;
+      const uint32_t mtlfx_fb_width = (uint32_t)fb_width >> 1, mtlfx_fb_height = (uint32_t)fb_height >> 1;
       glfwGetFramebufferSize(window, &fb_width, &fb_height);
       bool       resize_successful = true;
-      const bool need_resize       = (fb_width != old_fb_width || fb_height != old_fb_height);
+      const bool need_resize       = (fb_width != old_fb_width || fb_height != old_fb_height || !scaler);
       if (need_resize) {
         ngf_misc::logd(
             "window resizing detected, calling ngf_resize context. "
@@ -275,6 +319,75 @@ int main(int, char**) {
             old_fb_height,
             fb_width,
             fb_height);
+        const ngf_image_info mtlfx_output_color_info = {
+            .type = NGF_IMAGE_TYPE_IMAGE_2D,
+            .extent = {
+                .width = (uint32_t)fb_width,
+                .height = (uint32_t)fb_height,
+                .depth = 1u
+            },
+            .nmips = 1u,
+            .nlayers = 1u,
+            .format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+            .sample_count = NGF_SAMPLE_COUNT_1,
+            .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT | NGF_IMAGE_USAGE_STORAGE | NGF_IMAGE_USAGE_SAMPLE_FROM
+        };
+        const ngf_image_info mtlfx_input_color_info = {
+            .type = NGF_IMAGE_TYPE_IMAGE_2D,
+            .extent = {
+                .width = mtlfx_fb_width,
+                .height = mtlfx_fb_height,
+                .depth = 1u
+            },
+            .nmips = 1u,
+            .nlayers = 1u,
+            .format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+            .sample_count = NGF_SAMPLE_COUNT_1,
+            .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT | NGF_IMAGE_USAGE_STORAGE | NGF_IMAGE_USAGE_SAMPLE_FROM
+        };
+        const ngf_image_info mtlfx_input_depth_info = {
+            .type = NGF_IMAGE_TYPE_IMAGE_2D,
+            .extent = {
+                .width = mtlfx_fb_width,
+                .height = mtlfx_fb_height,
+                .depth = 1u
+            },
+            .nmips = 1u,
+            .nlayers = 1u,
+            .format = NGF_IMAGE_FORMAT_DEPTH32,
+            .sample_count = NGF_SAMPLE_COUNT_1,
+            .usage_hint = NGF_IMAGE_USAGE_ATTACHMENT
+        };
+        mtlfx_input_color_image.initialize(mtlfx_input_color_info);
+        mtlfx_input_depth_image.initialize(mtlfx_input_depth_info);
+        const ngf_attachment_description mtlfx_attachment_descs_array[] = {
+            { .type = NGF_ATTACHMENT_COLOR, .format = NGF_IMAGE_FORMAT_BGRA8_SRGB, .sample_count = NGF_SAMPLE_COUNT_1, .is_resolve = false },
+            { .type = NGF_ATTACHMENT_DEPTH, .format = NGF_IMAGE_FORMAT_DEPTH32, .sample_count = NGF_SAMPLE_COUNT_1, .is_resolve = false}
+        };
+        const ngf_attachment_descriptions mtlfx_attachment_descs = {
+            .descs = mtlfx_attachment_descs_array,
+            .ndescs = 2u
+        };
+        const ngf_image_ref mtlfx_attachment_imgrefs[] = {
+            { .image = mtlfx_input_color_image.get() },
+            { .image = mtlfx_input_depth_image.get() }
+        };
+        const ngf_render_target_info mtlfx_input_rt_info = {
+          .attachment_descriptions = &mtlfx_attachment_descs,
+          .attachment_image_refs = mtlfx_attachment_imgrefs
+        };
+        mtlfx_render_target.initialize(mtlfx_input_rt_info);
+        mtlfx_output_color_image.initialize(mtlfx_output_color_info);
+        const mtlfx_scaler_info scaler_info = {
+          .input_width =  mtlfx_fb_width,
+          .input_height = mtlfx_fb_height,
+          .output_width = (uint32_t)fb_width,
+          .output_height = (uint32_t)fb_height,
+          .input_format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+          .output_format = NGF_IMAGE_FORMAT_BGRA8_SRGB,
+        };
+        scaler = mtlfx_scaler::create(scaler_info);
+          
         resize_successful &=
             (NGF_ERROR_OK == ngf_resize_context(context, (uint32_t)fb_width, (uint32_t)fb_height));
       }
@@ -305,8 +418,8 @@ int main(int, char**) {
            */
           ngf_misc::logi("Initializing sample");
           sample_opaque_data = ngf_samples::sample_initialize(
-              (uint32_t)fb_width,
-              (uint32_t)fb_height,
+              mtlfx_fb_width,
+              mtlfx_fb_height,
               main_render_target_sample_count,
               xfer_encoder);
 
@@ -355,7 +468,7 @@ int main(int, char**) {
            */
           ngf::render_encoder main_render_pass_encoder(
               main_cmd_buffer,
-              ngf_default_render_target(),
+              mtlfx_render_target, // ngf_default_render_target(),
               0.0f,
               0.0f,
               0.0f,
@@ -371,8 +484,8 @@ int main(int, char**) {
               main_render_pass_encoder,
               time_delta_f,
               frame_token,
-              (uint32_t)fb_width,
-              (uint32_t)fb_height,
+              mtlfx_fb_width,
+              mtlfx_fb_height,
               t,
               sample_opaque_data);
           t += 0.008f;
@@ -388,13 +501,36 @@ int main(int, char**) {
            */
           ngf_samples::sample_draw_ui(sample_opaque_data);
           ImGui::EndFrame();
-
-          /**
-           * Draw the UI on top of everything else.
-           */
-          imgui_backend->record_rendering_commands(main_render_pass_encoder);
         }
         ngf_cmd_end_current_debug_group(main_cmd_buffer);
+          
+        {
+            /**
+             * Begin the final blit/UI pass.
+             */
+            ngf::render_encoder blit_render_pass_encoder(
+                main_cmd_buffer,
+                ngf_default_render_target(),
+                0.0f,
+                0.0f,
+                0.0f,
+                0.0f,
+                1.0f,
+                0);
+            ngf_irect2d onsc_viewport {0, 0, (uint32_t)fb_width, (uint32_t)fb_height};
+            ngf_cmd_bind_gfx_pipeline(blit_render_pass_encoder, blit_pipeline);
+            ngf_cmd_viewport(blit_render_pass_encoder, &onsc_viewport);
+            ngf_cmd_scissor(blit_render_pass_encoder, &onsc_viewport);
+            ngf::cmd_bind_resources(
+                blit_render_pass_encoder,
+                ngf::descriptor_set<0>::binding<1>::texture(mtlfx_output_color_image.get()),
+                ngf::descriptor_set<0>::binding<2>::sampler(sampler.get()));
+            ngf_cmd_draw(blit_render_pass_encoder, false, 0u, 3u, 1u);
+            /**
+             * Draw the UI on top of everything else.
+             */
+            imgui_backend->record_rendering_commands(blit_render_pass_encoder);
+        }
 
         /**
          * Let the sample record commands after the main render pass.
@@ -402,6 +538,13 @@ int main(int, char**) {
         ngf_cmd_begin_debug_group(main_cmd_buffer, "Sample post-draw frame");
         ngf_samples::sample_post_draw_frame(main_cmd_buffer, sample_opaque_data);
         ngf_cmd_end_current_debug_group(main_cmd_buffer);
+          
+        const mtlfx_encode_info upscale_info = {
+          .in_img = mtlfx_input_color_image.get(),
+          .out_img = mtlfx_output_color_image.get(),
+          .cmd_buf = main_cmd_buffer.get()
+        };
+        scaler->encode(upscale_info);
 
         /**
          * Submit the main command buffer and end the frame.

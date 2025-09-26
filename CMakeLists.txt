@@ -65,6 +65,7 @@ nmk_static_library(NAME nicegraf-util
 
 if (APPLE)
   find_library(APPLE_METAL Metal)
+  find_library(APPLE_METALFX MetalFX)
   find_library(APPLE_QUARTZ QuartzCore)
   find_library(APPLE_COREGRAPHICS CoreGraphics)
   find_library(APPLE_COCOA Cocoa)
@@ -73,7 +74,7 @@ endif()
 
 if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
   # Nicegraf with native Metal backend.
-  set(APPLE_LIBS ${APPLE_METAL} ${APPLE_QUARTZ} ${APPLE_COREGRAPHICS})
+  set(APPLE_LIBS ${APPLE_METAL} ${APPLE_METALFX}${APPLE_QUARTZ} ${APPLE_COREGRAPHICS})
 
   if (APPLE_COCOA)
     set(APPLE_LIBS ${APPLE_LIBS} ${APPLE_COCOA}) # macOS
@@ -202,6 +203,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/sample-interface.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/metalfx.h
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common/metalfx.mm
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.h
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/imgui-backend.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.h
