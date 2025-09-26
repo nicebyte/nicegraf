@@ -26,6 +26,7 @@
 #include "ngf-common/stack-alloc.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
+#include "nicegraf-mtl-handles.h"
 
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
@@ -2625,33 +2626,33 @@ void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
 
-uintptr_t ngf_get_mtl_image_handle(ngf_image image) {
+uintptr_t ngf_get_mtl_image_handle(ngf_image image) NGF_NOEXCEPT {
   return (uintptr_t)(image->texture.get());
 }
 
-uintptr_t ngf_get_mtl_buffer_handle(ngf_buffer buffer) {
+uintptr_t ngf_get_mtl_buffer_handle(ngf_buffer buffer) NGF_NOEXCEPT {
   return (uintptr_t)(buffer->mtl_buffer);
 }
 
-uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
+uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   return (uintptr_t)(cmd_buffer->mtl_cmd_buffer);
 }
 
-uintptr_t ngf_get_render_encoder_handle(ngf_render_encoder render_encoder) {
+uintptr_t ngf_get_render_encoder_handle(ngf_render_encoder render_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(render_encoder);
   return (uintptr_t)(buf->active_rce);
 }
 
-uintptr_t ngf_get_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) {
+uintptr_t ngf_get_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(xfer_encoder);
   return (uintptr_t)(buf->active_bce);
 }
 
-uintptr_t ngf_get_compute_encoder_handle(ngf_compute_encoder compute_encoder) {
+uintptr_t ngf_get_compute_encoder_handle(ngf_compute_encoder compute_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(compute_encoder);
   return (uintptr_t)(buf->active_cce);
 }
 
-uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) {
+uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
   return (uintptr_t)(sampler->sampler.get());
 }
