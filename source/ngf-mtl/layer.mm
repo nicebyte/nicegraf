@@ -35,13 +35,14 @@ CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
                                  ngf_colorspace colorspace,
                                  uint32_t capacity_hint,
                                  bool display_sync_enabled,
+                                 bool compute_access_enabled,
                                  uintptr_t native_handle) {
     CAMetalLayer* layer_   = [CAMetalLayer layer];
     layer_.device          = (__bridge id<MTLDevice>)device;
     layer_.drawableSize    = CGSizeMake(width, height);
     layer_.pixelFormat     = (MTLPixelFormat)pixel_format; // TODO: Is this cast correct?
     layer_.colorspace      = CGColorSpaceCreateWithName(get_mtl_colorspace(colorspace));
-    layer_.framebufferOnly = YES;
+    layer_.framebufferOnly = compute_access_enabled ? NO : YES;
     #if TARGET_OS_OSX
     if (@available(macOS 10.13.2, *)) {
       layer_.maximumDrawableCount = capacity_hint;

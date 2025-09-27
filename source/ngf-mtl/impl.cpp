@@ -703,6 +703,7 @@ CA::MetalLayer* ngf_layer_add_to_view(
     ngf_colorspace   colorspace,
     uint32_t         capacity_hint,
     bool             display_sync_enabled,
+    bool             compute_access_enabled,
     uintptr_t        native_handle);
 
 CA::MetalDrawable* ngf_layer_next_drawable(CA::MetalLayer* layer);
@@ -728,10 +729,12 @@ class ngfmtl_swapchain {
     MTL::Texture* depth_attachment_texture() {
       return depth_texture;
     }
+    
 
     CA::MetalDrawable* color_drawable      = nullptr;
     MTL::Texture*      depth_texture       = nullptr;
     MTL::Texture*      multisample_texture = nullptr;
+    ngf_image_t        img_wrapper;
   };
 
   ngfmtl_swapchain() = default;
@@ -754,8 +757,8 @@ class ngfmtl_swapchain {
 
   ngf_error initialize(const ngf_swapchain_info& swapchain_info, MTL::Device* device) {
     // Initialize the Metal layer.
-    const MTL::PixelFormat pixel_format = get_mtl_pixel_format(swapchain_info.color_format).format;
-    if (pixel_format == MTL::PixelFormatInvalid) {
+    pixel_format_ = get_mtl_pixel_format(swapchain_info.color_format).format;
+    if (pixel_format_ == MTL::PixelFormatInvalid) {
       NGFI_DIAG_ERROR("Image format not supported by Metal backend");
       return NGF_ERROR_INVALID_FORMAT;
     }
@@ -764,10 +767,11 @@ class ngfmtl_swapchain {
         device,
         swapchain_info.width,
         swapchain_info.height,
-        pixel_format,
+        pixel_format_,
         swapchain_info.colorspace,
         swapchain_info.capacity_hint,
         (swapchain_info.present_mode == NGF_PRESENTATION_MODE_FIFO),
+        swapchain_info.enable_compute_access,
         swapchain_info.native_handle);
 
     // Remember the number of images in the swapchain.
@@ -801,6 +805,8 @@ class ngfmtl_swapchain {
         depth_images_.size() > 0 ? depth_images_[img_idx_].get() : nullptr,
         is_multisampled() ? multisample_images_[img_idx_]->texture.get() : nullptr};
   }
+  
+  MTL::PixelFormat get_pixel_format() const { return pixel_format_; }
 
   operator bool() {
     return layer_;
@@ -874,6 +880,7 @@ class ngfmtl_swapchain {
   uint32_t                          capacity_ = 0u;
   std::vector<ngf_id<MTL::Texture>> depth_images_;
   std::vector<ngf_image>            multisample_images_;
+  MTL::PixelFormat                    pixel_format_;
 };
 
 struct ngf_context_t {
@@ -1089,6 +1096,9 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   *token = (uintptr_t)NSPushAutoreleasePool(0);
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
+  if (CURRENT_CONTEXT->frame.color_drawable) {
+    CURRENT_CONTEXT->frame.img_wrapper.texture = CURRENT_CONTEXT->frame.color_drawable->texture()->newTextureView(CURRENT_CONTEXT->swapchain.get_pixel_format());
+  }
   return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
 }
 
@@ -1107,6 +1117,13 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
   NSPopAutoreleasePool((void*)token);
+  return NGF_ERROR_OK;
+}
+
+
+ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NOEXCEPT {
+  assert(CURRENT_CONTEXT);
+  *result = &CURRENT_CONTEXT->frame.img_wrapper;
   return NGF_ERROR_OK;
 }
 
