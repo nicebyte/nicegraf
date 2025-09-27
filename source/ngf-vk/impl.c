@@ -1225,7 +1225,7 @@ static ngf_error ngfvk_create_swapchain(
                max_surface_extent.height,
                NGFI_MAX(min_surface_extent.height, swapchain_info->height))},
       .imageArrayLayers      = 1,
-      .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+      .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | (swapchain_info->enable_compute_access ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
       .imageSharingMode      = sharing_mode,
       .queueFamilyIndexCount = num_sharing_queue_families,
       .pQueueFamilyIndices   = sharing_queue_families,
@@ -1343,6 +1343,7 @@ static ngf_error ngfvk_create_swapchain(
         1u,
         &swapchain->img_views[i]);
     if (err != NGF_ERROR_OK) { goto ngfvk_create_swapchain_cleanup; }
+    swapchain->wrapper_imgs[i]->vkview = swapchain->img_views[i];
   }
 
   // Determine if we need a depth attachment.
@@ -4875,6 +4876,21 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
 
 void ngfi_dump_sys_alloc_dbgstats(FILE* out);
 
+ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) {
+  assert(CURRENT_CONTEXT);
+  assert(result);
+
+  if (token != CURRENT_CONTEXT->current_frame_token) {
+    NGFI_DIAG_ERROR("ending a frame with an unexpected frame token");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  if (CURRENT_CONTEXT->swapchain.vk_swapchain == VK_NULL_HANDLE) {
+    NGFI_DIAG_ERROR("requesting a swapchain image handle from a context that does not have a swapchain");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  *result = CURRENT_CONTEXT->swapchain.wrapper_imgs[CURRENT_CONTEXT->swapchain.image_idx];
+  return NGF_ERROR_OK;
+}
 ngf_error ngf_end_frame(ngf_frame_token token) {
   ngfi_blkalloc_cleanup(CURRENT_CONTEXT->blkalloc);
 
