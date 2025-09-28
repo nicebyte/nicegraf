@@ -67,6 +67,16 @@ uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT;
  */
 uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ *
+ * Returns a uint32_t representing the underlying VkFormat. The caller is responsible for casting the return
+ * value to a VkFormat.
+ *
+ * @param format A nicegraf image format.
+ */
+uint32_t ngf_get_vk_image_format_index(ngf_image_format format) NGF_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

@@ -97,6 +97,16 @@ uintptr_t ngf_get_mtl_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) NGF_NOE
  */
 uintptr_t ngf_get_mtl_compute_encoder_handle(ngf_compute_encoder compute_encoder) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ *
+ * Returns a uint32_t representing the underlying MTLPixelFormat. The caller is responsible for casting the return
+ * value to a MTLPixelFormat.
+ *
+ * @param format A nicegraf image format.
+ */
+uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif 

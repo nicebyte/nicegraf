@@ -2673,3 +2673,7 @@ uintptr_t ngf_get_compute_encoder_handle(ngf_compute_encoder compute_encoder) NG
 uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
   return (uintptr_t)(sampler->sampler.get());
 }
+
+uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT {
+  return (uint32_t)get_mtl_pixel_format(format).format;
+}
