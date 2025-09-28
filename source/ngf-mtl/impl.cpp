@@ -755,7 +755,7 @@ class ngfmtl_swapchain {
   ngfmtl_swapchain& operator=(const ngfmtl_swapchain&) = delete;
   ngfmtl_swapchain(const ngfmtl_swapchain&)            = delete;
 
-  ngf_error initialize(const ngf_swapchain_info& swapchain_info, MTL::Device* device) {
+  ngf_error initialize(const ngf_swapchain_info& swapchain_info, MTL::Device* device) noexcept {
     // Initialize the Metal layer.
     pixel_format_ = get_mtl_pixel_format(swapchain_info.color_format).format;
     if (pixel_format_ == MTL::PixelFormatInvalid) {
@@ -780,8 +780,14 @@ class ngfmtl_swapchain {
     // Initialize depth attachments if necessary.
     initialize_depth_attachments(swapchain_info);
     initialize_multisample_images(swapchain_info);
+    
+    compute_access_enabled_ = swapchain_info.enable_compute_access;
 
     return NGF_ERROR_OK;
+  }
+  
+  bool compute_access_enabled() const noexcept {
+    return compute_access_enabled_;
   }
 
   ngf_error resize(const ngf_swapchain_info& swapchain_info) {
@@ -880,7 +886,8 @@ class ngfmtl_swapchain {
   uint32_t                          capacity_ = 0u;
   std::vector<ngf_id<MTL::Texture>> depth_images_;
   std::vector<ngf_image>            multisample_images_;
-  MTL::PixelFormat                    pixel_format_;
+  MTL::PixelFormat                  pixel_format_;
+  bool                              compute_access_enabled_;
 };
 
 struct ngf_context_t {
@@ -1096,7 +1103,7 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   *token = (uintptr_t)NSPushAutoreleasePool(0);
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
-  if (CURRENT_CONTEXT->frame.color_drawable) {
+  if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->swapchain.compute_access_enabled()) {
     CURRENT_CONTEXT->frame.img_wrapper.texture = CURRENT_CONTEXT->frame.color_drawable->texture()->newTextureView(CURRENT_CONTEXT->swapchain.get_pixel_format());
   }
   return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
