@@ -6397,6 +6397,10 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
   return (uintptr_t)(sampler->vksampler);
 }
 
+uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
+  return (uint32_t)get_vk_image_format(format);
+}
+
 #pragma endregion
 
 #if defined(NGFVK_TEST_MODE)
