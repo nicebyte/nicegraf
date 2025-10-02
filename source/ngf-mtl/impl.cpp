@@ -37,6 +37,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <span>
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // can be bound at the same time.
@@ -1032,6 +1033,226 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
 }
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
+
+static ngf_error ngf_resolve_counter_timestamp(
+    MTL::CounterSampleBuffer* buf,
+    const uint32_t start_idx, const uint32_t end_idx,
+    uint64_t result[2] ) NGF_NOEXCEPT {
+  const NS::Range range{start_idx, end_idx - start_idx + 1u};
+  const NS::Data* data = buf->resolveCounterRange(range);
+
+  const std::span< const MTL::CounterResultTimestamp > timestamps{
+    static_cast<MTL::CounterResultTimestamp*>(data->mutableBytes()),
+    data->length() / sizeof(MTL::CounterResultTimestamp)
+  };
+
+  for (size_t index = 0; index < timestamps.size(); ++index) {
+    const auto& timestamp = timestamps[index].timestamp;
+
+    if (timestamp == MTL::CounterErrorValue)
+      return NGF_ERROR_INVALID_FORMAT;
+
+    if (timestamp == 0)
+      return NGF_ERROR_INVALID_FORMAT;
+
+    result[index] = timestamp;
+  }
+
+  return NGF_ERROR_OK;
+}
+
+static const MTL::CounterSet* ngf_get_counter_set( const MTL::CommonCounterSet name )
+{
+  const auto* sets = CURRENT_CONTEXT->device->counterSets();
+
+  for (size_t set_idx = 0u; set_idx < sets->count(); ++set_idx) {
+    const MTL::CounterSet* set = static_cast<MTL::CounterSet*>(sets->object( set_idx));
+    if ( set->name()->isEqualToString( name ) )
+      return set;
+  }
+
+  return nullptr;
+}
+
+class ngf_counter_sample_buffer {
+public:
+  struct timestamp_indices {
+    uint32_t start_idx;
+    uint32_t end_idx;
+  };
+
+  ngf_counter_sample_buffer(MTL::Device* device, const MTL::CounterSet* set) {
+    auto* desc = MTL::CounterSampleBufferDescriptor::alloc()->init();
+    desc->setCounterSet(set);
+    desc->setStorageMode(MTL::StorageModeShared);
+
+    NS::Error* err = nullptr;
+    uint32_t target_samples = 256u;
+    while (target_samples >= 2) {
+      desc->setSampleCount(target_samples);
+      buf = device->newCounterSampleBuffer(desc, &err);
+
+      if (buf) {
+        capacity_samples = target_samples;
+        capacity_pairs   = capacity_samples / 2u;
+
+        available_indices.reserve( capacity_pairs );
+        for ( uint32_t sample_idx = 0; sample_idx < target_samples; sample_idx += 2u )
+          available_indices.push_back(timestamp_indices{ // store in reverse order so that order will be correct when popping
+            .start_idx = target_samples - sample_idx - 2u,
+            .end_idx = target_samples - sample_idx - 1u
+          });
+        break;
+      }
+
+      bool isOutOfMem = err && err->code() == MTL::CounterSampleBufferErrorOutOfMemory;
+      if (isOutOfMem)
+        target_samples /= 2u;
+      else // Unknown error occured.
+        break;
+    }
+
+    desc->release();
+  }
+
+  enum class render_pass_mode {
+    VERTEX,
+    FRAGMENT
+  };
+  std::optional< timestamp_indices > record_pass( MTL::RenderPassDescriptor* desc, const render_pass_mode& mode );
+  std::optional< timestamp_indices > record_pass( MTL::ComputePassDescriptor* desc );
+
+  void fetch_resolved_timestamps( ngf_gpu_perf_timestamp** result, size_t* result_count)
+  {
+    *result_count = resolved_timestamps.size();
+    if ( *result_count == 0 )
+      return;
+
+    const auto result_size = *result_count * sizeof(ngf_gpu_perf_timestamp);
+    *result = static_cast<ngf_gpu_perf_timestamp*>(malloc(result_size));
+    memcpy(*result, resolved_timestamps.data(), result_size);
+
+    resolved_timestamps.clear();
+  }
+
+  MTL::HandlerFunction get_timestamp_resolution_handler( const char* debug_name, const timestamp_indices& timestamp_indices ) {
+    return [ this, debug_name, timestamp_indices ](const MTL::CommandBuffer* cmd_buf) {
+      uint64_t stamps[2];
+      if (ngf_resolve_counter_timestamp(buf, timestamp_indices.start_idx, timestamp_indices.end_idx, stamps) == NGF_ERROR_OK)
+        resolved_timestamps.push_back({ .debug_name = debug_name, .start_time = stamps[0], .end_time = stamps[1] });
+
+      available_indices.push_back({ .start_idx = timestamp_indices.start_idx, .end_idx = timestamp_indices.end_idx });
+    };
+  }
+
+private:
+  MTL::CounterSampleBuffer* buf;
+
+  std::vector< timestamp_indices > available_indices;
+  std::vector< ngf_gpu_perf_timestamp > resolved_timestamps;
+
+  uint32_t capacity_samples;   // Total timestamp slots (samples).
+  uint32_t capacity_pairs;     // Total start, end pairs (samples/2).
+};
+
+struct ngf_gpu_perf_metrics_recorder_t
+{
+  ngf_counter_sample_buffer csb;
+
+  bool record_vertex_timestamps{false};
+  bool record_fragment_timestamps{false};
+  bool record_compute_timestamps{false};
+
+  ngf_gpu_perf_metrics_recorder_t():
+    csb( CURRENT_CONTEXT->device.get(),
+    ngf_get_counter_set(MTL::CommonCounterSetTimestamp))
+  {}
+
+  void record_pass( MTL::CommandBuffer* cmd_buf, MTL::RenderPassDescriptor* desc, const char* debug_name )
+  {
+    static const char* default_debug_name = "unresolved_rce_name";
+
+    if (record_vertex_timestamps) {
+      auto maybeTimestampIndices = csb.record_pass(desc, ngf_counter_sample_buffer::render_pass_mode::VERTEX);
+
+      if (maybeTimestampIndices) {
+        cmd_buf->addCompletedHandler(csb.get_timestamp_resolution_handler(debug_name ? debug_name : default_debug_name, maybeTimestampIndices.value()));
+      }
+    }
+
+    if (record_fragment_timestamps) {
+      auto maybeTimestampIndices = csb.record_pass(desc, ngf_counter_sample_buffer::render_pass_mode::FRAGMENT);
+
+      if (maybeTimestampIndices) {
+        cmd_buf->addCompletedHandler(csb.get_timestamp_resolution_handler(debug_name ? debug_name : default_debug_name, maybeTimestampIndices.value()));
+      }
+    }
+  }
+
+  void record_pass( MTL::CommandBuffer* cmd_buf, MTL::ComputePassDescriptor* desc, const char* debug_name )
+  {
+    if (!record_compute_timestamps)
+      return;
+
+    static const char* default_debug_name = "unresolved_cce_name";
+
+    auto maybeTimestampIndices = csb.record_pass(desc);
+    if (maybeTimestampIndices)
+      cmd_buf->addCompletedHandler(csb.get_timestamp_resolution_handler(debug_name ? debug_name : default_debug_name, maybeTimestampIndices.value()));
+  }
+};
+
+std::optional< ngf_counter_sample_buffer::timestamp_indices > ngf_counter_sample_buffer::record_pass( MTL::RenderPassDescriptor* desc, const render_pass_mode& mode )
+{
+  if (!buf)
+    return std::nullopt;
+
+  if (available_indices.empty())
+    return std::nullopt;
+
+  const auto timestamp_indices = available_indices.back();
+  available_indices.pop_back();
+
+  const uint32_t sampleBufferAttachmentIdx = mode == render_pass_mode::VERTEX ? 0u : 1u;
+  auto* attachment = desc->sampleBufferAttachments()->object(sampleBufferAttachmentIdx);
+  attachment->setSampleBuffer(buf);
+
+  switch (mode) {
+    case render_pass_mode::VERTEX:
+      attachment->setStartOfVertexSampleIndex( timestamp_indices.start_idx );
+      attachment->setEndOfVertexSampleIndex( timestamp_indices.end_idx );
+      break;
+    case render_pass_mode::FRAGMENT:
+      attachment->setStartOfFragmentSampleIndex( timestamp_indices.start_idx );
+      attachment->setEndOfFragmentSampleIndex( timestamp_indices.end_idx );
+      break;
+    default: // error, undo
+      attachment->setSampleBuffer(nullptr);
+      available_indices.push_back(timestamp_indices);
+      return std::nullopt;
+  }
+
+  return timestamp_indices;
+}
+
+std::optional< ngf_counter_sample_buffer::timestamp_indices > ngf_counter_sample_buffer::record_pass( MTL::ComputePassDescriptor* desc )
+{
+  if (!buf)
+    return std::nullopt;
+
+  if (available_indices.empty())
+    return std::nullopt;
+
+  const timestamp_indices timestamp_indices = available_indices.back();
+  available_indices.pop_back();
+
+  auto* attachment = desc->sampleBufferAttachments()->object(0);
+  attachment->setSampleBuffer( buf );
+  attachment->setStartOfEncoderSampleIndex( timestamp_indices.start_idx );
+  attachment->setEndOfEncoderSampleIndex( timestamp_indices.end_idx );
+
+  return timestamp_indices;
+}
 
 std::vector<ngf_device> NGFMTL_DEVICES_LIST;
 const NS::Array*        NGFMTL_MTL_DEVICES;
@@ -2683,4 +2904,69 @@ uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
 
 uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT {
   return (uint32_t)get_mtl_pixel_format(format).format;
+}
+
+static bool ngf_supports_counter_sampling_point( MTL::CounterSamplingPoint point )
+{
+  return CURRENT_CONTEXT->device->supportsCounterSampling(point);
+}
+
+static bool ngf_supports_counter_set( MTL::CommonCounterSet name )
+{
+  const auto counter_sets = CURRENT_CONTEXT->device->counterSets();
+
+  for( size_t cs_idx = 0u; cs_idx < counter_sets->count(); ++cs_idx )
+  {
+    const MTL::CounterSet* counter_set = static_cast<MTL::CounterSet*>( counter_sets->object(cs_idx) );
+    if( counter_set->name()->isEqualToString( name ) )
+      return true;
+  }
+
+  return false;
+}
+
+bool ngf_supports_gpu_perf_metrics()
+{
+  if (!CURRENT_CONTEXT || !CURRENT_CONTEXT->device)
+    return false;
+
+  return ngf_supports_counter_sampling_point(MTL::CounterSamplingPointAtStageBoundary)
+    && ngf_supports_counter_set(MTL::CommonCounterSetTimestamp);
+  return false;
+}
+
+ngf_error ngf_create_gpu_perf_metrics_recorder(const ngf_gpu_perf_metrics_recorder_info* info, ngf_gpu_perf_metrics_recorder* result) NGF_NOEXCEPT
+{
+  assert( info );
+  assert( result );
+
+  ngf_gpu_perf_metrics_recorder recorder = new ngf_gpu_perf_metrics_recorder_t;
+  recorder->record_vertex_timestamps = info->record_vertex_timestamps;
+  recorder->record_fragment_timestamps = info->record_fragment_timestamps;
+  recorder->record_compute_timestamps = info->record_compute_timestamps;
+
+  *result = recorder;
+
+  return NGF_ERROR_OK;
+}
+
+void ngf_destroy_gpu_perf_metrics_recorder(ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT
+{
+  delete recorder;
+}
+
+void ngf_gpu_perf_fetch_timestamps(ngf_gpu_perf_metrics_recorder recorder, ngf_gpu_perf_timestamp** result, size_t* result_size) NGF_NOEXCEPT
+{
+  recorder->csb.fetch_resolved_timestamps( result, result_size );
+}
+
+void ngf_sample_timestamps( double* cpu_timestamp, double* gpu_timestamp )
+{
+  MTL::Timestamp mtl_cpu_timestamp;
+  MTL::Timestamp mtl_gpu_timestamp;
+
+  CURRENT_CONTEXT->device->sampleTimestamps(&mtl_cpu_timestamp, &mtl_gpu_timestamp);
+
+  (*cpu_timestamp) = static_cast<double>(mtl_cpu_timestamp);
+  (*gpu_timestamp) = static_cast<double>(mtl_gpu_timestamp);
 }

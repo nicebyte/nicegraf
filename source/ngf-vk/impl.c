@@ -6401,6 +6401,29 @@ uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
   return (uint32_t)get_vk_image_format(format);
 }
 
+bool ngf_supports_gpu_perf_metrics()
+{
+  return false;
+}
+
+ngf_error ngf_create_gpu_perf_metrics_recorder(const ngf_gpu_perf_metrics_recorder_info* info, ngf_gpu_perf_metrics_recorder* result) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return NGF_ERROR_OBJECT_CREATION_FAILED;
+}
+
+void ngf_destroy_gpu_perf_metrics_recorder(ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return NGF_ERROR_INVALID_OPERATION;
+}
+
+size_t ngf_gpu_perf_fetch_timestamps(ngf_gpu_perf_metrics_recorder recorder, ngf_gpu_perf_timestamp** res) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return NGF_ERROR_INVALID_OPERATION;
+}
+
 #pragma endregion
 
 #if defined(NGFVK_TEST_MODE)
