@@ -1940,6 +1940,12 @@ typedef struct ngf_render_pass_info {
    * The rest of the buffer's elements are ignored.
    */
   const ngf_clear* clears;
+
+  /**
+   * TODO: Add comment
+   */
+  const char* debug_name;
+
 } ngf_render_pass_info;
 
 /**
@@ -1961,6 +1967,12 @@ typedef struct ngf_xfer_pass_info {
  */
 typedef struct ngf_compute_pass_info {
   void* reserved;
+
+  /**
+   * TODO: Add comment
+   */
+  const char* debug_name;
+
 } ngf_compute_pass_info;
 
 /**
@@ -2581,6 +2593,55 @@ typedef struct ngf_image_write {
   uint32_t     dst_base_layer; /** < Starting destination layer. */
   uint32_t     nlayers;        /** < Number of layers to copy for the specified mip level. */
 } ngf_image_write;
+
+/**
+ * TODO: Add comment
+ */
+typedef struct ngf_gpu_perf_metrics_recorder_info{
+  /**
+   * TODO: Add comment
+   */
+  bool record_vertex_timestamps;
+
+  /**
+   * TODO: Add comment
+   */
+  bool record_fragment_timestamps;
+
+  /**
+   * TODO: Add comment
+   */
+  bool record_compute_timestamps;
+
+} ngf_gpu_perf_metrics_recorder_info;
+
+/**
+ * TODO: Add comment
+ */
+typedef struct ngf_gpu_perf_metrics_recorder_t* ngf_gpu_perf_metrics_recorder;
+
+/**
+ * TODO: Add comment
+ */
+typedef struct ngf_gpu_perf_timestamp
+{
+  /**
+   * TODO: Add comment
+   */
+  const char* debug_name;
+
+  /**
+   * TODO: Add comment
+   */
+  uint64_t start_time;
+
+  /**
+   * TODO: Add comment
+   */
+  uint64_t end_time;
+
+} ngf_gpu_perf_timestamp;
+
 
 #ifdef _MSC_VER
 #pragma endregion
@@ -3481,6 +3542,31 @@ void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
  * Ends frame capture for the active window in the current context.
  */
 void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
+
+/**
+ * TODO: Add comment
+ */
+bool ngf_supports_gpu_perf_metrics();
+
+/**
+ * TODO: Add comment
+ */
+ngf_error ngf_create_gpu_perf_metrics_recorder(const ngf_gpu_perf_metrics_recorder_info* info, ngf_gpu_perf_metrics_recorder* result) NGF_NOEXCEPT;
+
+/**
+ * TODO: Add comment
+ */
+void ngf_destroy_gpu_perf_metrics_recorder(ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT;
+
+/**
+ * TODO: Add comment
+ */
+void ngf_gpu_perf_fetch_timestamps(ngf_gpu_perf_metrics_recorder recorder, ngf_gpu_perf_timestamp** result, size_t* result_size) NGF_NOEXCEPT;
+
+/**
+ * TODO: Add comment
+ */
+void ngf_sample_timestamps( double* cpu_timestamp, double* gpu_timestamp );
 
 #ifdef _MSC_VER
 #pragma endregion
