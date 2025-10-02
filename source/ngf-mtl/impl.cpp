@@ -2204,13 +2204,14 @@ ngf_error ngf_cmd_begin_render_pass_simple(
   }
   const ngf_render_pass_info pass_info =
       {.render_target = rt, .load_ops = load_ops, .store_ops = store_ops, .clears = clears};
-  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc, nullptr);
 }
 
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buffer,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*         enc) NGF_NOEXCEPT {
+    ngf_render_encoder*         enc,
+    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
   assert(pass_info);
   const ngf_render_target rt = pass_info->render_target;
@@ -2228,6 +2229,10 @@ ngf_error ngf_cmd_begin_render_pass(
   pass_descriptor->setRenderTargetHeight(rt->height);
   pass_descriptor->setDepthAttachment(nullptr);
   pass_descriptor->setStencilAttachment(nullptr);
+
+  if (recorder)
+    recorder->record_pass(cmd_buffer->mtl_cmd_buffer, pass_descriptor.get(), pass_info->debug_name);
+
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = rt->attachment_descs.descs[i];
     if (attachment_desc.is_resolve) { continue; }
@@ -2340,11 +2345,19 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 
 ngf_error ngf_cmd_begin_compute_pass(
     ngf_cmd_buffer cmd_buf,
-    const ngf_compute_pass_info*,
-    ngf_compute_encoder* enc) NGF_NOEXCEPT {
+    const ngf_compute_pass_info* pass_info,
+    ngf_compute_encoder* enc,
+    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+
+  ngf_id<MTL::ComputePassDescriptor> pass_descriptor        = id_default;
+
+  if (recorder)
+    recorder->record_pass(cmd_buf->mtl_cmd_buffer, pass_descriptor.get(), pass_info->debug_name);
+
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
-  cmd_buf->active_cce       = cmd_buf->mtl_cmd_buffer->computeCommandEncoder();
+  cmd_buf->active_cce = cmd_buf->mtl_cmd_buffer->computeCommandEncoder(pass_descriptor.get());
+
   return NGF_ERROR_OK;
 }
 

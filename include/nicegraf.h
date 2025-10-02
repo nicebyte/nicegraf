@@ -3124,7 +3124,8 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* bufs) NGF_NO
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              buf,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*         enc) NGF_NOEXCEPT;
+    ngf_render_encoder*         enc,
+    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -3213,7 +3214,8 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT;
 ngf_error ngf_cmd_begin_compute_pass(
     ngf_cmd_buffer               buf,
     const ngf_compute_pass_info* pass_info,
-    ngf_compute_encoder*         enc) NGF_NOEXCEPT;
+    ngf_compute_encoder*         enc,
+    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
