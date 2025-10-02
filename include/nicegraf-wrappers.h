@@ -207,6 +207,7 @@ NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(buffer);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(texel_buffer_view);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(context);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(gpu_perf_metrics_recorder);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(cmd_buffer);
 
 /**
@@ -279,6 +280,8 @@ NGF_DEFINE_WRAPPER_TYPE(texel_buffer_view);
  * A RAII wrapper for \ref ngf_context.
  */
 NGF_DEFINE_WRAPPER_TYPE(context);
+
+NGF_DEFINE_WRAPPER_TYPE(gpu_perf_metrics_recorder);
 
 /**
  * \ingroup ngf_wrappers
