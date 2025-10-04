@@ -2184,7 +2184,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
   buf->active_rce->setCullMode(pipeline->culling);
   buf->active_rce->setFrontFacingWinding(pipeline->winding);
 
-  buf->active_rce->setBlendColorRed(
+  buf->active_rce->setBlendColor(
       pipeline->blend_color[0],
       pipeline->blend_color[1],
       pipeline->blend_color[2],
@@ -2192,7 +2192,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
   if (pipeline->depth_stencil) {
     buf->active_rce->setDepthStencilState(pipeline->depth_stencil.get());
   }
-  buf->active_rce->setStencilFrontReferenceValue(
+  buf->active_rce->setStencilReferenceValues(
       pipeline->front_stencil_reference,
       pipeline->back_stencil_reference);
   buf->active_gfx_pipe = pipeline;
@@ -2587,7 +2587,7 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
 
 void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  cmd_buf->active_rce->setStencilFrontReferenceValue(front, back);
+  cmd_buf->active_rce->setStencilReferenceValues(front, back);
 }
 
 void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back)
