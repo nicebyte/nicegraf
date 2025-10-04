@@ -1968,8 +1968,6 @@ typedef struct ngf_xfer_pass_info {
  * Information required to begin a compute pass.
  */
 typedef struct ngf_compute_pass_info {
-  void* reserved;
-
   /**
    * TODO: Add comment
    */
@@ -2601,21 +2599,7 @@ typedef struct ngf_image_write {
  * TODO: Add comment
  */
 typedef struct ngf_gpu_perf_metrics_recorder_info{
-  /**
-   * TODO: Add comment
-   */
-  bool record_vertex_timestamps;
-
-  /**
-   * TODO: Add comment
-   */
-  bool record_fragment_timestamps;
-
-  /**
-   * TODO: Add comment
-   */
-  bool record_compute_timestamps;
-
+  void* reserved;
 } ngf_gpu_perf_metrics_recorder_info;
 
 /**
@@ -2626,12 +2610,37 @@ typedef struct ngf_gpu_perf_metrics_recorder_t* ngf_gpu_perf_metrics_recorder;
 /**
  * TODO: Add comment
  */
+typedef enum ngf_gpu_perf_timestamp_stage {
+  /**
+   * TODO: Add comment
+   */
+  NGF_GPU_PERF_TIMESTAMP_VERTEX,
+
+  /**
+   * TODO: Add comment
+   */
+  NGF_GPU_PERF_TIMESTAMP_FRAGMENT,
+
+  /**
+   * TODO: Add comment
+   */
+  NGF_GPU_PERF_TIMESTAMP_COMPUTE
+} ngf_gpu_perf_timestamp_stage;
+
+/**
+ * TODO: Add comment
+ */
 typedef struct ngf_gpu_perf_timestamp
 {
   /**
    * TODO: Add comment
    */
   const char* debug_name;
+
+  /**
+   * TODO: Add comment
+   */
+  ngf_gpu_perf_timestamp_stage stage;
 
   /**
    * TODO: Add comment
