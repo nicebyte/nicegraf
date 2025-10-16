@@ -4539,12 +4539,14 @@ ngf_error ngf_cmd_begin_render_pass_simple(
       .store_ops     = store_ops,
       .clears        = clears,
   };
-  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
+  return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc, NULL );
 }
+
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buf,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*         enc) {
+    ngf_render_encoder*         enc,
+    ngf_gpu_perf_metrics_recorder recorder) {
   ngf_error err = NGF_ERROR_OK;
 
   ngfvk_encoder_start(cmd_buf);
@@ -4666,8 +4668,11 @@ ngf_error ngf_cmd_begin_xfer_pass(
 ngf_error ngf_cmd_begin_compute_pass(
     ngf_cmd_buffer               cmd_buf,
     const ngf_compute_pass_info* pass_info,
-    ngf_compute_encoder*         enc) {
+    ngf_compute_encoder*         enc,
+    ngf_gpu_perf_metrics_recorder recorder) {
+
   (void)pass_info;
+
   ngf_error err = ngfvk_encoder_start(cmd_buf);
   if (err != NGF_ERROR_OK) return err;
 
@@ -6401,6 +6406,29 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
 
 uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
   return (uint32_t)get_vk_image_format(format);
+}
+
+bool ngf_supports_gpu_perf_metrics()
+{
+  return false;
+}
+
+ngf_error ngf_create_gpu_perf_metrics_recorder(const ngf_gpu_perf_metrics_recorder_info* info, ngf_gpu_perf_metrics_recorder* result) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return NGF_ERROR_OBJECT_CREATION_FAILED;
+}
+
+void ngf_destroy_gpu_perf_metrics_recorder(ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return;
+}
+
+void ngf_gpu_perf_fetch_timestamps( ngf_gpu_perf_metrics_recorder recorder, ngf_gpu_perf_timestamp** result, size_t* result_size) NGF_NOEXCEPT
+{
+  // Do nothing.
+  return;
 }
 
 #pragma endregion
