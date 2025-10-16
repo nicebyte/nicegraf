@@ -22,7 +22,8 @@ static const CFStringRef get_mtl_colorspace(ngf_colorspace colorspace) {
     kCGColorSpaceDisplayP3,
     kCGColorSpaceExtendedLinearDisplayP3,
     kCGColorSpaceDCIP3,
-    kCGColorSpaceExtendedLinearITUR_2020
+    kCGColorSpaceExtendedLinearITUR_2020,
+    kCGColorSpaceITUR_2100_PQ
   };
   return color_spaces[colorspace];
 }
@@ -51,6 +52,23 @@ CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
       layer_.displaySyncEnabled = display_sync_enabled;
     }
     #endif
+
+    const bool supports_edr = colorspace == NGF_COLORSPACE_EXTENDED_SRGB_LINEAR ||
+                              colorspace == NGF_COLORSPACE_DISPLAY_P3_LINEAR ||
+                              colorspace == NGF_COLORSPACE_ITUR_BT2020 ||
+                              colorspace == NGF_COLORSPACE_ITUR_BT2100_PQ;
+
+    if (supports_edr) {
+      #if TARGET_OS_OSX
+      if (@available(macOS 10.11, *)) {
+        layer_.wantsExtendedDynamicRangeContent = YES;
+      }
+      #else
+      if (@available(iOS 16.0, *)) {
+        layer_.wantsExtendedDynamicRangeContent = YES;
+      }
+      #endif
+    }
 
     // Associate the newly created Metal layer with the user-provided View.
     NGFMTL_VIEW_TYPE* view = CFBridgingRelease((void*)native_handle);
