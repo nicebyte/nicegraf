@@ -927,7 +927,8 @@ static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
       VK_COLOR_SPACE_DISPLAY_P3_NONLINEAR_EXT,
       VK_COLOR_SPACE_DISPLAY_P3_LINEAR_EXT,
       VK_COLOR_SPACE_DCI_P3_NONLINEAR_EXT,
-      VK_COLOR_SPACE_BT2020_LINEAR_EXT};
+      VK_COLOR_SPACE_BT2020_LINEAR_EXT,
+      VK_COLOR_SPACE_HDR10_ST2084_EXT};
   return color_spaces[colorspace];
 }
 
