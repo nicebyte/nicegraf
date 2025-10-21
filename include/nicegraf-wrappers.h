@@ -207,6 +207,7 @@ NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(render_target);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(buffer);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(texel_buffer_view);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(context);
+NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(gpu_perf_metrics_recorder);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(cmd_buffer);
 
 /**
@@ -280,6 +281,8 @@ NGF_DEFINE_WRAPPER_TYPE(texel_buffer_view);
  */
 NGF_DEFINE_WRAPPER_TYPE(context);
 
+NGF_DEFINE_WRAPPER_TYPE(gpu_perf_metrics_recorder);
+
 /**
  * \ingroup ngf_wrappers
  *
@@ -301,8 +304,8 @@ class render_encoder {
    * @param cmd_buf The command buffer to create a new render encoder for.
    * @param pass_info Render pass description.
    */
-  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_render_pass_info& pass_info) {
-    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_);
+  explicit render_encoder(ngf_cmd_buffer cmd_buf, const ngf_render_pass_info& pass_info, ngf_gpu_perf_metrics_recorder recorder ) {
+    ngf_cmd_begin_render_pass(cmd_buf, &pass_info, &enc_, recorder);
   }
 
   /**
@@ -438,8 +441,8 @@ class compute_encoder {
    *
    * @param cmd_buf The command buffer to create a new compute encoder for.
    */
-  explicit compute_encoder(ngf_cmd_buffer cmd_buf, const ngf_compute_pass_info& pass_info) {
-    ngf_cmd_begin_compute_pass(cmd_buf, &pass_info, &enc_);
+  explicit compute_encoder(ngf_cmd_buffer cmd_buf, const ngf_compute_pass_info& pass_info, ngf_gpu_perf_metrics_recorder recorder) {
+    ngf_cmd_begin_compute_pass(cmd_buf, &pass_info, &enc_, recorder);
   }
 
   /**
@@ -449,7 +452,7 @@ class compute_encoder {
    * @param cmd_buf The command buffer to create a new compute encoder for.
    */
   explicit compute_encoder(ngf_cmd_buffer cmd_buf) {
-    ngf_cmd_begin_compute_pass(cmd_buf, nullptr, &enc_);
+    ngf_cmd_begin_compute_pass(cmd_buf, nullptr, &enc_, nullptr);
   }
 
   /**
