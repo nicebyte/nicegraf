@@ -244,8 +244,3 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     ngf_sample(NAME 0b-compute-vertices)
     ngf_sample(NAME 0c-render-to-multisample-texture)
 endif()
-
-if(MSVC)
-  target_compile_options(nicegraf-vk PRIVATE /wd4100)
-endif()
-
