@@ -107,6 +107,16 @@ uintptr_t ngf_get_mtl_compute_encoder_handle(ngf_compute_encoder compute_encoder
  */
 uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT;
 
+/**
+ * TODO: Add comment
+ */
+void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT;
+
+/**
+ * TODO: Add comment
+ */
+void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif 

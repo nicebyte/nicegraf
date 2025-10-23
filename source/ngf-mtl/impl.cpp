@@ -613,6 +613,9 @@ struct ngf_cmd_buffer_t {
   ngf_id<MTL::Buffer>         bound_index_buffer        = nullptr;
   MTL::IndexType              bound_index_buffer_type   = MTL::IndexTypeUInt16;
   size_t                      bound_index_buffer_offset = 0u;
+
+  MTL::RenderPassSampleBufferAttachmentDescriptor*  sample_buf_attachment_for_next_render_pass  = nullptr;
+  MTL::ComputePassSampleBufferAttachmentDescriptor* sample_buf_attachment_for_next_compute_pass = nullptr;
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
@@ -2940,6 +2943,16 @@ uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
 
 uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT {
   return (uint32_t)get_mtl_pixel_format(format).format;
+}
+
+void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
+{
+  cmd_buffer->sample_buf_attachment_for_next_render_pass = static_cast< MTL::RenderPassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor );
+}
+
+void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
+{
+  cmd_buffer->sample_buf_attachment_for_next_compute_pass = static_cast< MTL::ComputePassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor );
 }
 
 static bool ngf_supports_counter_sampling_point( MTL::CounterSamplingPoint point )
