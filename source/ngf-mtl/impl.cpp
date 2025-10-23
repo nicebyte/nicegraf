@@ -614,8 +614,8 @@ struct ngf_cmd_buffer_t {
   MTL::IndexType              bound_index_buffer_type   = MTL::IndexTypeUInt16;
   size_t                      bound_index_buffer_offset = 0u;
 
-  MTL::RenderPassSampleBufferAttachmentDescriptor*  sample_buf_attachment_for_next_render_pass  = nullptr;
-  MTL::ComputePassSampleBufferAttachmentDescriptor* sample_buf_attachment_for_next_compute_pass = nullptr;
+  ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>  sample_buf_attachment_for_next_render_pass  = nullptr;
+  ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor> sample_buf_attachment_for_next_compute_pass = nullptr;
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
@@ -2236,8 +2236,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
 ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buffer,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*         enc,
-    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT {
+    ngf_render_encoder*         enc) NGF_NOEXCEPT {
   NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
   assert(pass_info);
   const ngf_render_target rt = pass_info->render_target;
@@ -2256,8 +2255,23 @@ ngf_error ngf_cmd_begin_render_pass(
   pass_descriptor->setDepthAttachment(nullptr);
   pass_descriptor->setStencilAttachment(nullptr);
 
-  if (recorder)
-    recorder->record_pass(cmd_buffer->mtl_cmd_buffer, pass_descriptor.get(), pass_info->debug_name);
+  if (cmd_buffer->sample_buf_attachment_for_next_render_pass)
+  {
+    const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_render_pass;
+    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
+
+    attachment->setSampleBuffer( attachment_descriptor->sampleBuffer() );
+
+    if (attachment_descriptor->startOfVertexSampleIndex() < attachment_descriptor->endOfVertexSampleIndex()) {
+      attachment->setStartOfVertexSampleIndex(attachment_descriptor->startOfVertexSampleIndex());
+      attachment->setEndOfVertexSampleIndex(attachment_descriptor->endOfVertexSampleIndex());
+    }
+
+    if (attachment_descriptor->startOfFragmentSampleIndex() < attachment_descriptor->endOfFragmentSampleIndex()) {
+      attachment->setStartOfFragmentSampleIndex(attachment_descriptor->startOfFragmentSampleIndex());
+      attachment->setEndOfFragmentSampleIndex(attachment_descriptor->endOfFragmentSampleIndex());
+    }
+  }
 
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = rt->attachment_descs.descs[i];
@@ -2370,19 +2384,26 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_cmd_begin_compute_pass(
-    ngf_cmd_buffer cmd_buf,
+    ngf_cmd_buffer cmd_buffer,
     const ngf_compute_pass_info* pass_info,
-    ngf_compute_encoder* enc,
-    ngf_gpu_perf_metrics_recorder recorder) NGF_NOEXCEPT {
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+    ngf_compute_encoder* enc) NGF_NOEXCEPT {
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
 
   ngf_id<MTL::ComputePassDescriptor> pass_descriptor        = id_default;
 
-  if (recorder)
-    recorder->record_pass(cmd_buf->mtl_cmd_buffer, pass_descriptor.get(), pass_info->debug_name);
+  if (cmd_buffer->sample_buf_attachment_for_next_compute_pass) {
+    const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_compute_pass;
+    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
 
-  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
-  cmd_buf->active_cce = cmd_buf->mtl_cmd_buffer->computeCommandEncoder(pass_descriptor.get());
+    attachment->setSampleBuffer(attachment_descriptor->sampleBuffer());
+
+    assert(attachment_descriptor->startOfEncoderSampleIndex() < attachment_descriptor->endOfEncoderSampleIndex());
+    attachment->setStartOfEncoderSampleIndex(attachment_descriptor->startOfEncoderSampleIndex());
+    attachment->setEndOfEncoderSampleIndex(attachment_descriptor->endOfEncoderSampleIndex());
+  }
+
+  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buffer;
+  cmd_buffer->active_cce = cmd_buffer->mtl_cmd_buffer->computeCommandEncoder(pass_descriptor.get());
 
   return NGF_ERROR_OK;
 }
