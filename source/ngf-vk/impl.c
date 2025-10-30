@@ -3962,7 +3962,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
               .queueCount       = 1,
               .pQueuePriorities = &queue_prio}};
   const uint32_t num_queue_infos          = (same_gfx_and_present ? 1u : 2u);
-  const char*    device_exts[]            = {"VK_KHR_maintenance1", "VK_KHR_swapchain", NULL, NULL};
+  const char*    device_exts[]            = {"VK_KHR_maintenance1", "VK_KHR_swapchain", NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL};
   const uint32_t nmandatory_exts          = 2u;
   uint32_t       nsupported_optional_exts = 0u;
   const bool     shader_float16_int8_supported =
@@ -3975,6 +3975,34 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     NGFI_DIAG_INFO("VK sync2 support enabled");
     device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_synchronization2";
   }
+  const bool enable_raytracing_support = true;
+
+  if (enable_raytracing_support) {
+    NGFI_DIAG_INFO("VK raytracing support enabled");
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_acceleration_structure";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_EXT_descriptor_indexing";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_buffer_device_address";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_deferred_host_operations";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_spirv_1_4";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_shader_float_controls";
+    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_ray_query";
+  }
+
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+    .pNext = NULL,
+    .bufferDeviceAddress = VK_TRUE};
+
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+    .pNext = NULL,
+    .accelerationStructure = VK_TRUE};
+
+  VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = {
+    .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+    .pNext    = NULL,
+    .rayQuery = VK_TRUE};
+
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
@@ -4001,6 +4029,17 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   if (sync2_supported) {
     sync2_features.pNext = features_structs;
     features_structs     = &sync2_features;
+  }
+
+  if (enable_raytracing_support) {
+    buffer_device_address_features.pNext = features_structs;
+    features_structs = &buffer_device_address_features;
+
+    acceleration_structure_features.pNext = features_structs;
+    features_structs = &acceleration_structure_features;
+
+    ray_query_features.pNext = features_structs;
+    features_structs = &ray_query_features;
   }
 
   if (vkGetPhysicalDeviceFeatures2KHR) {
