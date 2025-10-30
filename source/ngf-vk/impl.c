@@ -6404,6 +6404,14 @@ uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
   return (uint32_t)get_vk_image_format(format);
 }
 
+uintptr_t ngf_get_vk_device_handle() {
+  return (uintptr_t)_vk.device;
+}
+
+uintptr_t ngf_get_vk_instance_handle() {
+  return (uintptr_t)_vk.instance;
+}
+
 #pragma endregion
 
 #if defined(NGFVK_TEST_MODE)

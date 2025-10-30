@@ -77,6 +77,9 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
  */
 uint32_t ngf_get_vk_image_format_index(ngf_image_format format) NGF_NOEXCEPT;
 
+uintptr_t ngf_get_vk_device_handle() NGF_NOEXCEPT;
+uintptr_t ngf_get_vk_instance_handle() NGF_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif
