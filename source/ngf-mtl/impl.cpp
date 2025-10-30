@@ -33,12 +33,10 @@
 #define CA_PRIVATE_IMPLEMENTATION
 #include <MetalSingleHeader.hpp>
 #include <memory>
-#include <mutex>
 #include <new>
 #include <optional>
 #include <string>
 #include <vector>
-#include <span>
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // can be bound at the same time.
