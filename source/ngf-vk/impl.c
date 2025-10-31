@@ -854,6 +854,9 @@ static VkBufferUsageFlags get_vk_buffer_usage(uint32_t usage) {
   if (usage & NGF_BUFFER_USAGE_VERTEX_BUFFER) flags |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
   if (usage & NGF_BUFFER_USAGE_TEXEL_BUFFER) flags |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
   if (usage & NGF_BUFFER_USAGE_STORAGE_BUFFER) flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+  if (usage & NGF_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) flags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+  if (usage & NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT) flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR;
+  if (usage & NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT) flags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   return flags;
 }
 
@@ -4075,7 +4078,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
   };
   VmaAllocatorCreateInfo vma_info = {
-      .flags                       = 0u,
+      .flags                       = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT,
       .physicalDevice              = _vk.phys_dev,
       .device                      = _vk.device,
       .preferredLargeHeapBlockSize = 0u,

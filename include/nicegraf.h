@@ -2056,7 +2056,12 @@ typedef enum ngf_buffer_usage {
   /**
    * \ingroup ngf
    * The buffer may be bound as a storage buffer. */
-  NGF_BUFFER_USAGE_STORAGE_BUFFER = 0x40
+  NGF_BUFFER_USAGE_STORAGE_BUFFER = 0x40,
+
+  NGF_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT = 0x80,
+  NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT = 0x100,
+  NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT = 0x200
+
 } ngf_buffer_usage;
 
 /**
