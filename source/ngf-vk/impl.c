@@ -1781,7 +1781,8 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
         desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
         break;
       default:
-        assert(false);
+        return result;
+        //assert(false);
       }
     }
   }
@@ -3268,8 +3269,8 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
   case NGF_DESCRIPTOR_SAMPLER:
     sync_req.barrier_masks.stage_mask = 0u;
     break;
-  default:
-    assert(0);
+  default:;
+    //assert(0);
   }
   return sync_req;
 }
