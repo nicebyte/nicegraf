@@ -585,6 +585,19 @@ template<uint32_t S> struct descriptor_set {
       return op;
     }
 
+    static ngf_resource_bind_op
+    accel_struct(const ngf_buffer buf, size_t offset, size_t range, uint32_t array_index = 0u) {
+      ngf_resource_bind_op op;
+      op.type               = NGF_DESCRIPTOR_ACCELERATION_STRUCTURE;
+      op.target_binding     = B;
+      op.target_set         = S;
+      op.info.buffer.buffer = buf;
+      op.info.buffer.offset = offset;
+      op.info.buffer.range  = range;
+      op.array_index        = array_index;
+      return op;
+    }
+
     /**
      * Creates a \ref ngf_resource_bind_op for an uniform buffer.
      *

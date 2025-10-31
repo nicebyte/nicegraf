@@ -1464,6 +1464,8 @@ typedef enum ngf_descriptor_type {
    */
   NGF_DESCRIPTOR_STORAGE_IMAGE,
 
+  NGF_DESCRIPTOR_ACCELERATION_STRUCTURE,
+
   NGF_DESCRIPTOR_TYPE_COUNT
 } ngf_descriptor_type;
 
