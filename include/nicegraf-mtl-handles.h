@@ -122,7 +122,6 @@ uintptr_t ngf_get_mtl_device() NGF_NOEXCEPT;
  *
  * @param cmd_buffer A handle to a nicegraf command buffer.
  * @param sample_buf_attachment_descriptor uintptr_t to MTLComputePassSampleBufferAttachmentDescriptor handle.
- * The caller must pass the pointer in manual memory management mode, e.g.(__bridge_retained uintptr_t*).
  */
 void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT;
 
@@ -133,7 +132,6 @@ void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buf
  *
  * @param cmd_buffer A handle to a nicegraf command buffer.
  * @param sample_buf_attachment_descriptor uintptr_t to MTLRenderPassSampleBufferAttachmentDescriptor handle.
- * The caller must pass the pointer in manual memory management mode, e.g.(__bridge_retained uintptr_t*).
  */
 void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT;
 

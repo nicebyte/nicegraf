@@ -2031,6 +2031,8 @@ ngf_error ngf_cmd_begin_render_pass(
       attachment->setStartOfFragmentSampleIndex(attachment_descriptor->startOfFragmentSampleIndex());
       attachment->setEndOfFragmentSampleIndex(attachment_descriptor->endOfFragmentSampleIndex());
     }
+
+    cmd_buffer->sample_buf_attachment_for_next_render_pass = nullptr;
   }
 
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
@@ -2160,6 +2162,8 @@ ngf_error ngf_cmd_begin_compute_pass(
     assert(attachment_descriptor->startOfEncoderSampleIndex() < attachment_descriptor->endOfEncoderSampleIndex());
     attachment->setStartOfEncoderSampleIndex(attachment_descriptor->startOfEncoderSampleIndex());
     attachment->setEndOfEncoderSampleIndex(attachment_descriptor->endOfEncoderSampleIndex());
+
+    cmd_buffer->sample_buf_attachment_for_next_compute_pass = nullptr;
   }
 
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buffer;
@@ -2732,10 +2736,14 @@ uintptr_t ngf_get_mtl_device() NGF_NOEXCEPT {
 
 void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
 {
-  cmd_buffer->sample_buf_attachment_for_next_render_pass = static_cast< MTL::RenderPassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor );
+  cmd_buffer->sample_buf_attachment_for_next_render_pass = ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>::add_retain(
+    static_cast< MTL::RenderPassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
+  );
 }
 
 void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
 {
-  cmd_buffer->sample_buf_attachment_for_next_compute_pass = static_cast< MTL::ComputePassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor );
+  cmd_buffer->sample_buf_attachment_for_next_compute_pass = ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>::add_retain(
+    static_cast< MTL::ComputePassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
+  );
 }
