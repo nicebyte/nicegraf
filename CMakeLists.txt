@@ -83,6 +83,7 @@ if (APPLE AND NOT (NGF_USE_MVK STREQUAL "yes"))
 
   nmk_static_library(NAME nicegraf-mtl
                      SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
+                          ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf-mtl-handles.h
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/impl.cpp
                           ${CMAKE_CURRENT_LIST_DIR}/source/ngf-mtl/layer.mm
                      DEPS ${NICEGRAF_COMMON_DEPS} ${APPLE_LIBS}

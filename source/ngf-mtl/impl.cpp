@@ -611,6 +611,9 @@ struct ngf_cmd_buffer_t {
   ngf_id<MTL::Buffer>         bound_index_buffer        = nullptr;
   MTL::IndexType              bound_index_buffer_type   = MTL::IndexTypeUInt16;
   size_t                      bound_index_buffer_offset = 0u;
+
+  ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>  sample_buf_attachment_for_next_render_pass  = nullptr;
+  ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor> sample_buf_attachment_for_next_compute_pass = nullptr;
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
@@ -2011,6 +2014,27 @@ ngf_error ngf_cmd_begin_render_pass(
   pass_descriptor->setRenderTargetHeight(rt->height);
   pass_descriptor->setDepthAttachment(nullptr);
   pass_descriptor->setStencilAttachment(nullptr);
+
+  if (cmd_buffer->sample_buf_attachment_for_next_render_pass)
+  {
+    const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_render_pass;
+    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
+
+    attachment->setSampleBuffer( attachment_descriptor->sampleBuffer() );
+
+    if (attachment_descriptor->startOfVertexSampleIndex() < attachment_descriptor->endOfVertexSampleIndex()) {
+      attachment->setStartOfVertexSampleIndex(attachment_descriptor->startOfVertexSampleIndex());
+      attachment->setEndOfVertexSampleIndex(attachment_descriptor->endOfVertexSampleIndex());
+    }
+
+    if (attachment_descriptor->startOfFragmentSampleIndex() < attachment_descriptor->endOfFragmentSampleIndex()) {
+      attachment->setStartOfFragmentSampleIndex(attachment_descriptor->startOfFragmentSampleIndex());
+      attachment->setEndOfFragmentSampleIndex(attachment_descriptor->endOfFragmentSampleIndex());
+    }
+
+    cmd_buffer->sample_buf_attachment_for_next_render_pass = nullptr;
+  }
+
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = rt->attachment_descs.descs[i];
     if (attachment_desc.is_resolve) { continue; }
@@ -2122,12 +2146,29 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_cmd_begin_compute_pass(
-    ngf_cmd_buffer cmd_buf,
-    const ngf_compute_pass_info*,
+    ngf_cmd_buffer cmd_buffer,
+    const ngf_compute_pass_info* pass_info,
     ngf_compute_encoder* enc) NGF_NOEXCEPT {
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
-  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
-  cmd_buf->active_cce       = cmd_buf->mtl_cmd_buffer->computeCommandEncoder();
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
+
+  ngf_id<MTL::ComputePassDescriptor> pass_descriptor        = id_default;
+
+  if (cmd_buffer->sample_buf_attachment_for_next_compute_pass) {
+    const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_compute_pass;
+    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
+
+    attachment->setSampleBuffer(attachment_descriptor->sampleBuffer());
+
+    assert(attachment_descriptor->startOfEncoderSampleIndex() < attachment_descriptor->endOfEncoderSampleIndex());
+    attachment->setStartOfEncoderSampleIndex(attachment_descriptor->startOfEncoderSampleIndex());
+    attachment->setEndOfEncoderSampleIndex(attachment_descriptor->endOfEncoderSampleIndex());
+
+    cmd_buffer->sample_buf_attachment_for_next_compute_pass = nullptr;
+  }
+
+  enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buffer;
+  cmd_buffer->active_cce = cmd_buffer->mtl_cmd_buffer->computeCommandEncoder(pass_descriptor.get());
+
   return NGF_ERROR_OK;
 }
 
@@ -2687,4 +2728,22 @@ uintptr_t ngf_get_mtl_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
 
 uint32_t ngf_get_mtl_pixel_format_index(ngf_image_format format) NGF_NOEXCEPT {
   return (uint32_t)get_mtl_pixel_format(format).format;
+}
+
+uintptr_t ngf_get_mtl_device() NGF_NOEXCEPT {
+  return (uintptr_t)(void*)MTL_DEVICE;
+}
+
+void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
+{
+  cmd_buffer->sample_buf_attachment_for_next_render_pass = ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>::add_retain(
+    static_cast< MTL::RenderPassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
+  );
+}
+
+void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
+{
+  cmd_buffer->sample_buf_attachment_for_next_compute_pass = ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>::add_retain(
+    static_cast< MTL::ComputePassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
+  );
 }
