@@ -29,6 +29,22 @@ extern "C" {
 
 /**
  * \ingroup ngf
+ *
+ * Returns the underlying VkDevice handle cast to uintptr_t. The caller is responsible for casting
+ * the return value to a VkDevice.
+ */
+uintptr_t ngf_get_vk_device_handle() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Returns the underlying VkInstance handle cast to uintptr_t. The caller is responsible for casting
+ * the return value to a VkInstance.
+ */
+uintptr_t ngf_get_vk_instance_handle() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
  * 
  * Returns a uintptr_t to the underlying VkImage. The caller is responsible for casting the return
  * value to a VkImage.

@@ -6384,6 +6384,14 @@ void ngf_renderdoc_capture_end() {
   }
 }
 
+uintptr_t ngf_get_vk_device_handle() {
+  return (uintptr_t)_vk.device;
+}
+
+uintptr_t ngf_get_vk_instance_handle() {
+  return (uintptr_t)_vk.instance;
+}
+
 uintptr_t ngf_get_vk_image_handle(ngf_image image) {
   return image->alloc.obj_handle;
 }
