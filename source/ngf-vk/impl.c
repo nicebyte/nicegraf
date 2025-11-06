@@ -3976,19 +3976,42 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
               .queueCount       = 1,
               .pQueuePriorities = &queue_prio}};
   const uint32_t num_queue_infos          = (same_gfx_and_present ? 1u : 2u);
-  const char*    device_exts[]            = {"VK_KHR_maintenance1", "VK_KHR_swapchain", NULL, NULL};
-  const uint32_t nmandatory_exts          = 2u;
-  uint32_t       nsupported_optional_exts = 0u;
-  const bool     shader_float16_int8_supported =
+
+  NGFI_DARRAY_OF(const char*) device_exts;
+  NGFI_DARRAY_RESET(device_exts, 4);
+  NGFI_DARRAY_APPEND(device_exts, "VK_KHR_maintenance1");
+  NGFI_DARRAY_APPEND(device_exts, "VK_KHR_swapchain");
+
+  const bool shader_float16_int8_supported =
       ngfvk_phys_dev_extension_supported("VK_KHR_shader_float16_int8");
   const bool sync2_supported = ngfvk_phys_dev_extension_supported("VK_KHR_synchronization2");
   if (shader_float16_int8_supported) {
-    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_shader_float16_int8";
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_shader_float16_int8");
   }
   if (sync2_supported) {
     NGFI_DIAG_INFO("VK sync2 support enabled");
-    device_exts[nmandatory_exts + nsupported_optional_exts++] = "VK_KHR_synchronization2";
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_synchronization2");
   }
+
+  const bool inline_ray_tracing_supported =
+      ngfvk_phys_dev_extension_supported("VK_KHR_acceleration_structure") &&
+      ngfvk_phys_dev_extension_supported("VK_KHR_buffer_device_address") &&
+      ngfvk_phys_dev_extension_supported("VK_KHR_deferred_host_operations") &&
+      ngfvk_phys_dev_extension_supported("VK_KHR_spirv_1_4") &&
+      ngfvk_phys_dev_extension_supported("VK_KHR_shader_float_controls") &&
+      ngfvk_phys_dev_extension_supported("VK_KHR_ray_query") &&
+      ngfvk_phys_dev_extension_supported("VK_EXT_descriptor_indexing");
+  if (inline_ray_tracing_supported) {
+    NGFI_DIAG_INFO("VK inline ray tracing (ray query) support enabled");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_acceleration_structure");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_buffer_device_address");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_deferred_host_operations");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_spirv_1_4");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_shader_float_controls");
+    NGFI_DARRAY_APPEND(device_exts, "VK_KHR_ray_query");
+    NGFI_DARRAY_APPEND(device_exts, "VK_EXT_descriptor_indexing");
+  }
+
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
@@ -4017,6 +4040,32 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     features_structs     = &sync2_features;
   }
 
+  VkPhysicalDeviceBufferDeviceAddressFeaturesKHR buffer_device_address_features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES_KHR,
+    .pNext = NULL,
+    .bufferDeviceAddress = VK_TRUE};
+
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_structure_features = {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR,
+    .pNext = NULL,
+    .accelerationStructure = VK_TRUE};
+
+  VkPhysicalDeviceRayQueryFeaturesKHR ray_query_features = {
+    .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR,
+    .pNext    = NULL,
+    .rayQuery = VK_TRUE};
+
+  if (inline_ray_tracing_supported) {
+    buffer_device_address_features.pNext = features_structs;
+    features_structs = &buffer_device_address_features;
+
+    acceleration_structure_features.pNext = features_structs;
+    features_structs = &acceleration_structure_features;
+
+    ray_query_features.pNext = features_structs;
+    features_structs = &ray_query_features;
+  }
+
   if (vkGetPhysicalDeviceFeatures2KHR) {
     VkPhysicalDeviceFeatures2KHR phys_features = {
         .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
@@ -4033,15 +4082,18 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .enabledLayerCount       = 0,
       .ppEnabledLayerNames     = NULL,
       .pEnabledFeatures        = &required_features,
-      .enabledExtensionCount   = nmandatory_exts + nsupported_optional_exts,
-      .ppEnabledExtensionNames = device_exts};
+      .enabledExtensionCount   = NGFI_DARRAY_SIZE(device_exts),
+      .ppEnabledExtensionNames = device_exts.data};
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
+
   if (vk_err != VK_SUCCESS) {
     NGFI_DIAG_ERROR("Failed to create a Vulkan device, VK error %d.", vk_err);
+    NGFI_DARRAY_DESTROY(device_exts);
     return NGF_ERROR_INVALID_OPERATION;
   }
 
   // Load device-level entry points.
+  NGFI_DARRAY_DESTROY(device_exts);
   vkl_init_device(_vk.device, sync2_supported);
 
   // Set up VMA.
