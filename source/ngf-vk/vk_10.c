@@ -24,6 +24,7 @@
 VK_HIDE_SYMBOL PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 VK_HIDE_SYMBOL PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 VK_HIDE_SYMBOL PFN_vkCreateInstance vkCreateInstance;
+VK_HIDE_SYMBOL PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
 
 VK_HIDE_SYMBOL PFN_vkCreateDevice vkCreateDevice;
 VK_HIDE_SYMBOL PFN_vkDestroyInstance vkDestroyInstance;
@@ -193,6 +194,8 @@ bool vkl_init_loader(void) {
       (PFN_vkCreateInstance)vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkCreateInstance");
   vkEnumerateInstanceLayerProperties = (PFN_vkEnumerateInstanceLayerProperties)
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceLayerProperties");
+  vkEnumerateInstanceVersion = (PFN_vkEnumerateInstanceVersion)
+      vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion");
 
   vkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceExtensionProperties");

@@ -45,6 +45,7 @@ extern "C" {
 extern PFN_vkEnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties;
 extern PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr;
 extern PFN_vkCreateInstance vkCreateInstance;
+extern PFN_vkEnumerateInstanceVersion vkEnumerateInstanceVersion;
 
 extern PFN_vkCreateDevice vkCreateDevice;
 extern PFN_vkDestroyInstance vkDestroyInstance;

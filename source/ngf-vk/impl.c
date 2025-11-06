@@ -2208,6 +2208,20 @@ static VkResult ngfvk_create_instance(
   }
   free(ext_props);
 
+  // Query the supported instance version.
+  uint32_t instance_version = VK_API_VERSION_1_0;
+  if (vkEnumerateInstanceVersion) {
+    vkEnumerateInstanceVersion(&instance_version);
+  }
+
+  // nicegraf requires Vulkan 1.1+
+  if (instance_version < VK_API_VERSION_1_1) {
+    return VK_ERROR_INCOMPATIBLE_DRIVER;
+  }
+
+  // Use the highest supported version up to 1.2.
+  const uint32_t api_version = NGFI_MIN(instance_version, VK_API_VERSION_1_2);
+
   // Names of instance-level extensions.
   const char* ext_names[] = {
       "VK_KHR_surface",
@@ -2232,7 +2246,7 @@ static VkResult ngfvk_create_instance(
                                       .pApplicationName = NULL,  // TODO: allow specifying app name.
                                       .pEngineName      = "nicegraf",
                                       .engineVersion = VK_MAKE_VERSION(NGF_VER_MAJ, NGF_VER_MIN, 0),
-                                      .apiVersion    = VK_MAKE_VERSION(1, 1, 0)};
+                                      .apiVersion    = api_version};
 
   // Names of instance layers to enable.
   const char* validation_layer_name = "VK_LAYER_KHRONOS_validation";
