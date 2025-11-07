@@ -119,7 +119,7 @@ struct {
 #endif
   ngfvk_retire_obj_dtor retire_obj_dtors[NGFVK_RETIRE_OBJ_COUNT];
   ngfvk_dummy_resources dummy_res;
-  bool                     inline_ray_tracing_enabled;
+  bool                     ray_tracing_enabled;
 } _vk;
 
 // Singleton for holding on to RenderDoc API
@@ -4014,7 +4014,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
     NGFI_DARRAY_APPEND(device_exts, "VK_KHR_shader_float_controls");
     NGFI_DARRAY_APPEND(device_exts, "VK_KHR_ray_query");
     NGFI_DARRAY_APPEND(device_exts, "VK_EXT_descriptor_indexing");
-    _vk.inline_ray_tracing_enabled = true;
+    _vk.ray_tracing_enabled = true;
   }
 
   const VkBool32 enable_cubemap_arrays =
@@ -4107,7 +4107,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
   };
   VmaAllocatorCreateInfo vma_info = {
-      .flags                       = _vk.inline_ray_tracing_enabled ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0,
+      .flags                       = _vk.ray_tracing_enabled ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0,
       .physicalDevice              = _vk.phys_dev,
       .device                      = _vk.device,
       .preferredLargeHeapBlockSize = 0u,
