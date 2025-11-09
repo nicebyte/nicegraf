@@ -29,6 +29,7 @@
 #include "nicemath.h"
 #include "sample-interface.h"
 #include "shader-loader.h"
+#include "file-utils.h"
 
 #include <stdio.h>
 #include <string>
@@ -42,6 +43,7 @@ namespace volume_rendering {
 struct uniforms {
   nm::float4x4 transform_matrix;
   float        aspect_ratio;
+  nm::float3   _padding;
 };
 
 struct state {
@@ -62,7 +64,8 @@ void* sample_initialize(
   auto state = new volume_rendering::state {};
 
   /** Open the file containing the volume data and read in the dimensions. */
-  FILE* volume_data_file = fopen("assets/stag-beetle-volume.dat", "rb");
+  std::string path = get_file_path("assets/stag-beetle-volume.dat");
+  FILE* volume_data_file = fopen(path.c_str(), "rb");
   if (volume_data_file == nullptr) {
     loge("failed to open the volume data file.");
     return nullptr;
