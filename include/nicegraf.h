@@ -93,7 +93,6 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -101,6 +100,7 @@
 extern "C" {
 #define NGF_NOEXCEPT noexcept
 #else
+#include <stdbool.h>
 #define NGF_NOEXCEPT
 #endif
 

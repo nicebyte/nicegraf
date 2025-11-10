@@ -32,10 +32,321 @@
  * @file
  * \defgroup ngf_wrappers C++ Wrappers
  *
- * This module contains optional C++ wrappers for certain nicegraf structures and routines.
+ * This module contains optional C++ wrappers for nicegraf structures and routines.
  */
 
 namespace ngf {
+
+#define NGF_POD_TYPE_ALIAS(name)    using name = ngf_##name;
+#define NGF_OPAQUE_TYPE_ALIAS(name) using unowned_##name = ngf_##name;
+
+NGF_POD_TYPE_ALIAS(diagnostic_log_verbosity)
+NGF_POD_TYPE_ALIAS(diagnostic_message_type)
+NGF_POD_TYPE_ALIAS(renderdoc_info)
+NGF_POD_TYPE_ALIAS(diagnostic_callback)
+NGF_POD_TYPE_ALIAS(diagnostic_info)
+NGF_POD_TYPE_ALIAS(allocation_callbacks)
+NGF_POD_TYPE_ALIAS(device_handle)
+NGF_POD_TYPE_ALIAS(device_performance_tier)
+NGF_POD_TYPE_ALIAS(init_info)
+NGF_POD_TYPE_ALIAS(error)
+NGF_POD_TYPE_ALIAS(irect2d)
+NGF_POD_TYPE_ALIAS(extent3d)
+NGF_POD_TYPE_ALIAS(offset3d)
+NGF_POD_TYPE_ALIAS(stage_type)
+NGF_POD_TYPE_ALIAS(shader_stage_info)
+NGF_POD_TYPE_ALIAS(polygon_mode)
+NGF_POD_TYPE_ALIAS(cull_mode)
+NGF_POD_TYPE_ALIAS(front_face_mode)
+NGF_POD_TYPE_ALIAS(rasterization_info)
+NGF_POD_TYPE_ALIAS(compare_op)
+NGF_POD_TYPE_ALIAS(stencil_op)
+NGF_POD_TYPE_ALIAS(stencil_info)
+NGF_POD_TYPE_ALIAS(depth_stencil_info)
+NGF_POD_TYPE_ALIAS(blend_factor)
+NGF_POD_TYPE_ALIAS(blend_op)
+NGF_POD_TYPE_ALIAS(color_write_mask_bit)
+NGF_POD_TYPE_ALIAS(blend_info)
+NGF_POD_TYPE_ALIAS(type)
+NGF_POD_TYPE_ALIAS(vertex_input_rate)
+NGF_POD_TYPE_ALIAS(vertex_buf_binding_desc)
+NGF_POD_TYPE_ALIAS(vertex_attrib_desc)
+NGF_POD_TYPE_ALIAS(vertex_input_info)
+NGF_POD_TYPE_ALIAS(sample_count)
+NGF_POD_TYPE_ALIAS(multisample_info)
+NGF_POD_TYPE_ALIAS(image_format)
+NGF_POD_TYPE_ALIAS(attachment_type)
+NGF_POD_TYPE_ALIAS(attachment_description)
+NGF_POD_TYPE_ALIAS(attachment_descriptions)
+NGF_POD_TYPE_ALIAS(primitive_topology)
+NGF_POD_TYPE_ALIAS(constant_specialization)
+NGF_POD_TYPE_ALIAS(specialization_info)
+NGF_POD_TYPE_ALIAS(input_assembly_info)
+NGF_POD_TYPE_ALIAS(graphics_pipeline_info)
+NGF_POD_TYPE_ALIAS(compute_pipeline_info)
+NGF_POD_TYPE_ALIAS(descriptor_type)
+NGF_POD_TYPE_ALIAS(sampler_filter)
+NGF_POD_TYPE_ALIAS(sampler_wrap_mode)
+NGF_POD_TYPE_ALIAS(sampler_info)
+NGF_POD_TYPE_ALIAS(image_usage)
+NGF_POD_TYPE_ALIAS(image_type)
+NGF_POD_TYPE_ALIAS(image_info)
+NGF_POD_TYPE_ALIAS(cubemap_face)
+NGF_POD_TYPE_ALIAS(image_ref)
+NGF_POD_TYPE_ALIAS(image_view_info)
+NGF_POD_TYPE_ALIAS(clear)
+NGF_POD_TYPE_ALIAS(attachment_load_op)
+NGF_POD_TYPE_ALIAS(attachment_store_op)
+NGF_POD_TYPE_ALIAS(render_pass_info)
+NGF_POD_TYPE_ALIAS(xfer_pass_info)
+NGF_POD_TYPE_ALIAS(compute_pass_info)
+NGF_POD_TYPE_ALIAS(buffer_storage_type)
+NGF_POD_TYPE_ALIAS(buffer_usage)
+NGF_POD_TYPE_ALIAS(buffer_info)
+NGF_POD_TYPE_ALIAS(buffer_slice)
+NGF_POD_TYPE_ALIAS(texel_buffer_view_info)
+NGF_POD_TYPE_ALIAS(buffer_bind_info)
+NGF_POD_TYPE_ALIAS(image_sampler_bind_info)
+NGF_POD_TYPE_ALIAS(resource_bind_op)
+NGF_POD_TYPE_ALIAS(present_mode)
+NGF_POD_TYPE_ALIAS(colorspace)
+NGF_POD_TYPE_ALIAS(swapchain_info)
+NGF_POD_TYPE_ALIAS(context_info)
+NGF_POD_TYPE_ALIAS(cmd_buffer_info)
+NGF_POD_TYPE_ALIAS(frame_token)
+NGF_POD_TYPE_ALIAS(device_capabilities)
+NGF_POD_TYPE_ALIAS(device)
+NGF_POD_TYPE_ALIAS(image_write)
+NGF_OPAQUE_TYPE_ALIAS(shader_stage)
+NGF_OPAQUE_TYPE_ALIAS(graphics_pipeline)
+NGF_OPAQUE_TYPE_ALIAS(compute_pipeline)
+NGF_OPAQUE_TYPE_ALIAS(sampler)
+NGF_OPAQUE_TYPE_ALIAS(image)
+NGF_OPAQUE_TYPE_ALIAS(image_view)
+NGF_OPAQUE_TYPE_ALIAS(render_target_info)
+NGF_OPAQUE_TYPE_ALIAS(render_target)
+NGF_OPAQUE_TYPE_ALIAS(render_encoder)
+NGF_OPAQUE_TYPE_ALIAS(compute_encoder)
+NGF_OPAQUE_TYPE_ALIAS(xfer_encoder)
+NGF_OPAQUE_TYPE_ALIAS(buffer)
+NGF_OPAQUE_TYPE_ALIAS(texel_buffer_view)
+NGF_OPAQUE_TYPE_ALIAS(context)
+NGF_OPAQUE_TYPE_ALIAS(cmd_buffer)
+
+static inline error get_device_list(const device** devices, uint32_t* ndevices) noexcept {
+  return ngf_get_device_list(devices, ndevices);
+}
+
+static inline error initialize(const init_info* init_info) noexcept {
+  return ngf_initialize(init_info);
+}
+
+static inline void shutdown() noexcept {
+  ngf_shutdown();
+}
+
+static inline error
+resize_context(unowned_context ctx, uint32_t new_width, uint32_t new_height) noexcept {
+  return ngf_resize_context(ctx, new_width, new_height);
+}
+
+static inline error set_context(unowned_context ctx) noexcept {
+  return ngf_set_context(ctx);
+}
+
+static inline unowned_context get_context() noexcept {
+  return ngf_get_context();
+}
+
+static inline error begin_frame(frame_token* token) noexcept {
+  return ngf_begin_frame(token);
+}
+
+static inline error end_frame(frame_token token) noexcept {
+  return ngf_end_frame(token);
+}
+
+static inline error get_current_swapchain_image(frame_token token, unowned_image* result) noexcept {
+  return ngf_get_current_swapchain_image(token, result);
+}
+
+static inline const device_capabilities* get_device_capabilities() noexcept {
+  return ngf_get_device_capabilities();
+}
+
+static inline unowned_render_target default_render_target() noexcept {
+  return ngf_default_render_target();
+}
+
+static inline const attachment_descriptions* default_render_target_attachment_descs() noexcept {
+  return ngf_default_render_target_attachment_descs();
+}
+
+static inline void* buffer_map_range(unowned_buffer buf, size_t offset, size_t size) noexcept {
+  return ngf_buffer_map_range(buf, offset, size);
+}
+
+static inline void buffer_flush_range(unowned_buffer buf, size_t offset, size_t size) noexcept {
+  ngf_buffer_flush_range(buf, offset, size);
+}
+
+static inline void buffer_unmap(unowned_buffer buf) noexcept {
+  ngf_buffer_unmap(buf);
+}
+
+static inline void finish() noexcept {
+  ngf_finish();
+}
+
+static inline error start_cmd_buffer(unowned_cmd_buffer buf, frame_token token) noexcept {
+  return ngf_start_cmd_buffer(buf, token);
+}
+
+static inline error submit_cmd_buffers(uint32_t nbuffers, unowned_cmd_buffer* bufs) noexcept {
+  return ngf_submit_cmd_buffers(nbuffers, bufs);
+}
+
+static inline void
+cmd_bind_gfx_pipeline(unowned_render_encoder buf, unowned_graphics_pipeline pipeline) noexcept {
+  ngf_cmd_bind_gfx_pipeline(buf, pipeline);
+}
+
+static inline void
+cmd_bind_compute_pipeline(unowned_compute_encoder buf, unowned_compute_pipeline pipeline) noexcept {
+  ngf_cmd_bind_compute_pipeline(buf, pipeline);
+}
+
+static inline void cmd_viewport(unowned_render_encoder buf, const irect2d* r) noexcept {
+  ngf_cmd_viewport(buf, r);
+}
+
+static inline void cmd_scissor(unowned_render_encoder enc, const irect2d* r) noexcept {
+  ngf_cmd_scissor(enc, r);
+}
+
+static inline void
+cmd_stencil_reference(unowned_render_encoder enc, uint32_t front, uint32_t back) noexcept {
+  ngf_cmd_stencil_reference(enc, front, back);
+}
+
+static inline void
+cmd_stencil_compare_mask(unowned_render_encoder enc, uint32_t front, uint32_t back) noexcept {
+  ngf_cmd_stencil_compare_mask(enc, front, back);
+}
+
+static inline void
+cmd_stencil_write_mask(unowned_render_encoder enc, uint32_t front, uint32_t back) noexcept {
+  ngf_cmd_stencil_write_mask(enc, front, back);
+}
+
+static inline void cmd_set_depth_bias(
+    unowned_render_encoder enc,
+    float                  const_scale,
+    float                  slope_scale,
+    float                  clamp) noexcept {
+  ngf_cmd_set_depth_bias(enc, const_scale, slope_scale, clamp);
+}
+
+static inline void cmd_bind_resources(
+    unowned_render_encoder  enc,
+    const resource_bind_op* bind_operations,
+    uint32_t                nbind_operations) noexcept {
+  ngf_cmd_bind_resources(enc, bind_operations, nbind_operations);
+}
+
+static inline void cmd_bind_compute_resources(
+    unowned_compute_encoder enc,
+    const resource_bind_op* bind_operations,
+    uint32_t                nbind_operations) noexcept {
+  ngf_cmd_bind_compute_resources(enc, bind_operations, nbind_operations);
+}
+
+static inline void cmd_bind_attrib_buffer(
+    unowned_render_encoder enc,
+    unowned_buffer         vbuf,
+    uint32_t               binding,
+    size_t                 offset) noexcept {
+  ngf_cmd_bind_attrib_buffer(enc, vbuf, binding, offset);
+}
+
+static inline void cmd_bind_index_buffer(
+    unowned_render_encoder enc,
+    unowned_buffer         idxbuf,
+    size_t                 offset,
+    type                   index_type) noexcept {
+  ngf_cmd_bind_index_buffer(enc, idxbuf, offset, index_type);
+}
+
+static inline void cmd_draw(
+    unowned_render_encoder enc,
+    bool                   indexed,
+    uint32_t               first_element,
+    uint32_t               nelements,
+    uint32_t               ninstances) noexcept {
+  ngf_cmd_draw(enc, indexed, first_element, nelements, ninstances);
+}
+
+static inline void cmd_dispatch(
+    unowned_compute_encoder enc,
+    uint32_t                x_threadgroups,
+    uint32_t                y_threadgroups,
+    uint32_t                z_threadgroups) noexcept {
+  ngf_cmd_dispatch(enc, x_threadgroups, y_threadgroups, z_threadgroups);
+}
+
+static inline void cmd_copy_buffer(
+    unowned_xfer_encoder enc,
+    unowned_buffer       src,
+    unowned_buffer       dst,
+    size_t               size,
+    size_t               src_offset,
+    size_t               dst_offset) noexcept {
+  ngf_cmd_copy_buffer(enc, src, dst, size, src_offset, dst_offset);
+}
+
+static inline void cmd_write_image(
+    unowned_xfer_encoder enc,
+    unowned_buffer       src,
+    unowned_image        dst,
+    const image_write*   writes,
+    uint32_t             nwrites) noexcept {
+  ngf_cmd_write_image(enc, src, dst, writes, nwrites);
+}
+
+static inline void cmd_copy_image_to_buffer(
+    unowned_xfer_encoder enc,
+    const image_ref      src,
+    offset3d             src_offset,
+    extent3d             src_extent,
+    uint32_t             nlayers,
+    unowned_buffer       dst,
+    size_t               dst_offset) noexcept {
+  ngf_cmd_copy_image_to_buffer(enc, src, src_offset, src_extent, nlayers, dst, dst_offset);
+}
+
+static inline error cmd_generate_mipmaps(unowned_xfer_encoder xfenc, unowned_image img) noexcept {
+  return ngf_cmd_generate_mipmaps(xfenc, img);
+}
+
+static inline void cmd_begin_debug_group(unowned_cmd_buffer cmd_buffer, const char* name) noexcept {
+  ngf_cmd_begin_debug_group(cmd_buffer, name);
+}
+
+static inline void cmd_end_current_debug_group(unowned_cmd_buffer cmd_buffer) noexcept {
+  ngf_cmd_end_current_debug_group(cmd_buffer);
+}
+
+static inline void renderdoc_capture_next_frame() noexcept {
+  ngf_renderdoc_capture_next_frame();
+}
+
+static inline void renderdoc_capture_begin() noexcept {
+  ngf_renderdoc_capture_begin();
+}
+
+static inline void renderdoc_capture_end() noexcept {
+  ngf_renderdoc_capture_end();
+}
 
 namespace detail {
 
@@ -83,30 +394,30 @@ template<class T> constexpr remove_ref_t<T>&& move(T&& x) noexcept {
  *
  * A move-only RAII wrapper over nicegraf handles that provides unique ownership semantics.
  */
-template<class T, class ObjectManagementFuncs> class ngf_handle {
+template<class T, class ObjectManagementFuncs> class unique_handle {
   public:
   /** Wraps a raw handle to a nicegraf object. */
-  explicit ngf_handle(T raw) : handle_(raw) {
+  explicit unique_handle(T raw) : handle_(raw) {
   }
 
   /** Wraps a null handle. */
-  ngf_handle() : handle_(nullptr) {
+  unique_handle() : handle_(nullptr) {
   }
 
-  ngf_handle(const ngf_handle&) = delete;
-  ngf_handle(ngf_handle&& other) : handle_(nullptr) {
+  unique_handle(const unique_handle&) = delete;
+  unique_handle(unique_handle&& other) : handle_(nullptr) {
     *this = detail::move(other);
   }
 
   /** Disposes of the owned handle, if it is not null. */
-  ~ngf_handle() {
+  ~unique_handle() {
     destroy_if_necessary();
   }
 
-  ngf_handle& operator=(const ngf_handle&) = delete;
+  unique_handle& operator=(const unique_handle&) = delete;
 
   /** Takes ownership of the handle wrapped by another object. */
-  ngf_handle& operator=(ngf_handle&& other) noexcept {
+  unique_handle& operator=(unique_handle&& other) noexcept {
     destroy_if_necessary();
     handle_       = other.handle_;
     other.handle_ = nullptr;
@@ -114,6 +425,13 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   }
 
   typedef typename ObjectManagementFuncs::InitType init_type;
+
+  static unique_handle create(const typename ObjectManagementFuncs::InitType& info, error* err = nullptr) {
+    unique_handle h;
+    auto e = h.initialize(info);
+    if (err) *err = e;
+    return h;
+  }
 
   /** Creates a new handle using the provided configuration, and takes ownership of it. */
   ngf_error initialize(const typename ObjectManagementFuncs::InitType& info) {
@@ -124,11 +442,11 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   }
 
   struct make_result {
-    ngf_handle      handle;
+    unique_handle   handle;
     const ngf_error error;
   };
   static make_result make(const init_type& info) {
-    ngf_handle      handle;
+    unique_handle   handle;
     const ngf_error error = handle.initialize(info);
     return make_result {detail::move(handle), error};
   }
@@ -195,7 +513,7 @@ template<class T, class ObjectManagementFuncs> class ngf_handle {
   };
 
 #define NGF_DEFINE_WRAPPER_TYPE(name) \
-  using name = ngf_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
+  using name = unique_handle<ngf_##name, ngf_##name##_ManagementFuncs>;
 
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(shader_stage);
 NGF_DEFINE_WRAPPER_MANAGEMENT_FUNCS(graphics_pipeline);
@@ -233,22 +551,21 @@ NGF_DEFINE_WRAPPER_TYPE(compute_pipeline);
 /**
  * \ingroup ngf_wrappers
  *
- * A RAII wrapper for \ref ngf_image.
+ * A RAII wrapper for \ref unowned_image.
  */
 NGF_DEFINE_WRAPPER_TYPE(image);
 
 /**
  * \ingroup ngf_wrappers
  *
- * A RAII wrapper for \ref ngf_image_view.
+ * A RAII wrapper for \ref unowned_image_view.
  */
 NGF_DEFINE_WRAPPER_TYPE(image_view);
-
 
 /**
  * \ingroup ngf_wrappers
  *
- * A RAII wrapper for \ref ngf_sampler.
+ * A RAII wrapper for \ref unowned_sampler.
  */
 NGF_DEFINE_WRAPPER_TYPE(sampler);
 
@@ -262,14 +579,14 @@ NGF_DEFINE_WRAPPER_TYPE(render_target);
 /**
  * \ingroup ngf_wrappers
  *
- * A RAII wrapper for \ref ngf_buffer.
+ * A RAII wrapper for \ref unowned_buffer.
  */
 NGF_DEFINE_WRAPPER_TYPE(buffer);
 
 /**
  * \ingroup ngf_wrappers
  *
- * A RAII wrapper for \ref ngf_texel_buffer_view.
+ * A RAII wrapper for \ref unowned_texel_buffer_view.
  */
 NGF_DEFINE_WRAPPER_TYPE(texel_buffer_view);
 
@@ -325,14 +642,14 @@ class render_encoder {
    * taget has one).
    */
   explicit render_encoder(
-      ngf_cmd_buffer    cmd_buf,
-      ngf_render_target rt,
-      float             clear_color_r,
-      float             clear_color_g,
-      float             clear_color_b,
-      float             clear_color_a,
-      float             clear_depth,
-      uint32_t          clear_stencil) {
+      unowned_cmd_buffer    cmd_buf,
+      unowned_render_target rt,
+      float                 clear_color_r,
+      float                 clear_color_g,
+      float                 clear_color_b,
+      float                 clear_color_a,
+      float                 clear_depth,
+      uint32_t              clear_stencil) {
     ngf_cmd_begin_render_pass_simple(
         cmd_buf,
         rt,
@@ -367,14 +684,14 @@ class render_encoder {
   render_encoder& operator=(const render_encoder&) = delete;
 
   /**
-   * Implicit conversion to \ref ngf_render_encoder.
+   * Implicit conversion to \ref unowned_render_encoder.
    */
-  operator ngf_render_encoder() {
+  operator unowned_render_encoder() {
     return enc_;
   }
 
   private:
-  ngf_render_encoder enc_ {};
+  unowned_render_encoder enc_ {};
 };
 
 /**
@@ -389,7 +706,7 @@ class xfer_encoder {
    *
    * @param cmd_buf The command buffer to create the transfer encoder for.
    */
-  explicit xfer_encoder(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info& pass_info) {
+  explicit xfer_encoder(unowned_cmd_buffer cmd_buf, const xfer_pass_info& pass_info) {
     ngf_cmd_begin_xfer_pass(cmd_buf, &pass_info, &enc_);
   }
 
@@ -417,12 +734,12 @@ class xfer_encoder {
   /**
    * Implicit conversion to \ref ngf_xfer_encoder.
    */
-  operator ngf_xfer_encoder() {
+  operator unowned_xfer_encoder() {
     return enc_;
   }
 
   private:
-  ngf_xfer_encoder enc_;
+  unowned_xfer_encoder enc_;
 };
 
 /**
@@ -474,14 +791,14 @@ class compute_encoder {
   compute_encoder& operator=(const compute_encoder&) = delete;
 
   /**
-   * Implicit conversion to \ref ngf_compute_encoder.
+   * Implicit conversion to \ref unowned_compute_encoder.
    */
-  operator ngf_compute_encoder() {
+  operator unowned_compute_encoder() {
     return enc_;
   }
 
   private:
-  ngf_compute_encoder enc_ {};
+  unowned_compute_encoder enc_ {};
 };
 
 /**
@@ -495,14 +812,14 @@ template<uint32_t S> struct descriptor_set {
    */
   template<uint32_t B> struct binding {
     /**
-     * Creates a \ref ngf_resource_bind_op for a \ref ngf_image.
+     * Creates a \ref resource_bind_op for a \ref unowned_image.
      *
      * @param image The image to bind.
      * @param array_index If the descriptor is an array, specifies the index of the array element to
      * bind the object to.
      */
-    static ngf_resource_bind_op texture(const ngf_image image, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op texture(const unowned_image image, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                              = NGF_DESCRIPTOR_IMAGE;
       op.target_binding                    = B;
       op.target_set                        = S;
@@ -513,13 +830,13 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for an \ref ngf_image that is to be used as a storage
+     * Creates a \ref resource_bind_op for an \ref unowned_image that is to be used as a storage
      * image
      *
      * @param image The image to bind.
      */
-    static ngf_resource_bind_op storage_image(const ngf_image image, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op storage_image(const unowned_image image, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                              = NGF_DESCRIPTOR_STORAGE_IMAGE;
       op.target_binding                    = B;
       op.target_set                        = S;
@@ -530,14 +847,14 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for a \ref ngf_image_view.
+     * Creates a \ref resource_bind_op for a \ref unowned_image_view.
      *
      * @param view The view to bind.
      * @param array_index If the descriptor is an array, specifies the index of the array element to
      * bind the object to.
      */
-    static ngf_resource_bind_op texture(const ngf_image_view view, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op texture(const unowned_image_view view, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                             = NGF_DESCRIPTOR_IMAGE;
       op.target_binding                   = B;
       op.target_set                       = S;
@@ -548,14 +865,14 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for an \ref ngf_image_view that is to be used as a
+     * Creates a \ref resource_bind_op for an \ref unowned_image_view that is to be used as a
      * storage image
      *
      * @param image The image to bind.
      */
-    static ngf_resource_bind_op
-    storage_image(const ngf_image_view view, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op
+    storage_image(const unowned_image_view view, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                             = NGF_DESCRIPTOR_STORAGE_IMAGE;
       op.target_binding                   = B;
       op.target_set                       = S;
@@ -566,15 +883,18 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for an storage buffer.
+     * Creates a \ref resource_bind_op for an storage buffer.
      *
      * @param buf The buffer to bind as a storage buffer.
      * @param offset The offset at which to bind the buffer.
      * @param range The extent of the bound memory.
      */
-    static ngf_resource_bind_op
-    storage_buffer(const ngf_buffer buf, size_t offset, size_t range, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op storage_buffer(
+        const unowned_buffer buf,
+        size_t               offset,
+        size_t               range,
+        uint32_t             array_index = 0u) {
+      resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_STORAGE_BUFFER;
       op.target_binding     = B;
       op.target_set         = S;
@@ -586,15 +906,18 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for an uniform buffer.
+     * Creates a \ref resource_bind_op for an uniform buffer.
      *
      * @param buf The buffer to bind as a uniform buffer.
      * @param offset The offset at which to bind the buffer.
      * @param range The extent of the bound memory.
      */
-    static ngf_resource_bind_op
-    uniform_buffer(const ngf_buffer buf, size_t offset, size_t range, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op uniform_buffer(
+        const unowned_buffer buf,
+        size_t               offset,
+        size_t               range,
+        uint32_t             array_index = 0u) {
+      resource_bind_op op;
       op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
       op.target_binding     = B;
       op.target_set         = S;
@@ -606,16 +929,16 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for a texel buffer.
+     * Creates a \ref resource_bind_op for a texel buffer.
      *
      * @param buf The buffer to bind as a texel buffer.
      * @param offset The offset at which to bind the buffer.
      * @param range The extent of the bound memory.
      * @param fmt The texel format expected by the shader.
      */
-    static ngf_resource_bind_op
-    texel_buffer(const ngf_texel_buffer_view buf_view, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op
+    texel_buffer(const unowned_texel_buffer_view buf_view, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                   = NGF_DESCRIPTOR_TEXEL_BUFFER;
       op.target_binding         = B;
       op.target_set             = S;
@@ -625,12 +948,12 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for a sampler.
+     * Creates a \ref resource_bind_op for a sampler.
      *
      * @param sampler The sampler to use.
      */
-    static ngf_resource_bind_op sampler(const ngf_sampler sampler, uint32_t array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op sampler(const unowned_sampler sampler, uint32_t array_index = 0u) {
+      resource_bind_op op;
       op.type                       = NGF_DESCRIPTOR_SAMPLER;
       op.target_binding             = B;
       op.target_set                 = S;
@@ -640,16 +963,16 @@ template<uint32_t S> struct descriptor_set {
     }
 
     /**
-     * Creates a \ref ngf_resource_bind_op for a combined image + sampler.
+     * Creates a \ref resource_bind_op for a combined image + sampler.
      *
      * @param image The image part of the combined image + sampler.
      * @param sampler The sampler part of the combined image + sampler.
      */
-    static ngf_resource_bind_op texture_and_sampler(
-        const ngf_image   image,
-        const ngf_sampler sampler,
-        uint32_t          array_index = 0u) {
-      ngf_resource_bind_op op;
+    static resource_bind_op texture_and_sampler(
+        const unowned_image   image,
+        const unowned_sampler sampler,
+        uint32_t              array_index = 0u) {
+      resource_bind_op op;
       op.type                              = NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
       op.target_binding                    = B;
       op.target_set                        = S;
@@ -674,9 +997,9 @@ template<uint32_t S> struct descriptor_set {
  *                         ngf::descriptor_set<1>::binding<0>::uniform_buffer(your_buffer));
  * ```
  */
-template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
-  ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
+template<class... Args> void cmd_bind_resources(unowned_render_encoder enc, const Args&&... args) {
+  const resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
+  ngf_cmd_bind_resources(enc, ops, sizeof(ops) / sizeof(resource_bind_op));
 }
 
 /**
@@ -692,9 +1015,9 @@ template<class... Args> void cmd_bind_resources(ngf_render_encoder enc, const Ar
  * ```
  *
  */
-template<class... Args> void cmd_bind_resources(ngf_compute_encoder enc, const Args&&... args) {
-  const ngf_resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
-  ngf_cmd_bind_compute_resources(enc, ops, sizeof(ops) / sizeof(ngf_resource_bind_op));
+template<class... Args> void cmd_bind_resources(unowned_compute_encoder enc, const Args&&... args) {
+  const resource_bind_op ops[] = {detail::fwd<const Args>(args)...};
+  ngf_cmd_bind_compute_resources(enc, ops, sizeof(ops) / sizeof(resource_bind_op));
 }
 
 /**
@@ -716,7 +1039,7 @@ template<typename T> class uniform_multibuffer {
   ngf_error initialize(const uint32_t frames) {
     const size_t alignment    = ngf_get_device_capabilities()->uniform_buffer_offset_alignment;
     const size_t aligned_size = ngf_util_align_size(sizeof(T), alignment);
-    NGF_RETURN_IF_ERROR(buf_.initialize(ngf_buffer_info {
+    NGF_RETURN_IF_ERROR(buf_.initialize(buffer_info {
         aligned_size * frames,
         NGF_BUFFER_STORAGE_HOST_WRITEABLE,
         NGF_BUFFER_USAGE_UNIFORM_BUFFER}));
@@ -734,12 +1057,12 @@ template<typename T> class uniform_multibuffer {
     frame_ = (frame_ + 1u) % nframes_;
   }
 
-  ngf_resource_bind_op bind_op_at_current_offset(
+  resource_bind_op bind_op_at_current_offset(
       uint32_t set,
       uint32_t binding,
       size_t   additional_offset = 0,
       size_t   range             = 0) const {
-    ngf_resource_bind_op op {};
+    resource_bind_op op {};
     op.type               = NGF_DESCRIPTOR_UNIFORM_BUFFER;
     op.target_binding     = binding;
     op.target_set         = set;
