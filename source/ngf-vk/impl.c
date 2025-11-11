@@ -86,6 +86,7 @@ typedef struct ngfvk_dummy_resources {
   ngf_buffer             buf;
   ngf_texel_buffer_view  tbuf;
   ngf_sampler            samp;
+  VkAccelerationStructureKHR dummy_accel_struct;
   VkDescriptorImageInfo  img_info;
   VkDescriptorImageInfo  cube_info;
   VkDescriptorImageInfo  img_arr_info;
@@ -1781,6 +1782,16 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
         desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
         break;
+      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
+        VkWriteDescriptorSetAccelerationStructureKHR* dummy_accel_info =
+            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkWriteDescriptorSetAccelerationStructureKHR));
+        dummy_accel_info->sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+        dummy_accel_info->pNext                      = NULL;
+        dummy_accel_info->accelerationStructureCount = 1;
+        dummy_accel_info->pAccelerationStructures    = &_vk.dummy_res.dummy_accel_struct;
+        desc_w->pNext                                = dummy_accel_info;
+        break;
+      }
       default:
         assert(false);
       }
@@ -1943,6 +1954,16 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
         vk_bind_info->sampler = bind_info->sampler->vksampler;
       }
       vk_write->pImageInfo = vk_bind_info;
+      break;
+    }
+    case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE: {
+      VkWriteDescriptorSetAccelerationStructureKHR* accel_struct_info =
+          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkWriteDescriptorSetAccelerationStructureKHR));
+      accel_struct_info->sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+      accel_struct_info->pNext                      = NULL;
+      accel_struct_info->accelerationStructureCount = 1u;
+      accel_struct_info->pAccelerationStructures    = (const VkAccelerationStructureKHR*)&bind_op->info.acceleration_structure;
+      vk_write->pNext                               = accel_struct_info;
       break;
     }
 
@@ -3283,6 +3304,9 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
   case NGF_DESCRIPTOR_SAMPLER:
     sync_req.barrier_masks.stage_mask = 0u;
     break;
+  case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
+    sync_req.barrier_masks.stage_mask = 0u;
+    break;
   default:
     assert(0);
   }
@@ -4197,6 +4221,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   _vk.dummy_res.imgsamp_info.sampler       = _vk.dummy_res.samp->vksampler;
   _vk.dummy_res.imgsamp_arr_info           = _vk.dummy_res.imgsamp_info;
   _vk.dummy_res.imgsamp_arr_info.imageView = _vk.dummy_res.img->vkview_arrayed;
+  _vk.dummy_res.dummy_accel_struct         = VK_NULL_HANDLE;
   _vk.dummy_res.image_transitioned         = false;
   pthread_mutex_init(&_vk.dummy_res.img_mu, NULL);
 
