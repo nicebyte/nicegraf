@@ -2397,6 +2397,9 @@ void ngf_cmd_bind_resources(
       NGFI_DIAG_ERROR("Binding storage images to non-compute shader is "
                       "currently unsupported.");
       break;
+    case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
+      NGFI_DIAG_WARNING("Acceleration structure binding is not implemented for Metal backend");
+      break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
     }
@@ -2486,6 +2489,9 @@ void ngf_cmd_bind_compute_resources(
       cmd_buf->active_cce->setSamplerState(img_bind_op.sampler->sampler.get(), native_binding);
       break;
     }
+    case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
+      NGFI_DIAG_WARNING("Acceleration structure binding is not implemented for Metal backend");
+      break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
     }
