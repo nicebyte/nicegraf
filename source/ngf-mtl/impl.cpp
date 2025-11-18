@@ -2706,7 +2706,7 @@ uintptr_t ngf_get_mtl_image_handle(ngf_image image) NGF_NOEXCEPT {
 }
 
 uintptr_t ngf_get_mtl_buffer_handle(ngf_buffer buffer) NGF_NOEXCEPT {
-  return (uintptr_t)(buffer->mtl_buffer);
+  return (uintptr_t)(buffer->mtl_buffer.get());
 }
 
 uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
