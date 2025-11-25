@@ -2398,7 +2398,8 @@ void ngf_cmd_bind_resources(
                       "currently unsupported.");
       break;
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
-      NGFI_DIAG_WARNING("Acceleration structure binding is not implemented for Metal backend");
+      cmd_buf->active_rce->setVertexAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
+      cmd_buf->active_rce->setFragmentAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
@@ -2490,7 +2491,7 @@ void ngf_cmd_bind_compute_resources(
       break;
     }
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
-      NGFI_DIAG_WARNING("Acceleration structure binding is not implemented for Metal backend");
+      cmd_buf->active_cce->setAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
