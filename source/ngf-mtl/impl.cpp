@@ -2713,17 +2713,17 @@ uintptr_t ngf_get_mtl_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT 
   return (uintptr_t)(cmd_buffer->mtl_cmd_buffer);
 }
 
-uintptr_t ngf_get_render_encoder_handle(ngf_render_encoder render_encoder) NGF_NOEXCEPT {
+uintptr_t ngf_get_mtl_render_encoder_handle(ngf_render_encoder render_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(render_encoder);
   return (uintptr_t)(buf->active_rce);
 }
 
-uintptr_t ngf_get_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) NGF_NOEXCEPT {
+uintptr_t ngf_get_mtl_xfer_encoder_handle(ngf_xfer_encoder xfer_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(xfer_encoder);
   return (uintptr_t)(buf->active_bce);
 }
 
-uintptr_t ngf_get_compute_encoder_handle(ngf_compute_encoder compute_encoder) NGF_NOEXCEPT {
+uintptr_t ngf_get_mtl_compute_encoder_handle(ngf_compute_encoder compute_encoder) NGF_NOEXCEPT {
   auto buf = NGFMTL_ENC2CMDBUF(compute_encoder);
   return (uintptr_t)(buf->active_cce);
 }
