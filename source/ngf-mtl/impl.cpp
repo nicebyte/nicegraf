@@ -1102,12 +1102,13 @@ const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT {
 }
 
 extern "C" {
-void* NSPushAutoreleasePool(NS::UInteger capacity);
-void  NSPopAutoreleasePool(void* token);
+void* objc_autoreleasePoolPush(void);
+void  objc_autoreleasePoolPop(void* pool);
 }
 
+
 ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
-  *token = (uintptr_t)NSPushAutoreleasePool(0);
+  *token = (uintptr_t)objc_autoreleasePoolPush();
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
   CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
   if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->swapchain.compute_access_enabled()) {
@@ -1130,7 +1131,7 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
   } else {
     dispatch_semaphore_signal(ctx->frame_sync_sem);
   }
-  NSPopAutoreleasePool((void*)token);
+  objc_autoreleasePoolPop((void*)token);
   return NGF_ERROR_OK;
 }
 
