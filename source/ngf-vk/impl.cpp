@@ -757,12 +757,12 @@ static VkPolygonMode get_vk_polygon_mode(ngf_polygon_mode m) {
   return modes[m];
 }
 
-static VkCullModeFlagBits get_vk_cull_mode(ngf_cull_mode m) {
+static VkCullModeFlags get_vk_cull_mode(ngf_cull_mode m) {
   static const VkCullModeFlagBits modes[NGF_CULL_MODE_COUNT] = {
       VK_CULL_MODE_BACK_BIT,
       VK_CULL_MODE_FRONT_BIT,
       VK_CULL_MODE_FRONT_AND_BACK};
-  return modes[m];
+  return (VkCullModeFlags)modes[m];
 }
 
 static VkFrontFace get_vk_front_face(ngf_front_face_mode f) {
@@ -946,7 +946,7 @@ static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
 #define NGFVK_RETIRE_OBJECT(frame_res, obj_type_idx, obj) \
   ngfi_chnklist_append(&((frame_res)->retire_objs[(obj_type_idx)]), &(obj), sizeof(obj))
 
-ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
+extern "C" ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
 // Handler for messages from validation layers, etc.
 // All messages are forwarded to the user-provided debug callback.
@@ -1015,8 +1015,11 @@ static ngf_error ngfvk_create_vk_image_view(
     uint32_t        nmips,
     uint32_t        nlayers,
     VkImageView*    result) {
-  const bool is_depth   = ngfvk_format_is_depth(image_format);
-  const bool is_stencil = ngfvk_format_is_stencil(image_format);
+  const bool is_depth    = ngfvk_format_is_depth(image_format);
+  const bool is_stencil  = ngfvk_format_is_stencil(image_format);
+  const auto stencil_bit = is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : ((VkImageAspectFlagBits)0);
+  const auto aspect_mask = (VkImageAspectFlags)(is_depth ? (VK_IMAGE_ASPECT_DEPTH_BIT | stencil_bit)
+                                                         : VK_IMAGE_ASPECT_COLOR_BIT);
 
   const VkImageViewCreateInfo image_view_info = {
       .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -1031,9 +1034,7 @@ static ngf_error ngfvk_create_vk_image_view(
            .b = VK_COMPONENT_SWIZZLE_IDENTITY,
            .a = VK_COMPONENT_SWIZZLE_IDENTITY},
       .subresourceRange = {
-          .aspectMask     = is_depth ? (VK_IMAGE_ASPECT_DEPTH_BIT |
-                                    (is_stencil ? VK_IMAGE_ASPECT_STENCIL_BIT : 0))
-                                     : VK_IMAGE_ASPECT_COLOR_BIT,
+          .aspectMask     = aspect_mask,
           .baseMipLevel   = 0u,
           .levelCount     = nmips,
           .baseArrayLayer = 0u,
@@ -1058,47 +1059,47 @@ static ngf_error ngfvk_create_image(
     bool                  owns_backing_resource,
     ngf_image*            result) {
   ngf_error err = NGF_ERROR_OK;
+  {
+    *result = NGFI_ALLOC(ngf_image_t);
+    if (*result == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngfvk_create_image_exit;
+    }
 
-  *result = NGFI_ALLOC(ngf_image_t);
-  if (*result == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto ngfvk_create_image_exit;
+    const bool is_cubemap            = info->type == NGF_IMAGE_TYPE_CUBE;
+    (*result)->alloc                 = *backing_resource_alloc;
+    (*result)->extent.width          = NGFI_MAX(1, info->extent.width);
+    (*result)->extent.height         = NGFI_MAX(1, info->extent.height);
+    (*result)->extent.depth          = NGFI_MAX(1, info->extent.depth);
+    (*result)->nlayers               = info->nlayers * (is_cubemap ? 6u : 1u);
+    (*result)->nlevels               = info->nmips;
+    (*result)->type                  = info->type;
+    (*result)->usage_flags           = info->usage_hint;
+    (*result)->vk_fmt                = get_vk_image_format(info->format);
+    (*result)->owns_backing_resource = owns_backing_resource;
+    memset(&(*result)->sync_state, 0, sizeof((*result)->sync_state));
+    (*result)->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    (*result)->hash              = ngfvk_ptr_hash(*result);
+
+    if (owns_backing_resource) {
+      err = ngfvk_create_vk_image_view(
+          (VkImage)(*result)->alloc.obj_handle,
+          get_vk_image_view_type(info->type, info->nlayers),
+          (*result)->vk_fmt,
+          (*result)->nlevels,
+          (*result)->nlayers,
+          &(*result)->vkview);
+      err = ngfvk_create_vk_image_view(
+          (VkImage)(*result)->alloc.obj_handle,
+          get_vk_image_view_type(info->type, 2u),  // force _ARRAY type view
+          (*result)->vk_fmt,
+          (*result)->nlevels,
+          (*result)->nlayers,
+          &(*result)->vkview_arrayed);
+    }
+
+    if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
   }
-
-  const bool is_cubemap            = info->type == NGF_IMAGE_TYPE_CUBE;
-  (*result)->alloc                 = *backing_resource_alloc;
-  (*result)->extent.width          = NGFI_MAX(1, info->extent.width);
-  (*result)->extent.height         = NGFI_MAX(1, info->extent.height);
-  (*result)->extent.depth          = NGFI_MAX(1, info->extent.depth);
-  (*result)->nlayers               = info->nlayers * (is_cubemap ? 6u : 1u);
-  (*result)->nlevels               = info->nmips;
-  (*result)->type                  = info->type;
-  (*result)->usage_flags           = info->usage_hint;
-  (*result)->vk_fmt                = get_vk_image_format(info->format);
-  (*result)->owns_backing_resource = owns_backing_resource;
-  memset(&(*result)->sync_state, 0, sizeof((*result)->sync_state));
-  (*result)->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
-  (*result)->hash              = ngfvk_ptr_hash(*result);
-
-  if (owns_backing_resource) {
-    err = ngfvk_create_vk_image_view(
-        (VkImage)(*result)->alloc.obj_handle,
-        get_vk_image_view_type(info->type, info->nlayers),
-        (*result)->vk_fmt,
-        (*result)->nlevels,
-        (*result)->nlayers,
-        &(*result)->vkview);
-    err = ngfvk_create_vk_image_view(
-        (VkImage)(*result)->alloc.obj_handle,
-        get_vk_image_view_type(info->type, 2u), // force _ARRAY type view
-        (*result)->vk_fmt,
-        (*result)->nlevels,
-        (*result)->nlayers,
-        &(*result)->vkview_arrayed);
-  }
-
-  if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
-
 ngfvk_create_image_exit:
   return err;
 }
@@ -1154,7 +1155,9 @@ static ngf_error ngfvk_create_swapchain(
   assert(swapchain_info);
   assert(swapchain);
 
-  ngf_error        err          = NGF_ERROR_OK;
+  ngf_error err = NGF_ERROR_OK;
+
+  {
   VkResult         vk_err       = VK_SUCCESS;
   VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
 
@@ -1217,7 +1220,12 @@ static ngf_error ngfvk_create_swapchain(
       exclusive_sharing ? VK_SHARING_MODE_EXCLUSIVE : VK_SHARING_MODE_CONCURRENT;
   const uint32_t num_sharing_queue_families = exclusive_sharing ? 0 : 2;
   const uint32_t sharing_queue_families[]   = {_vk.gfx_family_idx, _vk.present_family_idx};
-  ;
+
+  // Determine usage flags.
+  const auto storage_bit =
+      (VkImageUsageFlagBits)(swapchain_info->enable_compute_access ? VK_IMAGE_USAGE_STORAGE_BIT : 0);
+  const auto usage_mask = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | storage_bit);
+
   // Create swapchain.
   const VkSwapchainCreateInfoKHR vk_sc_info = {
       .sType           = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
@@ -1235,7 +1243,7 @@ static ngf_error ngfvk_create_swapchain(
                max_surface_extent.height,
                NGFI_MAX(min_surface_extent.height, swapchain_info->height))},
       .imageArrayLayers      = 1,
-      .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | (swapchain_info->enable_compute_access ? VK_IMAGE_USAGE_STORAGE_BIT : 0),
+      .imageUsage            = usage_mask,
       .imageSharingMode      = sharing_mode,
       .queueFamilyIndexCount = num_sharing_queue_families,
       .pQueueFamilyIndices   = sharing_queue_families,
@@ -1276,12 +1284,12 @@ static ngf_error ngfvk_create_swapchain(
   }
 
   const ngf_image_info wrapper_image_info = {
-      .extent  = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1},
-      .format  = swapchain_info->color_format,
-      .nlayers = 1u,
-      .nmips   = 1u,
-      .sample_count = NGF_SAMPLE_COUNT_1,
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
+      .extent  = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1},
+      .nmips   = 1u,
+      .nlayers = 1u,
+      .format  = swapchain_info->color_format,
+      .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT};
   for (size_t i = 0u; i < swapchain->nimgs; ++i) {
     ngfvk_alloc wrapper_alloc;
@@ -1366,8 +1374,8 @@ static ngf_error ngfvk_create_swapchain(
         .extent  = {.width = swapchain_info->width, .height = swapchain_info->height, .depth = 1u},
         .nmips   = 1u,
         .nlayers = 1u,
-        .sample_count = swapchain_info->sample_count,
         .format       = swapchain_info->depth_format,
+        .sample_count = swapchain_info->sample_count,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
                       (is_multisampled ? NGFVK_IMAGE_USAGE_TRANSIENT_ATTACHMENT : 0u)};
     err = ngf_create_image(&depth_image_info, &swapchain->depth_img);
@@ -1435,7 +1443,7 @@ static ngf_error ngfvk_create_swapchain(
   swapchain->image_idx = 0U;
   swapchain->width     = swapchain_info->width;
   swapchain->height    = swapchain_info->height;
-
+}
 ngfvk_create_swapchain_cleanup:
   if (err != NGF_ERROR_OK) { ngfvk_destroy_swapchain(swapchain); }
   return err;
@@ -1507,8 +1515,8 @@ ngfvk_initialize_cmd_pools(uint32_t queue_family_idx, VkCommandPool* pools, uint
     const VkCommandPoolCreateInfo pool_ci = {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext            = NULL,
-        .queueFamilyIndex = queue_family_idx,
-        .flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT};
+        .flags            = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,
+        .queueFamilyIndex = queue_family_idx };
     if (vkCreateCommandPool(_vk.device, &pool_ci, NULL, &pools[i]) != VK_SUCCESS)
       return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
@@ -1638,8 +1646,8 @@ static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) 
   if (superpool == NULL) {
     ngfvk_desc_superpool new_superpool = {
         .ctx_id      = (uint16_t)~0,
-        .num_lists   = 0,
-        .pools_lists = NULL};
+        .pools_lists = NULL,
+        .num_lists   = 0 };
     NGFI_DARRAY_APPEND(CURRENT_CONTEXT->desc_superpools, new_superpool);
     superpool = NGFI_DARRAY_BACKPTR(CURRENT_CONTEXT->desc_superpools);
     ngfvk_create_desc_superpool(superpool, nframes, ctx_id);
@@ -1662,7 +1670,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
     ngfvk_desc_pool*                pool     = pools->active_pool;
     const ngfvk_desc_pool_capacity* capacity = &pool->capacity;
     ngfvk_desc_pool_capacity*       usage    = &pool->utilization;
-    for (ngf_descriptor_type i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+    for (unsigned i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
       fresh_pool_required |=
           (usage->descriptors[i] + set_layout->counts[i] >= capacity->descriptors[i]);
     }
@@ -1676,9 +1684,8 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
 
       // Prepare descriptor counts.
-      VkDescriptorPoolSize* vk_pool_sizes =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorPoolSize) * NGF_DESCRIPTOR_TYPE_COUNT);
-      for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+      auto vk_pool_sizes = NGFI_SALLOC(VkDescriptorPoolSize, NGF_DESCRIPTOR_TYPE_COUNT);
+      for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
         vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
         vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
       }
@@ -1732,7 +1739,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   if (desc_set_alloc_result != VK_SUCCESS) { return VK_NULL_HANDLE; }
 
   // Update usage counters for the active descriptor pool.
-  for (ngf_descriptor_type i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+  for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
     pool->utilization.descriptors[i] += set_layout->counts[i];
   }
   pool->utilization.sets++;
@@ -1783,8 +1790,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
         desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
         break;
       case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
-        VkWriteDescriptorSetAccelerationStructureKHR* dummy_accel_info =
-            ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkWriteDescriptorSetAccelerationStructureKHR));
+        auto dummy_accel_info = NGFI_SALLOC(VkWriteDescriptorSetAccelerationStructureKHR, 1);
         dummy_accel_info->sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
         dummy_accel_info->pNext                      = NULL;
         dummy_accel_info->accelerationStructureCount = 1;
@@ -1824,14 +1830,12 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   // Allocate an array of descriptor set handles from temporary storage and
   // set them all to null. As we process bind operations, we'll allocate
   // descriptor sets and put them into the array as necessary.
-  const size_t     vk_desc_sets_size_bytes = sizeof(VkDescriptorSet) * ndesc_set_layouts;
-  VkDescriptorSet* vk_desc_sets = ngfi_sa_alloc(ngfi_tmp_store(), vk_desc_sets_size_bytes);
-  memset(vk_desc_sets, (uintptr_t)VK_NULL_HANDLE, vk_desc_sets_size_bytes);
+  auto vk_desc_sets = NGFI_SALLOC(VkDescriptorSet, ndesc_set_layouts);
+  memset(vk_desc_sets, (uintptr_t)VK_NULL_HANDLE, ndesc_set_layouts * sizeof(vk_desc_sets[0]));
 
   // Allocate an array of vulkan descriptor set writes from temp storage, one write per
   // pending bind op.
-  VkWriteDescriptorSet* vk_writes =
-      ngfi_sa_alloc(ngfi_tmp_store(), cmd_buf->npending_bind_ops * sizeof(VkWriteDescriptorSet));
+  auto vk_writes = NGFI_SALLOC(VkWriteDescriptorSet, cmd_buf->npending_bind_ops);
 
   // Find a descriptor pools list to allocate from.
   ngfvk_desc_pools_list* pools = ngfvk_find_desc_pools_list(cmd_buf->parent_frame);
@@ -1901,8 +1905,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     case NGF_DESCRIPTOR_STORAGE_BUFFER:
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
-      VkDescriptorBufferInfo*     vk_bind_info =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorBufferInfo));
+      auto                        vk_bind_info = NGFI_SALLOC(VkDescriptorBufferInfo, 1);
 
       vk_bind_info->buffer = (VkBuffer)bind_info->buffer->alloc.obj_handle;
       vk_bind_info->offset = bind_info->offset;
@@ -1936,8 +1939,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
                          : (is_multilayered_image ? bind_info->resource.image->vkview_arrayed
                                                   : bind_info->resource.image->vkview);
       }
-      VkDescriptorImageInfo* vk_bind_info =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorImageInfo));
+      auto vk_bind_info = NGFI_SALLOC(VkDescriptorImageInfo, 1);
       vk_bind_info->imageView   = VK_NULL_HANDLE;
       vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       vk_bind_info->sampler     = VK_NULL_HANDLE;
@@ -1957,13 +1959,13 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       break;
     }
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE: {
-      VkWriteDescriptorSetAccelerationStructureKHR* accel_struct_info =
-          ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkWriteDescriptorSetAccelerationStructureKHR));
-      accel_struct_info->sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-      accel_struct_info->pNext                      = NULL;
+      auto accel_struct_info   = NGFI_SALLOC(VkWriteDescriptorSetAccelerationStructureKHR, 1);
+      accel_struct_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+      accel_struct_info->pNext = NULL;
       accel_struct_info->accelerationStructureCount = 1u;
-      accel_struct_info->pAccelerationStructures    = (const VkAccelerationStructureKHR*)&bind_op->info.acceleration_structure;
-      vk_write->pNext                               = accel_struct_info;
+      accel_struct_info->pAccelerationStructures =
+          (const VkAccelerationStructureKHR*)&bind_op->info.acceleration_structure;
+      vk_write->pNext = accel_struct_info;
       break;
     }
 
@@ -2001,15 +2003,9 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
     const ngf_attachment_description* attachment_descs,
     const ngfvk_attachment_pass_desc* attachment_compat_pass_descs,
     VkRenderPass*                     result) {
-  const size_t vk_attachment_descs_size_bytes = sizeof(VkAttachmentDescription) * nattachments;
-  VkAttachmentDescription* vk_attachment_descs =
-      ngfi_sa_alloc(ngfi_tmp_store(), vk_attachment_descs_size_bytes);
-  const size_t vk_color_attachment_references_size_bytes =
-      sizeof(VkAttachmentReference) * nattachments;
-  VkAttachmentReference* vk_color_attachment_refs =
-      ngfi_sa_alloc(ngfi_tmp_store(), vk_color_attachment_references_size_bytes);
-  VkAttachmentReference* vk_resolve_attachment_refs =
-      ngfi_sa_alloc(ngfi_tmp_store(), vk_color_attachment_references_size_bytes);
+  auto vk_attachment_descs = NGFI_SALLOC(VkAttachmentDescription, nattachments);
+  auto vk_color_attachment_refs = NGFI_SALLOC(VkAttachmentReference, nattachments);
+  auto vk_resolve_attachment_refs = NGFI_SALLOC(VkAttachmentReference, nattachments);
   uint32_t              ncolor_attachments   = 0u;
   uint32_t              nresolve_attachments = 0u;
   VkAttachmentReference depth_stencil_attachment_ref;
@@ -2140,9 +2136,7 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
 
   if (result == VK_NULL_HANDLE) {
     const uint32_t nattachments               = rt->nattachments;
-    const size_t   attachment_pass_descs_size = sizeof(ngfvk_attachment_pass_desc) * nattachments;
-    ngfvk_attachment_pass_desc* attachment_compat_pass_descs =
-        ngfi_sa_alloc(ngfi_tmp_store(), attachment_pass_descs_size);
+    auto attachment_compat_pass_descs = NGFI_SALLOC(ngfvk_attachment_pass_desc, nattachments);
     const size_t rt_attachment_pass_descs_size =
         rt->nattachments * sizeof(ngfvk_attachment_pass_desc);
     memcpy(
@@ -2171,8 +2165,8 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
 }
 
 static int ngfvk_binding_comparator(const void* a, const void* b) {
-  const ngfvk_reflect_binding_and_stage_mask* a_binding = a;
-  const ngfvk_reflect_binding_and_stage_mask* b_binding = b;
+  auto a_binding = (const ngfvk_reflect_binding_and_stage_mask*)a;
+  auto b_binding = (const ngfvk_reflect_binding_and_stage_mask*)b;
   if (a_binding->binding_data.set < b_binding->binding_data.set)
     return -1;
   else if (a_binding->binding_data.set == b_binding->binding_data.set) {
@@ -2228,7 +2222,7 @@ static VkResult ngfvk_create_instance(
   bool     swapchain_colorspace_supported = false;
   uint32_t ninst_exts                     = 0u;
   vkEnumerateInstanceExtensionProperties(NULL, &ninst_exts, NULL);
-  VkExtensionProperties* ext_props = malloc(sizeof(VkExtensionProperties) * ninst_exts);
+  auto ext_props = (VkExtensionProperties*)malloc(sizeof(VkExtensionProperties) * ninst_exts);
   if (ext_props == NULL) { return VK_ERROR_OUT_OF_HOST_MEMORY; }
   vkEnumerateInstanceExtensionProperties(NULL, &ninst_exts, ext_props);
   for (size_t i = 0; i < ninst_exts && !swapchain_colorspace_supported; ++i) {
@@ -2284,8 +2278,7 @@ static VkResult ngfvk_create_instance(
   // Check if validation layers are supported.
   uint32_t nlayers = 0u;
   vkEnumerateInstanceLayerProperties(&nlayers, NULL);
-  VkLayerProperties* layer_props =
-      ngfi_sa_alloc(ngfi_tmp_store(), nlayers * sizeof(VkLayerProperties));
+  auto layer_props = NGFI_SALLOC(VkLayerProperties, nlayers);
   vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
   bool validation_supported = false;
   for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
@@ -2424,9 +2417,8 @@ ngf_error ngfvk_create_pipeline_layout(
   const uint32_t last_binding_idx = ntotal_bindings > 0 ? ntotal_bindings - 1u : 0u;
   const uint32_t max_set_id = ntotal_bindings > 0 ? bindings[last_binding_idx].binding_data.set : 0u;
   const uint32_t nall_sets = ntotal_bindings > 0 ? max_set_id + 1u : 0u;
-  const uint32_t binding_counter_buf_size = sizeof(uint32_t) * nall_sets;
-  uint32_t* nall_bindings_per_set = ngfi_sa_alloc(ngfi_tmp_store(), binding_counter_buf_size);
-  memset(nall_bindings_per_set, 0, binding_counter_buf_size);
+  uint32_t* nall_bindings_per_set = NGFI_SALLOC(uint32_t, nall_sets);
+  memset(nall_bindings_per_set, 0, nall_sets * sizeof(nall_bindings_per_set[0]));
   uint32_t  nunique_bindings      = 0u;
   for (uint32_t cur = 0u; cur < ntotal_bindings; ++cur) {
     const ngfvk_reflect_binding_and_stage_mask* cur_binding = &bindings[cur];
@@ -2447,8 +2439,7 @@ ngf_error ngfvk_create_pipeline_layout(
   }
 
   // Create descriptor set layouts.
-  VkDescriptorSetLayout* vk_set_layouts =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorSetLayout) * (max_set_id + 1));
+  auto vk_set_layouts = NGFI_SALLOC(VkDescriptorSetLayout, max_set_id+1);
   uint32_t last_set_id = ~0u;
   for (uint32_t cur = 0u; cur < nunique_bindings;) {
     ngfvk_desc_set_layout set_layout;
@@ -2477,8 +2468,7 @@ ngf_error ngfvk_create_pipeline_layout(
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
     const uint32_t                nbindings_in_set = cur - first_binding_in_set;
-    VkDescriptorSetLayoutBinding* vk_descriptor_bindings =
-        ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkDescriptorSetLayoutBinding) * nbindings_in_set);
+    auto vk_descriptor_bindings = NGFI_SALLOC(VkDescriptorSetLayoutBinding, nbindings_in_set);
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
       VkDescriptorSetLayoutBinding*      vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
       const SpvReflectDescriptorBinding* d    = &bindings[i].binding_data;
@@ -2492,10 +2482,10 @@ ngf_error ngfvk_create_pipeline_layout(
       const ngfvk_desc_binding binding_properties = {
           .type              = vk_d->descriptorType,
           .stage_accessors   = bindings[i].mask,
-          .readonly          = (d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE),
-          .ndescs_in_binding = vk_d->descriptorCount,
+          .readonly          = ((d->block.decoration_flags & SPV_REFLECT_DECORATION_NON_WRITABLE) != 0),
+          .is_multilayered_image = (d->image.arrayed != 0),
           .is_cubemap        = (d->image.dim == SpvDimCube),
-          .is_multilayered_image = (d->image.arrayed != 0)};
+          .ndescs_in_binding = vk_d->descriptorCount };
       set_layout.binding_properties[d->binding] = binding_properties;
       set_layout.counts[ngf_desc_type]++;
       set_layout.nall_descs += vk_d->descriptorCount;
@@ -2596,8 +2586,7 @@ static bool ngfvk_phys_dev_extension_supported(const char* ext_name) {
       return false;
     }
 
-    _vk.supported_phys_dev_exts =
-        malloc(sizeof(VkExtensionProperties) * _vk.nsupported_phys_dev_exts);
+    _vk.supported_phys_dev_exts = (VkExtensionProperties*)malloc(sizeof(VkExtensionProperties) * _vk.nsupported_phys_dev_exts);
     if (_vk.supported_phys_dev_exts == NULL) {
       NGFI_DIAG_WARNING("Out of memory");
       return false;
@@ -2680,8 +2669,7 @@ static bool ngfvk_cmd_buf_lookup_sync_res(
   bool                    new_res = false;
   const ngfi_dict_keyhash keyhash = {ngfvk_handle_from_sync_res(sync_res), sync_res->hash};
 
-  *sync_res_data_out =
-      ngfi_dict_get_prehashed(&cmd_buf->local_res_states, &keyhash, &new_res_state, &new_res);
+  *sync_res_data_out = (ngfvk_sync_res_data*)ngfi_dict_get_prehashed(&cmd_buf->local_res_states, &keyhash, &new_res_state, &new_res);
 
   if (new_res) {
     ngfvk_sync_res_data* sync_res_data = *sync_res_data_out;
@@ -3049,10 +3037,10 @@ static void ngfvk_sync_commit_pending_barriers_legacy(
       buffer_barrier->buffer                = (VkBuffer)buf->alloc.obj_handle;
       buffer_barrier->size                  = buf->size;
       break;
+    }
     default:
       assert(false);
       break;
-    }
     }
   }
   ngfi_chnklist_clear(&pending_bars->chnklist);
@@ -3139,12 +3127,12 @@ static void ngfvk_sync_commit_pending_barriers_sync2(
         .sType                    = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
         .pNext                    = NULL,
         .dependencyFlags          = 0u,
-        .bufferMemoryBarrierCount = nbuf_bars,
-        .imageMemoryBarrierCount  = nimg_bars,
         .memoryBarrierCount       = 0u,
+        .pMemoryBarriers          = NULL,
+        .bufferMemoryBarrierCount = nbuf_bars,
         .pBufferMemoryBarriers    = buf_bars,
-        .pImageMemoryBarriers     = img_bars,
-        .pMemoryBarriers          = NULL};
+        .imageMemoryBarrierCount  = nimg_bars,
+        .pImageMemoryBarriers     = img_bars};
     vkCmdPipelineBarrier2(cmd_buf, &dep_info);
   }
 }
@@ -3161,7 +3149,7 @@ static void ngfvk_sync_commit_pending_barriers(
 
 static void ngfvk_sync_req_batch_process(ngfvk_sync_req_batch* batch, ngf_cmd_buffer cmd_buf) {
   for (size_t i = 0u; i < batch->npending_sync_reqs; ++i) {
-    ngfvk_sync_res_data* sync_res_data = ngfi_dict_get_prehashed(
+    auto sync_res_data = (ngfvk_sync_res_data*)ngfi_dict_get_prehashed(
         &cmd_buf->local_res_states,
         &batch->sync_res_data_keys[i],
         NULL,
@@ -3251,7 +3239,7 @@ static ngfvk_sync_res ngfvk_sync_res_from_bind_op(const ngf_resource_bind_op* bi
   default:
     break;
   }
-  const ngfvk_sync_res none = {.type = NGFVK_SYNC_RES_COUNT, .data = {.buf = NULL}};
+  const ngfvk_sync_res none = {.data = {.buf = NULL}, .type = NGFVK_SYNC_RES_COUNT };
   return none;
 }
 
@@ -3446,10 +3434,11 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
 static void ngfvk_debug_label_begin(VkCommandBuffer b, const char* name) {
   if (vkCmdBeginDebugUtilsLabelEXT) {
     const VkDebugUtilsLabelEXT label = {
-        .color      = {0.f, 0.f, 0.f, 0.f},
-        .pLabelName = name,
+        
+        .sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
         .pNext      = NULL,
-        .sType      = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT};
+        .pLabelName = name,
+        .color      = {0.f, 0.f, 0.f, 0.f} };
     vkCmdBeginDebugUtilsLabelEXT(b, &label);
   }
 }
@@ -3466,8 +3455,9 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
 
   ngf_error        err       = NGF_ERROR_OK;
   const uint32_t   ncmd_bufs = NGFI_DARRAY_SIZE(frame_res->submitted_cmd_bufs);
-  VkCommandBuffer* submitted_cmd_buf_handles =
-      ngfi_sa_alloc(ngfi_frame_store(), sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 2u);
+  auto             submitted_cmd_buf_handles = (VkCommandBuffer*)ngfi_sa_alloc(
+      ngfi_frame_store(),
+      sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 2u);
   uint32_t submitted_cmd_buf_handles_idx = 0u;
 
   {
@@ -3485,34 +3475,35 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
       const VkImageMemoryBarrier bar[] = {
           {.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
            .pNext         = NULL,
-           .image         = (VkImage)_vk.dummy_res.img->alloc.obj_handle,
-           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
-           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
            .srcAccessMask = 0,
            .dstAccessMask = 0,
+           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
+           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .image         = (VkImage)_vk.dummy_res.img->alloc.obj_handle,
            .subresourceRange =
                {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseArrayLayer = 0u,
                 .baseMipLevel   = 0u,
-                .layerCount     = 1u,
-                .levelCount     = 1u},
-           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED},
+                .levelCount     = 1u,
+                .baseArrayLayer = 0u,
+                .layerCount     = 1u},
+           },
           {.sType         = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
            .pNext         = NULL,
-           .image         = (VkImage)_vk.dummy_res.cube->alloc.obj_handle,
-           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
-           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
            .srcAccessMask = 0,
            .dstAccessMask = 0,
+           .oldLayout     = VK_IMAGE_LAYOUT_UNDEFINED,
+           .newLayout     = VK_IMAGE_LAYOUT_GENERAL,
+           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+           .image         = (VkImage)_vk.dummy_res.cube->alloc.obj_handle,
            .subresourceRange =
                {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseArrayLayer = 0u,
                 .baseMipLevel   = 0u,
-                .layerCount     = 6u,
-                .levelCount     = 1u},
-           .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED}};
+                .levelCount     = 1u,
+                .baseArrayLayer = 0u,
+                .layerCount     = 6u}}};
       vkCmdPipelineBarrier(aux_cmd_buf, 0, 0, 0, 0, NULL, 0, NULL, 2, bar);
       vkEndCommandBuffer(aux_cmd_buf);
       submitted_cmd_buf_handles[submitted_cmd_buf_handles_idx++] = aux_cmd_buf;
@@ -3619,11 +3610,11 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
           .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
           .image               = (VkImage)swapchain_image->alloc.obj_handle,
           .subresourceRange    = {
-                 .baseMipLevel   = 0u,
-                 .baseArrayLayer = 0u,
                  .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                 .layerCount     = 1u,
-                 .levelCount     = 1u}};
+                 .baseMipLevel   = 0u,
+                 .levelCount     = 1u,
+                 .baseArrayLayer = 0u,
+                 .layerCount     = 1u}};
       vkCmdPipelineBarrier(
           aux_cmd_buf,
           swapchain_image->sync_state.last_writer_masks.stage_mask,
@@ -3648,13 +3639,13 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   const VkSubmitInfo         submit_info  = {
                .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
                .pNext                = NULL,
-               .pCommandBuffers      = submitted_cmd_buf_handles,
-               .commandBufferCount   = submitted_cmd_buf_handles_idx,
-               .pWaitDstStageMask    = wait_masks,
-               .pWaitSemaphores      = needs_present ? &wait_semaphore : NULL,
                .waitSemaphoreCount   = needs_present ? 1u : 0u,
-               .pSignalSemaphores    = needs_present ? &(frame_res->semaphore) : NULL,
-               .signalSemaphoreCount = needs_present ? 1u : 0u};
+               .pWaitSemaphores      = needs_present ? &wait_semaphore : NULL,
+               .pWaitDstStageMask    = wait_masks,
+               .commandBufferCount   = submitted_cmd_buf_handles_idx,
+               .pCommandBuffers      = submitted_cmd_buf_handles,
+               .signalSemaphoreCount = needs_present ? 1u : 0u,
+               .pSignalSemaphores    = needs_present ? &(frame_res->semaphore) : NULL };
 
   VkResult submit_result = vkQueueSubmit(_vk.gfx_queue, 1, &submit_info, signal_fence);
 
@@ -3722,11 +3713,17 @@ static void ngfvk_desc_pools_list_dtor(ngfi_chnk_hdr* chunk) {
   }
 }
 
+#if defined(__APPLE__)
+void* ngfvk_create_ca_metal_layer(const ngf_swapchain_info*);
+#endif
+
+void ngfi_dump_sys_alloc_dbgstats(FILE* out);
+
 #pragma endregion
 
 #pragma region external_funcs
 
-ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
+extern "C" ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT {
   ngfvk_init_loader_if_necessary();
   if (NGFVK_DEVICE_LIST == NULL) {
     ngf_error  err          = NGF_ERROR_OK;
@@ -3746,15 +3743,15 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
 
     PFN_vkDestroyInstance destroy_vk_instance =
         (PFN_vkDestroyInstance)vkGetInstanceProcAddr(tmp_instance, "vkDestroyInstance");
+    {
     vk_err = enumerate_vk_phys_devs(tmp_instance, &NGFVK_DEVICE_COUNT, NULL);
     if (vk_err != VK_SUCCESS || NGFVK_DEVICE_COUNT == 0) {
       err = NGF_ERROR_OBJECT_CREATION_FAILED;
       goto ngf_enumerate_devices_cleanup;
     }
-    NGFVK_DEVICE_LIST    = malloc(sizeof(ngf_device) * NGFVK_DEVICE_COUNT);
-    NGFVK_DEVICE_ID_LIST = malloc(sizeof(ngfvk_device_id) * NGFVK_DEVICE_COUNT);
-    VkPhysicalDevice* phys_devs =
-        ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkPhysicalDevice) * NGFVK_DEVICE_COUNT);
+    NGFVK_DEVICE_LIST    = (ngf_device*)malloc(sizeof(ngf_device) * NGFVK_DEVICE_COUNT);
+    NGFVK_DEVICE_ID_LIST = (ngfvk_device_id*)malloc(sizeof(ngfvk_device_id) * NGFVK_DEVICE_COUNT);
+    VkPhysicalDevice* phys_devs = NGFI_SALLOC(VkPhysicalDevice, NGFVK_DEVICE_COUNT);
     if (NGFVK_DEVICE_LIST == NULL || NGFVK_DEVICE_ID_LIST == NULL || phys_devs == NULL) {
       err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_enumerate_devices_cleanup;
@@ -3842,6 +3839,7 @@ ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
         }
       }
     }
+    }
 ngf_enumerate_devices_cleanup:
     if (tmp_instance != VK_NULL_HANDLE) { destroy_vk_instance(tmp_instance, NULL); }
     if (err != NGF_ERROR_OK) return err;
@@ -3851,7 +3849,7 @@ ngf_enumerate_devices_cleanup:
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_initialize(const ngf_init_info* init_info) {
+extern "C" ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT {
   assert(init_info);
 
   if (init_info->renderdoc_info) {
@@ -4048,12 +4046,12 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   const VkBool32 enable_cubemap_arrays =
       NGFVK_DEVICE_LIST[device_idx].capabilities.cubemap_arrays_supported ? VK_TRUE : VK_FALSE;
   const VkPhysicalDeviceFeatures required_features = {
-      .depthBiasClamp                       = VK_TRUE,
+      .imageCubeArray                       = enable_cubemap_arrays,
       .independentBlend                     = VK_TRUE,
+      .depthBiasClamp                       = VK_TRUE,
       .samplerAnisotropy                    = VK_TRUE,
       .shaderStorageImageReadWithoutFormat  = VK_TRUE,
-      .shaderStorageImageWriteWithoutFormat = VK_TRUE,
-      .imageCubeArray                       = enable_cubemap_arrays};
+      .shaderStorageImageWriteWithoutFormat = VK_TRUE};
   VkPhysicalDeviceShaderFloat16Int8Features sf16_features = {
       .sType         = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES,
       .pNext         = NULL,
@@ -4114,9 +4112,9 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .pQueueCreateInfos       = &queue_infos[same_gfx_and_present ? 1u : 0u],
       .enabledLayerCount       = 0,
       .ppEnabledLayerNames     = NULL,
-      .pEnabledFeatures        = &required_features,
       .enabledExtensionCount   = NGFI_DARRAY_SIZE(device_exts),
-      .ppEnabledExtensionNames = device_exts.data};
+      .ppEnabledExtensionNames = device_exts.data,
+      .pEnabledFeatures        = &required_features };
   vk_err = vkCreateDevice(_vk.phys_dev, &dev_info, NULL, &_vk.device);
 
   if (vk_err != VK_SUCCESS) {
@@ -4135,7 +4133,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
       .vkGetDeviceProcAddr   = vkGetDeviceProcAddr,
   };
   VmaAllocatorCreateInfo vma_info = {
-      .flags                       = _vk.ray_tracing_enabled ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0,
+      .flags                       = (VmaAllocatorCreateFlags)(_vk.ray_tracing_enabled ? VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT : 0),
       .physicalDevice              = _vk.phys_dev,
       .device                      = _vk.device,
       .preferredLargeHeapBlockSize = 0u,
@@ -4171,26 +4169,26 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
 
   // Create dummy objects to pre-bind in fresh descriptor sets.
   const ngf_image_info dummy_img_info = {
-      .extent       = {1u, 1u, 1u},
-      .format       = NGF_IMAGE_FORMAT_R8,
-      .nlayers      = 1u,
-      .nmips        = 1u,
-      .sample_count = NGF_SAMPLE_COUNT_1,
       .type         = NGF_IMAGE_TYPE_IMAGE_2D,
+      .extent       = {1u, 1u, 1u},
+      .nmips        = 1u,
+      .nlayers      = 1u,
+      .format       = NGF_IMAGE_FORMAT_R8,
+      .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE};
   const ngf_image_info dummy_cube_info = {
-      .extent       = {1u, 1u, 1u},
-      .format       = NGF_IMAGE_FORMAT_R8,
-      .nlayers      = 1u,
-      .nmips        = 1u,
-      .sample_count = NGF_SAMPLE_COUNT_1,
       .type         = NGF_IMAGE_TYPE_CUBE,
+      .extent       = {1u, 1u, 1u},
+      .nmips        = 1u,
+      .nlayers      = 1u,
+      .format       = NGF_IMAGE_FORMAT_R8,
+      .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE};
   const ngf_buffer_info dummy_buf_info = {
-      .buffer_usage = NGF_BUFFER_USAGE_STORAGE_BUFFER | NGF_BUFFER_USAGE_UNIFORM_BUFFER |
-                      NGF_BUFFER_USAGE_TEXEL_BUFFER,
       .size         = 1u,
-      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL};
+      .storage_type = NGF_BUFFER_STORAGE_DEVICE_LOCAL,
+      .buffer_usage = NGF_BUFFER_USAGE_STORAGE_BUFFER | NGF_BUFFER_USAGE_UNIFORM_BUFFER |
+                      NGF_BUFFER_USAGE_TEXEL_BUFFER};
   ngf_sampler_info dummy_samp_info;
   memset(&dummy_samp_info, 0, sizeof(dummy_samp_info));
   ngf_create_image(&dummy_img_info, &_vk.dummy_res.img);
@@ -4230,7 +4228,7 @@ ngf_error ngf_initialize(const ngf_init_info* init_info) {
   return NGF_ERROR_OK;
 }
 
-void ngf_shutdown(void) {
+extern "C" void ngf_shutdown(void) NGF_NOEXCEPT {
   NGFI_DIAG_INFO("Shutting down nicegraf.");
 
   if (CURRENT_CONTEXT != NULL) { NGFI_DIAG_ERROR("Context not destroyed before shutdown.") }
@@ -4266,239 +4264,238 @@ void ngf_shutdown(void) {
 #endif
 }
 
-const ngf_device_capabilities* ngf_get_device_capabilities(void) {
+extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT {
   return &DEVICE_CAPS;
 }
 
-#if defined(__APPLE__)
-void* ngfvk_create_ca_metal_layer(const ngf_swapchain_info*);
-#endif
-
-ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) {
+extern "C" ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
+  
+  ngf_error   err = NGF_ERROR_OK;
+  ngf_context ctx = NULL;
 
-  ngf_error                 err            = NGF_ERROR_OK;
-  VkResult                  vk_err         = VK_SUCCESS;
-  const ngf_swapchain_info* swapchain_info = info->swapchain_info;
+  {
+    VkResult                  vk_err         = VK_SUCCESS;
+    const ngf_swapchain_info* swapchain_info = info->swapchain_info;
 
-  // Allocate space for context data.
-  *result         = NGFI_ALLOC(struct ngf_context_t);
-  ngf_context ctx = *result;
-  if (ctx == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto ngf_create_context_cleanup;
-  }
-  memset(ctx, 0, sizeof(struct ngf_context_t));
+    // Allocate space for context data.
+    *result         = NGFI_ALLOC(struct ngf_context_t);
+    ctx = *result;
+    if (ctx == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngf_create_context_cleanup;
+    }
+    memset(ctx, 0, sizeof(struct ngf_context_t));
 
-  // Create swapchain if necessary.
-  if (swapchain_info != NULL) {
-    // Begin by creating the window surface.
+    // Create swapchain if necessary.
+    if (swapchain_info != NULL) {
+      // Begin by creating the window surface.
 #if defined(_WIN32) || defined(_WIN64)
-    const VkWin32SurfaceCreateInfoKHR surface_info = {
-        .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .pNext     = NULL,
-        .flags     = 0,
-        .hinstance = GetModuleHandle(NULL),
-        .hwnd      = (HWND)swapchain_info->native_handle};
+      const VkWin32SurfaceCreateInfoKHR surface_info = {
+          .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+          .pNext     = NULL,
+          .flags     = 0,
+          .hinstance = GetModuleHandle(NULL),
+          .hwnd      = (HWND)swapchain_info->native_handle};
 #elif defined(__ANDROID__)
-    const VkAndroidSuraceCreateInfoKHR surface_info = {
-        .sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
-        .pNext  = NULL,
-        .flags  = 0,
-        .window = swapchain_info->native_handle};
+      const VkAndroidSuraceCreateInfoKHR surface_info = {
+          .sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+          .pNext  = NULL,
+          .flags  = 0,
+          .window = swapchain_info->native_handle};
 #elif defined(__APPLE__)
-    const VkMetalSurfaceCreateInfoEXT surface_info = {
-        .sType  = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
-        .pNext  = NULL,
-        .flags  = 0,
-        .pLayer = (const CAMetalLayer*)ngfvk_create_ca_metal_layer(swapchain_info)};
+      const VkMetalSurfaceCreateInfoEXT surface_info = {
+          .sType  = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
+          .pNext  = NULL,
+          .flags  = 0,
+          .pLayer = (const CAMetalLayer*)ngfvk_create_ca_metal_layer(swapchain_info)};
 #else
-    const VkXcbSurfaceCreateInfoKHR surface_info = {
-        .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-        .pNext      = NULL,
-        .flags      = 0,
-        .window     = (xcb_window_t)swapchain_info->native_handle,
-        .connection = _vk.xcb_connection};
+      const VkXcbSurfaceCreateInfoKHR surface_info = {
+          .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+          .pNext      = NULL,
+          .flags      = 0,
+          .window     = (xcb_window_t)swapchain_info->native_handle,
+          .connection = _vk.xcb_connection};
 #endif
-    vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-    VkBool32 surface_supported = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(
-        _vk.phys_dev,
-        _vk.present_family_idx,
-        ctx->surface,
-        &surface_supported);
-    if (!surface_supported) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
-    // Create the default rendertarget object.
-    const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
-    const bool default_rt_is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
-    const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
-                                       swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
-
-    ctx->default_render_target = NGFI_ALLOC(struct ngf_render_target_t);
-    if (ctx->default_render_target == NULL) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-    const uint32_t nattachment_descs =
-        1u + (default_rt_has_depth ? 1u : 0u) + (default_rt_is_multisampled ? 1u : 0u);
-
-    ctx->default_render_target->is_default   = true;
-    ctx->default_render_target->width        = swapchain_info->width;
-    ctx->default_render_target->height       = swapchain_info->height;
-    ctx->default_render_target->frame_buffer = VK_NULL_HANDLE;
-    ctx->default_render_target->nattachments = nattachment_descs;
-    ctx->default_render_target->attachment_descs =
-        NGFI_ALLOCN(ngf_attachment_description, nattachment_descs);
-    ctx->default_render_target->attachment_compat_pass_descs =
-        NGFI_ALLOCN(ngfvk_attachment_pass_desc, nattachment_descs);
-    ctx->default_render_target->attachment_image_views = NULL;
-    ctx->default_render_target->attachment_images      = NULL;
-
-    uint32_t                    attachment_desc_idx = 0u;
-    ngf_attachment_description* color_attachment_desc =
-        &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-    color_attachment_desc->format       = swapchain_info->color_format;
-    color_attachment_desc->sample_count = swapchain_info->sample_count;
-    color_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
-    color_attachment_desc->is_resolve   = false;
-
-    ngfvk_attachment_pass_desc* color_attachment_pass_desc =
-        &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-    color_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_pass_desc->is_resolve = false;
-    color_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    if (default_rt_has_depth) {
-      ++attachment_desc_idx;
-
-      ngf_attachment_description* depth_attachment_desc =
-          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-      depth_attachment_desc->format       = swapchain_info->depth_format;
-      depth_attachment_desc->sample_count = swapchain_info->sample_count;
-      depth_attachment_desc->type =
-          default_rt_no_stencil ? NGF_ATTACHMENT_DEPTH : NGF_ATTACHMENT_DEPTH_STENCIL;
-      depth_attachment_desc->is_resolve = false;
-
-      ngfvk_attachment_pass_desc* depth_attachment_pass_desc =
-          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-      depth_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      depth_attachment_pass_desc->is_resolve = false;
-      depth_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      depth_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    }
-
-    if (default_rt_is_multisampled) {
-      ++attachment_desc_idx;
-
-      ngf_attachment_description* resolve_attachment_desc =
-          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-      resolve_attachment_desc->format       = swapchain_info->color_format;
-      resolve_attachment_desc->sample_count = NGF_SAMPLE_COUNT_1;
-      resolve_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
-      resolve_attachment_desc->is_resolve   = true;
-
-      ngfvk_attachment_pass_desc* resolve_attachment_pass_desc =
-          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-      resolve_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      resolve_attachment_pass_desc->is_resolve = true;
-      resolve_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      resolve_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-      ctx->default_render_target->have_resolve_attachments = true;
-    }
-
-    ngfvk_renderpass_from_attachment_descs(
-        nattachment_descs,
-        ctx->default_render_target->attachment_descs,
-        ctx->default_render_target->attachment_compat_pass_descs,
-        &ctx->default_render_target->compat_render_pass);
-
-    // Create the swapchain itself.
-    ngf_context tmp = CURRENT_CONTEXT;
-    CURRENT_CONTEXT = ctx;
-    err             = ngfvk_create_swapchain(swapchain_info, ctx->surface, &ctx->swapchain);
-    CURRENT_CONTEXT = tmp;
-    if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
-    ctx->swapchain_info = *swapchain_info;
-  } else {
-    ctx->default_render_target = NULL;
-  }
-
-  // Initialize block allocator for this context.
-  ctx->blkalloc = ngfi_blkalloc_create(
-      1024,  // 1K per block
-      16u);  // 16 blocks per pool
-  if (ctx->blkalloc == NULL) {
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    goto ngf_create_context_cleanup;
-  }
-
-  // Create frame resource holders.
-  const uint32_t max_inflight_frames = swapchain_info ? ctx->swapchain.nimgs : 3u;
-  ctx->max_inflight_frames           = max_inflight_frames;
-  ctx->frame_res                     = NGFI_ALLOCN(ngfvk_frame_resources, max_inflight_frames);
-  if (ctx->frame_res == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto ngf_create_context_cleanup;
-  }
-  for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    memset(ctx->frame_res[f].retire_objs, 0, sizeof(ctx->frame_res[f].retire_objs));
-    for (uint32_t i = 0u; i < NGFVK_RETIRE_OBJ_COUNT; ++i) {
-      ctx->frame_res[f].retire_objs[i].blkalloc = ctx->blkalloc;
-    }
-    NGFI_DARRAY_RESET(ctx->frame_res[f].submitted_cmd_bufs, 8u);
-
-    ctx->frame_res[f].semaphore                = VK_NULL_HANDLE;
-    const VkSemaphoreCreateInfo semaphore_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0u,
-    };
-    vk_err = vkCreateSemaphore(_vk.device, &semaphore_info, NULL, &ctx->frame_res[f].semaphore);
-    if (vk_err != VK_SUCCESS) {
-      err = NGF_ERROR_OBJECT_CREATION_FAILED;
-      goto ngf_create_context_cleanup;
-    }
-
-    const VkFenceCreateInfo fence_info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0u};
-    ctx->frame_res[f].nwait_fences = 0;
-    for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
-      vk_err = vkCreateFence(_vk.device, &fence_info, NULL, &ctx->frame_res[f].fences[i]);
+      vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
       if (vk_err != VK_SUCCESS) {
         err = NGF_ERROR_OBJECT_CREATION_FAILED;
         goto ngf_create_context_cleanup;
       }
+      VkBool32 surface_supported = false;
+      vkGetPhysicalDeviceSurfaceSupportKHR(
+          _vk.phys_dev,
+          _vk.present_family_idx,
+          ctx->surface,
+          &surface_supported);
+      if (!surface_supported) {
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_context_cleanup;
+      }
+
+      // Create the default rendertarget object.
+      const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
+      const bool default_rt_is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
+      const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
+                                         swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
+
+      ctx->default_render_target = NGFI_ALLOC(struct ngf_render_target_t);
+      if (ctx->default_render_target == NULL) {
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_context_cleanup;
+      }
+      const uint32_t nattachment_descs =
+          1u + (default_rt_has_depth ? 1u : 0u) + (default_rt_is_multisampled ? 1u : 0u);
+
+      ctx->default_render_target->is_default   = true;
+      ctx->default_render_target->width        = swapchain_info->width;
+      ctx->default_render_target->height       = swapchain_info->height;
+      ctx->default_render_target->frame_buffer = VK_NULL_HANDLE;
+      ctx->default_render_target->nattachments = nattachment_descs;
+      ctx->default_render_target->attachment_descs =
+          NGFI_ALLOCN(ngf_attachment_description, nattachment_descs);
+      ctx->default_render_target->attachment_compat_pass_descs =
+          NGFI_ALLOCN(ngfvk_attachment_pass_desc, nattachment_descs);
+      ctx->default_render_target->attachment_image_views = NULL;
+      ctx->default_render_target->attachment_images      = NULL;
+
+      uint32_t                    attachment_desc_idx = 0u;
+      ngf_attachment_description* color_attachment_desc =
+          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+      color_attachment_desc->format       = swapchain_info->color_format;
+      color_attachment_desc->sample_count = swapchain_info->sample_count;
+      color_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
+      color_attachment_desc->is_resolve   = false;
+
+      ngfvk_attachment_pass_desc* color_attachment_pass_desc =
+          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+      color_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      color_attachment_pass_desc->is_resolve = false;
+      color_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      color_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+      if (default_rt_has_depth) {
+        ++attachment_desc_idx;
+
+        ngf_attachment_description* depth_attachment_desc =
+            &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+        depth_attachment_desc->format       = swapchain_info->depth_format;
+        depth_attachment_desc->sample_count = swapchain_info->sample_count;
+        depth_attachment_desc->type =
+            default_rt_no_stencil ? NGF_ATTACHMENT_DEPTH : NGF_ATTACHMENT_DEPTH_STENCIL;
+        depth_attachment_desc->is_resolve = false;
+
+        ngfvk_attachment_pass_desc* depth_attachment_pass_desc =
+            &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+        depth_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        depth_attachment_pass_desc->is_resolve = false;
+        depth_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        depth_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      }
+
+      if (default_rt_is_multisampled) {
+        ++attachment_desc_idx;
+
+        ngf_attachment_description* resolve_attachment_desc =
+            &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+        resolve_attachment_desc->format       = swapchain_info->color_format;
+        resolve_attachment_desc->sample_count = NGF_SAMPLE_COUNT_1;
+        resolve_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
+        resolve_attachment_desc->is_resolve   = true;
+
+        ngfvk_attachment_pass_desc* resolve_attachment_pass_desc =
+            &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+        resolve_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        resolve_attachment_pass_desc->is_resolve = true;
+        resolve_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        resolve_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+        ctx->default_render_target->have_resolve_attachments = true;
+      }
+
+      ngfvk_renderpass_from_attachment_descs(
+          nattachment_descs,
+          ctx->default_render_target->attachment_descs,
+          ctx->default_render_target->attachment_compat_pass_descs,
+          &ctx->default_render_target->compat_render_pass);
+
+      // Create the swapchain itself.
+      ngf_context tmp = CURRENT_CONTEXT;
+      CURRENT_CONTEXT = ctx;
+      err             = ngfvk_create_swapchain(swapchain_info, ctx->surface, &ctx->swapchain);
+      CURRENT_CONTEXT = tmp;
+      if (err != NGF_ERROR_OK) goto ngf_create_context_cleanup;
+      ctx->swapchain_info = *swapchain_info;
+    } else {
+      ctx->default_render_target = NULL;
     }
+
+    // Initialize block allocator for this context.
+    ctx->blkalloc = ngfi_blkalloc_create(
+        1024,  // 1K per block
+        16u);  // 16 blocks per pool
+    if (ctx->blkalloc == NULL) {
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_context_cleanup;
+    }
+
+    // Create frame resource holders.
+    const uint32_t max_inflight_frames = swapchain_info ? ctx->swapchain.nimgs : 3u;
+    ctx->max_inflight_frames           = max_inflight_frames;
+    ctx->frame_res                     = NGFI_ALLOCN(ngfvk_frame_resources, max_inflight_frames);
+    if (ctx->frame_res == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngf_create_context_cleanup;
+    }
+    for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
+      memset(ctx->frame_res[f].retire_objs, 0, sizeof(ctx->frame_res[f].retire_objs));
+      for (uint32_t i = 0u; i < NGFVK_RETIRE_OBJ_COUNT; ++i) {
+        ctx->frame_res[f].retire_objs[i].blkalloc = ctx->blkalloc;
+      }
+      NGFI_DARRAY_RESET(ctx->frame_res[f].submitted_cmd_bufs, 8u);
+
+      ctx->frame_res[f].semaphore                = VK_NULL_HANDLE;
+      const VkSemaphoreCreateInfo semaphore_info = {
+          .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+          .pNext = NULL,
+          .flags = 0u,
+      };
+      vk_err = vkCreateSemaphore(_vk.device, &semaphore_info, NULL, &ctx->frame_res[f].semaphore);
+      if (vk_err != VK_SUCCESS) {
+        err = NGF_ERROR_OBJECT_CREATION_FAILED;
+        goto ngf_create_context_cleanup;
+      }
+
+      const VkFenceCreateInfo fence_info = {
+          .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+          .pNext = NULL,
+          .flags = 0u};
+      ctx->frame_res[f].nwait_fences = 0;
+      for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
+        vk_err = vkCreateFence(_vk.device, &fence_info, NULL, &ctx->frame_res[f].fences[i]);
+        if (vk_err != VK_SUCCESS) {
+          err = NGF_ERROR_OBJECT_CREATION_FAILED;
+          goto ngf_create_context_cleanup;
+        }
+      }
+    }
+
+    ctx->frame_id            = 0u;
+    ctx->current_frame_token = ~0u;
+
+    NGFI_DARRAY_RESET(ctx->command_superpools, 3);
+    NGFI_DARRAY_RESET(ctx->desc_superpools, 3);
+    NGFI_DARRAY_RESET(ctx->renderpass_cache, 8);
+
+    ctx->cmd_buffer_counter = 0u;
   }
-
-  ctx->frame_id            = 0u;
-  ctx->current_frame_token = ~0u;
-
-  NGFI_DARRAY_RESET(ctx->command_superpools, 3);
-  NGFI_DARRAY_RESET(ctx->desc_superpools, 3);
-  NGFI_DARRAY_RESET(ctx->renderpass_cache, 8);
-
-  ctx->cmd_buffer_counter = 0u;
-
 ngf_create_context_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_context(ctx); }
   return err;
 }
 
-ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) {
+extern "C" ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT {
   assert(ctx);
   if (ctx == NULL || ctx->default_render_target == NULL) { return NGF_ERROR_INVALID_OPERATION; }
 
@@ -4512,7 +4509,7 @@ ngf_error ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_h
   return err;
 }
 
-void ngf_destroy_context(ngf_context ctx) {
+extern "C" void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT {
   if (ctx != NULL) {
     ctx->being_destroyed = true;
     vkDeviceWaitIdle(_vk.device);
@@ -4555,16 +4552,16 @@ void ngf_destroy_context(ngf_context ctx) {
   }
 }
 
-ngf_error ngf_set_context(ngf_context ctx) {
+extern "C" ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
   CURRENT_CONTEXT = ctx;
   return NGF_ERROR_OK;
 }
 
-ngf_context ngf_get_context() {
+extern "C" ngf_context ngf_get_context() NGF_NOEXCEPT {
   return CURRENT_CONTEXT;
 }
 
-ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) {
+extern "C" ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   NGFI_IGNORE_VAR(info);
@@ -4598,7 +4595,7 @@ ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info* info, ngf_cmd_buffer*
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_render_pass_simple(
+extern "C" ngf_error ngf_cmd_begin_render_pass_simple(
     ngf_cmd_buffer      cmd_buf,
     ngf_render_target   rt,
     float               clear_color_r,
@@ -4607,13 +4604,11 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_color_a,
     float               clear_depth,
     uint32_t            clear_stencil,
-    ngf_render_encoder* enc) {
+    ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi_sa_reset(ngfi_tmp_store());
-  ngf_attachment_load_op* load_ops =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_load_op) * rt->nattachments);
-  ngf_attachment_store_op* store_ops =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_attachment_store_op) * rt->nattachments);
-  ngf_clear* clears = ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_clear) * rt->nattachments);
+  auto load_ops = NGFI_SALLOC(ngf_attachment_load_op, rt->nattachments);
+  auto store_ops = NGFI_SALLOC(ngf_attachment_store_op, rt->nattachments);
+  auto clears = NGFI_SALLOC(ngf_clear, rt->nattachments);
 
   for (size_t i = 0u; i < rt->nattachments; ++i) {
     load_ops[i] = NGF_LOAD_OP_CLEAR;
@@ -4642,10 +4637,11 @@ ngf_error ngf_cmd_begin_render_pass_simple(
   };
   return ngf_cmd_begin_render_pass(cmd_buf, &pass_info, enc);
 }
-ngf_error ngf_cmd_begin_render_pass(
+
+extern "C" ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buf,
     const ngf_render_pass_info* pass_info,
-    ngf_render_encoder*         enc) {
+    ngf_render_encoder*         enc) NGF_NOEXCEPT {
   ngf_error err = NGF_ERROR_OK;
 
   ngfvk_encoder_start(cmd_buf);
@@ -4661,7 +4657,7 @@ ngf_error ngf_cmd_begin_render_pass(
 
   cmd_buf->pending_render_pass_info.render_target = pass_info->render_target;
 
-  ngf_attachment_load_op* cloned_load_ops = ngfi_sa_alloc(
+  auto cloned_load_ops = (ngf_attachment_load_op*)ngfi_sa_alloc(
       ngfi_frame_store(),
       sizeof(ngf_attachment_load_op) * pass_info->render_target->nattachments);
   cmd_buf->pending_render_pass_info.load_ops = cloned_load_ops;
@@ -4671,7 +4667,7 @@ ngf_error ngf_cmd_begin_render_pass(
       pass_info->load_ops,
       sizeof(ngf_attachment_load_op) * pass_info->render_target->nattachments);
 
-  ngf_attachment_store_op* cloned_store_ops = ngfi_sa_alloc(
+  auto cloned_store_ops = (ngf_attachment_store_op*)ngfi_sa_alloc(
       ngfi_frame_store(),
       sizeof(ngf_attachment_store_op) * pass_info->render_target->nattachments);
   cmd_buf->pending_render_pass_info.store_ops = cloned_store_ops;
@@ -4683,8 +4679,7 @@ ngf_error ngf_cmd_begin_render_pass(
 
   uint32_t   nclears   = 0u;
   uint32_t   clear_idx = 0u;
-  ngf_clear* cloned_clears =
-      ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
+  auto cloned_clears = (ngf_clear*)ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
   if (cloned_clears == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   for (uint32_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     if (cmd_buf->pending_render_pass_info.load_ops[i] == NGF_LOAD_OP_CLEAR) {
@@ -4750,10 +4745,10 @@ ngf_error ngf_cmd_begin_render_pass(
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_xfer_pass(
+extern "C" ngf_error ngf_cmd_begin_xfer_pass(
     ngf_cmd_buffer            cmd_buf,
     const ngf_xfer_pass_info* pass_info,
-    ngf_xfer_encoder*         enc) {
+    ngf_xfer_encoder*         enc) NGF_NOEXCEPT {
   (void)pass_info;
   ngf_error err = ngfvk_encoder_start(cmd_buf);
   if (err != NGF_ERROR_OK) return err;
@@ -4764,10 +4759,10 @@ ngf_error ngf_cmd_begin_xfer_pass(
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_begin_compute_pass(
+extern "C" ngf_error ngf_cmd_begin_compute_pass(
     ngf_cmd_buffer               cmd_buf,
     const ngf_compute_pass_info* pass_info,
-    ngf_compute_encoder*         enc) {
+    ngf_compute_encoder*         enc) NGF_NOEXCEPT {
   (void)pass_info;
   ngf_error err = ngfvk_encoder_start(cmd_buf);
   if (err != NGF_ERROR_OK) return err;
@@ -4779,7 +4774,7 @@ ngf_error ngf_cmd_begin_compute_pass(
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
+extern "C" ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
 
   // Commit all the pending barriers.
@@ -4805,9 +4800,7 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
 
   const uint32_t clear_value_count = buf->pending_clear_value_count;
   VkClearValue*  vk_clears =
-      clear_value_count > 0
-           ? ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkClearValue) * clear_value_count)
-           : NULL;
+      clear_value_count > 0 ? NGFI_SALLOC(VkClearValue, clear_value_count) : NULL;
   if (clear_value_count > 0) {
     for (size_t i = 0; i < clear_value_count; ++i) {
       VkClearValue*    vk_clear_val = &vk_clears[i];
@@ -4831,11 +4824,11 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
   const VkRenderPassBeginInfo begin_info = {
       .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
       .pNext           = NULL,
-      .framebuffer     = fb,
-      .clearValueCount = clear_value_count,
-      .pClearValues    = vk_clears,
       .renderPass      = render_pass,
-      .renderArea      = {.offset = {0u, 0u}, .extent = render_extent}};
+      .framebuffer     = fb,
+      .renderArea      = {.offset = {0u, 0u}, .extent = render_extent},
+      .clearValueCount = clear_value_count,
+      .pClearValues    = vk_clears };
   vkCmdBeginRenderPass(buf->vk_cmd_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
   // Clean up after the begin operation.
@@ -4855,18 +4848,18 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) {
   return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse);
 }
 
-ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) {
+extern "C" ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   return ngfvk_encoder_end(buf, &enc.pvt_data_donotuse);
 }
 
-ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) {
+extern "C" ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
   ngf_cmd_buffer cmd_buf       = NGFVK_ENC2CMDBUF(enc);
   cmd_buf->compute_pass_active = false;
   return ngfvk_encoder_end(cmd_buf, &enc.pvt_data_donotuse);
 }
 
-ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
+extern "C" ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) NGF_NOEXCEPT {
   assert(cmd_buf);
 
   NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY);
@@ -4889,7 +4882,7 @@ ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) {
   return ngfvk_cmd_buffer_allocate_for_frame(token, &cmd_buf->vk_cmd_pool, &cmd_buf->vk_cmd_buffer);
 }
 
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
+extern "C" void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT {
   if (buffer && buffer->state != NGFI_CMD_BUFFER_PENDING) {
     if (buffer->vk_cmd_buffer != VK_NULL_HANDLE) {
       vkFreeCommandBuffers(_vk.device, buffer->vk_cmd_pool, 1u, &buffer->vk_cmd_buffer);
@@ -4904,7 +4897,7 @@ void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) {
   }
 }
 
-ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
+extern "C" ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) NGF_NOEXCEPT {
   assert(cmd_bufs);
   uint32_t               frame_id       = CURRENT_CONTEXT->frame_id;
   ngfvk_frame_resources* frame_res_data = &CURRENT_CONTEXT->frame_res[frame_id];
@@ -4929,7 +4922,7 @@ ngf_error ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) {
   return NGF_ERROR_OK;
 }
 
-ngf_error ngf_begin_frame(ngf_frame_token* token) {
+extern "C" ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   ngf_error err = NGF_ERROR_OK;
 
   // increment frame id.
@@ -4977,9 +4970,7 @@ ngf_error ngf_begin_frame(ngf_frame_token* token) {
   return err;
 }
 
-void ngfi_dump_sys_alloc_dbgstats(FILE* out);
-
-ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) {
+extern "C" ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NOEXCEPT {
   assert(CURRENT_CONTEXT);
   assert(result);
 
@@ -4994,7 +4985,8 @@ ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* resu
   *result = CURRENT_CONTEXT->swapchain.wrapper_imgs[CURRENT_CONTEXT->swapchain.image_idx];
   return NGF_ERROR_OK;
 }
-ngf_error ngf_end_frame(ngf_frame_token token) {
+
+extern "C" ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
   ngfi_blkalloc_cleanup(CURRENT_CONTEXT->blkalloc);
 
   if (token != CURRENT_CONTEXT->current_frame_token) {
@@ -5046,7 +5038,7 @@ ngf_error ngf_end_frame(ngf_frame_token token) {
   return err;
 }
 
-ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* result) {
+extern "C" ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
 
@@ -5058,8 +5050,8 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_
       .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext    = NULL,
       .flags    = 0u,
-      .pCode    = (uint32_t*)info->content,
-      .codeSize = (info->content_length)};
+      .codeSize = (info->content_length),
+      .pCode    = (uint32_t*)info->content };
   VkResult vkerr = vkCreateShaderModule(_vk.device, &vk_sm_info, NULL, &stage->vk_module);
   const SpvReflectResult spverr =
       spvReflectCreateShaderModule(info->content_length, info->content, &stage->spv_reflect_module);
@@ -5075,7 +5067,7 @@ ngf_error ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_shader_stage(ngf_shader_stage stage) {
+extern "C" void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT {
   if (stage) {
     vkDestroyShaderModule(_vk.device, stage->vk_module, NULL);
     spvReflectDestroyShaderModule(&stage->spv_reflect_module);
@@ -5084,294 +5076,302 @@ void ngf_destroy_shader_stage(ngf_shader_stage stage) {
   }
 }
 
-ngf_error ngf_create_graphics_pipeline(
+extern "C" ngf_error ngf_create_graphics_pipeline(
     const ngf_graphics_pipeline_info* info,
-    ngf_graphics_pipeline*            result) {
+    ngf_graphics_pipeline*            result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_error err    = NGF_ERROR_OK;
-  VkResult  vk_err = VK_SUCCESS;
+  ngf_graphics_pipeline pipeline = NULL;
+  {
+    VkResult vk_err = VK_SUCCESS;
 
-  // Allocate space for the pipeline object.
-  *result                        = NGFI_ALLOC(ngf_graphics_pipeline_t);
-  ngf_graphics_pipeline pipeline = *result;
-  if (pipeline == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto ngf_create_graphics_pipeline_cleanup;
-  }
+    // Allocate space for the pipeline object.
+    *result                        = NGFI_ALLOC(ngf_graphics_pipeline_t);
+    pipeline = *result;
+    if (pipeline == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngf_create_graphics_pipeline_cleanup;
+    }
 
-  VkPipelineShaderStageCreateInfo vk_shader_stages[5];
-  err = ngfvk_initialize_generic_pipeline_data(
-      &pipeline->generic_pipeline,
-      info->spec_info,
-      vk_shader_stages,
-      info->shader_stages,
-      info->nshader_stages);
-  if (err != NGF_ERROR_OK) { goto ngf_create_graphics_pipeline_cleanup; }
+    VkPipelineShaderStageCreateInfo vk_shader_stages[5];
+    err = ngfvk_initialize_generic_pipeline_data(
+        &pipeline->generic_pipeline,
+        info->spec_info,
+        vk_shader_stages,
+        info->shader_stages,
+        info->nshader_stages);
+    if (err != NGF_ERROR_OK) { goto ngf_create_graphics_pipeline_cleanup; }
 
-  // Prepare vertex input.
-  VkVertexInputBindingDescription* vk_binding_descs =
-      NGFI_SALLOC(VkVertexInputBindingDescription, info->input_info->nvert_buf_bindings);
-  VkVertexInputAttributeDescription* vk_attrib_descs =
-      NGFI_SALLOC(VkVertexInputAttributeDescription, info->input_info->nattribs);
+    // Prepare vertex input.
+    VkVertexInputBindingDescription* vk_binding_descs =
+        NGFI_SALLOC(VkVertexInputBindingDescription, info->input_info->nvert_buf_bindings);
+    VkVertexInputAttributeDescription* vk_attrib_descs =
+        NGFI_SALLOC(VkVertexInputAttributeDescription, info->input_info->nattribs);
 
-  if (vk_binding_descs == NULL || vk_attrib_descs == NULL) {
-    err = NGF_ERROR_OUT_OF_MEM;
-    goto ngf_create_graphics_pipeline_cleanup;
-  }
+    if (vk_binding_descs == NULL || vk_attrib_descs == NULL) {
+      err = NGF_ERROR_OUT_OF_MEM;
+      goto ngf_create_graphics_pipeline_cleanup;
+    }
 
-  for (uint32_t i = 0u; i < info->input_info->nvert_buf_bindings; ++i) {
-    VkVertexInputBindingDescription*   vk_binding_desc = &vk_binding_descs[i];
-    const ngf_vertex_buf_binding_desc* binding_desc    = &info->input_info->vert_buf_bindings[i];
-    vk_binding_desc->binding                           = binding_desc->binding;
-    vk_binding_desc->stride                            = binding_desc->stride;
-    vk_binding_desc->inputRate = get_vk_input_rate(binding_desc->input_rate);
-  }
+    for (uint32_t i = 0u; i < info->input_info->nvert_buf_bindings; ++i) {
+      VkVertexInputBindingDescription*   vk_binding_desc = &vk_binding_descs[i];
+      const ngf_vertex_buf_binding_desc* binding_desc    = &info->input_info->vert_buf_bindings[i];
+      vk_binding_desc->binding                           = binding_desc->binding;
+      vk_binding_desc->stride                            = binding_desc->stride;
+      vk_binding_desc->inputRate = get_vk_input_rate(binding_desc->input_rate);
+    }
 
-  for (uint32_t i = 0u; i < info->input_info->nattribs; ++i) {
-    VkVertexInputAttributeDescription* vk_attrib_desc = &vk_attrib_descs[i];
-    const ngf_vertex_attrib_desc*      attrib_desc    = &info->input_info->attribs[i];
-    vk_attrib_desc->location                          = attrib_desc->location;
-    vk_attrib_desc->binding                           = attrib_desc->binding;
-    vk_attrib_desc->offset                            = attrib_desc->offset;
-    vk_attrib_desc->format =
-        get_vk_vertex_format(attrib_desc->type, attrib_desc->size, attrib_desc->normalized);
-  }
+    for (uint32_t i = 0u; i < info->input_info->nattribs; ++i) {
+      VkVertexInputAttributeDescription* vk_attrib_desc = &vk_attrib_descs[i];
+      const ngf_vertex_attrib_desc*      attrib_desc    = &info->input_info->attribs[i];
+      vk_attrib_desc->location                          = attrib_desc->location;
+      vk_attrib_desc->binding                           = attrib_desc->binding;
+      vk_attrib_desc->offset                            = attrib_desc->offset;
+      vk_attrib_desc->format =
+          get_vk_vertex_format(attrib_desc->type, attrib_desc->size, attrib_desc->normalized);
+    }
 
-  VkPipelineVertexInputStateCreateInfo vertex_input = {
-      .sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-      .pNext                           = NULL,
-      .flags                           = 0u,
-      .vertexBindingDescriptionCount   = info->input_info->nvert_buf_bindings,
-      .pVertexBindingDescriptions      = vk_binding_descs,
-      .vertexAttributeDescriptionCount = info->input_info->nattribs,
-      .pVertexAttributeDescriptions    = vk_attrib_descs};
+    VkPipelineVertexInputStateCreateInfo vertex_input = {
+        .sType                         = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .pNext                         = NULL,
+        .flags                         = 0u,
+        .vertexBindingDescriptionCount = info->input_info->nvert_buf_bindings,
+        .pVertexBindingDescriptions    = vk_binding_descs,
+        .vertexAttributeDescriptionCount = info->input_info->nattribs,
+        .pVertexAttributeDescriptions    = vk_attrib_descs};
 
-  // Prepare input assembly.
-  VkPipelineInputAssemblyStateCreateInfo input_assembly = {
-      .sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-      .pNext    = NULL,
-      .flags    = 0u,
-      .topology = get_vk_primitive_type(info->input_assembly_info->primitive_topology),
-      .primitiveRestartEnable = info->input_assembly_info->enable_primitive_restart};
+    // Prepare input assembly.
+    VkPipelineInputAssemblyStateCreateInfo input_assembly = {
+        .sType    = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .pNext    = NULL,
+        .flags    = 0u,
+        .topology = get_vk_primitive_type(info->input_assembly_info->primitive_topology),
+        .primitiveRestartEnable = info->input_assembly_info->enable_primitive_restart};
 
-  // Prepare tessellation state.
-  VkPipelineTessellationStateCreateInfo tess = {
-      .sType              = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
-      .pNext              = NULL,
-      .flags              = 0u,
-      .patchControlPoints = 1u};
+    // Prepare tessellation state.
+    VkPipelineTessellationStateCreateInfo tess = {
+        .sType              = VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO,
+        .pNext              = NULL,
+        .flags              = 0u,
+        .patchControlPoints = 1u};
 
-  // Prepare viewport/scissor state.
-  const VkViewport dummy_viewport =
-      {.x = .0f, .y = .0f, .width = .0f, .height = .0f, .minDepth = .0f, .maxDepth = .0f};
-  const VkRect2D dummy_scissor = {.offset = {.x = 0, .y = 0}, .extent = {.width = 0, .height = 0}};
-  VkPipelineViewportStateCreateInfo viewport_state = {
-      .sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
-      .pNext         = NULL,
-      .flags         = 0u,
-      .viewportCount = 1u,
-      .scissorCount  = 1u,
-      .pViewports    = &dummy_viewport,
-      .pScissors     = &dummy_scissor};
+    // Prepare viewport/scissor state.
+    const VkViewport dummy_viewport =
+        {.x = .0f, .y = .0f, .width = .0f, .height = .0f, .minDepth = .0f, .maxDepth = .0f};
+    const VkRect2D dummy_scissor = {
+        .offset = {.x = 0, .y = 0},
+        .extent = {.width = 0, .height = 0}};
+    VkPipelineViewportStateCreateInfo viewport_state = {
+        .sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .pNext         = NULL,
+        .flags         = 0u,
+        .viewportCount = 1u,
+        .pViewports    = &dummy_viewport,
+        .scissorCount  = 1u,
+        .pScissors     = &dummy_scissor};
 
-  // Prepare rasterization state.
-  VkPipelineRasterizationStateCreateInfo rasterization = {
-      .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
-      .pNext                   = NULL,
-      .flags                   = 0u,
-      .depthClampEnable        = VK_FALSE,
-      .rasterizerDiscardEnable = info->rasterization->discard,
-      .polygonMode             = get_vk_polygon_mode(info->rasterization->polygon_mode),
-      .cullMode                = get_vk_cull_mode(info->rasterization->cull_mode),
-      .frontFace               = get_vk_front_face(info->rasterization->front_face),
-      .depthBiasEnable         = info->rasterization->enable_depth_bias ? VK_TRUE : VK_FALSE,
-      .depthBiasConstantFactor = 0.0f,
-      .depthBiasClamp          = 0.0f,
-      .depthBiasSlopeFactor    = 0.0f,
-      .lineWidth               = 1.0f};
+    // Prepare rasterization state.
+    VkPipelineRasterizationStateCreateInfo rasterization = {
+        .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0u,
+        .depthClampEnable        = VK_FALSE,
+        .rasterizerDiscardEnable = info->rasterization->discard,
+        .polygonMode             = get_vk_polygon_mode(info->rasterization->polygon_mode),
+        .cullMode                = get_vk_cull_mode(info->rasterization->cull_mode),
+        .frontFace               = get_vk_front_face(info->rasterization->front_face),
+        .depthBiasEnable         = info->rasterization->enable_depth_bias ? VK_TRUE : VK_FALSE,
+        .depthBiasConstantFactor = 0.0f,
+        .depthBiasClamp          = 0.0f,
+        .depthBiasSlopeFactor    = 0.0f,
+        .lineWidth               = 1.0f};
 
-  // Prepare multisampling.
-  VkPipelineMultisampleStateCreateInfo multisampling = {
-      .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
-      .pNext                 = NULL,
-      .flags                 = 0u,
-      .rasterizationSamples  = get_vk_sample_count(info->multisample->sample_count),
-      .sampleShadingEnable   = VK_FALSE,
-      .minSampleShading      = 0.0f,
-      .pSampleMask           = NULL,
-      .alphaToCoverageEnable = info->multisample->alpha_to_coverage ? VK_TRUE : VK_FALSE,
-      .alphaToOneEnable      = VK_FALSE};
+    // Prepare multisampling.
+    VkPipelineMultisampleStateCreateInfo multisampling = {
+        .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .pNext                 = NULL,
+        .flags                 = 0u,
+        .rasterizationSamples  = get_vk_sample_count(info->multisample->sample_count),
+        .sampleShadingEnable   = VK_FALSE,
+        .minSampleShading      = 0.0f,
+        .pSampleMask           = NULL,
+        .alphaToCoverageEnable = info->multisample->alpha_to_coverage ? VK_TRUE : VK_FALSE,
+        .alphaToOneEnable      = VK_FALSE};
 
-  // Prepare depth/stencil.
-  VkPipelineDepthStencilStateCreateInfo depth_stencil = {
-      .sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-      .pNext                 = NULL,
-      .flags                 = 0u,
-      .depthTestEnable       = info->depth_stencil->depth_test,
-      .depthWriteEnable      = info->depth_stencil->depth_write,
-      .depthCompareOp        = get_vk_compare_op(info->depth_stencil->depth_compare),
-      .depthBoundsTestEnable = VK_FALSE,
-      .stencilTestEnable     = info->depth_stencil->stencil_test,
-      .front =
-          {.failOp      = get_vk_stencil_op(info->depth_stencil->front_stencil.fail_op),
-           .passOp      = get_vk_stencil_op(info->depth_stencil->front_stencil.pass_op),
-           .depthFailOp = get_vk_stencil_op(info->depth_stencil->front_stencil.depth_fail_op),
-           .compareOp   = get_vk_compare_op(info->depth_stencil->front_stencil.compare_op),
-           .compareMask = info->depth_stencil->front_stencil.compare_mask,
-           .writeMask   = info->depth_stencil->front_stencil.write_mask,
-           .reference   = info->depth_stencil->front_stencil.reference},
-      .back =
-          {.failOp      = get_vk_stencil_op(info->depth_stencil->back_stencil.fail_op),
-           .passOp      = get_vk_stencil_op(info->depth_stencil->back_stencil.pass_op),
-           .depthFailOp = get_vk_stencil_op(info->depth_stencil->back_stencil.depth_fail_op),
-           .compareOp   = get_vk_compare_op(info->depth_stencil->back_stencil.compare_op),
-           .compareMask = info->depth_stencil->back_stencil.compare_mask,
-           .writeMask   = info->depth_stencil->back_stencil.write_mask,
-           .reference   = info->depth_stencil->back_stencil.reference},
-      .minDepthBounds = 0.0f,
-      .maxDepthBounds = 1.0f};
+    // Prepare depth/stencil.
+    VkPipelineDepthStencilStateCreateInfo depth_stencil = {
+        .sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .pNext                 = NULL,
+        .flags                 = 0u,
+        .depthTestEnable       = info->depth_stencil->depth_test,
+        .depthWriteEnable      = info->depth_stencil->depth_write,
+        .depthCompareOp        = get_vk_compare_op(info->depth_stencil->depth_compare),
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable     = info->depth_stencil->stencil_test,
+        .front =
+            {.failOp      = get_vk_stencil_op(info->depth_stencil->front_stencil.fail_op),
+             .passOp      = get_vk_stencil_op(info->depth_stencil->front_stencil.pass_op),
+             .depthFailOp = get_vk_stencil_op(info->depth_stencil->front_stencil.depth_fail_op),
+             .compareOp   = get_vk_compare_op(info->depth_stencil->front_stencil.compare_op),
+             .compareMask = info->depth_stencil->front_stencil.compare_mask,
+             .writeMask   = info->depth_stencil->front_stencil.write_mask,
+             .reference   = info->depth_stencil->front_stencil.reference},
+        .back =
+            {.failOp      = get_vk_stencil_op(info->depth_stencil->back_stencil.fail_op),
+             .passOp      = get_vk_stencil_op(info->depth_stencil->back_stencil.pass_op),
+             .depthFailOp = get_vk_stencil_op(info->depth_stencil->back_stencil.depth_fail_op),
+             .compareOp   = get_vk_compare_op(info->depth_stencil->back_stencil.compare_op),
+             .compareMask = info->depth_stencil->back_stencil.compare_mask,
+             .writeMask   = info->depth_stencil->back_stencil.write_mask,
+             .reference   = info->depth_stencil->back_stencil.reference},
+        .minDepthBounds = 0.0f,
+        .maxDepthBounds = 1.0f};
 
-  uint32_t ncolor_attachments = 0u;
-  for (uint32_t i = 0; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
-    if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR &&
-        !info->compatible_rt_attachment_descs->descs[i].is_resolve)
-      ++ncolor_attachments;
-  }
+    uint32_t ncolor_attachments = 0u;
+    for (uint32_t i = 0; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
+      if (info->compatible_rt_attachment_descs->descs[i].type == NGF_ATTACHMENT_COLOR &&
+          !info->compatible_rt_attachment_descs->descs[i].is_resolve)
+        ++ncolor_attachments;
+    }
 
-  // Prepare blend state.
-  VkPipelineColorBlendAttachmentState blend_states[16];
-  memset(blend_states, 0, sizeof(blend_states));
-  for (size_t i = 0u; i < ncolor_attachments; ++i) {
-    if (info->color_attachment_blend_states) {
-      const ngf_blend_info* blend = &info->color_attachment_blend_states[i];
+    // Prepare blend state.
+    VkPipelineColorBlendAttachmentState blend_states[16];
+    memset(blend_states, 0, sizeof(blend_states));
+    for (size_t i = 0u; i < ncolor_attachments; ++i) {
+      if (info->color_attachment_blend_states) {
+        const ngf_blend_info* blend = &info->color_attachment_blend_states[i];
 
-      const VkPipelineColorBlendAttachmentState attachment_blend_state = {
-          .blendEnable         = blend->enable,
-          .srcColorBlendFactor = blend->enable ? get_vk_blend_factor(blend->src_color_blend_factor)
-                                               : VK_BLEND_FACTOR_ONE,
-          .dstColorBlendFactor = blend->enable ? get_vk_blend_factor(blend->dst_color_blend_factor)
-                                               : VK_BLEND_FACTOR_ZERO,
-          .colorBlendOp = blend->enable ? get_vk_blend_op(blend->blend_op_color) : VK_BLEND_OP_ADD,
-          .srcAlphaBlendFactor = blend->enable ? get_vk_blend_factor(blend->src_alpha_blend_factor)
-                                               : VK_BLEND_FACTOR_ONE,
-          .dstAlphaBlendFactor = blend->enable ? get_vk_blend_factor(blend->dst_alpha_blend_factor)
-                                               : VK_BLEND_FACTOR_ZERO,
-          .alphaBlendOp = blend->enable ? get_vk_blend_op(blend->blend_op_alpha) : VK_BLEND_OP_ADD,
-          .colorWriteMask =
-              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R) ? VK_COLOR_COMPONENT_R_BIT
-                                                                      : 0) |
-              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G) ? VK_COLOR_COMPONENT_G_BIT
-                                                                      : 0) |
-              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B) ? VK_COLOR_COMPONENT_B_BIT
-                                                                      : 0) |
-              ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A) ? VK_COLOR_COMPONENT_A_BIT
-                                                                      : 0)};
-      blend_states[i] = attachment_blend_state;
-    } else {
-      blend_states[i].blendEnable    = VK_FALSE;
-      blend_states[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                       VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        const VkPipelineColorBlendAttachmentState attachment_blend_state = {
+            .blendEnable         = blend->enable,
+            .srcColorBlendFactor = blend->enable
+                                       ? get_vk_blend_factor(blend->src_color_blend_factor)
+                                       : VK_BLEND_FACTOR_ONE,
+            .dstColorBlendFactor = blend->enable
+                                       ? get_vk_blend_factor(blend->dst_color_blend_factor)
+                                       : VK_BLEND_FACTOR_ZERO,
+            .colorBlendOp =
+                blend->enable ? get_vk_blend_op(blend->blend_op_color) : VK_BLEND_OP_ADD,
+            .srcAlphaBlendFactor = blend->enable
+                                       ? get_vk_blend_factor(blend->src_alpha_blend_factor)
+                                       : VK_BLEND_FACTOR_ONE,
+            .dstAlphaBlendFactor = blend->enable
+                                       ? get_vk_blend_factor(blend->dst_alpha_blend_factor)
+                                       : VK_BLEND_FACTOR_ZERO,
+            .alphaBlendOp =
+                blend->enable ? get_vk_blend_op(blend->blend_op_alpha) : VK_BLEND_OP_ADD,
+            .colorWriteMask = (VkColorComponentFlags)(
+                ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R) ? VK_COLOR_COMPONENT_R_BIT
+                                                                        : 0) |
+                ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G) ? VK_COLOR_COMPONENT_G_BIT
+                                                                        : 0) |
+                ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_B) ? VK_COLOR_COMPONENT_B_BIT
+                                                                        : 0) |
+                ((blend->color_write_mask & NGF_COLOR_MASK_WRITE_BIT_A) ? VK_COLOR_COMPONENT_A_BIT
+                                                                        : 0))};
+        blend_states[i] = attachment_blend_state;
+      } else {
+        blend_states[i].blendEnable    = VK_FALSE;
+        blend_states[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+      }
+    }
+
+    if (ncolor_attachments >= NGFI_ARRAYSIZE(blend_states)) {
+      NGFI_DIAG_ERROR("too many attachments specified");
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_graphics_pipeline_cleanup;
+    }
+
+    VkPipelineColorBlendStateCreateInfo color_blend = {
+        .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .pNext           = NULL,
+        .flags           = 0u,
+        .logicOpEnable   = VK_FALSE,
+        .logicOp         = VK_LOGIC_OP_SET,
+        .attachmentCount = ncolor_attachments,
+        .pAttachments    = blend_states,
+        .blendConstants  = {
+            info->blend_consts[0],
+            info->blend_consts[1],
+            info->blend_consts[2],
+            info->blend_consts[3]}};
+
+    // Dynamic state.
+    const VkDynamicState dynamic_states[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR,
+        VK_DYNAMIC_STATE_DEPTH_BOUNDS,
+        VK_DYNAMIC_STATE_DEPTH_BIAS};
+    const uint32_t                   ndynamic_states = NGFI_ARRAYSIZE(dynamic_states);
+    VkPipelineDynamicStateCreateInfo dynamic_state   = {
+          .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+          .pNext             = NULL,
+          .flags             = 0u,
+          .dynamicStateCount = ndynamic_states,
+          .pDynamicStates    = dynamic_states};
+
+    // Create a compatible render pass object.
+    auto attachment_compat_pass_descs = NGFI_SALLOC(ngfvk_attachment_pass_desc, info->compatible_rt_attachment_descs->ndescs);
+    for (uint32_t i = 0u; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
+      attachment_compat_pass_descs[i].load_op  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      attachment_compat_pass_descs[i].store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      attachment_compat_pass_descs[i].is_resolve =
+          info->compatible_rt_attachment_descs->descs[i].is_resolve;
+      attachment_compat_pass_descs[i].layout = VK_IMAGE_LAYOUT_GENERAL;
+    }
+
+    vk_err = ngfvk_renderpass_from_attachment_descs(
+        info->compatible_rt_attachment_descs->ndescs,
+        info->compatible_rt_attachment_descs->descs,
+        attachment_compat_pass_descs,
+        &pipeline->compatible_render_pass);
+
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_graphics_pipeline_cleanup;
+    }
+
+    // Create required pipeline.
+    const VkGraphicsPipelineCreateInfo vk_pipeline_info = {
+        .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext               = NULL,
+        .flags               = 0u,
+        .stageCount          = info->nshader_stages,
+        .pStages             = vk_shader_stages,
+        .pVertexInputState   = &vertex_input,
+        .pInputAssemblyState = &input_assembly,
+        .pTessellationState  = &tess,
+        .pViewportState      = &viewport_state,
+        .pRasterizationState = &rasterization,
+        .pMultisampleState   = &multisampling,
+        .pDepthStencilState  = &depth_stencil,
+        .pColorBlendState    = &color_blend,
+        .pDynamicState       = &dynamic_state,
+        .layout              = pipeline->generic_pipeline.vk_pipeline_layout,
+        .renderPass          = pipeline->compatible_render_pass,
+        .subpass             = 0u,
+        .basePipelineHandle  = VK_NULL_HANDLE,
+        .basePipelineIndex   = -1};
+    vk_err = vkCreateGraphicsPipelines(
+        _vk.device,
+        VK_NULL_HANDLE,
+        1u,
+        &vk_pipeline_info,
+        NULL,
+        &pipeline->generic_pipeline.vk_pipeline);
+    if (vk_err != VK_SUCCESS) {
+      err = NGF_ERROR_OBJECT_CREATION_FAILED;
+      goto ngf_create_graphics_pipeline_cleanup;
     }
   }
-
-  if (ncolor_attachments >= NGFI_ARRAYSIZE(blend_states)) {
-    NGFI_DIAG_ERROR("too many attachments specified");
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    goto ngf_create_graphics_pipeline_cleanup;
-  }
-
-  VkPipelineColorBlendStateCreateInfo color_blend = {
-      .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-      .pNext           = NULL,
-      .flags           = 0u,
-      .logicOpEnable   = VK_FALSE,
-      .logicOp         = VK_LOGIC_OP_SET,
-      .attachmentCount = ncolor_attachments,
-      .pAttachments    = blend_states,
-      .blendConstants  = {
-          info->blend_consts[0],
-          info->blend_consts[1],
-          info->blend_consts[2],
-          info->blend_consts[3]}};
-
-  // Dynamic state.
-  const VkDynamicState dynamic_states[] = {
-      VK_DYNAMIC_STATE_VIEWPORT,
-      VK_DYNAMIC_STATE_SCISSOR,
-      VK_DYNAMIC_STATE_DEPTH_BOUNDS,
-      VK_DYNAMIC_STATE_DEPTH_BIAS};
-  const uint32_t                   ndynamic_states = NGFI_ARRAYSIZE(dynamic_states);
-  VkPipelineDynamicStateCreateInfo dynamic_state   = {
-        .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
-        .pNext             = NULL,
-        .flags             = 0u,
-        .dynamicStateCount = ndynamic_states,
-        .pDynamicStates    = dynamic_states};
-
-  // Create a compatible render pass object.
-  ngfvk_attachment_pass_desc* attachment_compat_pass_descs = ngfi_sa_alloc(
-      ngfi_tmp_store(),
-      sizeof(ngfvk_attachment_pass_desc) * info->compatible_rt_attachment_descs->ndescs);
-  for (uint32_t i = 0u; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
-    attachment_compat_pass_descs[i].load_op  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachment_compat_pass_descs[i].store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachment_compat_pass_descs[i].is_resolve =
-        info->compatible_rt_attachment_descs->descs[i].is_resolve;
-    attachment_compat_pass_descs[i].layout = VK_IMAGE_LAYOUT_GENERAL;
-  }
-
-  vk_err = ngfvk_renderpass_from_attachment_descs(
-      info->compatible_rt_attachment_descs->ndescs,
-      info->compatible_rt_attachment_descs->descs,
-      attachment_compat_pass_descs,
-      &pipeline->compatible_render_pass);
-
-  if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    goto ngf_create_graphics_pipeline_cleanup;
-  }
-
-  // Create required pipeline.
-  const VkGraphicsPipelineCreateInfo vk_pipeline_info = {
-      .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-      .pNext               = NULL,
-      .flags               = 0u,
-      .stageCount          = info->nshader_stages,
-      .pStages             = vk_shader_stages,
-      .pVertexInputState   = &vertex_input,
-      .pInputAssemblyState = &input_assembly,
-      .pTessellationState  = &tess,
-      .pViewportState      = &viewport_state,
-      .pRasterizationState = &rasterization,
-      .pMultisampleState   = &multisampling,
-      .pDepthStencilState  = &depth_stencil,
-      .pColorBlendState    = &color_blend,
-      .pDynamicState       = &dynamic_state,
-      .layout              = pipeline->generic_pipeline.vk_pipeline_layout,
-      .renderPass          = pipeline->compatible_render_pass,
-      .subpass             = 0u,
-      .basePipelineHandle  = VK_NULL_HANDLE,
-      .basePipelineIndex   = -1};
-  vk_err = vkCreateGraphicsPipelines(
-      _vk.device,
-      VK_NULL_HANDLE,
-      1u,
-      &vk_pipeline_info,
-      NULL,
-      &pipeline->generic_pipeline.vk_pipeline);
-  if (vk_err != VK_SUCCESS) {
-    err = NGF_ERROR_OBJECT_CREATION_FAILED;
-    goto ngf_create_graphics_pipeline_cleanup;
-  }
-
 ngf_create_graphics_pipeline_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_graphics_pipeline(pipeline); }
   return err;
 }
 
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
+extern "C" void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) NGF_NOEXCEPT {
   if (p != NULL) {
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     NGFVK_RETIRE_OBJECT(res, NGFVK_RETIRE_OBJ_RENDER_PASS, p->compatible_render_pass);
@@ -5380,16 +5380,18 @@ void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline p) {
   }
 }
 
-ngf_error
-ngf_create_compute_pipeline(const ngf_compute_pipeline_info* info, ngf_compute_pipeline* result) {
+extern "C" ngf_error
+ngf_create_compute_pipeline(const ngf_compute_pipeline_info* info, ngf_compute_pipeline* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   ngfi_sa_reset(ngfi_tmp_store());
   ngf_error err = NGF_ERROR_OK;
+  ngf_compute_pipeline pipeline = NULL;
 
+  {
   // Allocate space for the pipeline object.
   *result                       = NGFI_ALLOC(ngf_compute_pipeline_t);
-  ngf_compute_pipeline pipeline = *result;
+  pipeline = *result;
   if (pipeline == NULL) {
     err = NGF_ERROR_OUT_OF_MEM;
     goto ngf_create_compute_pipeline_cleanup;
@@ -5419,12 +5421,13 @@ ngf_create_compute_pipeline(const ngf_compute_pipeline_info* info, ngf_compute_p
       NULL,
       &pipeline->generic_pipeline.vk_pipeline);
   if (vk_err != VK_SUCCESS) { err = NGF_ERROR_OBJECT_CREATION_FAILED; }
+  }
 ngf_create_compute_pipeline_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_compute_pipeline(pipeline); }
   return err;
 }
 
-void ngf_destroy_compute_pipeline(ngf_compute_pipeline p) {
+extern "C" void ngf_destroy_compute_pipeline(ngf_compute_pipeline p) NGF_NOEXCEPT {
   if (p != NULL) {
     ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     ngfi_destroy_generic_pipeline_data(res, &p->generic_pipeline);
@@ -5432,7 +5435,7 @@ void ngf_destroy_compute_pipeline(ngf_compute_pipeline p) {
   }
 }
 
-ngf_render_target ngf_default_render_target() {
+extern "C" ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT) {
     return CURRENT_CONTEXT->default_render_target;
   } else {
@@ -5440,7 +5443,7 @@ ngf_render_target ngf_default_render_target() {
   }
 }
 
-const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() {
+extern "C" const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->default_render_target) {
     CURRENT_CONTEXT->default_attachment_descriptions_list.ndescs =
         CURRENT_CONTEXT->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED ? 2u : 1u;
@@ -5452,12 +5455,13 @@ const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() 
   }
 }
 
-ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result) {
+extern "C" ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result) NGF_NOEXCEPT {
   ngf_render_target rt = NGFI_ALLOC(ngf_render_target_t);
   if (rt == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   memset(rt, 0, sizeof(ngf_render_target_t));
   *result          = rt;
   ngf_error err    = NGF_ERROR_OK;
+  {
   VkResult  vk_err = VK_SUCCESS;
 
   uint32_t ncolor_attachments   = 0u;
@@ -5532,8 +5536,9 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
         .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
         .pNext    = NULL,
         .flags    = 0u,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
         .image    = (VkImage)attachment_img->alloc.obj_handle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format           = attachment_img->vk_fmt,
         .components =
             {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -5541,15 +5546,15 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
                 .b = VK_COMPONENT_SWIZZLE_IDENTITY,
                 .a = VK_COMPONENT_SWIZZLE_IDENTITY,
             },
-        .format           = attachment_img->vk_fmt,
         .subresourceRange = {
+            .aspectMask     = subresource_aspect_flags,
+            .baseMipLevel   = attachment_img_ref->mip_level,
+            .levelCount     = 1u,
             .baseArrayLayer = attachment_is_cubemap ? 6u * attachment_img_ref->layer +
                                                           attachment_img_ref->cubemap_face
                                                     : attachment_img_ref->layer,
-            .baseMipLevel   = attachment_img_ref->mip_level,
             .layerCount     = 1u,
-            .levelCount     = 1u,
-            .aspectMask     = subresource_aspect_flags}};
+            }};
     vk_err = vkCreateImageView(_vk.device, &image_view_create_info, NULL, &attachment_views[a]);
 
     attachment_images[a] = attachment_img;
@@ -5600,13 +5605,13 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_render_target_cleanup;
   }
-
+  }
 ngf_create_render_target_cleanup:
   if (err != NGF_ERROR_OK) { ngf_destroy_render_target(rt); }
   return err;
 }
 
-void ngf_destroy_render_target(ngf_render_target target) {
+extern "C" void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT {
   if (target && (!target->is_default || CURRENT_CONTEXT->being_destroyed)) {
     if (target->is_default && CURRENT_CONTEXT->default_render_target != target) {
       NGFI_DIAG_ERROR("default RT can only be destroyed by owning context\n");
@@ -5641,11 +5646,11 @@ void ngf_destroy_render_target(ngf_render_target target) {
   }
 }
 
-void ngf_cmd_dispatch(
+extern "C" void ngf_cmd_dispatch(
     ngf_compute_encoder enc,
     uint32_t            x_threadgroups,
     uint32_t            y_threadgroups,
-    uint32_t            z_threadgroups) {
+    uint32_t            z_threadgroups) NGF_NOEXCEPT {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
 
   ngfi_sa_reset(ngfi_tmp_store());
@@ -5672,12 +5677,12 @@ void ngf_cmd_dispatch(
   vkCmdDispatch(cmd_buf->vk_cmd_buffer, x_threadgroups, y_threadgroups, z_threadgroups);
 }
 
-void ngf_cmd_draw(
+extern "C" void ngf_cmd_draw(
     ngf_render_encoder enc,
     bool               indexed,
     uint32_t           first_element,
     uint32_t           nelements,
-    uint32_t           ninstances) {
+    uint32_t           ninstances) NGF_NOEXCEPT {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
 
   uint32_t nmax_pending_sync_reqs = 2u;
@@ -5714,8 +5719,7 @@ void ngf_cmd_draw(
   cmd_buf->active_idx_buf  = NULL;
 
   NGFI_CHNKLIST_FOR_EACH(cmd_buf->virt_bind_ops_ranges, ngfi_chnk_range, r) {
-    const ngfvk_render_cmd* render_cmds =
-        ngfi_chnk_data(r->chnk, r->start * sizeof(ngfvk_render_cmd));
+    auto render_cmds = (const ngfvk_render_cmd*)ngfi_chnk_data(r->chnk, r->start * sizeof(ngfvk_render_cmd));
     for (size_t j = 0u; j < r->size; ++j) {
       const ngfvk_render_cmd* render_cmd = &render_cmds[j];
       assert(render_cmd->type == NGFVK_RENDER_CMD_BIND_RESOURCE);
@@ -5731,38 +5735,37 @@ void ngf_cmd_draw(
   ngfvk_sync_req_batch_process(&sync_req_batch, cmd_buf);
 
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_DRAW,
-      .data = {
-          .draw = {
-              .first_element = first_element,
-              .indexed       = indexed,
-              .nelements     = nelements,
-              .ninstances    = ninstances}}};
+      .data =
+          {.draw =
+               {.first_element = first_element,
+                .nelements     = nelements,
+                .ninstances    = ninstances,
+                .indexed       = indexed}},
+      .type = NGFVK_RENDER_CMD_DRAW};
   ngfvk_cmd_buf_add_render_cmd(cmd_buf, &cmd, true);
 }
 
-void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, ngf_graphics_pipeline pipeline) {
+extern "C" void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, ngf_graphics_pipeline pipeline) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_BIND_PIPELINE,
-      .data = {.pipeline = pipeline}};
+      .data = {.pipeline = pipeline},
+      .type = NGFVK_RENDER_CMD_BIND_PIPELINE };
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
   buf->active_gfx_pipe = pipeline;
 }
 
-void ngf_cmd_bind_resources(
+extern "C" void ngf_cmd_bind_resources(
     ngf_render_encoder          enc,
     const ngf_resource_bind_op* bind_operations,
-    uint32_t                    nbind_operations) {
+    uint32_t                    nbind_operations) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   if (nbind_operations <= 0u) { return; }
   ngfi_chnk_range curr_range = {.chnk = NULL};
   for (size_t i = 0u; i < nbind_operations; ++i) {
     const ngfvk_render_cmd cmd = {
-        .type = NGFVK_RENDER_CMD_BIND_RESOURCE,
-        .data = {.bind_resource = bind_operations[i]}};
-    const ngfvk_render_cmd* cmd_data =
-        ngfi_chnklist_append(&buf->in_pass_cmd_chnks, &cmd, sizeof(cmd));
+        .data = {.bind_resource = bind_operations[i]}, 
+        .type = NGFVK_RENDER_CMD_BIND_RESOURCE };
+    auto cmd_data = (const ngfvk_render_cmd*)ngfi_chnklist_append(&buf->in_pass_cmd_chnks, &cmd, sizeof(cmd));
     ngfi_chnk_hdr* last_chnk = NGFI_CHNK_FROM_NODE(buf->in_pass_cmd_chnks.firstchnk->clnode.prev);
     if (last_chnk != curr_range.chnk) {
       if (curr_range.chnk) {
@@ -5780,15 +5783,15 @@ void ngf_cmd_bind_resources(
   }
 }
 
-void ngf_cmd_bind_compute_resources(
+extern "C" void ngf_cmd_bind_compute_resources(
     ngf_compute_encoder         enc,
     const ngf_resource_bind_op* bind_operations,
-    uint32_t                    nbind_operations) {
+    uint32_t                    nbind_operations) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   ngfvk_cmd_bind_resources(buf, bind_operations, nbind_operations);
 }
 
-void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline) {
+extern "C" void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   if (buf->active_compute_pipe && buf->npending_bind_ops > 0u) { ngfvk_execute_pending_binds(buf); }
 
@@ -5799,89 +5802,89 @@ void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline
       pipeline->generic_pipeline.vk_pipeline);
 }
 
-void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) {
+extern "C" void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_render_cmd cmd = {.type = NGFVK_RENDER_CMD_SET_VIEWPORT, .data = {.rect = *r}};
+  const ngfvk_render_cmd cmd = { .data = {.rect = *r}, .type = NGFVK_RENDER_CMD_SET_VIEWPORT};
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) {
+extern "C" void ngf_cmd_scissor(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_render_cmd cmd = {.type = NGFVK_RENDER_CMD_SET_SCISSOR, .data = {.rect = *r}};
+  const ngfvk_render_cmd cmd = {.data = {.rect = *r}, .type = NGFVK_RENDER_CMD_SET_SCISSOR };
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) {
-  ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
-  const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_SET_STENCIL_REFERENCE,
-      .data = {.stencil_values = {.front = front, .back = back}}};
-  ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
-}
-
-void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) {
+extern "C" void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_SET_STENCIL_COMPARE_MASK,
-      .data = {.stencil_values = {.front = front, .back = back}}};
+      .data = {.stencil_values = {.front = front, .back = back}},
+      .type = NGFVK_RENDER_CMD_SET_STENCIL_REFERENCE };
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) {
+extern "C" void ngf_cmd_stencil_compare_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_SET_STENCIL_WRITE_MASK,
-      .data = {.stencil_values = {.front = front, .back = back}}};
+      .data = {.stencil_values = {.front = front, .back = back}},
+      .type = NGFVK_RENDER_CMD_SET_STENCIL_COMPARE_MASK };
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_set_depth_bias(
+extern "C" void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
+  ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
+  const ngfvk_render_cmd cmd = {
+      .data = {.stencil_values = {.front = front, .back = back}},
+      .type = NGFVK_RENDER_CMD_SET_STENCIL_WRITE_MASK };
+  ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
+}
+
+extern "C" void ngf_cmd_set_depth_bias(
     ngf_render_encoder enc,
     float              const_scale,
     float              slope_scale,
-    float              clamp) {
+    float              clamp) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_SET_DEPTH_BIAS,
       .data = {
           .depth_bias =
-              {.const_factor = const_scale, .slope_factor = slope_scale, .clamp = clamp}}};
+              {.const_factor = const_scale, .slope_factor = slope_scale, .clamp = clamp}},
+      .type = NGFVK_RENDER_CMD_SET_DEPTH_BIAS };
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_bind_attrib_buffer(
+extern "C" void ngf_cmd_bind_attrib_buffer(
     ngf_render_encoder enc,
     ngf_buffer         abuf,
     uint32_t           binding,
-    size_t             offset) {
+    size_t             offset) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_BIND_ATTRIB_BUFFER,
-      .data = {.bind_attrib_buffer = {.binding = binding, .buffer = abuf, .offset = offset}}};
+      .data = {.bind_attrib_buffer = {.buffer = abuf, .binding = binding,.offset = offset}},
+      .type = NGFVK_RENDER_CMD_BIND_ATTRIB_BUFFER };
   buf->active_attr_buf = abuf;
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_bind_index_buffer(
+extern "C" void ngf_cmd_bind_index_buffer(
     ngf_render_encoder enc,
     ngf_buffer         ibuf,
     size_t             offset,
-    ngf_type           index_type) {
+    ngf_type           index_type) NGF_NOEXCEPT {
   ngf_cmd_buffer         buf = NGFVK_ENC2CMDBUF(enc);
   const ngfvk_render_cmd cmd = {
-      .type = NGFVK_RENDER_CMD_BIND_INDEX_BUFFER,
-      .data = {.bind_index_buffer = {.buffer = ibuf, .offset = offset, .type = index_type}}};
+      .data = {.bind_index_buffer = {.buffer = ibuf, .offset = offset, .type = index_type}},
+      .type = NGFVK_RENDER_CMD_BIND_INDEX_BUFFER };
   buf->active_idx_buf = ibuf;
   ngfvk_cmd_buf_add_render_cmd(buf, &cmd, true);
 }
 
-void ngf_cmd_copy_buffer(
+extern "C" void ngf_cmd_copy_buffer(
     ngf_xfer_encoder enc,
     ngf_buffer       src,
     ngf_buffer       dst,
     size_t           size,
     size_t           src_offset,
-    size_t           dst_offset) {
+    size_t           dst_offset) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_sync_req_batch sync_req_batch;
@@ -5911,12 +5914,13 @@ void ngf_cmd_copy_buffer(
       1u,
       &copy_region);
 }
-void ngf_cmd_write_image(
+
+extern "C" void ngf_cmd_write_image(
     ngf_xfer_encoder       enc,
     ngf_buffer             src,
     ngf_image              dst,
     const ngf_image_write* writes,
-    uint32_t               nwrites) {
+    uint32_t               nwrites) NGF_NOEXCEPT {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
   assert(cmd_buf);
   assert(nwrites == 0u || writes);
@@ -5941,8 +5945,7 @@ void ngf_cmd_write_image(
   ngfvk_sync_req_batch_commit(&sync_req_batch, cmd_buf);
 
   ngfi_sa_reset(ngfi_tmp_store());
-  VkBufferImageCopy* vk_writes =
-      ngfi_sa_alloc(ngfi_tmp_store(), sizeof(VkBufferImageCopy) * nwrites);
+  VkBufferImageCopy* vk_writes = NGFI_SALLOC(VkBufferImageCopy, nwrites);
   if (vk_writes) {
     for (size_t i = 0u; i < nwrites; ++i) {
       const ngf_image_write* ngf_write = &writes[i];
@@ -5972,14 +5975,14 @@ void ngf_cmd_write_image(
   }
 }
 
-void ngf_cmd_copy_image_to_buffer(
+extern "C" void ngf_cmd_copy_image_to_buffer(
     ngf_xfer_encoder    enc,
     const ngf_image_ref src,
     ngf_offset3d        src_offset,
     ngf_extent3d        src_extent,
     uint32_t            nlayers,
     ngf_buffer          dst,
-    size_t              dst_offset) {
+    size_t              dst_offset) NGF_NOEXCEPT {
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_sync_req_batch sync_req_batch;
@@ -6025,7 +6028,7 @@ void ngf_cmd_copy_image_to_buffer(
       &copy_op);
 }
 
-ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
+extern "C" ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NOEXCEPT {
   if (!(img->usage_flags & NGF_IMAGE_USAGE_MIPMAP_GENERATION)) {
     NGFI_DIAG_ERROR("mipmap generation was requested for an image that was created without "
                     "the NGF_IMAGE_USAGE_MIPMAP_GENERATION usage flag.");
@@ -6085,16 +6088,16 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
     if (src_level < img->nlevels - 1) {
       const VkImageBlit blit_region = {
           .srcSubresource =
-              {.mipLevel       = src_level,
+              {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+               .mipLevel       = src_level,
                .baseArrayLayer = 0u,
-               .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-               .layerCount     = nlayers},
-          .dstSubresource =
-              {.mipLevel       = dst_level,
-               .baseArrayLayer = 0u,
-               .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                .layerCount     = nlayers},
           .srcOffsets = {{0, 0, 0}, {(int32_t)src_w, (int32_t)src_h, (int32_t)src_d}},
+          .dstSubresource =
+              {.aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+               .mipLevel       = dst_level,
+               .baseArrayLayer = 0u,
+               .layerCount     = nlayers},
           .dstOffsets = {{0, 0, 0}, {(int32_t)dst_w, (int32_t)dst_h, (int32_t)dst_d}}};
       vkCmdBlitImage(
           buf->vk_cmd_buffer,
@@ -6120,17 +6123,17 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) {
   return NGF_ERROR_OK;
 }
 
-void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) {
+extern "C" void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buffer, const char* name) NGF_NOEXCEPT {
   ngfvk_debug_label_begin(cmd_buffer->vk_cmd_buffer, name);
 }
 
-void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) {
+extern "C" void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   ngfvk_debug_label_end(cmd_buffer->vk_cmd_buffer);
 }
 
-ngf_error ngf_create_texel_buffer_view(
+extern "C" ngf_error ngf_create_texel_buffer_view(
     const ngf_texel_buffer_view_info* info,
-    ngf_texel_buffer_view*            result) {
+    ngf_texel_buffer_view*            result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
 
@@ -6142,10 +6145,10 @@ ngf_error ngf_create_texel_buffer_view(
       .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
       .pNext  = NULL,
       .flags  = 0u,
-      .offset = info->offset,
-      .range  = info->size,
+      .buffer = (VkBuffer)info->buffer->alloc.obj_handle,
       .format = get_vk_image_format(info->texel_format),
-      .buffer = (VkBuffer)info->buffer->alloc.obj_handle};
+      .offset = info->offset,
+      .range  = info->size };
   const VkResult vk_result =
       vkCreateBufferView(_vk.device, &vk_buf_view_ci, NULL, &buf_view->vk_buf_view);
   if (vk_result != VK_SUCCESS) {
@@ -6156,7 +6159,7 @@ ngf_error ngf_create_texel_buffer_view(
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
+extern "C" void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT {
   if (buf_view) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFVK_RETIRE_OBJECT(
@@ -6167,7 +6170,7 @@ void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) {
   }
 }
 
-ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
+extern "C" ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   if (info->buffer_usage == 0u) {
@@ -6187,7 +6190,7 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   const VkBufferUsageFlags    vk_usage_flags = get_vk_buffer_usage(info->buffer_usage);
   const VkMemoryPropertyFlags vk_mem_flags   = get_vk_memory_flags(info->storage_type);
   const bool     vk_mem_is_host_visible      = vk_mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-  const uint32_t vma_usage_flags             = info->storage_type >= NGF_BUFFER_STORAGE_DEVICE_LOCAL
+  const VmaMemoryUsage vma_usage_flags             = info->storage_type >= NGF_BUFFER_STORAGE_DEVICE_LOCAL
                                                    ? VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
                                                    : VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
   ngf_error      err                         = NGF_ERROR_OK;
@@ -6239,29 +6242,29 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   return err;
 }
 
-void ngf_destroy_buffer(ngf_buffer buffer) {
+extern "C" void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT {
   if (buffer) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFVK_RETIRE_OBJECT(&CURRENT_CONTEXT->frame_res[fi], NGFVK_RETIRE_OBJ_BUF, buffer);
   }
 }
 
-void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) {
+extern "C" void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT {
   NGFI_IGNORE_VAR(size);
   buf->mapped_offset = offset;
   return (uint8_t*)buf->alloc.mapped_data + buf->mapped_offset;
 }
 
-void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) {
+extern "C" void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT {
   vmaFlushAllocation(_vk.allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
 }
 
-void ngf_buffer_unmap(ngf_buffer buf) {
+extern "C" void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT {
   // vk buffers are persistently mapped.
   NGFI_IGNORE_VAR(buf);
 }
 
-ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) {
+extern "C" ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
 
@@ -6301,7 +6304,7 @@ ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view*
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_image_view(ngf_image_view view) {
+extern "C" void ngf_destroy_image_view(ngf_image_view view) NGF_NOEXCEPT {
   if (view) {
     if (view->vk_view) {
       ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
@@ -6311,7 +6314,7 @@ void ngf_destroy_image_view(ngf_image_view view) {
   }
 }
 
-ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
+extern "C" ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
 
@@ -6329,14 +6332,14 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
   const VkImageUsageFlagBits attachment_usage_bits =
       is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
                        : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-  const VkImageUsageFlagBits usage_flags =
+  const auto usage_flags = (VkImageUsageFlags)(
       (is_sampled_from ? VK_IMAGE_USAGE_SAMPLED_BIT : 0u) |
       (is_storage ? VK_IMAGE_USAGE_STORAGE_BIT : 0u) |
       (is_attachment ? attachment_usage_bits : 0u) |
       (is_transient ? VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT : 0) |
       (is_xfer_dst ? VK_IMAGE_USAGE_TRANSFER_DST_BIT : 0u) |
       (is_xfer_src ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0u) |
-      (enable_auto_mips ? (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : 0u);
+      (enable_auto_mips ? (VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT) : 0u));
 
   ngf_error                err             = NGF_ERROR_OK;
   const bool               is_cubemap      = info->type == NGF_IMAGE_TYPE_CUBE;
@@ -6357,16 +6360,16 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
       .pNext     = NULL,
       .flags     = create_flags,
       .imageType = vk_image_type,
+      .format                = vk_image_format,
       .extent =
           {.width = info->extent.width, .height = info->extent.height, .depth = info->extent.depth},
-      .format                = vk_image_format,
       .mipLevels             = info->nmips,
       .arrayLayers           = info->nlayers * (!is_cubemap ? 1u : 6u),
       .samples               = get_vk_sample_count(info->sample_count),
+      .tiling = optimal_tiling_supported ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR,
       .usage                 = usage_flags,
       .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
       .queueFamilyIndexCount = 0,
-      .tiling = optimal_tiling_supported ? VK_IMAGE_TILING_OPTIMAL : VK_IMAGE_TILING_LINEAR,
       .pQueueFamilyIndices = NULL,
       .initialLayout       = VK_IMAGE_LAYOUT_UNDEFINED};
 
@@ -6401,14 +6404,14 @@ ngf_create_image_cleanup:
   return err;
 }
 
-void ngf_destroy_image(ngf_image img) {
+extern "C" void ngf_destroy_image(ngf_image img) NGF_NOEXCEPT {
   if (img != NULL) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFVK_RETIRE_OBJECT(&CURRENT_CONTEXT->frame_res[fi], NGFVK_RETIRE_OBJ_IMG, img);
   }
 }
 
-ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) {
+extern "C" ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
   ngf_sampler sampler = NGFI_ALLOC(ngf_sampler_t);
@@ -6445,7 +6448,7 @@ ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) 
   }
 }
 
-void ngf_destroy_sampler(ngf_sampler sampler) {
+extern "C" void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT {
   if (sampler) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
     NGFVK_RETIRE_OBJECT(
@@ -6456,7 +6459,7 @@ void ngf_destroy_sampler(ngf_sampler sampler) {
   }
 }
 
-void ngf_finish(void) {
+extern "C" void ngf_finish(void) NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->current_frame_token != ~0u) {
     ngfvk_frame_resources* frame_res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
     ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
@@ -6464,11 +6467,11 @@ void ngf_finish(void) {
   vkDeviceWaitIdle(_vk.device);
 }
 
-void ngf_renderdoc_capture_next_frame() {
+extern "C" void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
   if (_renderdoc.api) _renderdoc.capture_next = true;
 }
 
-void ngf_renderdoc_capture_begin() {
+extern "C" void ngf_renderdoc_capture_begin() NGF_NOEXCEPT {
   if (_renderdoc.api && !_renderdoc.api->IsFrameCapturing()) {
     _renderdoc.api->StartFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
@@ -6476,7 +6479,7 @@ void ngf_renderdoc_capture_begin() {
   }
 }
 
-void ngf_renderdoc_capture_end() {
+extern "C" void ngf_renderdoc_capture_end() NGF_NOEXCEPT {
   if (_renderdoc.api && _renderdoc.api->IsFrameCapturing()) {
     _renderdoc.api->EndFrameCapture(
         RENDERDOC_DEVICEPOINTER_FROM_VKINSTANCE(_vk.instance),
@@ -6484,31 +6487,31 @@ void ngf_renderdoc_capture_end() {
   }
 }
 
-uintptr_t ngf_get_vk_device_handle() {
+extern "C" uintptr_t ngf_get_vk_device_handle() NGF_NOEXCEPT {
   return (uintptr_t)_vk.device;
 }
 
-uintptr_t ngf_get_vk_instance_handle() {
+extern "C" uintptr_t ngf_get_vk_instance_handle() NGF_NOEXCEPT {
   return (uintptr_t)_vk.instance;
 }
 
-uintptr_t ngf_get_vk_image_handle(ngf_image image) {
+extern "C" uintptr_t ngf_get_vk_image_handle(ngf_image image) NGF_NOEXCEPT {
   return image->alloc.obj_handle;
 }
 
-uintptr_t ngf_get_vk_buffer_handle(ngf_buffer buffer) {
+extern "C" uintptr_t ngf_get_vk_buffer_handle(ngf_buffer buffer) NGF_NOEXCEPT {
   return buffer->alloc.obj_handle;
 }
 
-uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) {
+extern "C" uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
   return (uintptr_t)(cmd_buffer->vk_cmd_buffer);
 }
 
-uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
+extern "C" uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
   return (uintptr_t)(sampler->vksampler);
 }
 
-uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
+extern "C" uint32_t ngf_get_vk_image_format_index(ngf_image_format format) NGF_NOEXCEPT {
   return (uint32_t)get_vk_image_format(format);
 }
 

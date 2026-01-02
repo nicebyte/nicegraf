@@ -1,5 +1,5 @@
 #[[
-Copyright (c) 2024 nicegraf contributors
+Copyright (c) 2026 nicegraf contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the “Software”), to deal in
@@ -111,7 +111,7 @@ else()
   set(NICEGRAF_VK_DEPS ${NICEGRAF_VK_DEPS} ${NICEGRAF_COMMON_DEPS})
 
   set(NICEGRAF_VK_SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
-                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.c
+                       ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/impl.cpp
                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/vk_10.c)
   if (NGF_USE_MVK STREQUAL "yes")
     set(NICEGRAF_VK_SRCS ${NICEGRAF_VK_SRCS} ${CMAKE_CURRENT_LIST_DIR}/source/ngf-vk/ca-metal-layer.mm)

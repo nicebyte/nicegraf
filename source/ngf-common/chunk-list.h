@@ -89,7 +89,7 @@ static inline void ngfi_chnklist_clear(ngfi_chnklist* list) {
 }
 
 #define NGFI_CHNK_FOR_EACH(chnk, elem_type, ptrname) \
-  for (elem_type* ptrname = ngfi_chnk_data((chnk), 0);          \
+  for (elem_type* ptrname = (elem_type*)ngfi_chnk_data((chnk), 0);          \
        ptrname - (elem_type*)ngfi_chnk_data((chnk), 0) <        \
        (ptrdiff_t)((chnk)->bytes_used / sizeof(elem_type)); \
        ptrname++)

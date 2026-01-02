@@ -82,7 +82,7 @@ ngfi_sa* ngfi_frame_store(void);
 /**
  * Helper macro to allocate N objects from per-thread stack allocator.
  */
-#define NGFI_SALLOC(type, n) (ngfi_sa_alloc(ngfi_tmp_store(), sizeof(type) * (n)))
+#define NGFI_SALLOC(type, n) (type*)(ngfi_sa_alloc(ngfi_tmp_store(), sizeof(type) * (n)))
 
 #ifdef __cplusplus
 }
