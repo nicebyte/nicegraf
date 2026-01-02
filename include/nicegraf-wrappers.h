@@ -33,6 +33,9 @@
  * \defgroup ngf_wrappers C++ Wrappers
  *
  * This module contains optional C++ wrappers for nicegraf structures and routines.
+ * The \ref ngf namespace contains aliases for most types without the `ngf_` prefix
+ * (i.e. `ngf_extent3d` becomes `ngf::extent3d`).
+ * Most functions are wrapped using static inline wrappers.
  */
 
 namespace ngf {
