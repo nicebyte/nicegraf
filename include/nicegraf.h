@@ -2614,7 +2614,7 @@ typedef struct ngf_image_write {
  * @param ndevices pointer to a `uint32_t`. If not NULL, the number of available rendering devices
  * shall be written to the memory pointed to by this parameter.
  */
-ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices);
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

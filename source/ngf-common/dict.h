@@ -25,6 +25,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef uintptr_t           ngfi_dict_key;
 typedef struct ngfi_dict_t* ngfi_dict;
 typedef void*               ngfi_dict_iter;
@@ -124,3 +128,6 @@ static inline void ngfi_mmh3_x64_128(uintptr_t key, const uint32_t seed, void* o
   ((uint64_t*)out)[1] = h2;
 }
 
+#ifdef __cplusplus
+}
+#endif
