@@ -20,6 +20,13 @@
  * IN THE SOFTWARE.
  */
 
+// Disable warning about setjmp/longjmp interaction with C++ object destruction.
+// This is expected when using nicetest with C++ objects - memory may leak on
+// assertion failure, but this is acceptable for testing.
+#if defined(_MSC_VER)
+#pragma warning(disable : 4611)
+#endif
+
 #include "../source/ngf-vk/vk_10.h"
 #include "nicegraf.h"
 #include "nicetest.h"
@@ -419,12 +426,12 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req src_reqs[] = {
         {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
         {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
     test_sync_req_merge(
         &dst_req,
@@ -447,8 +454,8 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req sync_reqs[] = {
         {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_WRITE_BIT},
+             {.access_mask = VK_ACCESS_SHADER_WRITE_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_UNDEFINED},
     };
     test_sync_req_merge(
@@ -465,12 +472,12 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req sync_reqs[] = {
         {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_WRITE_BIT},
+             {.access_mask = VK_ACCESS_SHADER_WRITE_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL},
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-              .access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT},
+             {.access_mask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT},
          .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL}
     };
     test_sync_req_merge(
@@ -494,12 +501,12 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req sync_reqs[] = {
         {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_WRITE_BIT},
+             {.access_mask = VK_ACCESS_SHADER_WRITE_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL},
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL}
     };
     test_sync_req_merge(
@@ -523,12 +530,12 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req sync_reqs[] = {
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL},
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_WRITE_BIT},
+             {.access_mask = VK_ACCESS_SHADER_WRITE_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL}
     };
     test_sync_req_merge(
@@ -551,12 +558,12 @@ NT_TESTSUITE {
     ngfvk_sync_req dst_req = {{0, 0}, VK_IMAGE_LAYOUT_UNDEFINED};
     static const ngfvk_sync_req sync_reqs[] = {
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_GENERAL},
        {.barrier_masks =
-             {.stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-              .access_mask = VK_ACCESS_SHADER_READ_BIT},
+             {.access_mask = VK_ACCESS_SHADER_READ_BIT,
+              .stage_mask  = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT},
          .layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}
     };
     test_sync_req_merge(

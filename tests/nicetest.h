@@ -74,8 +74,13 @@
          nt_internal_handle_test_start(#name, test_suite_context)) || \
         nt_internal_handle_test_failure(#name, test_suite_context))   \
 
+#ifdef __cplusplus
+#define NT_TESTSUITE \
+  extern "C" void nt_internal_test_suite_main(nt_internal_test_suite_context* test_suite_context)
+#else
 #define NT_TESTSUITE \
   void nt_internal_test_suite_main(nt_internal_test_suite_context* test_suite_context)
+#endif
 
 typedef struct nt_internal_test_suite_context {
   uint32_t failed_test_cases;
@@ -100,9 +105,17 @@ static inline int nt_internal_handle_test_start(
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern NT_THREADLOCAL bool nt_internal_mainthread_flag;
 extern jmp_buf             nt_internal_jmpbuf;
 void nt_internal_test_suite_main(nt_internal_test_suite_context* test_suite_context);
+
+#ifdef __cplusplus
+}
+#endif
 
 #if defined(NT_SELF_TEST)
 
