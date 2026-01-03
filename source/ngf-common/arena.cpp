@@ -132,29 +132,17 @@ arena arena::create(size_t initial_capacity) noexcept {
   return a;
 }
 
-arena::arena(arena&& other) noexcept {
-  *this = ngfi::move(other);
-}
-
-arena& arena::operator=(arena&& other) noexcept {
-  if (this != &other) {
-    // Free existing blocks
-    free_block_chain(first_block_);
-
-    // Transfer ownership
-    first_block_        = other.first_block_;
-    current_block_      = other.current_block_;
-    total_allocated_    = other.total_allocated_;
-    total_used_         = other.total_used_;
-    default_block_size_ = other.default_block_size_;
-
-    other.first_block_        = nullptr;
-    other.current_block_      = nullptr;
-    other.total_allocated_    = 0;
-    other.total_used_         = 0;
-    other.default_block_size_ = 0;
-  }
-  return *this;
+arena::arena(arena&& other) noexcept
+    : first_block_(other.first_block_)
+    , current_block_(other.current_block_)
+    , total_allocated_(other.total_allocated_)
+    , total_used_(other.total_used_)
+    , default_block_size_(other.default_block_size_) {
+  other.first_block_        = nullptr;
+  other.current_block_      = nullptr;
+  other.total_allocated_    = 0;
+  other.total_used_         = 0;
+  other.default_block_size_ = 0;
 }
 
 arena::~arena() noexcept {

@@ -313,44 +313,6 @@ NT_TESTSUITE {
     NT_ASSERT(ptr2 != nullptr);
   }
 
-  NT_TESTCASE("arena: move assignment") {
-    ngfi::arena arena1 = ngfi::arena::create(256);
-    ngfi::arena arena2 = ngfi::arena::create(128);
-
-    NT_ASSERT(arena1.is_valid());
-    NT_ASSERT(arena2.is_valid());
-
-    arena1.alloc(64);
-    size_t arena1_used      = arena1.total_used();
-    size_t arena1_allocated = arena1.total_allocated();
-
-    arena2 = static_cast<ngfi::arena&&>(arena1);
-
-    // arena2 should have arena1's data
-    NT_ASSERT(arena2.is_valid());
-    NT_ASSERT(arena2.total_used() == arena1_used);
-    NT_ASSERT(arena2.total_allocated() == arena1_allocated);
-
-    // arena1 should be invalid
-    NT_ASSERT(!arena1.is_valid());
-  }
-
-  NT_TESTCASE("arena: self-move-assignment is safe") {
-    ngfi::arena arena = ngfi::arena::create(256);
-    NT_ASSERT(arena.is_valid());
-
-    arena.alloc(64);
-    size_t used      = arena.total_used();
-    size_t allocated = arena.total_allocated();
-
-    // Self-assignment should be a no-op
-    arena = static_cast<ngfi::arena&&>(arena);
-
-    NT_ASSERT(arena.is_valid());
-    NT_ASSERT(arena.total_used() == used);
-    NT_ASSERT(arena.total_allocated() == allocated);
-  }
-
   /* Fuzz tests */
 
   NT_TESTCASE("arena: fuzz random allocation sizes") {
