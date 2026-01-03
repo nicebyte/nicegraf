@@ -62,11 +62,6 @@ public:
   arena(arena&& other) noexcept;
 
   /**
-   * Move assignment - transfers ownership from other arena.
-   */
-  arena& operator=(arena&& other) noexcept;
-
-  /**
    * Destructor - frees all allocated memory.
    */
   ~arena() noexcept;
@@ -125,9 +120,10 @@ public:
   size_t total_used() const noexcept;
 
 private:
-  // Prevent copying
+  // Prevent copying and move-assignment
   arena(const arena&) = delete;
   arena& operator=(const arena&) = delete;
+  arena& operator=(arena&&) = delete;
 
   // Allocate a new block and chain it to the arena
   bool grow(size_t min_capacity) noexcept;
