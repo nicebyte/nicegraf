@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2021 nicegraf contributors
+ * Copyright (c) 2025 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -22,36 +22,44 @@
 
 #pragma once
 
-#include "nicegraf.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Provides a mapping from nicegraf's (set, binding) to the backend platform's actual native binding. */
-typedef struct ngfi_native_binding_map ngfi_native_binding_map;
+namespace ngfi {
 
 /**
- * Finds the first instance of a serialized native binding map within a given character buffer and
- * returns a pointer to it within the buffer. Returns NULL if not found.
+ * Remove reference from a type.
  */
-const char* ngfi_find_serialized_native_binding_map(const char* input);
+template<class T>
+struct remove_reference {
+  using type = T;
+};
+
+template<class T>
+struct remove_reference<T&> {
+  using type = T;
+};
+
+template<class T>
+struct remove_reference<T&&> {
+  using type = T;
+};
+
+template<class T>
+using remove_reference_t = typename remove_reference<T>::type;
 
 /**
- * Parses a native binding map out of the provided buffer. Returns NULL if parsing fails.
+ * Cast to rvalue reference to enable move semantics.
+ * Equivalent to std::move.
  */
-ngfi_native_binding_map* ngfi_parse_serialized_native_binding_map(const char* serialized_native_binding_map);
-
-/**
- * Looks up a binding from the given native binding map.
- */
-uint32_t ngfi_native_binding_map_lookup(const ngfi_native_binding_map* map, uint32_t set, uint32_t binding);
-
-/**
- * Deallocates any resources associated with the given native binding map.
- */
-void ngfi_destroy_native_binding_map(ngfi_native_binding_map* map);
-
-#ifdef __cplusplus
+template<class T>
+constexpr remove_reference_t<T>&& move(T&& t) noexcept {
+  return static_cast<remove_reference_t<T>&&>(t);
 }
-#endif
+
+template<class T> constexpr T&& forward(typename remove_reference<T>::type& t) noexcept {
+  return static_cast<T&&>(t);
+}
+
+template<class T> constexpr T&& forward(typename remove_reference<T>::type&& t) noexcept {
+  return static_cast<T&&>(t);
+}
+
+}  // namespace ngfi
