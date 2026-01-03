@@ -41,11 +41,9 @@ set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 nmk_static_library(NAME nicegraf-internal
                    SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dynamic-array.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/native-binding-map.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.c

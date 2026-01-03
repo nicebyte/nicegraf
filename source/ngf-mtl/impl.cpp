@@ -21,9 +21,8 @@
  */
 
 #include "ngf-common/cmdbuf-state.h"
+#include "ngf-common/default-arenas.h"
 #include "ngf-common/macros.h"
-#include "ngf-common/native-binding-map.h"
-#include "ngf-common/stack-alloc.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
 #include "nicegraf-mtl-handles.h"
@@ -1050,7 +1049,7 @@ const NS::Array*        NGFMTL_MTL_DEVICES;
 
 #pragma mark ngf_function_implementations
 
-ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) {
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT {
   if (NGFMTL_DEVICES_LIST.empty()) {
 #if TARGET_OS_OSX
     NGFMTL_MTL_DEVICES = MTL::CopyAllDevices();
@@ -1961,15 +1960,11 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     float             clear_depth,
     uint32_t          clear_stencil,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   const uint32_t nattachments = rt->attachment_descs.ndescs;
-  auto           load_ops     = (ngf_attachment_load_op*)ngfi_sa_alloc(
-      ngfi_tmp_store(),
-      sizeof(ngf_attachment_load_op) * nattachments);
-  auto store_ops = (ngf_attachment_store_op*)ngfi_sa_alloc(
-      ngfi_tmp_store(),
-      sizeof(ngf_attachment_store_op) * nattachments);
-  auto clears = (ngf_clear*)ngfi_sa_alloc(ngfi_tmp_store(), sizeof(ngf_clear) * nattachments);
+  auto           load_ops     = ngfi::tmp_alloc<ngf_attachment_load_op>(nattachments);
+  auto           store_ops    = ngfi::tmp_alloc<ngf_attachment_store_op>(nattachments);
+  auto           clears       = ngfi::tmp_alloc<ngf_clear>(nattachments);
 
   for (size_t i = 0u; i < nattachments; ++i) {
     load_ops[i] = NGF_LOAD_OP_CLEAR;
