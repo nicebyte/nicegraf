@@ -42,23 +42,18 @@ set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 nmk_static_library(NAME nicegraf-internal
                    SRCS ${CMAKE_CURRENT_LIST_DIR}/include/nicegraf.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/macros.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dynamic-array.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/unique-ptr.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/value-or-error.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/stack-alloc.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/list.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/chunk-list.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.c
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.cpp
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/default-arenas.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/default-arenas.cpp)
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/default-arenas.cpp
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/chunked-list.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/hashtable.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/array.h)
 
 # nicegraf utility library.
 nmk_static_library(NAME nicegraf-util
@@ -130,21 +125,15 @@ endif()
 
 # Build tests only if explicitly requested.
 if (NGF_BUILD_TESTS STREQUAL "yes")
-    nmk_binary(NAME internal-utils-tests
-           SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/internal-utils-tests.c
-           SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-           DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
-  nmk_static_library(NAME nicegraf-vk-for-tests 
-                     SRCS ${NICEGRAF_VK_SRCS}
-                     DEPS ${NICEGRAF_VK_DEPS}
-                     PVT_DEFINES NGFVK_TEST_MODE)
+  nmk_header_library(NAME utest
+                     PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/deps/utest)
+  nmk_binary(NAME common-tests
+             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/common-tests.cpp
+             DEPS utest nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
   nmk_binary(NAME vk-backend-tests
-             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-             DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
-  nmk_binary(NAME arena-alloc-tests
-             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/arena-alloc-tests.cpp
-             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
-             DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
+             SRCS ${NICEGRAF_VK_SRCS}
+             DEPS utest ${NICEGRAF_VK_DEPS}
+             PVT_DEFINES NGFVK_TEST_MODE)
 endif()
 
 
@@ -251,4 +240,60 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
     ngf_sample(NAME 0a-compute-mandelbrot)
     ngf_sample(NAME 0b-compute-vertices)
     ngf_sample(NAME 0c-render-to-multisample-texture)
+endif()
+
+# Build image tests only if explicitly requested.
+# These tests run samples headlessly and compare rendered output against golden images.
+# Requires NGF_BUILD_SAMPLES=yes since image tests depend on sample shaders and utilities.
+if (NGF_BUILD_IMAGE_TESTS STREQUAL "yes")
+    if (NOT NGF_BUILD_SAMPLES STREQUAL "yes")
+        message(FATAL_ERROR "NGF_BUILD_IMAGE_TESTS requires NGF_BUILD_SAMPLES=yes")
+    endif()
+
+    # Sample utility sources needed by image tests (excluding main.cpp and factory.cpp)
+    set(IMAGE_TEST_SAMPLE_UTILS
+        ${CMAKE_CURRENT_LIST_DIR}/samples/common/staging-image.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/common/camera-controller.cpp
+    )
+
+    # All sample sources (excluding factory.cpp which is only for interactive samples)
+    set(IMAGE_TEST_SAMPLE_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/samples/01-fullscreen-triangle/fullscreen-triangle.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/02-render-to-texture/render-to-texture.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/03-uniform-buffers/uniform-buffers.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/04-texture-sampling/texture-sampling.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/05-cubemap/cubemap.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/06-vertex-attribs/vertex-attribs.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/07-blinn-phong/blinn-phong.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/08-image-arrays/image-arrays.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/09-volume-rendering/volume-rendering.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/0a-compute-mandelbrot/compute-mandelbrot.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/0b-compute-vertices/compute-vertices.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/samples/0c-render-to-multisample-texture/render-to-multisample-texture.cpp
+    )
+
+    # Image test sources
+    set(IMAGE_TEST_SOURCES
+        ${CMAKE_CURRENT_LIST_DIR}/tests/image-tests/image-test-main.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/tests/image-tests/headless-harness.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/tests/image-tests/image-comparator.cpp
+        ${IMAGE_TEST_SAMPLE_UTILS}
+        ${IMAGE_TEST_SAMPLE_SOURCES}
+    )
+
+    # Ensure golden images directory exists
+    file(MAKE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/tests/golden)
+
+    # Create unified image test executable
+    nmk_binary(NAME image-tests
+               SRCS ${IMAGE_TEST_SOURCES}
+               DEPS nicegraf nicegraf-util nicegraf-misc-common ngf-imgui
+               PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/tests
+                            ${CMAKE_CURRENT_LIST_DIR}/tests/image-tests
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/common
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath
+                            ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
+               OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
+    add_dependencies(image-tests sample-shaders)
+    set_target_properties(image-tests PROPERTIES FOLDER "tests")
 endif()

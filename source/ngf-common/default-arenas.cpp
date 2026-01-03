@@ -25,12 +25,12 @@
 namespace ngfi {
 
 arena& tmp_arena() noexcept {
-  static thread_local arena a = arena::create(100u * 1024u);  // 100KB
+  static thread_local arena a = arena{100u * 1024u};  // 100KB
   return a;
 }
 
 arena& frame_arena() noexcept {
-  static thread_local arena a = arena::create(4u * 1024u);  // 4KB
+  static thread_local arena a = arena{4u * 1024u};  // 4KB
   return a;
 }
 
