@@ -24,6 +24,7 @@
 
 #include <stdint.h>
 #include <vector>
+#include <string>
 
 #if defined(_WIN64) || defined(_WIN32)
 #define NGF_MISC_PATH_SEPARATOR "\\"
@@ -34,5 +35,7 @@
 namespace ngf_misc {
 
 std::vector<char> load_file(const char* file_name);
+
+std::string get_file_path(const char* file_name);
 
 }
