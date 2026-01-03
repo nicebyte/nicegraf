@@ -24,26 +24,14 @@
 
 namespace ngfi {
 
-static thread_local arena tmp_arena_storage;
-static thread_local arena frame_arena_storage;
-static thread_local bool  arenas_initialized = false;
-
-static void ensure_initialized() noexcept {
-  if (!arenas_initialized) {
-    tmp_arena_storage   = arena::create(100u * 1024u);  // 100KB
-    frame_arena_storage = arena::create(4u * 1024u);    // 4KB
-    arenas_initialized  = true;
-  }
-}
-
 arena& tmp_arena() noexcept {
-  ensure_initialized();
-  return tmp_arena_storage;
+  static thread_local arena a = arena::create(100u * 1024u);  // 100KB
+  return a;
 }
 
 arena& frame_arena() noexcept {
-  ensure_initialized();
-  return frame_arena_storage;
+  static thread_local arena a = arena::create(4u * 1024u);  // 4KB
+  return a;
 }
 
 }  // namespace ngfi
