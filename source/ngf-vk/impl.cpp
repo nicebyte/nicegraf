@@ -37,7 +37,7 @@
 #include "ngf-common/dynamic-array.h"
 #include "ngf-common/frame-token.h"
 #include "ngf-common/macros.h"
-#include "ngf-common/stack-alloc.h"
+#include "ngf-common/default-arenas.h"
 #include "nicegraf.h"
 #include "vk_10.h"
 
@@ -1684,7 +1684,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
 
       // Prepare descriptor counts.
-      auto vk_pool_sizes = NGFI_SALLOC(VkDescriptorPoolSize, NGF_DESCRIPTOR_TYPE_COUNT);
+      auto vk_pool_sizes = ngfi::tmp_alloc<VkDescriptorPoolSize>(NGF_DESCRIPTOR_TYPE_COUNT);
       for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
         vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
         vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
@@ -1745,9 +1745,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   pool->utilization.sets++;
 
   // Bind dummy resources.
-  VkWriteDescriptorSet* dummy_writes = (VkWriteDescriptorSet*)ngfi_sa_alloc(
-      ngfi_tmp_store(),
-      sizeof(VkWriteDescriptorSet) * set_layout->nall_descs);
+  auto dummy_writes = ngfi::tmp_alloc<VkWriteDescriptorSet>(set_layout->nall_descs);
   uint32_t num_writes = 0u;
   for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
     if (set_layout->binding_properties[b].type == VK_DESCRIPTOR_TYPE_MAX_ENUM) continue;
@@ -1790,7 +1788,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
         desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
         break;
       case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
-        auto dummy_accel_info = NGFI_SALLOC(VkWriteDescriptorSetAccelerationStructureKHR, 1);
+        auto dummy_accel_info = ngfi::tmp_alloc<VkWriteDescriptorSetAccelerationStructureKHR>();
         dummy_accel_info->sType                      = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
         dummy_accel_info->pNext                      = NULL;
         dummy_accel_info->accelerationStructureCount = 1;
@@ -1825,17 +1823,17 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   const uint32_t ndesc_set_layouts = NGFI_DARRAY_SIZE(pipeline_data->descriptor_set_layouts);
 
   // Reset temp. storage to make sure we have all of it available.
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 
   // Allocate an array of descriptor set handles from temporary storage and
   // set them all to null. As we process bind operations, we'll allocate
   // descriptor sets and put them into the array as necessary.
-  auto vk_desc_sets = NGFI_SALLOC(VkDescriptorSet, ndesc_set_layouts);
+  auto vk_desc_sets = ngfi::tmp_alloc<VkDescriptorSet>(ndesc_set_layouts);
   memset(vk_desc_sets, (uintptr_t)VK_NULL_HANDLE, ndesc_set_layouts * sizeof(vk_desc_sets[0]));
 
   // Allocate an array of vulkan descriptor set writes from temp storage, one write per
   // pending bind op.
-  auto vk_writes = NGFI_SALLOC(VkWriteDescriptorSet, cmd_buf->npending_bind_ops);
+  auto vk_writes = ngfi::tmp_alloc<VkWriteDescriptorSet>(cmd_buf->npending_bind_ops);
 
   // Find a descriptor pools list to allocate from.
   ngfvk_desc_pools_list* pools = ngfvk_find_desc_pools_list(cmd_buf->parent_frame);
@@ -1905,7 +1903,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     case NGF_DESCRIPTOR_STORAGE_BUFFER:
     case NGF_DESCRIPTOR_UNIFORM_BUFFER: {
       const ngf_buffer_bind_info* bind_info = &bind_op->info.buffer;
-      auto                        vk_bind_info = NGFI_SALLOC(VkDescriptorBufferInfo, 1);
+      auto vk_bind_info = ngfi::tmp_alloc<VkDescriptorBufferInfo>();
 
       vk_bind_info->buffer = (VkBuffer)bind_info->buffer->alloc.obj_handle;
       vk_bind_info->offset = bind_info->offset;
@@ -1939,7 +1937,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
                          : (is_multilayered_image ? bind_info->resource.image->vkview_arrayed
                                                   : bind_info->resource.image->vkview);
       }
-      auto vk_bind_info = NGFI_SALLOC(VkDescriptorImageInfo, 1);
+      auto vk_bind_info = ngfi::tmp_alloc<VkDescriptorImageInfo>();
       vk_bind_info->imageView   = VK_NULL_HANDLE;
       vk_bind_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
       vk_bind_info->sampler     = VK_NULL_HANDLE;
@@ -1959,7 +1957,7 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
       break;
     }
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE: {
-      auto accel_struct_info   = NGFI_SALLOC(VkWriteDescriptorSetAccelerationStructureKHR, 1);
+      auto accel_struct_info = ngfi::tmp_alloc<VkWriteDescriptorSetAccelerationStructureKHR>();
       accel_struct_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
       accel_struct_info->pNext = NULL;
       accel_struct_info->accelerationStructureCount = 1u;
@@ -2003,9 +2001,9 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
     const ngf_attachment_description* attachment_descs,
     const ngfvk_attachment_pass_desc* attachment_compat_pass_descs,
     VkRenderPass*                     result) {
-  auto vk_attachment_descs = NGFI_SALLOC(VkAttachmentDescription, nattachments);
-  auto vk_color_attachment_refs = NGFI_SALLOC(VkAttachmentReference, nattachments);
-  auto vk_resolve_attachment_refs = NGFI_SALLOC(VkAttachmentReference, nattachments);
+  auto vk_attachment_descs = ngfi::tmp_alloc<VkAttachmentDescription>(nattachments);
+  auto vk_color_attachment_refs   = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
+  auto vk_resolve_attachment_refs = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
   uint32_t              ncolor_attachments   = 0u;
   uint32_t              nresolve_attachments = 0u;
   VkAttachmentReference depth_stencil_attachment_ref;
@@ -2136,7 +2134,7 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
 
   if (result == VK_NULL_HANDLE) {
     const uint32_t nattachments               = rt->nattachments;
-    auto attachment_compat_pass_descs = NGFI_SALLOC(ngfvk_attachment_pass_desc, nattachments);
+    auto attachment_compat_pass_descs = ngfi::tmp_alloc<ngfvk_attachment_pass_desc>(nattachments);
     const size_t rt_attachment_pass_descs_size =
         rt->nattachments * sizeof(ngfvk_attachment_pass_desc);
     memcpy(
@@ -2278,7 +2276,7 @@ static VkResult ngfvk_create_instance(
   // Check if validation layers are supported.
   uint32_t nlayers = 0u;
   vkEnumerateInstanceLayerProperties(&nlayers, NULL);
-  auto layer_props = NGFI_SALLOC(VkLayerProperties, nlayers);
+  auto layer_props = ngfi::tmp_alloc<VkLayerProperties>(nlayers);
   vkEnumerateInstanceLayerProperties(&nlayers, layer_props);
   bool validation_supported = false;
   for (size_t l = 0u; !validation_supported && l < nlayers; ++l) {
@@ -2313,8 +2311,8 @@ static void ngfvk_populate_vk_spec_consts(
     const ngf_specialization_info* spec_info,
     VkSpecializationInfo*          vk_spec_info) {
   if (spec_info) {
-    VkSpecializationMapEntry* spec_map_entries =
-        NGFI_SALLOC(VkSpecializationMapEntry, spec_info->nspecializations);
+    auto spec_map_entries =
+        ngfi::tmp_alloc<VkSpecializationMapEntry>(spec_info->nspecializations);
 
     vk_spec_info->pData         = spec_info->value_buffer;
     vk_spec_info->mapEntryCount = spec_info->nspecializations;
@@ -2383,8 +2381,7 @@ ngf_error ngfvk_create_pipeline_layout(
   for (uint32_t i = 0u; i < nshader_stages; ++i) {
     ntotal_bindings += shader_stages[i]->spv_reflect_module.descriptor_binding_count;
   }
-  ngfvk_reflect_binding_and_stage_mask* bindings =
-      NGFI_SALLOC(ngfvk_reflect_binding_and_stage_mask, ntotal_bindings);
+  auto bindings = ngfi::tmp_alloc<ngfvk_reflect_binding_and_stage_mask>(ntotal_bindings);
 
   uint32_t bindings_offset = 0u;
   for (uint32_t i = 0u; i < nshader_stages; ++i) {
@@ -2417,7 +2414,7 @@ ngf_error ngfvk_create_pipeline_layout(
   const uint32_t last_binding_idx = ntotal_bindings > 0 ? ntotal_bindings - 1u : 0u;
   const uint32_t max_set_id = ntotal_bindings > 0 ? bindings[last_binding_idx].binding_data.set : 0u;
   const uint32_t nall_sets = ntotal_bindings > 0 ? max_set_id + 1u : 0u;
-  uint32_t* nall_bindings_per_set = NGFI_SALLOC(uint32_t, nall_sets);
+  auto nall_bindings_per_set = ngfi::tmp_alloc<uint32_t>(nall_sets);
   memset(nall_bindings_per_set, 0, nall_sets * sizeof(nall_bindings_per_set[0]));
   uint32_t  nunique_bindings      = 0u;
   for (uint32_t cur = 0u; cur < ntotal_bindings; ++cur) {
@@ -2439,7 +2436,7 @@ ngf_error ngfvk_create_pipeline_layout(
   }
 
   // Create descriptor set layouts.
-  auto vk_set_layouts = NGFI_SALLOC(VkDescriptorSetLayout, max_set_id+1);
+  auto vk_set_layouts = ngfi::tmp_alloc<VkDescriptorSetLayout>(max_set_id + 1);
   uint32_t last_set_id = ~0u;
   for (uint32_t cur = 0u; cur < nunique_bindings;) {
     ngfvk_desc_set_layout set_layout;
@@ -2468,7 +2465,7 @@ ngf_error ngfvk_create_pipeline_layout(
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
     const uint32_t                nbindings_in_set = cur - first_binding_in_set;
-    auto vk_descriptor_bindings = NGFI_SALLOC(VkDescriptorSetLayoutBinding, nbindings_in_set);
+    auto vk_descriptor_bindings = ngfi::tmp_alloc<VkDescriptorSetLayoutBinding>(nbindings_in_set);
     for (uint32_t i = first_binding_in_set; i < cur; ++i) {
       VkDescriptorSetLayoutBinding*      vk_d = &vk_descriptor_bindings[i - first_binding_in_set];
       const SpvReflectDescriptorBinding* d    = &bindings[i].binding_data;
@@ -2885,9 +2882,9 @@ static bool ngfvk_sync_barrier(
 
 static void ngfvk_sync_req_batch_init(uint32_t nmax_sync_reqs, ngfvk_sync_req_batch* result) {
   memset(result, 0, sizeof(*result));
-  result->pending_sync_reqs  = NGFI_SALLOC(ngfvk_sync_req, nmax_sync_reqs);
-  result->sync_res_data_keys = NGFI_SALLOC(ngfi_dict_keyhash, nmax_sync_reqs);
-  result->freshness          = NGFI_SALLOC(bool, nmax_sync_reqs);
+  result->pending_sync_reqs  = ngfi::tmp_alloc<ngfvk_sync_req>(nmax_sync_reqs);
+  result->sync_res_data_keys = ngfi::tmp_alloc<ngfi_dict_keyhash>(nmax_sync_reqs);
+  result->freshness          = ngfi::tmp_alloc<bool>(nmax_sync_reqs);
   memset(result->freshness, 0, sizeof(bool) * nmax_sync_reqs);
 }
 
@@ -2987,10 +2984,8 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
 static void ngfvk_sync_commit_pending_barriers_legacy(
     ngfvk_pending_barrier_list* pending_bars,
     VkCommandBuffer             cmd_buf) {
-  VkImageMemoryBarrier* img_bars =
-      NGFI_SALLOC(VkImageMemoryBarrier, pending_bars->npending_img_bars);
-  VkBufferMemoryBarrier* buf_bars =
-      NGFI_SALLOC(VkBufferMemoryBarrier, pending_bars->npending_buf_bars);
+  auto img_bars = ngfi::tmp_alloc<VkImageMemoryBarrier>(pending_bars->npending_img_bars);
+  auto buf_bars = ngfi::tmp_alloc<VkBufferMemoryBarrier>(pending_bars->npending_buf_bars);
   VkPipelineStageFlags src_stage_mask = 0u;
   VkPipelineStageFlags dst_stage_mask = 0u;
   uint32_t             nimg_bars      = 0u;
@@ -3064,10 +3059,8 @@ static void ngfvk_sync_commit_pending_barriers_legacy(
 static void ngfvk_sync_commit_pending_barriers_sync2(
     ngfvk_pending_barrier_list* pending_bars,
     VkCommandBuffer             cmd_buf) {
-  VkImageMemoryBarrier2* img_bars =
-      NGFI_SALLOC(VkImageMemoryBarrier2, pending_bars->npending_img_bars);
-  VkBufferMemoryBarrier2* buf_bars =
-      NGFI_SALLOC(VkBufferMemoryBarrier2, pending_bars->npending_buf_bars);
+  auto img_bars = ngfi::tmp_alloc<VkImageMemoryBarrier2>(pending_bars->npending_img_bars);
+  auto buf_bars = ngfi::tmp_alloc<VkBufferMemoryBarrier2>(pending_bars->npending_buf_bars);
   uint32_t nimg_bars = 0u;
   uint32_t nbuf_bars = 0u;
   NGFI_CHNKLIST_FOR_EACH(pending_bars->chnklist, ngfvk_barrier_data, barrier) {
@@ -3303,7 +3296,7 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
 
 // Actually records renderpass commands into a command buffer.
 static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnklist* cmd_list) {
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 
   NGFI_CHNKLIST_FOR_EACH((*cmd_list), ngfvk_render_cmd, cmd) {
     switch (cmd->type) {
@@ -3428,7 +3421,7 @@ static void ngfvk_cmd_buf_record_render_cmds(ngf_cmd_buffer buf, const ngfi_chnk
       assert(false);
     }
   }
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 }
 
 static void ngfvk_debug_label_begin(VkCommandBuffer b, const char* name) {
@@ -3455,9 +3448,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
 
   ngf_error        err       = NGF_ERROR_OK;
   const uint32_t   ncmd_bufs = NGFI_DARRAY_SIZE(frame_res->submitted_cmd_bufs);
-  auto             submitted_cmd_buf_handles = (VkCommandBuffer*)ngfi_sa_alloc(
-      ngfi_frame_store(),
-      sizeof(VkCommandBuffer) * ncmd_bufs * 2u + 2u);
+  auto submitted_cmd_buf_handles = ngfi::frame_alloc<VkCommandBuffer>(ncmd_bufs * 2u + 2u);
   uint32_t submitted_cmd_buf_handles_idx = 0u;
 
   {
@@ -3519,7 +3510,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
 
   NGFI_DARRAY_FOREACH(frame_res->submitted_cmd_bufs, c) {
     ngf_cmd_buffer cmd_buf = NGFI_DARRAY_AT(frame_res->submitted_cmd_bufs, c);
-    ngfi_sa_reset(ngfi_tmp_store());
+    ngfi::tmp_arena().reset();
 
     NGFI_DICT_FOREACH(cmd_buf->local_res_states, r_it) {
       ngfvk_sync_res_data* cmd_buf_res_state =
@@ -3751,7 +3742,7 @@ extern "C" ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* n
     }
     NGFVK_DEVICE_LIST    = (ngf_device*)malloc(sizeof(ngf_device) * NGFVK_DEVICE_COUNT);
     NGFVK_DEVICE_ID_LIST = (ngfvk_device_id*)malloc(sizeof(ngfvk_device_id) * NGFVK_DEVICE_COUNT);
-    VkPhysicalDevice* phys_devs = NGFI_SALLOC(VkPhysicalDevice, NGFVK_DEVICE_COUNT);
+    auto phys_devs = ngfi::tmp_alloc<VkPhysicalDevice>(NGFVK_DEVICE_COUNT);
     if (NGFVK_DEVICE_LIST == NULL || NGFVK_DEVICE_ID_LIST == NULL || phys_devs == NULL) {
       err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_enumerate_devices_cleanup;
@@ -4605,10 +4596,10 @@ extern "C" ngf_error ngf_cmd_begin_render_pass_simple(
     float               clear_depth,
     uint32_t            clear_stencil,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
-  ngfi_sa_reset(ngfi_tmp_store());
-  auto load_ops = NGFI_SALLOC(ngf_attachment_load_op, rt->nattachments);
-  auto store_ops = NGFI_SALLOC(ngf_attachment_store_op, rt->nattachments);
-  auto clears = NGFI_SALLOC(ngf_clear, rt->nattachments);
+  ngfi::tmp_arena().reset();
+  auto load_ops  = ngfi::tmp_alloc<ngf_attachment_load_op>(rt->nattachments);
+  auto store_ops = ngfi::tmp_alloc<ngf_attachment_store_op>(rt->nattachments);
+  auto clears    = ngfi::tmp_alloc<ngf_clear>(rt->nattachments);
 
   for (size_t i = 0u; i < rt->nattachments; ++i) {
     load_ops[i] = NGF_LOAD_OP_CLEAR;
@@ -4650,16 +4641,15 @@ extern "C" ngf_error ngf_cmd_begin_render_pass(
   err = ngfvk_initialize_generic_encoder(cmd_buf, &enc->pvt_data_donotuse);
   if (err != NGF_ERROR_OK) { return err; }
 
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 
   cmd_buf->active_rt         = pass_info->render_target;
   cmd_buf->renderpass_active = true;
 
   cmd_buf->pending_render_pass_info.render_target = pass_info->render_target;
 
-  auto cloned_load_ops = (ngf_attachment_load_op*)ngfi_sa_alloc(
-      ngfi_frame_store(),
-      sizeof(ngf_attachment_load_op) * pass_info->render_target->nattachments);
+  auto cloned_load_ops =
+      ngfi::frame_alloc<ngf_attachment_load_op>(pass_info->render_target->nattachments);
   cmd_buf->pending_render_pass_info.load_ops = cloned_load_ops;
   if (cmd_buf->pending_render_pass_info.load_ops == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   memcpy(
@@ -4667,9 +4657,8 @@ extern "C" ngf_error ngf_cmd_begin_render_pass(
       pass_info->load_ops,
       sizeof(ngf_attachment_load_op) * pass_info->render_target->nattachments);
 
-  auto cloned_store_ops = (ngf_attachment_store_op*)ngfi_sa_alloc(
-      ngfi_frame_store(),
-      sizeof(ngf_attachment_store_op) * pass_info->render_target->nattachments);
+  auto cloned_store_ops =
+      ngfi::frame_alloc<ngf_attachment_store_op>(pass_info->render_target->nattachments);
   cmd_buf->pending_render_pass_info.store_ops = cloned_store_ops;
   if (cmd_buf->pending_render_pass_info.store_ops == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   memcpy(
@@ -4679,7 +4668,7 @@ extern "C" ngf_error ngf_cmd_begin_render_pass(
 
   uint32_t   nclears   = 0u;
   uint32_t   clear_idx = 0u;
-  auto cloned_clears = (ngf_clear*)ngfi_sa_alloc(ngfi_frame_store(), sizeof(ngf_clear) * pass_info->render_target->nattachments);
+  auto cloned_clears = ngfi::frame_alloc<ngf_clear>(pass_info->render_target->nattachments);
   if (cloned_clears == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   for (uint32_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     if (cmd_buf->pending_render_pass_info.load_ops[i] == NGF_LOAD_OP_CLEAR) {
@@ -4799,8 +4788,8 @@ extern "C" ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEP
       target->is_default ? CURRENT_CONTEXT->swapchain_info.height : target->height};
 
   const uint32_t clear_value_count = buf->pending_clear_value_count;
-  VkClearValue*  vk_clears =
-      clear_value_count > 0 ? NGFI_SALLOC(VkClearValue, clear_value_count) : NULL;
+  auto vk_clears =
+      clear_value_count > 0 ? ngfi::tmp_alloc<VkClearValue>(clear_value_count) : nullptr;
   if (clear_value_count > 0) {
     for (size_t i = 0; i < clear_value_count; ++i) {
       VkClearValue*    vk_clear_val = &vk_clears[i];
@@ -4832,7 +4821,7 @@ extern "C" ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEP
   vkCmdBeginRenderPass(buf->vk_cmd_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
   // Clean up after the begin operation.
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 
   // Encode each pending render command.
   ngfvk_cmd_buf_record_render_cmds(buf, &buf->in_pass_cmd_chnks);
@@ -4939,8 +4928,8 @@ extern "C" ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   }
 
   // reset stack allocators.
-  ngfi_sa_reset(ngfi_tmp_store());
-  ngfi_sa_reset(ngfi_frame_store());
+  ngfi::tmp_arena().reset();
+  ngfi::frame_arena().reset();
 
   // Retire resources.
   ngfvk_frame_resources* next_frame_res = &CURRENT_CONTEXT->frame_res[fi];
@@ -5081,7 +5070,7 @@ extern "C" ngf_error ngf_create_graphics_pipeline(
     ngf_graphics_pipeline*            result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   ngf_error err    = NGF_ERROR_OK;
   ngf_graphics_pipeline pipeline = NULL;
   {
@@ -5105,12 +5094,13 @@ extern "C" ngf_error ngf_create_graphics_pipeline(
     if (err != NGF_ERROR_OK) { goto ngf_create_graphics_pipeline_cleanup; }
 
     // Prepare vertex input.
-    VkVertexInputBindingDescription* vk_binding_descs =
-        NGFI_SALLOC(VkVertexInputBindingDescription, info->input_info->nvert_buf_bindings);
-    VkVertexInputAttributeDescription* vk_attrib_descs =
-        NGFI_SALLOC(VkVertexInputAttributeDescription, info->input_info->nattribs);
+    auto vk_binding_descs =
+        ngfi::tmp_alloc<VkVertexInputBindingDescription>(info->input_info->nvert_buf_bindings);
+    auto vk_attrib_descs =
+        ngfi::tmp_alloc<VkVertexInputAttributeDescription>(info->input_info->nattribs);
 
-    if (vk_binding_descs == NULL || vk_attrib_descs == NULL) {
+    if ((vk_binding_descs == NULL && info->input_info->nvert_buf_bindings > 0)  || 
+        (vk_attrib_descs == NULL && info->input_info->nattribs > 0)) {
       err = NGF_ERROR_OUT_OF_MEM;
       goto ngf_create_graphics_pipeline_cleanup;
     }
@@ -5313,7 +5303,7 @@ extern "C" ngf_error ngf_create_graphics_pipeline(
           .pDynamicStates    = dynamic_states};
 
     // Create a compatible render pass object.
-    auto attachment_compat_pass_descs = NGFI_SALLOC(ngfvk_attachment_pass_desc, info->compatible_rt_attachment_descs->ndescs);
+    auto attachment_compat_pass_descs = ngfi::tmp_alloc<ngfvk_attachment_pass_desc>(info->compatible_rt_attachment_descs->ndescs);
     for (uint32_t i = 0u; i < info->compatible_rt_attachment_descs->ndescs; ++i) {
       attachment_compat_pass_descs[i].load_op  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
       attachment_compat_pass_descs[i].store_op = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -5384,7 +5374,7 @@ extern "C" ngf_error
 ngf_create_compute_pipeline(const ngf_compute_pipeline_info* info, ngf_compute_pipeline* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   ngf_error err = NGF_ERROR_OK;
   ngf_compute_pipeline pipeline = NULL;
 
@@ -5653,7 +5643,7 @@ extern "C" void ngf_cmd_dispatch(
     uint32_t            z_threadgroups) NGF_NOEXCEPT {
   ngf_cmd_buffer cmd_buf = NGFVK_ENC2CMDBUF(enc);
 
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
 
   // Prepare a batch of sync requests by scanning all pending bind operations.
   ngfvk_sync_req_batch sync_req_batch;
@@ -5888,7 +5878,7 @@ extern "C" void ngf_cmd_copy_buffer(
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_sync_req_batch sync_req_batch;
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   ngfvk_sync_req_batch_init(2, &sync_req_batch);
   const ngfvk_sync_req src_sync_req = {
       .barrier_masks =
@@ -5926,7 +5916,7 @@ extern "C" void ngf_cmd_write_image(
   assert(nwrites == 0u || writes);
   if (nwrites == 0u) return;
   ngfvk_sync_req_batch sync_req_batch;
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   ngfvk_sync_req_batch_init(2, &sync_req_batch);
   const ngfvk_sync_req src_sync_req = {
       .barrier_masks =
@@ -5944,8 +5934,8 @@ extern "C" void ngf_cmd_write_image(
   ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &dst_sync_res, &dst_sync_req);
   ngfvk_sync_req_batch_commit(&sync_req_batch, cmd_buf);
 
-  ngfi_sa_reset(ngfi_tmp_store());
-  VkBufferImageCopy* vk_writes = NGFI_SALLOC(VkBufferImageCopy, nwrites);
+  ngfi::tmp_arena().reset();
+  auto vk_writes = ngfi::tmp_alloc<VkBufferImageCopy>(nwrites);
   if (vk_writes) {
     for (size_t i = 0u; i < nwrites; ++i) {
       const ngf_image_write* ngf_write = &writes[i];
@@ -5986,7 +5976,7 @@ extern "C" void ngf_cmd_copy_image_to_buffer(
   ngf_cmd_buffer buf = NGFVK_ENC2CMDBUF(enc);
   assert(buf);
   ngfvk_sync_req_batch sync_req_batch;
-  ngfi_sa_reset(ngfi_tmp_store());
+  ngfi::tmp_arena().reset();
   ngfvk_sync_req_batch_init(2, &sync_req_batch);
   const ngfvk_sync_req src_sync_req = {
       .barrier_masks =

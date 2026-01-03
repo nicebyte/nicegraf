@@ -54,7 +54,12 @@ nmk_static_library(NAME nicegraf-internal
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/dict.c
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c)
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/block-alloc.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.cpp
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/default-arenas.h
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/default-arenas.cpp)
 
 # nicegraf utility library.
 nmk_static_library(NAME nicegraf-util
@@ -137,6 +142,10 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
   nmk_binary(NAME vk-backend-tests
              SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
              DEPS nicegraf-vk-for-tests "$<IF:$<NOT:$<BOOL:${WIN32}>>,dl,>")
+  nmk_binary(NAME arena-alloc-tests
+             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/arena-alloc-tests.cpp
+             SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/test-suite-runner.c
+             DEPS nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
 endif()
 
 
