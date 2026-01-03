@@ -29,7 +29,6 @@
 #include "ngf-common/dynamic-array.h"
 #include "ngf-common/frame-token.h"
 #include "ngf-common/list.h"
-#include "ngf-common/native-binding-map.h"
 #include "ngf-common/stack-alloc.h"
 #include "ngf-common/macros.h"
 #include "nicetest.h"
@@ -150,82 +149,6 @@ NT_TESTSUITE {
     NT_ASSERT(test_ctx_id == ngfi_frame_ctx_id(test_token));
     NT_ASSERT(test_max_inflight_frames == ngfi_frame_max_inflight_frames(test_token));
     NT_ASSERT(test_frame_id == ngfi_frame_id(test_token));
-  }
-
-  /* native binding map tests */
-
-  NT_TESTCASE("native binding map: magic") {
-    const char  test_string[] = "nothing /* NGF_NATIVE_BINDING_MAP */ more of nothing";
-    const char* result        = ngfi_find_serialized_native_binding_map(test_string);
-    NT_ASSERT(result != NULL);
-    NT_ASSERT(result - test_string == 33);
-
-    const char  test_string2[] = "nothing /**\nNGF_NATIVE_BINDING_MAP\n**/\nmore of nothing";
-    const char* result2        = ngfi_find_serialized_native_binding_map(test_string2);
-    NT_ASSERT(result2 != NULL);
-    NT_ASSERT(result2 - test_string2 == 34);
-  }
-
-  NT_TESTCASE("native binding map: missing magic") {
-    const char  test_string[] = "/*NGF_NATIVE_";
-    const char* result        = ngfi_find_serialized_native_binding_map(test_string);
-    NT_ASSERT(result == NULL);
-
-    const char  test_string2[] = "";
-    const char* result2        = ngfi_find_serialized_native_binding_map(test_string2);
-    NT_ASSERT(result2 == NULL);
-  }
-
-  NT_TESTCASE("native binding map: magic not in comment") {
-    const char  test_string[] = "*/nothing NGF_NATIVE_BINDING_MAP */ more of nothing";
-    const char* result        = ngfi_find_serialized_native_binding_map(test_string);
-    NT_ASSERT(result == NULL);
-  }
-
-  NT_TESTCASE("native binding map: first occuring magic") {
-    const char  test_string[] = "0123456/*NGF_NATIVE_BINDING_MAP*/012/*NGF_NATIVE_BINDING_MAP*/";
-    const char* result1       = ngfi_find_serialized_native_binding_map(test_string);
-    NT_ASSERT(result1 != NULL);
-    NT_ASSERT(result1 - test_string == 31);
-    const char* result2 = ngfi_find_serialized_native_binding_map(result1);
-    NT_ASSERT(result2 != NULL);
-    NT_ASSERT(result2 - test_string == sizeof(test_string) - 3);
-  }
-
-  NT_TESTCASE("native binding map: parsing") {
-    const char               test_string[] = "( 0 1 \n) : 2\n(2 0) : 3\naaaa";
-    ngfi_native_binding_map* map           = ngfi_parse_serialized_native_binding_map(test_string);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 0, 1) == 2u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 2, 0) == 3u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 2, 1) == ~0u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 0, 0) == ~0u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 3, 0) == ~0u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map, 3, 2) == ~0u);
-    ngfi_destroy_native_binding_map(map);
-  }
-
-  NT_TESTCASE("native binding map: ill-formed") {
-    const char               test_string1[] = "(0 1 : 2\n(2 0) : 3\naaaa";
-    ngfi_native_binding_map* map1 = ngfi_parse_serialized_native_binding_map(test_string1);
-    NT_ASSERT(map1 == NULL);
-  }
-
-  NT_TESTCASE("native binding map: parsing stops at error") {
-    const char               test_string2[] = "(0 1 ): 2\n2 0) : 3\naaaa";
-    ngfi_native_binding_map* map2 = ngfi_parse_serialized_native_binding_map(test_string2);
-    NT_ASSERT(map2 != NULL);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map2, 0, 1) == 2u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0u);
-    ngfi_destroy_native_binding_map(map2);
-  }
-
-  NT_TESTCASE("native binding map: parsing stops at (-1 -1 -1)") {
-    const char               test_string2[] = "(0 1): 2\n(-1 -1):-1 (2 0) : 3\naaaa";
-    ngfi_native_binding_map* map2 = ngfi_parse_serialized_native_binding_map(test_string2);
-    NT_ASSERT(map2 != NULL);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map2, 0, 1) == 2u);
-    NT_ASSERT(ngfi_native_binding_map_lookup(map2, 2, 0) == ~0u);
-    ngfi_destroy_native_binding_map(map2);
   }
 
   /* stack allocator tests */
