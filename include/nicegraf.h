@@ -3493,6 +3493,10 @@ void ngf_renderdoc_capture_begin() NGF_NOEXCEPT;
  */
 void ngf_renderdoc_capture_end() NGF_NOEXCEPT;
 
+void ngf_img_skip_sync(ngf_image i) NGF_NOEXCEPT;
+
+void ngf_buf_skip_sync(ngf_buffer b) NGF_NOEXCEPT;
+
 #ifdef _MSC_VER
 #pragma endregion
 #endif

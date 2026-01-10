@@ -274,6 +274,7 @@ typedef struct ngfvk_sync_state {
   ngfvk_sync_barrier_masks active_readers_masks;
   uint32_t                 per_stage_readers_mask;
   VkImageLayout            layout;
+  bool                     skip;
 } ngfvk_sync_state;
 
 // Type of synchronized resource.
@@ -1098,7 +1099,6 @@ static ngf_error ngfvk_create_image(
   }
 
   if (err != NGF_ERROR_OK) { goto ngfvk_create_image_exit; }
-
 ngfvk_create_image_exit:
   return err;
 }
@@ -1738,7 +1738,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   pool->utilization.sets++;
 
   // Bind dummy resources.
-  VkWriteDescriptorSet* dummy_writes = (VkWriteDescriptorSet*)ngfi_sa_alloc(
+  /*VkWriteDescriptorSet* dummy_writes = (VkWriteDescriptorSet*)ngfi_sa_alloc(
       ngfi_tmp_store(),
       sizeof(VkWriteDescriptorSet) * set_layout->nall_descs);
   uint32_t num_writes = 0u;
@@ -1797,7 +1797,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
       }
     }
   }
-  vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);
+  vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);*/
 
   return result;
 }
@@ -3556,7 +3556,10 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
             sizeof(patch_barrier_data));
       }
       if (cmd_buf_res_state->sync_state.last_writer_masks.access_mask != 0) {
+          bool old_skip = global_sync_state->skip;
+
         *global_sync_state = cmd_buf_res_state->sync_state;
+        global_sync_state->skip = old_skip;
       } else {
         global_sync_state->active_readers_masks.access_mask |=
             cmd_buf_res_state->sync_state.active_readers_masks.access_mask;
@@ -5764,6 +5767,26 @@ void ngf_cmd_bind_resources(
     const ngfvk_render_cmd* cmd_data =
         ngfi_chnklist_append(&buf->in_pass_cmd_chnks, &cmd, sizeof(cmd));
     ngfi_chnk_hdr* last_chnk = NGFI_CHNK_FROM_NODE(buf->in_pass_cmd_chnks.firstchnk->clnode.prev);
+    switch(bind_operations[i].type) {
+    case NGF_DESCRIPTOR_UNIFORM_BUFFER:
+    case NGF_DESCRIPTOR_STORAGE_BUFFER: 
+        if (bind_operations[i].info.buffer.buffer->sync_state.skip) {
+            continue;
+        }
+        break;
+    case NGF_DESCRIPTOR_STORAGE_IMAGE:
+    case NGF_DESCRIPTOR_IMAGE:
+    case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER:
+        if(!bind_operations[i].info.image_sampler.is_image_view && bind_operations[i].info.image_sampler.resource.image->sync_state.skip) {
+            continue;
+        }
+        else if (bind_operations[i].info.image_sampler.is_image_view && bind_operations[i].info.image_sampler.resource.view->src->sync_state.skip) {
+            continue;
+        } 
+        break;
+    default: continue;
+    }
+
     if (last_chnk != curr_range.chnk) {
       if (curr_range.chnk) {
         ngfi_chnklist_append(&buf->virt_bind_ops_ranges, &curr_range, sizeof(curr_range));
@@ -6235,7 +6258,6 @@ ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) {
   buf->hash         = ngfvk_ptr_hash(buf);
   memset(&buf->sync_state, 0, sizeof(buf->sync_state));
   buf->sync_state.layout = VK_IMAGE_LAYOUT_UNDEFINED;
-
   return err;
 }
 
@@ -6392,7 +6414,6 @@ ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) {
     err = NGF_ERROR_OBJECT_CREATION_FAILED;
     goto ngf_create_image_cleanup;
   }
-
   err = ngfvk_create_image(info, &alloc, true, result);
   if (err != NGF_ERROR_OK) { goto ngf_create_image_cleanup; }
 
@@ -6511,6 +6532,12 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) {
 uint32_t ngf_get_vk_image_format_index(ngf_image_format format) {
   return (uint32_t)get_vk_image_format(format);
 }
+
+void ngf_img_skip_sync(ngf_image i) {
+    i->sync_state.skip = true;
+}
+
+void ngf_buf_skip_sync(ngf_buffer b) { b->sync_state.skip = true; }
 
 #pragma endregion
 
