@@ -1104,7 +1104,7 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
     xcb_screen_t*      screen     = NULL;
     xcb_connection_t*  connection = xcb_connect(NULL, &screen_idx);
     const xcb_setup_t* setup      = xcb_get_setup(connection);
-    for (xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup); screen >= 0 && it.rem;
+    for (xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup); screen_idx >= 0 && it.rem;
          xcb_screen_next(&it)) {
       if (screen_idx-- == 0) { screen = it.data; }
     }
@@ -1159,6 +1159,92 @@ static ngf_error ngfvk_create_vk_image_view(
   }
 }
 
+static VkResult ngfvk_renderpass_from_attachment_descs(
+    uint32_t                          nattachments,
+    const ngf_attachment_description* attachment_descs,
+    const ngfvk_attachment_pass_desc* attachment_compat_pass_descs,
+    VkRenderPass*                     result) {
+  auto     vk_attachment_descs        = ngfi::tmp_alloc<VkAttachmentDescription>(nattachments);
+  auto     vk_color_attachment_refs   = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
+  auto     vk_resolve_attachment_refs = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
+  uint32_t ncolor_attachments         = 0u;
+  uint32_t nresolve_attachments       = 0u;
+  VkAttachmentReference depth_stencil_attachment_ref;
+  bool                  have_depth_stencil_attachment = false;
+
+  for (uint32_t a = 0u; a < nattachments; ++a) {
+    const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
+    const ngfvk_attachment_pass_desc* attachment_pass_desc = &attachment_compat_pass_descs[a];
+    VkAttachmentDescription*          vk_attachment_desc   = &vk_attachment_descs[a];
+
+    vk_attachment_desc->flags   = 0u;
+    vk_attachment_desc->format  = get_vk_image_format(ngf_attachment_desc->format);
+    vk_attachment_desc->samples = get_vk_sample_count(ngf_attachment_desc->sample_count);
+    vk_attachment_desc->loadOp  = attachment_pass_desc->load_op;
+    vk_attachment_desc->storeOp = attachment_pass_desc->store_op;
+    vk_attachment_desc->stencilLoadOp =
+        VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // attachment_pass_desc->load_op;
+    vk_attachment_desc->stencilStoreOp =
+        VK_ATTACHMENT_STORE_OP_DONT_CARE;  // attachment_pass_desc->store_op;
+    vk_attachment_desc->initialLayout = attachment_pass_desc->layout;
+    vk_attachment_desc->finalLayout   = attachment_pass_desc->layout;
+
+    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
+      if (!attachment_pass_desc->is_resolve) {
+        VkAttachmentReference* vk_color_attachment_reference =
+            &vk_color_attachment_refs[ncolor_attachments++];
+        vk_color_attachment_reference->attachment = a;
+        vk_color_attachment_reference->layout     = attachment_pass_desc->layout;
+      } else {
+        VkAttachmentReference* vk_resolve_attachment_reference =
+            &vk_resolve_attachment_refs[nresolve_attachments++];
+        vk_resolve_attachment_reference->attachment = a;
+        vk_resolve_attachment_reference->layout     = attachment_pass_desc->layout;
+      }
+    }
+    if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH ||
+        ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL) {
+      if (have_depth_stencil_attachment) {
+        // TODO: insert diag. log here
+        return VK_ERROR_UNKNOWN;
+      } else {
+        have_depth_stencil_attachment           = true;
+        depth_stencil_attachment_ref.attachment = a;
+        depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
+      }
+    }
+  }
+  if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
+    // TODO: insert diag. log here.
+    return VK_ERROR_UNKNOWN;
+  }
+
+  const VkSubpassDescription subpass_desc = {
+      .flags                = 0u,
+      .pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .inputAttachmentCount = 0u,
+      .pInputAttachments    = NULL,
+      .colorAttachmentCount = ncolor_attachments,
+      .pColorAttachments    = vk_color_attachment_refs,
+      .pResolveAttachments  = nresolve_attachments > 0u ? vk_resolve_attachment_refs : NULL,
+      .pDepthStencilAttachment =
+          have_depth_stencil_attachment ? &depth_stencil_attachment_ref : NULL,
+      .preserveAttachmentCount = 0u,
+      .pPreserveAttachments    = NULL};
+
+  const VkRenderPassCreateInfo renderpass_ci = {
+      .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+      .pNext           = NULL,
+      .flags           = 0u,
+      .attachmentCount = nattachments,
+      .pAttachments    = vk_attachment_descs,
+      .subpassCount    = 1u,
+      .pSubpasses      = &subpass_desc,
+      .dependencyCount = 0u,
+      .pDependencies   = NULL};
+
+  return vkCreateRenderPass(_vk.device, &renderpass_ci, NULL, result);
+}
 static inline uint64_t ngfvk_ptr_hash(void* data) {
   uint64_t mmh3_out[2] = {0, 0};
   ngfi::detail::mmh3_x64_128(reinterpret_cast<uintptr_t>(data), 0x9e3779b9, mmh3_out);
@@ -1457,6 +1543,43 @@ ngfvk_generic_pipeline::make(const ngf_compute_pipeline_info& info) NGF_NOEXCEPT
   return pipeline;
 }
 
+static int ngfvk_binding_comparator(const void* a, const void* b) {
+  auto a_binding = (const ngfvk_reflect_binding_and_stage_mask*)a;
+  auto b_binding = (const ngfvk_reflect_binding_and_stage_mask*)b;
+  if (a_binding->binding_data.set < b_binding->binding_data.set)
+    return -1;
+  else if (a_binding->binding_data.set == b_binding->binding_data.set) {
+    if (a_binding->binding_data.binding < b_binding->binding_data.binding)
+      return -1;
+    else if (a_binding->binding_data.binding == b_binding->binding_data.binding)
+      return 0;
+  }
+  return 1;
+}
+
+static ngf_descriptor_type
+ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
+  switch (spv_reflect_type) {
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+    return NGF_DESCRIPTOR_UNIFORM_BUFFER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+    return NGF_DESCRIPTOR_IMAGE;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
+    return NGF_DESCRIPTOR_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+    return NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+    return NGF_DESCRIPTOR_TEXEL_BUFFER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+    return NGF_DESCRIPTOR_STORAGE_BUFFER;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+    return NGF_DESCRIPTOR_STORAGE_IMAGE;
+  case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
+    return NGF_DESCRIPTOR_ACCELERATION_STRUCTURE;
+  default:
+    return NGF_DESCRIPTOR_TYPE_COUNT;
+  }
+}
 ngf_error ngfvk_generic_pipeline::common_init(
     const ngf_specialization_info*   spec_info,
     VkPipelineShaderStageCreateInfo* vk_shader_stages,
@@ -2817,93 +2940,6 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
   ngfvk_cleanup_pending_binds(cmd_buf);
 }
 
-static VkResult ngfvk_renderpass_from_attachment_descs(
-    uint32_t                          nattachments,
-    const ngf_attachment_description* attachment_descs,
-    const ngfvk_attachment_pass_desc* attachment_compat_pass_descs,
-    VkRenderPass*                     result) {
-  auto     vk_attachment_descs        = ngfi::tmp_alloc<VkAttachmentDescription>(nattachments);
-  auto     vk_color_attachment_refs   = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
-  auto     vk_resolve_attachment_refs = ngfi::tmp_alloc<VkAttachmentReference>(nattachments);
-  uint32_t ncolor_attachments         = 0u;
-  uint32_t nresolve_attachments       = 0u;
-  VkAttachmentReference depth_stencil_attachment_ref;
-  bool                  have_depth_stencil_attachment = false;
-
-  for (uint32_t a = 0u; a < nattachments; ++a) {
-    const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
-    const ngfvk_attachment_pass_desc* attachment_pass_desc = &attachment_compat_pass_descs[a];
-    VkAttachmentDescription*          vk_attachment_desc   = &vk_attachment_descs[a];
-
-    vk_attachment_desc->flags   = 0u;
-    vk_attachment_desc->format  = get_vk_image_format(ngf_attachment_desc->format);
-    vk_attachment_desc->samples = get_vk_sample_count(ngf_attachment_desc->sample_count);
-    vk_attachment_desc->loadOp  = attachment_pass_desc->load_op;
-    vk_attachment_desc->storeOp = attachment_pass_desc->store_op;
-    vk_attachment_desc->stencilLoadOp =
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // attachment_pass_desc->load_op;
-    vk_attachment_desc->stencilStoreOp =
-        VK_ATTACHMENT_STORE_OP_DONT_CARE;  // attachment_pass_desc->store_op;
-    vk_attachment_desc->initialLayout = attachment_pass_desc->layout;
-    vk_attachment_desc->finalLayout   = attachment_pass_desc->layout;
-
-    if (ngf_attachment_desc->type == NGF_ATTACHMENT_COLOR) {
-      if (!attachment_pass_desc->is_resolve) {
-        VkAttachmentReference* vk_color_attachment_reference =
-            &vk_color_attachment_refs[ncolor_attachments++];
-        vk_color_attachment_reference->attachment = a;
-        vk_color_attachment_reference->layout     = attachment_pass_desc->layout;
-      } else {
-        VkAttachmentReference* vk_resolve_attachment_reference =
-            &vk_resolve_attachment_refs[nresolve_attachments++];
-        vk_resolve_attachment_reference->attachment = a;
-        vk_resolve_attachment_reference->layout     = attachment_pass_desc->layout;
-      }
-    }
-    if (ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH ||
-        ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL) {
-      if (have_depth_stencil_attachment) {
-        // TODO: insert diag. log here
-        return VK_ERROR_UNKNOWN;
-      } else {
-        have_depth_stencil_attachment           = true;
-        depth_stencil_attachment_ref.attachment = a;
-        depth_stencil_attachment_ref.layout     = attachment_pass_desc->layout;
-      }
-    }
-  }
-  if (nresolve_attachments > 0u && nresolve_attachments != ncolor_attachments) {
-    // TODO: insert diag. log here.
-    return VK_ERROR_UNKNOWN;
-  }
-
-  const VkSubpassDescription subpass_desc = {
-      .flags                = 0u,
-      .pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS,
-      .inputAttachmentCount = 0u,
-      .pInputAttachments    = NULL,
-      .colorAttachmentCount = ncolor_attachments,
-      .pColorAttachments    = vk_color_attachment_refs,
-      .pResolveAttachments  = nresolve_attachments > 0u ? vk_resolve_attachment_refs : NULL,
-      .pDepthStencilAttachment =
-          have_depth_stencil_attachment ? &depth_stencil_attachment_ref : NULL,
-      .preserveAttachmentCount = 0u,
-      .pPreserveAttachments    = NULL};
-
-  const VkRenderPassCreateInfo renderpass_ci = {
-      .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-      .pNext           = NULL,
-      .flags           = 0u,
-      .attachmentCount = nattachments,
-      .pAttachments    = vk_attachment_descs,
-      .subpassCount    = 1u,
-      .pSubpasses      = &subpass_desc,
-      .dependencyCount = 0u,
-      .pDependencies   = NULL};
-
-  return vkCreateRenderPass(_vk.device, &renderpass_ci, NULL, result);
-}
-
 // Returns a bitstring uniquely identifying the series of load/store op combos
 // for each attachment.
 static uint64_t ngfvk_renderpass_ops_key(
@@ -2980,44 +3016,6 @@ static VkRenderPass ngfvk_lookup_renderpass(ngf_render_target rt, uint64_t ops_k
   }
 
   return result;
-}
-
-static int ngfvk_binding_comparator(const void* a, const void* b) {
-  auto a_binding = (const ngfvk_reflect_binding_and_stage_mask*)a;
-  auto b_binding = (const ngfvk_reflect_binding_and_stage_mask*)b;
-  if (a_binding->binding_data.set < b_binding->binding_data.set)
-    return -1;
-  else if (a_binding->binding_data.set == b_binding->binding_data.set) {
-    if (a_binding->binding_data.binding < b_binding->binding_data.binding)
-      return -1;
-    else if (a_binding->binding_data.binding == b_binding->binding_data.binding)
-      return 0;
-  }
-  return 1;
-}
-
-static ngf_descriptor_type
-ngfvk_get_ngf_descriptor_type(SpvReflectDescriptorType spv_reflect_type) {
-  switch (spv_reflect_type) {
-  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-    return NGF_DESCRIPTOR_UNIFORM_BUFFER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-    return NGF_DESCRIPTOR_IMAGE;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_SAMPLER:
-    return NGF_DESCRIPTOR_SAMPLER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-    return NGF_DESCRIPTOR_IMAGE_AND_SAMPLER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-    return NGF_DESCRIPTOR_TEXEL_BUFFER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-    return NGF_DESCRIPTOR_STORAGE_BUFFER;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-    return NGF_DESCRIPTOR_STORAGE_IMAGE;
-  case SPV_REFLECT_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR:
-    return NGF_DESCRIPTOR_ACCELERATION_STRUCTURE;
-  default:
-    return NGF_DESCRIPTOR_TYPE_COUNT;
-  }
 }
 
 static bool ngfvk_init_loader_if_necessary() {
@@ -4708,8 +4706,8 @@ ngf_context_t::make(const ngf_context_info& info) {
         .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
         .pNext      = NULL,
         .flags      = 0,
-        .window     = (xcb_window_t)swapchain_info->native_handle,
-        .connection = _vk.xcb_connection};
+        .connection = _vk.xcb_connection,
+        .window     = (xcb_window_t)swapchain_info->native_handle};
 #endif
     vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
     if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
@@ -4727,8 +4725,6 @@ ngf_context_t::make(const ngf_context_info& info) {
     const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
                                        swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
 
-    ctx->default_render_target = NGFI_ALLOC(struct ngf_render_target_t);
-    if (ctx->default_render_target == NULL) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
     const uint32_t nattachment_descs =
         1u + (default_rt_has_depth ? 1u : 0u) + (default_rt_is_multisampled ? 1u : 0u);
 
