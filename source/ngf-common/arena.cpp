@@ -116,9 +116,9 @@ arena::arena(size_t initial_capacity) noexcept : block_capacity_ { initial_capac
 
 arena::arena(arena&& other) noexcept
     : current_block_(other.current_block_)
+    , block_capacity_(other.block_capacity_)
     , total_allocated_(other.total_allocated_)
-    , total_used_(other.total_used_)
-    , block_capacity_(other.block_capacity_) {
+    , total_used_(other.total_used_) {
   other.current_block_      = nullptr;
   other.total_allocated_    = 0;
   other.total_used_         = 0;
