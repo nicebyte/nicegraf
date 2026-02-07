@@ -47,10 +47,6 @@ typedef HMODULE ngfi_module_handle;
 typedef void* ngfi_module_handle;
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Custom allocation callbacks.
 extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 
@@ -132,10 +128,6 @@ typedef struct ngfi_range {
 } ngfi_range;
 
 void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
-
-#ifdef __cplusplus
-}
-#endif
 
 #ifdef __cplusplus
 #include <new>
