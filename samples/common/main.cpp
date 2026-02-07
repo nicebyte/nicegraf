@@ -212,8 +212,8 @@ int main(int, char**) {
         .capacity_hint = 3u,
         .width         = (uint32_t)fb_width,
         .height        = (uint32_t)fb_height,
-        .native_handle = native_window_handle,
-        .present_mode  = NGF_PRESENTATION_MODE_FIFO};
+        .present_mode  = NGF_PRESENTATION_MODE_FIFO,
+        .native_handle = native_window_handle};
     const ngf_context_info ctx_info = {
         .swapchain_info = &swapchain_info,
         .shared_context = nullptr};

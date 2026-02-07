@@ -181,9 +181,8 @@ struct ngfvk_desc_binding {
 struct ngfvk_desc_set_layout {
   VkDescriptorSetLayout vk_handle;
   ngfvk_desc_count      counts;
-  uint32_t              nall_bindings;  // < Number of ALL bindings (incl. unused ones).
   uint32_t              nall_descs;     // < Total number of descriptors across all bindings.
-  ngfvk_desc_binding*   binding_properties;
+  ngfi::fixed_array<ngfvk_desc_binding> binding_properties;
 };
 
 struct ngfvk_desc_pool {
@@ -1716,20 +1715,20 @@ ngf_error ngfvk_generic_pipeline::common_init(
             .bindingCount = 0u,
             .pBindings    = NULL};
         vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &set_layout.vk_handle);
-        descriptor_set_layouts.push_back(set_layout);
         vk_set_layouts[i] = set_layout.vk_handle;
+        descriptor_set_layouts.emplace_back(ngfi::move(set_layout));
       }
     }
-    set_layout.nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
-    if (set_layout.nall_bindings > 0u) {
-      set_layout.binding_properties = NGFI_ALLOCN(ngfvk_desc_binding, set_layout.nall_bindings);
-      for (size_t i = 0u; i < set_layout.nall_bindings; ++i) {
+    const uint32_t nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
+    if (nall_bindings > 0u) {
+      set_layout.binding_properties = ngfi::fixed_array<ngfvk_desc_binding> { nall_bindings };
+      for (size_t i = 0u; i < nall_bindings; ++i) {
         set_layout.binding_properties[i].type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
       }
       memset(
-          set_layout.binding_properties,
+          set_layout.binding_properties.data(),
           0,
-          sizeof(ngfvk_desc_binding) * set_layout.nall_bindings);
+          sizeof(ngfvk_desc_binding) * set_layout.binding_properties.size());
     }
     const uint32_t first_binding_in_set = cur;
     while (cur < nunique_bindings && current_set_id == bindings[cur].binding_data.set) cur++;
@@ -1764,8 +1763,8 @@ ngf_error ngfvk_generic_pipeline::common_init(
         .pBindings    = vk_descriptor_bindings};
     const VkResult vk_err =
         vkCreateDescriptorSetLayout(_vk.device, &vk_ds_info, NULL, &set_layout.vk_handle);
-    descriptor_set_layouts.push_back(set_layout);
     vk_set_layouts[current_set_id] = set_layout.vk_handle;
+    descriptor_set_layouts.emplace_back(ngfi::move(set_layout));
     if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
     last_set_id = current_set_id;
   }
@@ -1794,11 +1793,6 @@ ngfvk_generic_pipeline::~ngfvk_generic_pipeline() NGF_NOEXCEPT {
     ngfvk_desc_set_layout* layout    = &descriptor_set_layouts[l];
     VkDescriptorSetLayout  vk_layout = layout->vk_handle;
     res->retire.append(vk_layout);
-    if (layout->nall_bindings > 0u) {
-      if (layout->binding_properties) {
-        NGFI_FREEN(layout->binding_properties, layout->nall_bindings);
-      }
-    }
   }
   if (compat_render_pass != VK_NULL_HANDLE) res->retire.append(compat_render_pass);
 }
@@ -2686,7 +2680,7 @@ static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
   // Bind dummy resources.
   auto     dummy_writes = ngfi::tmp_alloc<VkWriteDescriptorSet>(set_layout->nall_descs);
   uint32_t num_writes   = 0u;
-  for (uint32_t b = 0u; b < set_layout->nall_bindings; ++b) {
+  for (uint32_t b = 0u; b < set_layout->binding_properties.size(); ++b) {
     if (set_layout->binding_properties[b].type == VK_DESCRIPTOR_TYPE_MAX_ENUM) continue;
     for (uint32_t array_idx = 0u; array_idx < set_layout->binding_properties[b].ndescs_in_binding;
          ++array_idx) {
@@ -2799,12 +2793,12 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
     const ngfvk_desc_set_layout* set_layout =
         &pipeline_data->descriptor_set_layouts[bind_op->target_set];
     // Ensure that a valid binding is referenced by this bind operation.
-    if (bind_op->target_binding >= set_layout->nall_bindings) {
+    if (bind_op->target_binding >= set_layout->binding_properties.size()) {
       NGFI_DIAG_WARNING(
           "invalid binding %d referenced by bind operation (descriptor set has %d bindings) - "
           "ignoring",
           bind_op->target_binding,
-          set_layout->nall_bindings);
+          set_layout->binding_properties.size());
       continue;
     }
 
@@ -3763,7 +3757,7 @@ static ngfvk_sync_req ngfvk_sync_req_for_bind_op(
   // Bind ops that target non-existent sets/bindings should be disregarded.
   if (bind_op->target_set >= pipeline->descriptor_set_layouts.size()) return sync_req;
   const ngfvk_desc_set_layout* layout = &pipeline->descriptor_set_layouts[bind_op->target_set];
-  if (bind_op->target_binding >= layout->nall_bindings) return sync_req;
+  if (bind_op->target_binding >= layout->binding_properties.size()) return sync_req;
 
   const bool is_read_only = layout->binding_properties[bind_op->target_binding].readonly;
 
