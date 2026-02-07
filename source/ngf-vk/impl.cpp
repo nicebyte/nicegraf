@@ -1054,7 +1054,7 @@ static VkColorSpaceKHR get_vk_color_space(ngf_colorspace colorspace) {
 
 #pragma region internal_funcs
 
-extern "C" ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
+ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
 
 ngfi::arena& current_frame_res_arena() {
   return CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id].res_frame_arena;
