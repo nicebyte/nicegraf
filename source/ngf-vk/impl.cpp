@@ -198,9 +198,8 @@ struct ngfvk_desc_pools_list {
 };
 
 struct ngfvk_desc_superpool {
-  uint16_t               ctx_id;
-  ngfvk_desc_pools_list* pools_lists;
-  uint8_t                num_lists;
+  uint16_t                                 ctx_id;
+  ngfi::fixed_array<ngfvk_desc_pools_list> pools_lists;
 };
 
 // Command buffer with its associated pool.
@@ -573,7 +572,7 @@ struct ngf_shader_stage_t {
   VkShaderModule         vk_module;
   VkShaderStageFlagBits  vk_stage_bits;
   SpvReflectShaderModule spv_reflect_module;
-  char*                  entry_point_name;
+  ngfi::fixed_array<char> entry_point_name;
 
   static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_shader_stage_t>>
   make(const ngf_shader_stage_info& info) NGF_NOEXCEPT;
@@ -1250,6 +1249,29 @@ static inline uint64_t ngfvk_ptr_hash(void* data) {
   return mmh3_out[0] ^ mmh3_out[1];
 }
 
+ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_texel_buffer_view_t>>
+ngf_texel_buffer_view_t::make(const ngf_texel_buffer_view_info& info) NGF_NOEXCEPT {
+  auto buf_view = ngfi::unique_ptr<ngf_texel_buffer_view_t>::make();
+  if (!buf_view) return NGF_ERROR_OUT_OF_MEM;
+  const VkBufferViewCreateInfo vk_buf_view_ci = {
+      .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
+      .pNext  = NULL,
+      .flags  = 0u,
+      .buffer = (VkBuffer)info.buffer->alloc.obj_handle,
+      .format = get_vk_image_format(info.texel_format),
+      .offset = info.offset,
+      .range  = info.size};
+  const VkResult vk_result =
+      vkCreateBufferView(_vk.device, &vk_buf_view_ci, NULL, &buf_view->vk_buf_view);
+  if (vk_result != VK_SUCCESS) return NGF_ERROR_OBJECT_CREATION_FAILED;
+  buf_view->buffer = info.buffer;
+  return buf_view;
+}
+
+ngf_texel_buffer_view_t::~ngf_texel_buffer_view_t() NGF_NOEXCEPT {
+  vkDestroyBufferView(_vk.device, vk_buf_view, nullptr);
+}
+
 ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_generic_pipeline>>
 ngfvk_generic_pipeline::make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT {
   ngfi::tmp_arena().reset();
@@ -1632,7 +1654,7 @@ ngf_error ngfvk_generic_pipeline::common_init(
     vk_shader_stages[s].flags               = 0u;
     vk_shader_stages[s].stage               = stage->vk_stage_bits;
     vk_shader_stages[s].module              = stage->vk_module;
-    vk_shader_stages[s].pName               = stage->entry_point_name,
+    vk_shader_stages[s].pName               = stage->entry_point_name.data(),
     vk_shader_stages[s].pSpecializationInfo = &vk_spec_info;
   }
 
@@ -1800,7 +1822,6 @@ ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_shader_stage_t>>
 ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
   auto stage = ngfi::unique_ptr<ngf_shader_stage_t>::make();
   if (!stage) return NGF_ERROR_OUT_OF_MEM;
-  stage->entry_point_name = nullptr;
   VkShaderModuleCreateInfo vk_sm_info = {
       .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext    = NULL,
@@ -1814,8 +1835,8 @@ ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
   if (spverr != SPV_REFLECT_RESULT_SUCCESS) return NGF_ERROR_OBJECT_CREATION_FAILED;
   stage->vk_stage_bits           = get_vk_shader_stage(info.type);
   size_t entry_point_name_length = strlen(info.entry_point_name) + 1u;
-  stage->entry_point_name        = NGFI_ALLOCN(char, entry_point_name_length);
-  strncpy(stage->entry_point_name, info.entry_point_name, entry_point_name_length);
+  stage->entry_point_name        = ngfi::fixed_array<char>{entry_point_name_length};
+  strncpy(stage->entry_point_name.data(), info.entry_point_name, entry_point_name_length);
   return stage;
 }
 
@@ -1824,7 +1845,6 @@ ngf_shader_stage_t::~ngf_shader_stage_t() NGF_NOEXCEPT {
     vkDestroyShaderModule(_vk.device, vk_module, NULL);
     spvReflectDestroyShaderModule(&spv_reflect_module);
   }
-  if (entry_point_name) { NGFI_FREEN(entry_point_name, strlen(entry_point_name) + 1u); }
 }
 ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_buffer_t>>
 ngf_buffer_t::make(const ngf_buffer_info& info) NGF_NOEXCEPT {
@@ -2544,15 +2564,14 @@ static ngf_error ngfvk_cmd_buffer_allocate_for_frame(
 static ngf_error
 ngfvk_create_desc_superpool(ngfvk_desc_superpool* superpool, uint8_t pools_lists, uint16_t ctx_id) {
   superpool->ctx_id      = ctx_id;
-  superpool->pools_lists = NGFI_ALLOCN(ngfvk_desc_pools_list, pools_lists);
-  superpool->num_lists   = pools_lists;
-  memset(superpool->pools_lists, 0, pools_lists * sizeof(ngfvk_desc_pools_list));
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{pools_lists};
+  memset(superpool->pools_lists.data(), 0, pools_lists * sizeof(ngfvk_desc_pools_list));
   return NGF_ERROR_OK;
 }
 
 static void ngfvk_destroy_desc_superpool(ngfvk_desc_superpool* superpool) {
-  for (uint8_t i = 0u; i < superpool->num_lists; ++i) {
-    ngfvk_desc_pool* p = superpool->pools_lists[i].list;
+  for (auto& pool_list : superpool->pools_lists) {
+    ngfvk_desc_pool* p = pool_list.list;
     while (p) {
       vkDestroyDescriptorPool(_vk.device, p->vk_pool, NULL);
       ngfvk_desc_pool* next = p->next;
@@ -2560,7 +2579,7 @@ static void ngfvk_destroy_desc_superpool(ngfvk_desc_superpool* superpool) {
       p = next;
     }
   }
-  NGFI_FREEN(superpool->pools_lists, superpool->num_lists);
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{};
 }
 
 static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) {
@@ -2579,9 +2598,8 @@ static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) 
   if (superpool == NULL) {
     ngfvk_desc_superpool new_superpool = {
         .ctx_id      = (uint16_t)~0,
-        .pools_lists = NULL,
-        .num_lists   = 0};
-    CURRENT_CONTEXT->desc_superpools.push_back(new_superpool);
+        .pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{}};
+    CURRENT_CONTEXT->desc_superpools.emplace_back(ngfi::move(new_superpool));
     superpool = &CURRENT_CONTEXT->desc_superpools.back();
     ngfvk_create_desc_superpool(superpool, nframes, ctx_id);
   }
@@ -6128,25 +6146,6 @@ extern "C" void ngf_cmd_end_current_debug_group(ngf_cmd_buffer cmd_buffer) NGF_N
   ngfvk_debug_label_end(cmd_buffer->vk_cmd_buffer);
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_texel_buffer_view_t>>
-ngf_texel_buffer_view_t::make(const ngf_texel_buffer_view_info& info) NGF_NOEXCEPT {
-  auto buf_view = ngfi::unique_ptr<ngf_texel_buffer_view_t>::make();
-  if (!buf_view) return NGF_ERROR_OUT_OF_MEM;
-  const VkBufferViewCreateInfo vk_buf_view_ci = {
-      .sType  = VK_STRUCTURE_TYPE_BUFFER_VIEW_CREATE_INFO,
-      .pNext  = NULL,
-      .flags  = 0u,
-      .buffer = (VkBuffer)info.buffer->alloc.obj_handle,
-      .format = get_vk_image_format(info.texel_format),
-      .offset = info.offset,
-      .range  = info.size};
-  const VkResult vk_result =
-      vkCreateBufferView(_vk.device, &vk_buf_view_ci, NULL, &buf_view->vk_buf_view);
-  if (vk_result != VK_SUCCESS) return NGF_ERROR_OBJECT_CREATION_FAILED;
-  buf_view->buffer = info.buffer;
-  return buf_view;
-}
-
 extern "C" ngf_error ngf_create_texel_buffer_view(
     const ngf_texel_buffer_view_info* info,
     ngf_texel_buffer_view*            result) NGF_NOEXCEPT {
@@ -6155,10 +6154,6 @@ extern "C" ngf_error ngf_create_texel_buffer_view(
   auto maybe_buf_view = ngf_texel_buffer_view_t::make(*info);
   if (!maybe_buf_view.has_error()) result[0] = maybe_buf_view.value().release();
   return maybe_buf_view.has_error() ? maybe_buf_view.error() : NGF_ERROR_OK;
-}
-
-ngf_texel_buffer_view_t::~ngf_texel_buffer_view_t() NGF_NOEXCEPT {
-  vkDestroyBufferView(_vk.device, vk_buf_view, nullptr);
 }
 
 extern "C" void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT {
