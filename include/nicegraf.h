@@ -321,9 +321,14 @@ typedef enum ngf_error {
    * An enumerator passed as part of an argument to the call is not valid in that context.*/
   NGF_ERROR_INVALID_ENUM,
 
+  /**
+   * \ingroup ngf
+   */
+  NGF_ERROR_INVALID_OPERATION,
+ 
   /** \ingroup ngf
    * The routine did not complete successfully. */
-  NGF_ERROR_INVALID_OPERATION
+  NGF_ERROR_OPERATION_FAILED,
   /*..add new errors above this line */
 } ngf_error;
 
@@ -2235,8 +2240,8 @@ typedef struct ngf_swapchain_info {
   uint32_t         capacity_hint; /**< Number of images in swapchain (may be ignored)*/
   uint32_t         width;         /**< Width of swapchain images in pixels. */
   uint32_t         height;        /**< Height of swapchain images in pixels. */
-  uintptr_t        native_handle; /**< HWND, ANativeWindow, NSWindow, etc. */
   ngf_present_mode present_mode;  /**< Desired present mode. */
+  uintptr_t        native_handle; /**< HWND, ANativeWindow, NSWindow, etc. */
   bool             enable_compute_access; /**< Whether to enable access to swapchain images from compute stage. */
 } ngf_swapchain_info;
 
@@ -2552,6 +2557,12 @@ typedef struct ngf_device_capabilities {
    * cases.
    */
   bool device_local_memory_is_host_visible;
+
+  /**
+   * Indicates whether the device is capable of inline raytracing.
+   */
+  bool supports_inline_raytracing;
+
 } ngf_device_capabilities;
 
 /**

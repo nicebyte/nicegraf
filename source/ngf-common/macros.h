@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 nicegraf contributors
+ * Copyright (c) 2026 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -47,18 +47,17 @@ typedef HMODULE ngfi_module_handle;
 typedef void* ngfi_module_handle;
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Custom allocation callbacks.
 extern const ngf_allocation_callbacks* NGF_ALLOC_CB;
 
 // Convenience macros for invoking custom memory allocation callbacks.
+// C++ versions are defined after the template functions below.
+#ifndef __cplusplus
 #define NGFI_ALLOC(type)     ((type*)NGF_ALLOC_CB->allocate(sizeof(type), 1, NGF_ALLOC_CB->userdata))
 #define NGFI_ALLOCN(type, n) ((type*)NGF_ALLOC_CB->allocate(sizeof(type), n, NGF_ALLOC_CB->userdata))
 #define NGFI_FREE(ptr)       (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), 1, NGF_ALLOC_CB->userdata))
 #define NGFI_FREEN(ptr, n)   (NGF_ALLOC_CB->free((void*)(ptr), sizeof(*ptr), n, NGF_ALLOC_CB->userdata))
+#endif
 
 // Macro for determining size of arrays.
 #if defined(_MSC_VER)
@@ -131,5 +130,77 @@ typedef struct ngfi_range {
 void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 
 #ifdef __cplusplus
+#include <new>
+#include "ngf-common/util.h"
+
+namespace ngfi {
+
+template<class T, class... Args>
+T* alloc(Args&&... arg) noexcept {
+  T* ptr = static_cast<T*>(NGF_ALLOC_CB->allocate(sizeof(T), 1, NGF_ALLOC_CB->userdata));
+  if (ptr != nullptr) {
+    new (ptr) T(ngfi::forward<Args>(arg)...);
+  }
+  return ptr;
 }
+
+template<class T>
+T* allocn(size_t n) noexcept {
+  if (n == 0) return nullptr;
+  T* ptr = static_cast<T*>(NGF_ALLOC_CB->allocate(sizeof(T), n, NGF_ALLOC_CB->userdata));
+  if (ptr != nullptr) {
+    for (size_t i = 0; i < n; ++i) {
+      new (&ptr[i]) T();
+    }
+  }
+  return ptr;
+}
+
+template<class T>
+void free(T* ptr) noexcept {
+  if (ptr != nullptr) {
+    if constexpr (! __is_trivially_copyable(T)) {
+      ptr->~T();
+    }
+    NGF_ALLOC_CB->free(ptr, sizeof(T), 1, NGF_ALLOC_CB->userdata);
+  }
+}
+
+template<class T>
+void freen(T* ptr, size_t n) noexcept {
+  if (ptr != nullptr) {
+    if constexpr (!__is_trivially_copyable(T)) {
+      for (size_t i = 0; i < n; ++i) {
+        ptr[i].~T();
+      }
+    }
+    NGF_ALLOC_CB->free(ptr, sizeof(T), n, NGF_ALLOC_CB->userdata);
+  }
+}
+
+struct configured_alloc_callbacks  {
+    template <class T> static T* alloc() noexcept { return ::ngfi::alloc<T>(); }
+    template <class T> static T* allocn(size_t n) noexcept { return ::ngfi::allocn<T>(n); }
+    template <class T> static void free(T* ptr) noexcept { ::ngfi::free<T>(ptr); }
+    template <class T> static void freen(T* ptr, size_t n) noexcept { ::ngfi::freen<T>(ptr, n); }
+};
+
+struct system_alloc_callbacks  {
+    template <class T> static T* alloc() noexcept { return new T{}; }
+    template <class T> static T* allocn(size_t n) noexcept { return new T[n]; }
+    template <class T> static void free(T* ptr) noexcept { delete ptr; }
+    template <class T> static void freen(T* ptr, size_t) noexcept { delete[] ptr; }
+};
+
+
+}  // namespace ngfi
+
+// C++ versions of allocation macros that use the template functions.
+#define NGFI_ALLOC(type)     (ngfi::alloc<type>())
+#define NGFI_ALLOCN(type, n) (ngfi::allocn<type>(n))
+#define NGFI_FREE(ptr)       (ngfi::free(ptr))
+#define NGFI_FREEN(ptr, n)   (ngfi::freen(ptr, n))
+
+
 #endif
+

@@ -54,4 +54,12 @@ constexpr remove_reference_t<T>&& move(T&& t) noexcept {
   return static_cast<remove_reference_t<T>&&>(t);
 }
 
+template<class T> constexpr T&& forward(typename remove_reference<T>::type& t) noexcept {
+  return static_cast<T&&>(t);
+}
+
+template<class T> constexpr T&& forward(typename remove_reference<T>::type&& t) noexcept {
+  return static_cast<T&&>(t);
+}
+
 }  // namespace ngfi

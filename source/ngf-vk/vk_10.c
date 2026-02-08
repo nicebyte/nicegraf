@@ -1,3 +1,4 @@
+#include "ngf-common/silence.h"
 #include "vk_10.h"
 #include "ngf-common/macros.h"
 
@@ -12,12 +13,6 @@
 #define VK_LOADER_LIB "libMoltenVK.dylib"
 #else
 #define VK_LOADER_LIB "libvulkan.so.1"
-#endif
-#endif
-#ifdef __clang__
-#pragma clang diagnostic ignored "-Wnullability-completeness"
-#if __has_warning("-Wcast-function-type-mismatch")
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
 #endif
 #endif
 
