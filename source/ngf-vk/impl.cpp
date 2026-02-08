@@ -20,6 +20,10 @@
  * IN THE SOFTWARE.
  */
 
+
+#include "ngf-common/silence.h"
+#include "nicegraf.h"
+
 #include "ngf-common/arena.h"
 #include "ngf-common/array.h"
 #include "ngf-common/chunked-list.h"
@@ -28,11 +32,9 @@
 #include "ngf-common/frame-token.h"
 #include "ngf-common/hashtable.h"
 #include "ngf-common/macros.h"
-#include "ngf-common/silence.h"
 #include "ngf-common/unique-ptr.h"
 #include "ngf-common/util.h"
 #include "ngf-common/value-or-error.h"
-#include "nicegraf.h"
 #include "vk_10.h"
 
 #include <assert.h>
@@ -1116,6 +1118,299 @@ ngfvk_query_presentation_support(VkPhysicalDevice phys_dev, uint32_t queue_famil
 #endif
 }
 
+static void ngfvk_reset_renderpass_cache(ngf_context ctx) {
+  for (size_t p = 0; p < ctx->renderpass_cache.size(); ++p) {
+    ctx->frame_res[ctx->frame_id].retire.append(ctx->renderpass_cache[p].renderpass);
+  }
+  ctx->renderpass_cache.clear();
+}
+
+// Forward declaration for use in ngfvk_retire_resources
+static void ngfvk_reset_desc_pools_list(ngfvk_desc_pools_list* superpool);
+
+static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
+  if (frame_res->nwait_fences > 0u) {
+    VkResult wait_status = VK_SUCCESS;
+    do {
+      wait_status = vkWaitForFences(
+          _vk.device,
+          frame_res->nwait_fences,
+          frame_res->fences,
+          VK_TRUE,
+          0x3B9ACA00ul);
+    } while (wait_status == VK_TIMEOUT);
+    vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
+    frame_res->nwait_fences = 0;
+  }
+
+  // Destroy retired pipelines
+  for (VkPipeline p : frame_res->retire.list<VkPipeline>()) {
+    vkDestroyPipeline(_vk.device, p, NULL);
+  }
+  frame_res->retire.clear<VkPipeline>();
+
+  // Destroy retired pipeline layouts
+  for (VkPipelineLayout l : frame_res->retire.list<VkPipelineLayout>()) {
+    vkDestroyPipelineLayout(_vk.device, l, NULL);
+  }
+  frame_res->retire.clear<VkPipelineLayout>();
+
+  // Destroy retired descriptor set layouts
+  for (VkDescriptorSetLayout l : frame_res->retire.list<VkDescriptorSetLayout>()) {
+    vkDestroyDescriptorSetLayout(_vk.device, l, NULL);
+  }
+  frame_res->retire.clear<VkDescriptorSetLayout>();
+
+  // Free retired command buffers
+  for (const ngfvk_cmd_buf_with_pool& cb : frame_res->retire.list<ngfvk_cmd_buf_with_pool>()) {
+    vkFreeCommandBuffers(_vk.device, cb.cmd_pool, 1u, &cb.cmd_buf);
+  }
+
+  // Reset command pools
+  for (const ngfvk_cmd_buf_with_pool& cb : frame_res->retire.list<ngfvk_cmd_buf_with_pool>()) {
+    vkResetCommandPool(_vk.device, cb.cmd_pool, 0);
+  }
+  frame_res->retire.clear<ngfvk_cmd_buf_with_pool>();
+
+  // Destroy retired framebuffers
+  for (VkFramebuffer fb : frame_res->retire.list<VkFramebuffer>()) {
+    vkDestroyFramebuffer(_vk.device, fb, NULL);
+  }
+  frame_res->retire.clear<VkFramebuffer>();
+
+  // Destroy retired render passes
+  for (VkRenderPass rp : frame_res->retire.list<VkRenderPass>()) {
+    vkDestroyRenderPass(_vk.device, rp, NULL);
+  }
+  frame_res->retire.clear<VkRenderPass>();
+
+  // Destroy retired samplers
+  for (ngf_sampler s : frame_res->retire.list<ngf_sampler>()) { NGFI_FREE(s); }
+  frame_res->retire.clear<ngf_sampler>();
+
+  // Destroy retired image views
+  for (VkImageView v : frame_res->retire.list<VkImageView>()) {
+    vkDestroyImageView(_vk.device, v, nullptr);
+  }
+  frame_res->retire.list<VkImageView>().clear();
+  for (ngf_image_view v : frame_res->retire.list<ngf_image_view>()) { NGFI_FREE(v); }
+  frame_res->retire.list<ngf_image_view>().clear();
+
+  // Destroy retired buffer views
+  for (ngf_texel_buffer_view v : frame_res->retire.list<ngf_texel_buffer_view>()) { NGFI_FREE(v); }
+  frame_res->retire.clear<ngf_texel_buffer_view>();
+
+  // Destroy retired images
+  for (ngf_image img : frame_res->retire.list<ngf_image>()) { NGFI_FREE(img); }
+  frame_res->retire.clear<ngf_image>();
+
+  // Destroy retired buffers
+  for (ngf_buffer buf : frame_res->retire.list<ngf_buffer>()) { NGFI_FREE(buf); }
+  frame_res->retire.clear<ngf_buffer>();
+
+  // Reset retired descriptor pool lists
+  for (ngfvk_desc_pools_list* dpl : frame_res->retire.list<ngfvk_desc_pools_list*>()) {
+    ngfvk_reset_desc_pools_list(dpl);
+  }
+  frame_res->retire.clear<ngfvk_desc_pools_list*>();
+}
+
+static ngf_error
+ngfvk_create_desc_superpool(ngfvk_desc_superpool* superpool, uint8_t pools_lists, uint16_t ctx_id) {
+  superpool->ctx_id      = ctx_id;
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {pools_lists};
+  memset(superpool->pools_lists.data(), 0, pools_lists * sizeof(ngfvk_desc_pools_list));
+  return NGF_ERROR_OK;
+}
+
+static void ngfvk_destroy_desc_superpool(ngfvk_desc_superpool* superpool) {
+  for (auto& pool_list : superpool->pools_lists) {
+    ngfvk_desc_pool* p = pool_list.list;
+    while (p) {
+      vkDestroyDescriptorPool(_vk.device, p->vk_pool, NULL);
+      ngfvk_desc_pool* next = p->next;
+      NGFI_FREE(p);
+      p = next;
+    }
+  }
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {};
+}
+
+static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) {
+  const uint16_t ctx_id   = ngfi_frame_ctx_id(token);
+  const uint8_t  nframes  = ngfi_frame_max_inflight_frames(token);
+  const uint8_t  frame_id = ngfi_frame_id(token);
+
+  ngfvk_desc_superpool* superpool = NULL;
+  for (size_t i = 0; i < CURRENT_CONTEXT->desc_superpools.size(); ++i) {
+    if (CURRENT_CONTEXT->desc_superpools[i].ctx_id == ctx_id) {
+      superpool = &CURRENT_CONTEXT->desc_superpools[i];
+      break;
+    }
+  }
+
+  if (superpool == NULL) {
+    ngfvk_desc_superpool new_superpool = {
+        .ctx_id      = (uint16_t)~0,
+        .pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {}};
+    CURRENT_CONTEXT->desc_superpools.emplace_back(ngfi::move(new_superpool));
+    superpool = &CURRENT_CONTEXT->desc_superpools.back();
+    ngfvk_create_desc_superpool(superpool, nframes, ctx_id);
+  }
+
+  return &superpool->pools_lists[frame_id];
+}
+
+static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
+    ngfvk_desc_pools_list*       pools,
+    const ngfvk_desc_set_layout* set_layout) {
+  // Ensure we have an active desriptor pool that is able to service the
+  // request.
+  const bool have_active_pool    = (pools->active_pool != NULL);
+  bool       fresh_pool_required = !have_active_pool;
+
+  if (have_active_pool) {
+    // Check if the active descriptor pool can fit the required descriptor
+    // set.
+    ngfvk_desc_pool*                pool     = pools->active_pool;
+    const ngfvk_desc_pool_capacity* capacity = &pool->capacity;
+    ngfvk_desc_pool_capacity*       usage    = &pool->utilization;
+    for (unsigned i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+      fresh_pool_required |=
+          (usage->descriptors[i] + set_layout->counts[i] >= capacity->descriptors[i]);
+    }
+    fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
+  }
+  if (fresh_pool_required) {
+    if (!have_active_pool || pools->active_pool->next == NULL) {
+      // TODO: make this tweakable
+      ngfvk_desc_pool_capacity capacity;
+      capacity.sets = 100u;
+      for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
+
+      // Prepare descriptor counts.
+      auto vk_pool_sizes = ngfi::tmp_alloc<VkDescriptorPoolSize>(NGF_DESCRIPTOR_TYPE_COUNT);
+      for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+        vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
+        vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
+      }
+
+      // Prepare a createinfo structure for the new pool.
+      const VkDescriptorPoolCreateInfo vk_pool_ci = {
+          .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+          .pNext         = NULL,
+          .flags         = 0u,
+          .maxSets       = capacity.sets,
+          .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
+          .pPoolSizes    = vk_pool_sizes};
+
+      // Create the new pool.
+      ngfvk_desc_pool* new_pool = NGFI_ALLOC(ngfvk_desc_pool);
+      new_pool->next            = NULL;
+      new_pool->capacity        = capacity;
+      memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
+      const VkResult vk_pool_create_result =
+          vkCreateDescriptorPool(_vk.device, &vk_pool_ci, NULL, &new_pool->vk_pool);
+      if (vk_pool_create_result == VK_SUCCESS) {
+        if (pools->active_pool != NULL && pools->active_pool->next == NULL) {
+          pools->active_pool->next = new_pool;
+        } else if (pools->active_pool == NULL) {
+          pools->list = new_pool;
+        } else {  // shouldn't happen
+          assert(false);
+        }
+        pools->active_pool = new_pool;
+      } else {
+        NGFI_FREE(new_pool);
+        assert(false);
+      }
+    } else {
+      pools->active_pool = pools->active_pool->next;
+    }
+  }
+
+  // Allocate the new descriptor set from the pool.
+  ngfvk_desc_pool* pool = pools->active_pool;
+
+  const VkDescriptorSetAllocateInfo vk_desc_set_info = {
+      .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+      .pNext              = NULL,
+      .descriptorPool     = pool->vk_pool,
+      .descriptorSetCount = 1u,
+      .pSetLayouts        = &set_layout->vk_handle};
+  VkDescriptorSet result = VK_NULL_HANDLE;
+  const VkResult  desc_set_alloc_result =
+      vkAllocateDescriptorSets(_vk.device, &vk_desc_set_info, &result);
+  if (desc_set_alloc_result != VK_SUCCESS) { return VK_NULL_HANDLE; }
+
+  // Update usage counters for the active descriptor pool.
+  for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
+    pool->utilization.descriptors[i] += set_layout->counts[i];
+  }
+  pool->utilization.sets++;
+
+  // Bind dummy resources.
+  auto     dummy_writes = ngfi::tmp_alloc<VkWriteDescriptorSet>(set_layout->nall_descs);
+  uint32_t num_writes   = 0u;
+  for (uint32_t b = 0u; b < set_layout->binding_properties.size(); ++b) {
+    if (set_layout->binding_properties[b].type == VK_DESCRIPTOR_TYPE_MAX_ENUM) continue;
+    for (uint32_t array_idx = 0u; array_idx < set_layout->binding_properties[b].ndescs_in_binding;
+         ++array_idx) {
+      VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
+      desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      desc_w->pNext                = NULL;
+      desc_w->descriptorCount      = 1u;
+      desc_w->descriptorType       = set_layout->binding_properties[b].type;
+      desc_w->dstArrayElement      = array_idx;
+      desc_w->dstBinding           = b;
+      desc_w->dstSet               = result;
+
+      const bool is_multilayered_image = set_layout->binding_properties[b].is_multilayered_image;
+      const bool is_cubemap            = set_layout->binding_properties[b].is_cubemap;
+
+      switch (desc_w->descriptorType) {
+      case VK_DESCRIPTOR_TYPE_SAMPLER:
+        desc_w->pImageInfo = &_vk.dummy_res.samp_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+        desc_w->pImageInfo =
+            is_multilayered_image ? &_vk.dummy_res.imgsamp_arr_info : &_vk.dummy_res.imgsamp_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+      case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+        if (!is_cubemap) {
+          desc_w->pImageInfo =
+              is_multilayered_image ? &_vk.dummy_res.img_arr_info : &_vk.dummy_res.img_info;
+        } else {
+          desc_w->pImageInfo =
+              is_multilayered_image ? &_vk.dummy_res.cube_arr_info : &_vk.dummy_res.cube_info;
+        }
+        break;
+      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        desc_w->pBufferInfo = &_vk.dummy_res.buf_info;
+        break;
+      case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+        desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
+        break;
+      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
+        auto dummy_accel_info   = ngfi::tmp_alloc<VkWriteDescriptorSetAccelerationStructureKHR>();
+        dummy_accel_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+        dummy_accel_info->pNext = NULL;
+        dummy_accel_info->accelerationStructureCount = 1;
+        dummy_accel_info->pAccelerationStructures    = &_vk.dummy_res.dummy_accel_struct;
+        desc_w->pNext                                = dummy_accel_info;
+        break;
+      }
+      default:
+        assert(false);
+      }
+    }
+  }
+  vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);
+
+  return result;
+}
 static ngf_error ngfvk_create_vk_image_view(
     VkImage         image,
     VkImageViewType image_type,
@@ -1245,6 +1540,365 @@ static inline uint64_t ngfvk_ptr_hash(void* data) {
   uint64_t mmh3_out[2] = {0, 0};
   ngfi::detail::mmh3_x64_128(reinterpret_cast<uintptr_t>(data), 0x9e3779b9, mmh3_out);
   return mmh3_out[0] ^ mmh3_out[1];
+}
+
+ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& info) {
+  auto ctx = ngfi::unique_ptr<ngf_context_t>::make();
+  if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
+
+  ngf_error                 err            = NGF_ERROR_OK;
+  VkResult                  vk_err         = VK_SUCCESS;
+  const ngf_swapchain_info* swapchain_info = info.swapchain_info;
+
+  // Create swapchain if necessary.
+  if (swapchain_info != NULL) {
+    // Begin by creating the window surface.
+#if defined(_WIN32) || defined(_WIN64)
+    const VkWin32SurfaceCreateInfoKHR surface_info = {
+        .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+        .pNext     = NULL,
+        .flags     = 0,
+        .hinstance = GetModuleHandle(NULL),
+        .hwnd      = (HWND)swapchain_info->native_handle};
+#elif defined(__ANDROID__)
+    const VkAndroidSuraceCreateInfoKHR surface_info = {
+        .sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+        .pNext  = NULL,
+        .flags  = 0,
+        .window = swapchain_info->native_handle};
+#elif defined(__APPLE__)
+    const VkMetalSurfaceCreateInfoEXT surface_info = {
+        .sType  = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
+        .pNext  = NULL,
+        .flags  = 0,
+        .pLayer = (const CAMetalLayer*)ngfvk_create_ca_metal_layer(swapchain_info)};
+#else
+    const VkXcbSurfaceCreateInfoKHR surface_info = {
+        .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
+        .pNext      = NULL,
+        .flags      = 0,
+        .connection = _vk.xcb_connection,
+        .window     = (xcb_window_t)swapchain_info->native_handle};
+#endif
+    vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    VkBool32 surface_supported = false;
+    vkGetPhysicalDeviceSurfaceSupportKHR(
+        _vk.phys_dev,
+        _vk.present_family_idx,
+        ctx->surface,
+        &surface_supported);
+    if (!surface_supported) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+
+    // Create the default rendertarget object.
+    const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
+    const bool default_rt_is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
+    const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
+                                       swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
+
+    const uint32_t nattachment_descs =
+        1u + (default_rt_has_depth ? 1u : 0u) + (default_rt_is_multisampled ? 1u : 0u);
+
+    ctx->default_render_target = ngfi::move(
+        ngf_render_target_t::make(swapchain_info->width, swapchain_info->height, nattachment_descs)
+            .value());
+
+    uint32_t                    attachment_desc_idx = 0u;
+    ngf_attachment_description* color_attachment_desc =
+        &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+    color_attachment_desc->format       = swapchain_info->color_format;
+    color_attachment_desc->sample_count = swapchain_info->sample_count;
+    color_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
+    color_attachment_desc->is_resolve   = false;
+
+    ngfvk_attachment_pass_desc* color_attachment_pass_desc =
+        &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+    color_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    color_attachment_pass_desc->is_resolve = false;
+    color_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    color_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+    if (default_rt_has_depth) {
+      ++attachment_desc_idx;
+
+      ngf_attachment_description* depth_attachment_desc =
+          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+      depth_attachment_desc->format       = swapchain_info->depth_format;
+      depth_attachment_desc->sample_count = swapchain_info->sample_count;
+      depth_attachment_desc->type =
+          default_rt_no_stencil ? NGF_ATTACHMENT_DEPTH : NGF_ATTACHMENT_DEPTH_STENCIL;
+      depth_attachment_desc->is_resolve = false;
+
+      ngfvk_attachment_pass_desc* depth_attachment_pass_desc =
+          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+      depth_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      depth_attachment_pass_desc->is_resolve = false;
+      depth_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      depth_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    }
+
+    if (default_rt_is_multisampled) {
+      ++attachment_desc_idx;
+
+      ngf_attachment_description* resolve_attachment_desc =
+          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
+      resolve_attachment_desc->format       = swapchain_info->color_format;
+      resolve_attachment_desc->sample_count = NGF_SAMPLE_COUNT_1;
+      resolve_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
+      resolve_attachment_desc->is_resolve   = true;
+
+      ngfvk_attachment_pass_desc* resolve_attachment_pass_desc =
+          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
+      resolve_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      resolve_attachment_pass_desc->is_resolve = true;
+      resolve_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      resolve_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+      ctx->default_render_target->have_resolve_attachments = true;
+    }
+
+    ngfvk_renderpass_from_attachment_descs(
+        nattachment_descs,
+        ctx->default_render_target->attachment_descs.data(),
+        ctx->default_render_target->attachment_compat_pass_descs.data(),
+        &ctx->default_render_target->compat_render_pass);
+
+    // Create the swapchain itself.
+    auto maybe_swapchain =
+        ngfvk_swapchain::make(*swapchain_info, ctx->default_render_target.get(), ctx->surface);
+    if (maybe_swapchain.has_error()) return maybe_swapchain.error();
+    ctx->swapchain = ngfi::move(maybe_swapchain.value());
+    if (err != NGF_ERROR_OK) { return err; }
+    ctx->swapchain_info = *swapchain_info;
+  } else {
+    ctx->default_render_target = NULL;
+  }
+
+  // Create frame resource holders.
+  const uint32_t max_inflight_frames = swapchain_info ? ctx->swapchain->nimgs : 3u;
+  ctx->max_inflight_frames           = max_inflight_frames;
+  ctx->frame_res = ngfi::fixed_array<ngfvk_frame_resources> {max_inflight_frames};
+  if (ctx->frame_res.data() == nullptr) { return NGF_ERROR_OUT_OF_MEM; }
+  for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
+    ctx->frame_res[f].res_frame_arena.set_block_size(1024);
+    ctx->frame_res[f].submitted_cmd_bufs.reserve(8u);
+    ctx->frame_res[f].semaphore = VK_NULL_HANDLE;
+
+    const VkSemaphoreCreateInfo semaphore_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u,
+    };
+    vk_err = vkCreateSemaphore(_vk.device, &semaphore_info, NULL, &ctx->frame_res[f].semaphore);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    const VkFenceCreateInfo fence_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0u};
+    ctx->frame_res[f].nwait_fences = 0;
+    for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
+      vk_err = vkCreateFence(_vk.device, &fence_info, NULL, &ctx->frame_res[f].fences[i]);
+      if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    }
+  }
+
+  ctx->frame_id            = 0u;
+  ctx->current_frame_token = ~0u;
+
+  ctx->command_superpools.reserve(3);
+  ctx->desc_superpools.reserve(3);
+  ctx->renderpass_cache.reserve(8);
+
+  return ngfi::move(ctx);
+}
+
+ngf_context_t::~ngf_context_t() noexcept {
+  vkDeviceWaitIdle(_vk.device);
+
+  if (default_render_target) {
+    swapchain =
+        ngfi::unique_ptr<ngfvk_swapchain> {};  // swapchain must be destroyed before surface.
+    if (surface != VK_NULL_HANDLE) { vkDestroySurfaceKHR(_vk.instance, surface, NULL); }
+  }
+
+  default_render_target =
+      ngfi::unique_ptr<ngf_render_target_t> {};  // explicitly destroy default RT here.
+  for (ngfvk_frame_resources& fr : frame_res) {
+    ngfvk_retire_resources(&fr);
+    for (uint32_t i = 0u; i < sizeof(fr.fences) / sizeof(VkFence); ++i) {
+      vkDestroyFence(_vk.device, fr.fences[i], NULL);
+    }
+    if (fr.semaphore != VK_NULL_HANDLE) { vkDestroySemaphore(_vk.device, fr.semaphore, nullptr); }
+  }
+
+  for (size_t p = 0; p < desc_superpools.size(); ++p) {
+    ngfvk_destroy_desc_superpool(&desc_superpools[p]);
+  }
+
+  ngfvk_reset_renderpass_cache(this);
+
+  if (CURRENT_CONTEXT == this) CURRENT_CONTEXT = nullptr;
+}
+
+ngfi::maybe_ngfptr<ngf_render_target_t>
+ngf_render_target_t::make(const ngf_render_target_info& info) NGF_NOEXCEPT {
+  auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
+  if (!rt) return NGF_ERROR_OUT_OF_MEM;
+
+  uint32_t ncolor_attachments   = 0u;
+  uint32_t nresolve_attachments = 0u;
+  for (uint32_t a = 0u; a < info.attachment_descriptions->ndescs; ++a) {
+    if (info.attachment_descriptions->descs[a].type == NGF_ATTACHMENT_COLOR) {
+      if (info.attachment_descriptions->descs[a].is_resolve) {
+        ++nresolve_attachments;
+      } else {
+        ++ncolor_attachments;
+      }
+    }
+  }
+  if (nresolve_attachments > 0 && ncolor_attachments != nresolve_attachments) {
+    NGFI_DIAG_ERROR("the same number of resolve and color attachments must be provided");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+
+  ngfi::fixed_array<ngfvk_attachment_pass_desc> vk_attachment_pass_descs {
+      info.attachment_descriptions->ndescs};
+  ngfi::fixed_array<VkImageView> attachment_views {info.attachment_descriptions->ndescs};
+  ngfi::fixed_array<ngf_image>   attachment_images {info.attachment_descriptions->ndescs};
+
+  for (uint32_t a = 0u; a < info.attachment_descriptions->ndescs; ++a) {
+    const ngf_attachment_description* ngf_attachment_desc = &info.attachment_descriptions->descs[a];
+    ngfvk_attachment_pass_desc*       attachment_pass_desc = &vk_attachment_pass_descs[a];
+    const ngf_attachment_type         attachment_type      = ngf_attachment_desc->type;
+
+    rt->have_resolve_attachments |= ngf_attachment_desc->is_resolve;
+
+    switch (attachment_type) {
+    case NGF_ATTACHMENT_COLOR:
+      attachment_pass_desc->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      break;
+    case NGF_ATTACHMENT_DEPTH:
+    case NGF_ATTACHMENT_DEPTH_STENCIL:
+      attachment_pass_desc->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      break;
+    default:
+      assert(false);
+    }
+
+    const ngf_image_ref* attachment_img_ref = &info.attachment_image_refs[a];
+    const ngf_image      attachment_img     = attachment_img_ref->image;
+    attachment_pass_desc->is_resolve        = ngf_attachment_desc->is_resolve;
+
+    // These are needed just to create a compatible render pass, load/store ops don't affect
+    // render pass compatibility.
+    const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_DONTCARE;
+    const ngf_attachment_store_op store_op = NGF_STORE_OP_DONTCARE;
+    attachment_pass_desc->load_op          = get_vk_load_op(load_op);
+    attachment_pass_desc->store_op         = get_vk_store_op(store_op);
+    const bool attachment_is_cubemap       = attachment_img_ref->image->type == NGF_IMAGE_TYPE_CUBE;
+
+    const VkImageAspectFlags subresource_aspect_flags =
+        (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0u) |
+        (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
+        (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL
+             ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
+             : 0u);
+    const VkImageViewCreateInfo image_view_create_info = {
+        .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .pNext    = NULL,
+        .flags    = 0u,
+        .image    = (VkImage)attachment_img->alloc.obj_handle,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format   = attachment_img->vk_fmt,
+        .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+        .subresourceRange = {
+            .aspectMask     = subresource_aspect_flags,
+            .baseMipLevel   = attachment_img_ref->mip_level,
+            .levelCount     = 1u,
+            .baseArrayLayer = attachment_is_cubemap ? 6u * attachment_img_ref->layer +
+                                                          attachment_img_ref->cubemap_face
+                                                    : attachment_img_ref->layer,
+            .layerCount     = 1u,
+        }};
+    VkResult vk_err =
+        vkCreateImageView(_vk.device, &image_view_create_info, NULL, &attachment_views[a]);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    attachment_images[a] = attachment_img;
+  }
+  rt->attachment_image_views = ngfi::move(attachment_views);
+  rt->attachment_images      = ngfi::move(attachment_images);
+
+  const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
+      info.attachment_descriptions->ndescs,
+      info.attachment_descriptions->descs,
+      vk_attachment_pass_descs.data(),
+      &rt->compat_render_pass);
+  if (renderpass_create_result != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+
+  rt->width            = info.attachment_image_refs[0].image->extent.width;
+  rt->height           = info.attachment_image_refs[0].image->extent.height;
+  rt->nattachments     = info.attachment_descriptions->ndescs;
+  rt->attachment_descs = ngfi::fixed_array<ngf_attachment_description> {rt->nattachments};
+  rt->attachment_compat_pass_descs = ngfi::move(vk_attachment_pass_descs);
+  memcpy(
+      &rt->attachment_descs[0],
+      info.attachment_descriptions->descs,
+      sizeof(rt->attachment_descs[0]) * info.attachment_descriptions->ndescs);
+
+  // Create a framebuffer.
+  const VkFramebufferCreateInfo fb_info = {
+      .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+      .pNext           = NULL,
+      .flags           = 0u,
+      .renderPass      = rt->compat_render_pass,
+      .attachmentCount = info.attachment_descriptions->ndescs,
+      .pAttachments    = rt->attachment_image_views.data(),
+      .width           = rt->width,
+      .height          = rt->height,
+      .layers          = 1u};
+  VkResult vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL, &rt->frame_buffer);
+  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+
+  return rt;
+}
+
+ngfi::maybe_ngfptr<ngf_render_target_t>
+ngf_render_target_t::make(uint32_t width, uint32_t height, uint32_t nattachment_descs)
+    NGF_NOEXCEPT {
+  auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
+  if (!rt) return NGF_ERROR_OUT_OF_MEM;
+
+  rt->is_default       = true;
+  rt->width            = width;
+  rt->height           = height;
+  rt->frame_buffer     = VK_NULL_HANDLE;
+  rt->nattachments     = nattachment_descs;
+  rt->attachment_descs = ngfi::fixed_array<ngf_attachment_description> {nattachment_descs};
+  rt->attachment_compat_pass_descs =
+      ngfi::fixed_array<ngfvk_attachment_pass_desc> {nattachment_descs};
+
+  return rt;
+}
+
+ngf_render_target_t::~ngf_render_target_t() NGF_NOEXCEPT {
+  if (CURRENT_CONTEXT) {
+    ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
+    if (!is_default) {
+      if (frame_buffer != VK_NULL_HANDLE) { res->retire.append(frame_buffer); }
+    }
+    if (compat_render_pass != VK_NULL_HANDLE) { res->retire.append(compat_render_pass); }
+    for (VkImageView v : attachment_image_views) { res->retire.append(v); }
+    // clear out the entire renderpass cache to make sure the entries associated
+    // with this target don't stick around.
+    // TODO: clear out all caches across all contexts.
+    ngfvk_reset_renderpass_cache(CURRENT_CONTEXT);
+  }
 }
 
 ngfi::maybe_ngfptr<ngf_texel_buffer_view_t>
@@ -2379,96 +3033,6 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
   return ngfi::move(swapchain);
 }
 
-// Forward declaration for use in ngfvk_retire_resources
-static void ngfvk_reset_desc_pools_list(ngfvk_desc_pools_list* superpool);
-
-static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
-  if (frame_res->nwait_fences > 0u) {
-    VkResult wait_status = VK_SUCCESS;
-    do {
-      wait_status = vkWaitForFences(
-          _vk.device,
-          frame_res->nwait_fences,
-          frame_res->fences,
-          VK_TRUE,
-          0x3B9ACA00ul);
-    } while (wait_status == VK_TIMEOUT);
-    vkResetFences(_vk.device, frame_res->nwait_fences, frame_res->fences);
-    frame_res->nwait_fences = 0;
-  }
-
-  // Destroy retired pipelines
-  for (VkPipeline p : frame_res->retire.list<VkPipeline>()) {
-    vkDestroyPipeline(_vk.device, p, NULL);
-  }
-  frame_res->retire.clear<VkPipeline>();
-
-  // Destroy retired pipeline layouts
-  for (VkPipelineLayout l : frame_res->retire.list<VkPipelineLayout>()) {
-    vkDestroyPipelineLayout(_vk.device, l, NULL);
-  }
-  frame_res->retire.clear<VkPipelineLayout>();
-
-  // Destroy retired descriptor set layouts
-  for (VkDescriptorSetLayout l : frame_res->retire.list<VkDescriptorSetLayout>()) {
-    vkDestroyDescriptorSetLayout(_vk.device, l, NULL);
-  }
-  frame_res->retire.clear<VkDescriptorSetLayout>();
-
-  // Free retired command buffers
-  for (const ngfvk_cmd_buf_with_pool& cb : frame_res->retire.list<ngfvk_cmd_buf_with_pool>()) {
-    vkFreeCommandBuffers(_vk.device, cb.cmd_pool, 1u, &cb.cmd_buf);
-  }
-
-  // Reset command pools
-  for (const ngfvk_cmd_buf_with_pool& cb : frame_res->retire.list<ngfvk_cmd_buf_with_pool>()) {
-    vkResetCommandPool(_vk.device, cb.cmd_pool, 0);
-  }
-  frame_res->retire.clear<ngfvk_cmd_buf_with_pool>();
-
-  // Destroy retired framebuffers
-  for (VkFramebuffer fb : frame_res->retire.list<VkFramebuffer>()) {
-    vkDestroyFramebuffer(_vk.device, fb, NULL);
-  }
-  frame_res->retire.clear<VkFramebuffer>();
-
-  // Destroy retired render passes
-  for (VkRenderPass rp : frame_res->retire.list<VkRenderPass>()) {
-    vkDestroyRenderPass(_vk.device, rp, NULL);
-  }
-  frame_res->retire.clear<VkRenderPass>();
-
-  // Destroy retired samplers
-  for (ngf_sampler s : frame_res->retire.list<ngf_sampler>()) { NGFI_FREE(s); }
-  frame_res->retire.clear<ngf_sampler>();
-
-  // Destroy retired image views
-  for (VkImageView v : frame_res->retire.list<VkImageView>()) {
-    vkDestroyImageView(_vk.device, v, nullptr);
-  }
-  frame_res->retire.list<VkImageView>().clear();
-  for (ngf_image_view v : frame_res->retire.list<ngf_image_view>()) { NGFI_FREE(v); }
-  frame_res->retire.list<ngf_image_view>().clear();
-
-  // Destroy retired buffer views
-  for (ngf_texel_buffer_view v : frame_res->retire.list<ngf_texel_buffer_view>()) { NGFI_FREE(v); }
-  frame_res->retire.clear<ngf_texel_buffer_view>();
-
-  // Destroy retired images
-  for (ngf_image img : frame_res->retire.list<ngf_image>()) { NGFI_FREE(img); }
-  frame_res->retire.clear<ngf_image>();
-
-  // Destroy retired buffers
-  for (ngf_buffer buf : frame_res->retire.list<ngf_buffer>()) { NGFI_FREE(buf); }
-  frame_res->retire.clear<ngf_buffer>();
-
-  // Reset retired descriptor pool lists
-  for (ngfvk_desc_pools_list* dpl : frame_res->retire.list<ngfvk_desc_pools_list*>()) {
-    ngfvk_reset_desc_pools_list(dpl);
-  }
-  frame_res->retire.clear<ngfvk_desc_pools_list*>();
-}
-
 static void ngfvk_cleanup_pending_binds(ngf_cmd_buffer cmd_buf) {
   cmd_buf->pending_bind_ops.clear();
   cmd_buf->npending_bind_ops = 0u;
@@ -2564,201 +3128,35 @@ static ngf_error ngfvk_cmd_buffer_allocate_for_frame(
   return NGF_ERROR_OK;
 }
 
-static ngf_error
-ngfvk_create_desc_superpool(ngfvk_desc_superpool* superpool, uint8_t pools_lists, uint16_t ctx_id) {
-  superpool->ctx_id      = ctx_id;
-  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {pools_lists};
-  memset(superpool->pools_lists.data(), 0, pools_lists * sizeof(ngfvk_desc_pools_list));
-  return NGF_ERROR_OK;
+ngfi::maybe_ngfptr<ngf_cmd_buffer_t> ngf_cmd_buffer_t::make() NGF_NOEXCEPT {
+  auto cmd_buf = ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
+  if (!cmd_buf) { return NGF_ERROR_OUT_OF_MEM; }
+  cmd_buf->parent_frame                       = ~0u;
+  cmd_buf->state                              = ngfi::CMD_BUFFER_STATE_NEW;
+  cmd_buf->active_gfx_pipe                    = NULL;
+  cmd_buf->active_compute_pipe                = NULL;
+  cmd_buf->active_attr_buf                    = NULL;
+  cmd_buf->active_idx_buf                     = NULL;
+  cmd_buf->renderpass_active                  = false;
+  cmd_buf->compute_pass_active                = false;
+  cmd_buf->destroy_on_submit                  = false;
+  cmd_buf->active_rt                          = NULL;
+  cmd_buf->desc_pools_list                    = NULL;
+  cmd_buf->vk_cmd_buffer                      = VK_NULL_HANDLE;
+  cmd_buf->vk_cmd_pool                        = VK_NULL_HANDLE;
+  cmd_buf->pending_barriers.npending_img_bars = 0;
+  cmd_buf->pending_barriers.npending_buf_bars = 0;
+  cmd_buf->local_res_states                   = ngfvk_sync_res_hashtable {100u};
+  return ngfi::move(cmd_buf);
 }
 
-static void ngfvk_destroy_desc_superpool(ngfvk_desc_superpool* superpool) {
-  for (auto& pool_list : superpool->pools_lists) {
-    ngfvk_desc_pool* p = pool_list.list;
-    while (p) {
-      vkDestroyDescriptorPool(_vk.device, p->vk_pool, NULL);
-      ngfvk_desc_pool* next = p->next;
-      NGFI_FREE(p);
-      p = next;
-    }
+ngf_cmd_buffer_t::~ngf_cmd_buffer_t() noexcept {
+  if (vk_cmd_buffer != VK_NULL_HANDLE) {
+    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buffer);
   }
-  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {};
-}
-
-static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) {
-  const uint16_t ctx_id   = ngfi_frame_ctx_id(token);
-  const uint8_t  nframes  = ngfi_frame_max_inflight_frames(token);
-  const uint8_t  frame_id = ngfi_frame_id(token);
-
-  ngfvk_desc_superpool* superpool = NULL;
-  for (size_t i = 0; i < CURRENT_CONTEXT->desc_superpools.size(); ++i) {
-    if (CURRENT_CONTEXT->desc_superpools[i].ctx_id == ctx_id) {
-      superpool = &CURRENT_CONTEXT->desc_superpools[i];
-      break;
-    }
-  }
-
-  if (superpool == NULL) {
-    ngfvk_desc_superpool new_superpool = {
-        .ctx_id      = (uint16_t)~0,
-        .pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {}};
-    CURRENT_CONTEXT->desc_superpools.emplace_back(ngfi::move(new_superpool));
-    superpool = &CURRENT_CONTEXT->desc_superpools.back();
-    ngfvk_create_desc_superpool(superpool, nframes, ctx_id);
-  }
-
-  return &superpool->pools_lists[frame_id];
-}
-
-static VkDescriptorSet ngfvk_desc_pools_list_allocate_set(
-    ngfvk_desc_pools_list*       pools,
-    const ngfvk_desc_set_layout* set_layout) {
-  // Ensure we have an active desriptor pool that is able to service the
-  // request.
-  const bool have_active_pool    = (pools->active_pool != NULL);
-  bool       fresh_pool_required = !have_active_pool;
-
-  if (have_active_pool) {
-    // Check if the active descriptor pool can fit the required descriptor
-    // set.
-    ngfvk_desc_pool*                pool     = pools->active_pool;
-    const ngfvk_desc_pool_capacity* capacity = &pool->capacity;
-    ngfvk_desc_pool_capacity*       usage    = &pool->utilization;
-    for (unsigned i = 0; !fresh_pool_required && i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-      fresh_pool_required |=
-          (usage->descriptors[i] + set_layout->counts[i] >= capacity->descriptors[i]);
-    }
-    fresh_pool_required |= (usage->sets + 1u >= capacity->sets);
-  }
-  if (fresh_pool_required) {
-    if (!have_active_pool || pools->active_pool->next == NULL) {
-      // TODO: make this tweakable
-      ngfvk_desc_pool_capacity capacity;
-      capacity.sets = 100u;
-      for (int i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) capacity.descriptors[i] = 100u;
-
-      // Prepare descriptor counts.
-      auto vk_pool_sizes = ngfi::tmp_alloc<VkDescriptorPoolSize>(NGF_DESCRIPTOR_TYPE_COUNT);
-      for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-        vk_pool_sizes[i].descriptorCount = capacity.descriptors[i];
-        vk_pool_sizes[i].type            = get_vk_descriptor_type((ngf_descriptor_type)i);
-      }
-
-      // Prepare a createinfo structure for the new pool.
-      const VkDescriptorPoolCreateInfo vk_pool_ci = {
-          .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-          .pNext         = NULL,
-          .flags         = 0u,
-          .maxSets       = capacity.sets,
-          .poolSizeCount = NGF_DESCRIPTOR_TYPE_COUNT,
-          .pPoolSizes    = vk_pool_sizes};
-
-      // Create the new pool.
-      ngfvk_desc_pool* new_pool = NGFI_ALLOC(ngfvk_desc_pool);
-      new_pool->next            = NULL;
-      new_pool->capacity        = capacity;
-      memset(&new_pool->utilization, 0, sizeof(new_pool->utilization));
-      const VkResult vk_pool_create_result =
-          vkCreateDescriptorPool(_vk.device, &vk_pool_ci, NULL, &new_pool->vk_pool);
-      if (vk_pool_create_result == VK_SUCCESS) {
-        if (pools->active_pool != NULL && pools->active_pool->next == NULL) {
-          pools->active_pool->next = new_pool;
-        } else if (pools->active_pool == NULL) {
-          pools->list = new_pool;
-        } else {  // shouldn't happen
-          assert(false);
-        }
-        pools->active_pool = new_pool;
-      } else {
-        NGFI_FREE(new_pool);
-        assert(false);
-      }
-    } else {
-      pools->active_pool = pools->active_pool->next;
-    }
-  }
-
-  // Allocate the new descriptor set from the pool.
-  ngfvk_desc_pool* pool = pools->active_pool;
-
-  const VkDescriptorSetAllocateInfo vk_desc_set_info = {
-      .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-      .pNext              = NULL,
-      .descriptorPool     = pool->vk_pool,
-      .descriptorSetCount = 1u,
-      .pSetLayouts        = &set_layout->vk_handle};
-  VkDescriptorSet result = VK_NULL_HANDLE;
-  const VkResult  desc_set_alloc_result =
-      vkAllocateDescriptorSets(_vk.device, &vk_desc_set_info, &result);
-  if (desc_set_alloc_result != VK_SUCCESS) { return VK_NULL_HANDLE; }
-
-  // Update usage counters for the active descriptor pool.
-  for (unsigned i = 0; i < NGF_DESCRIPTOR_TYPE_COUNT; ++i) {
-    pool->utilization.descriptors[i] += set_layout->counts[i];
-  }
-  pool->utilization.sets++;
-
-  // Bind dummy resources.
-  auto     dummy_writes = ngfi::tmp_alloc<VkWriteDescriptorSet>(set_layout->nall_descs);
-  uint32_t num_writes   = 0u;
-  for (uint32_t b = 0u; b < set_layout->binding_properties.size(); ++b) {
-    if (set_layout->binding_properties[b].type == VK_DESCRIPTOR_TYPE_MAX_ENUM) continue;
-    for (uint32_t array_idx = 0u; array_idx < set_layout->binding_properties[b].ndescs_in_binding;
-         ++array_idx) {
-      VkWriteDescriptorSet* desc_w = &dummy_writes[num_writes++];
-      desc_w->sType                = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      desc_w->pNext                = NULL;
-      desc_w->descriptorCount      = 1u;
-      desc_w->descriptorType       = set_layout->binding_properties[b].type;
-      desc_w->dstArrayElement      = array_idx;
-      desc_w->dstBinding           = b;
-      desc_w->dstSet               = result;
-
-      const bool is_multilayered_image = set_layout->binding_properties[b].is_multilayered_image;
-      const bool is_cubemap            = set_layout->binding_properties[b].is_cubemap;
-
-      switch (desc_w->descriptorType) {
-      case VK_DESCRIPTOR_TYPE_SAMPLER:
-        desc_w->pImageInfo = &_vk.dummy_res.samp_info;
-        break;
-      case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-        desc_w->pImageInfo =
-            is_multilayered_image ? &_vk.dummy_res.imgsamp_arr_info : &_vk.dummy_res.imgsamp_info;
-        break;
-      case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-      case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-        if (!is_cubemap) {
-          desc_w->pImageInfo =
-              is_multilayered_image ? &_vk.dummy_res.img_arr_info : &_vk.dummy_res.img_info;
-        } else {
-          desc_w->pImageInfo =
-              is_multilayered_image ? &_vk.dummy_res.cube_arr_info : &_vk.dummy_res.cube_info;
-        }
-        break;
-      case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-      case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-        desc_w->pBufferInfo = &_vk.dummy_res.buf_info;
-        break;
-      case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-        desc_w->pTexelBufferView = &_vk.dummy_res.tbuf->vk_buf_view;
-        break;
-      case VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR: {
-        auto dummy_accel_info   = ngfi::tmp_alloc<VkWriteDescriptorSetAccelerationStructureKHR>();
-        dummy_accel_info->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
-        dummy_accel_info->pNext = NULL;
-        dummy_accel_info->accelerationStructureCount = 1;
-        dummy_accel_info->pAccelerationStructures    = &_vk.dummy_res.dummy_accel_struct;
-        desc_w->pNext                                = dummy_accel_info;
-        break;
-      }
-      default:
-        assert(false);
-      }
-    }
-  }
-  vkUpdateDescriptorSets(_vk.device, num_writes, dummy_writes, 0, NULL);
-
-  return result;
+  ngfvk_cleanup_pending_binds(this);
+  in_pass_cmd_chnks.clear();
+  virt_bind_ops_ranges.clear();
 }
 
 static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
@@ -3139,13 +3537,6 @@ static void ngfvk_cmd_bind_resources(
         CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id].res_frame_arena);
     ++buf->npending_bind_ops;
   }
-}
-
-static void ngfvk_reset_renderpass_cache(ngf_context ctx) {
-  for (size_t p = 0; p < ctx->renderpass_cache.size(); ++p) {
-    ctx->frame_res[ctx->frame_id].retire.append(ctx->renderpass_cache[p].renderpass);
-  }
-  ctx->renderpass_cache.clear();
 }
 
 static void ngfvk_cmd_buf_reset_render_cmds(ngf_cmd_buffer cmd_buf) {
@@ -4682,180 +5073,6 @@ extern "C" void ngf_shutdown(void) NGF_NOEXCEPT {
 #endif
 }
 
-extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT {
-  return &ngfvk::global::phys_device_caps;
-}
-
-ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& info) {
-  auto ctx = ngfi::unique_ptr<ngf_context_t>::make();
-  if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
-
-  ngf_error                 err            = NGF_ERROR_OK;
-  VkResult                  vk_err         = VK_SUCCESS;
-  const ngf_swapchain_info* swapchain_info = info.swapchain_info;
-
-  // Create swapchain if necessary.
-  if (swapchain_info != NULL) {
-    // Begin by creating the window surface.
-#if defined(_WIN32) || defined(_WIN64)
-    const VkWin32SurfaceCreateInfoKHR surface_info = {
-        .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
-        .pNext     = NULL,
-        .flags     = 0,
-        .hinstance = GetModuleHandle(NULL),
-        .hwnd      = (HWND)swapchain_info->native_handle};
-#elif defined(__ANDROID__)
-    const VkAndroidSuraceCreateInfoKHR surface_info = {
-        .sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
-        .pNext  = NULL,
-        .flags  = 0,
-        .window = swapchain_info->native_handle};
-#elif defined(__APPLE__)
-    const VkMetalSurfaceCreateInfoEXT surface_info = {
-        .sType  = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT,
-        .pNext  = NULL,
-        .flags  = 0,
-        .pLayer = (const CAMetalLayer*)ngfvk_create_ca_metal_layer(swapchain_info)};
-#else
-    const VkXcbSurfaceCreateInfoKHR surface_info = {
-        .sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR,
-        .pNext      = NULL,
-        .flags      = 0,
-        .connection = _vk.xcb_connection,
-        .window     = (xcb_window_t)swapchain_info->native_handle};
-#endif
-    vk_err = VK_CREATE_SURFACE_FN(_vk.instance, &surface_info, NULL, &ctx->surface);
-    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-    VkBool32 surface_supported = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(
-        _vk.phys_dev,
-        _vk.present_family_idx,
-        ctx->surface,
-        &surface_supported);
-    if (!surface_supported) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-
-    // Create the default rendertarget object.
-    const bool default_rt_has_depth = swapchain_info->depth_format != NGF_IMAGE_FORMAT_UNDEFINED;
-    const bool default_rt_is_multisampled = (unsigned int)swapchain_info->sample_count > 1u;
-    const bool default_rt_no_stencil = swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH32 ||
-                                       swapchain_info->depth_format == NGF_IMAGE_FORMAT_DEPTH16;
-
-    const uint32_t nattachment_descs =
-        1u + (default_rt_has_depth ? 1u : 0u) + (default_rt_is_multisampled ? 1u : 0u);
-
-    ctx->default_render_target = ngfi::move(
-        ngf_render_target_t::make(swapchain_info->width, swapchain_info->height, nattachment_descs)
-            .value());
-
-    uint32_t                    attachment_desc_idx = 0u;
-    ngf_attachment_description* color_attachment_desc =
-        &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-    color_attachment_desc->format       = swapchain_info->color_format;
-    color_attachment_desc->sample_count = swapchain_info->sample_count;
-    color_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
-    color_attachment_desc->is_resolve   = false;
-
-    ngfvk_attachment_pass_desc* color_attachment_pass_desc =
-        &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-    color_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    color_attachment_pass_desc->is_resolve = false;
-    color_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-    if (default_rt_has_depth) {
-      ++attachment_desc_idx;
-
-      ngf_attachment_description* depth_attachment_desc =
-          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-      depth_attachment_desc->format       = swapchain_info->depth_format;
-      depth_attachment_desc->sample_count = swapchain_info->sample_count;
-      depth_attachment_desc->type =
-          default_rt_no_stencil ? NGF_ATTACHMENT_DEPTH : NGF_ATTACHMENT_DEPTH_STENCIL;
-      depth_attachment_desc->is_resolve = false;
-
-      ngfvk_attachment_pass_desc* depth_attachment_pass_desc =
-          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-      depth_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      depth_attachment_pass_desc->is_resolve = false;
-      depth_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      depth_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    }
-
-    if (default_rt_is_multisampled) {
-      ++attachment_desc_idx;
-
-      ngf_attachment_description* resolve_attachment_desc =
-          &ctx->default_render_target->attachment_descs[attachment_desc_idx];
-      resolve_attachment_desc->format       = swapchain_info->color_format;
-      resolve_attachment_desc->sample_count = NGF_SAMPLE_COUNT_1;
-      resolve_attachment_desc->type         = NGF_ATTACHMENT_COLOR;
-      resolve_attachment_desc->is_resolve   = true;
-
-      ngfvk_attachment_pass_desc* resolve_attachment_pass_desc =
-          &ctx->default_render_target->attachment_compat_pass_descs[attachment_desc_idx];
-      resolve_attachment_pass_desc->layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      resolve_attachment_pass_desc->is_resolve = true;
-      resolve_attachment_pass_desc->load_op    = VK_ATTACHMENT_LOAD_OP_CLEAR;
-      resolve_attachment_pass_desc->store_op   = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-
-      ctx->default_render_target->have_resolve_attachments = true;
-    }
-
-    ngfvk_renderpass_from_attachment_descs(
-        nattachment_descs,
-        ctx->default_render_target->attachment_descs.data(),
-        ctx->default_render_target->attachment_compat_pass_descs.data(),
-        &ctx->default_render_target->compat_render_pass);
-
-    // Create the swapchain itself.
-    auto maybe_swapchain =
-        ngfvk_swapchain::make(*swapchain_info, ctx->default_render_target.get(), ctx->surface);
-    if (maybe_swapchain.has_error()) return maybe_swapchain.error();
-    ctx->swapchain = ngfi::move(maybe_swapchain.value());
-    if (err != NGF_ERROR_OK) { return err; }
-    ctx->swapchain_info = *swapchain_info;
-  } else {
-    ctx->default_render_target = NULL;
-  }
-
-  // Create frame resource holders.
-  const uint32_t max_inflight_frames = swapchain_info ? ctx->swapchain->nimgs : 3u;
-  ctx->max_inflight_frames           = max_inflight_frames;
-  ctx->frame_res = ngfi::fixed_array<ngfvk_frame_resources> {max_inflight_frames};
-  if (ctx->frame_res.data() == nullptr) { return NGF_ERROR_OUT_OF_MEM; }
-  for (uint32_t f = 0u; f < max_inflight_frames; ++f) {
-    ctx->frame_res[f].res_frame_arena.set_block_size(1024);
-    ctx->frame_res[f].submitted_cmd_bufs.reserve(8u);
-    ctx->frame_res[f].semaphore = VK_NULL_HANDLE;
-
-    const VkSemaphoreCreateInfo semaphore_info = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0u,
-    };
-    vk_err = vkCreateSemaphore(_vk.device, &semaphore_info, NULL, &ctx->frame_res[f].semaphore);
-    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-    const VkFenceCreateInfo fence_info = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0u};
-    ctx->frame_res[f].nwait_fences = 0;
-    for (uint32_t i = 0u; i < sizeof(ctx->frame_res[f].fences) / sizeof(VkFence); ++i) {
-      vk_err = vkCreateFence(_vk.device, &fence_info, NULL, &ctx->frame_res[f].fences[i]);
-      if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-    }
-  }
-
-  ctx->frame_id            = 0u;
-  ctx->current_frame_token = ~0u;
-
-  ctx->command_superpools.reserve(3);
-  ctx->desc_superpools.reserve(3);
-  ctx->renderpass_cache.reserve(8);
-
-  return ngfi::move(ctx);
-}
-
 extern "C" ngf_error
 ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT {
   assert(info);
@@ -4864,6 +5081,10 @@ ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCE
 
   if (!maybe_ctx.has_error()) result[0] = maybe_ctx.value().release();
   return maybe_ctx.has_error() ? maybe_ctx.error() : NGF_ERROR_OK;
+}
+
+extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_NOEXCEPT {
+  return &ngfvk::global::phys_device_caps;
 }
 
 extern "C" ngf_error
@@ -4890,38 +5111,9 @@ ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF
   }
 }
 
-ngf_context_t::~ngf_context_t() noexcept {
-  vkDeviceWaitIdle(_vk.device);
-
-  if (default_render_target) {
-    swapchain =
-        ngfi::unique_ptr<ngfvk_swapchain> {};  // swapchain must be destroyed before surface.
-    if (surface != VK_NULL_HANDLE) { vkDestroySurfaceKHR(_vk.instance, surface, NULL); }
-  }
-
-  default_render_target =
-      ngfi::unique_ptr<ngf_render_target_t> {};  // explicitly destroy default RT here.
-  for (ngfvk_frame_resources& fr : frame_res) {
-    ngfvk_retire_resources(&fr);
-    for (uint32_t i = 0u; i < sizeof(fr.fences) / sizeof(VkFence); ++i) {
-      vkDestroyFence(_vk.device, fr.fences[i], NULL);
-    }
-    if (fr.semaphore != VK_NULL_HANDLE) { vkDestroySemaphore(_vk.device, fr.semaphore, nullptr); }
-  }
-
-  for (size_t p = 0; p < desc_superpools.size(); ++p) {
-    ngfvk_destroy_desc_superpool(&desc_superpools[p]);
-  }
-
-  ngfvk_reset_renderpass_cache(this);
-
-  if (CURRENT_CONTEXT == this) CURRENT_CONTEXT = nullptr;
-}
-
 extern "C" void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT {
   if (ctx != nullptr) { ngfi::free<ngf_context_t>(ctx); }
 }
-
 extern "C" ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
   CURRENT_CONTEXT = ctx;
   return NGF_ERROR_OK;
@@ -4929,28 +5121,6 @@ extern "C" ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
 
 extern "C" ngf_context ngf_get_context() NGF_NOEXCEPT {
   return CURRENT_CONTEXT;
-}
-
-ngfi::maybe_ngfptr<ngf_cmd_buffer_t> ngf_cmd_buffer_t::make() NGF_NOEXCEPT {
-  auto cmd_buf = ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
-  if (!cmd_buf) { return NGF_ERROR_OUT_OF_MEM; }
-  cmd_buf->parent_frame                       = ~0u;
-  cmd_buf->state                              = ngfi::CMD_BUFFER_STATE_NEW;
-  cmd_buf->active_gfx_pipe                    = NULL;
-  cmd_buf->active_compute_pipe                = NULL;
-  cmd_buf->active_attr_buf                    = NULL;
-  cmd_buf->active_idx_buf                     = NULL;
-  cmd_buf->renderpass_active                  = false;
-  cmd_buf->compute_pass_active                = false;
-  cmd_buf->destroy_on_submit                  = false;
-  cmd_buf->active_rt                          = NULL;
-  cmd_buf->desc_pools_list                    = NULL;
-  cmd_buf->vk_cmd_buffer                      = VK_NULL_HANDLE;
-  cmd_buf->vk_cmd_pool                        = VK_NULL_HANDLE;
-  cmd_buf->pending_barriers.npending_img_bars = 0;
-  cmd_buf->pending_barriers.npending_buf_bars = 0;
-  cmd_buf->local_res_states                   = ngfvk_sync_res_hashtable {100u};
-  return ngfi::move(cmd_buf);
 }
 
 extern "C" ngf_error
@@ -5260,15 +5430,6 @@ ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buf, ngf_frame_token token) NGF_NOEXCEPT
   return ngfvk_cmd_buffer_allocate_for_frame(token, &cmd_buf->vk_cmd_pool, &cmd_buf->vk_cmd_buffer);
 }
 
-ngf_cmd_buffer_t::~ngf_cmd_buffer_t() noexcept {
-  if (vk_cmd_buffer != VK_NULL_HANDLE) {
-    vkFreeCommandBuffers(_vk.device, vk_cmd_pool, 1u, &vk_cmd_buffer);
-  }
-  ngfvk_cleanup_pending_binds(this);
-  in_pass_cmd_chnks.clear();
-  virt_bind_ops_ranges.clear();
-}
-
 extern "C" void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT {
   if (buffer && buffer->state != ngfi::CMD_BUFFER_STATE_PENDING) {
     NGFI_FREE(buffer);
@@ -5276,7 +5437,6 @@ extern "C" void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT {
     buffer->destroy_on_submit = true;
   }
 }
-
 extern "C" ngf_error
 ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) NGF_NOEXCEPT {
   assert(cmd_bufs);
@@ -5471,152 +5631,6 @@ ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
   }
 }
 
-ngfi::maybe_ngfptr<ngf_render_target_t>
-ngf_render_target_t::make(const ngf_render_target_info& info) NGF_NOEXCEPT {
-  auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
-  if (!rt) return NGF_ERROR_OUT_OF_MEM;
-
-  uint32_t ncolor_attachments   = 0u;
-  uint32_t nresolve_attachments = 0u;
-  for (uint32_t a = 0u; a < info.attachment_descriptions->ndescs; ++a) {
-    if (info.attachment_descriptions->descs[a].type == NGF_ATTACHMENT_COLOR) {
-      if (info.attachment_descriptions->descs[a].is_resolve) {
-        ++nresolve_attachments;
-      } else {
-        ++ncolor_attachments;
-      }
-    }
-  }
-  if (nresolve_attachments > 0 && ncolor_attachments != nresolve_attachments) {
-    NGFI_DIAG_ERROR("the same number of resolve and color attachments must be provided");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-
-  ngfi::fixed_array<ngfvk_attachment_pass_desc> vk_attachment_pass_descs {
-      info.attachment_descriptions->ndescs};
-  ngfi::fixed_array<VkImageView> attachment_views {info.attachment_descriptions->ndescs};
-  ngfi::fixed_array<ngf_image>   attachment_images {info.attachment_descriptions->ndescs};
-
-  for (uint32_t a = 0u; a < info.attachment_descriptions->ndescs; ++a) {
-    const ngf_attachment_description* ngf_attachment_desc = &info.attachment_descriptions->descs[a];
-    ngfvk_attachment_pass_desc*       attachment_pass_desc = &vk_attachment_pass_descs[a];
-    const ngf_attachment_type         attachment_type      = ngf_attachment_desc->type;
-
-    rt->have_resolve_attachments |= ngf_attachment_desc->is_resolve;
-
-    switch (attachment_type) {
-    case NGF_ATTACHMENT_COLOR:
-      attachment_pass_desc->layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      break;
-    case NGF_ATTACHMENT_DEPTH:
-    case NGF_ATTACHMENT_DEPTH_STENCIL:
-      attachment_pass_desc->layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      break;
-    default:
-      assert(false);
-    }
-
-    const ngf_image_ref* attachment_img_ref = &info.attachment_image_refs[a];
-    const ngf_image      attachment_img     = attachment_img_ref->image;
-    attachment_pass_desc->is_resolve        = ngf_attachment_desc->is_resolve;
-
-    // These are needed just to create a compatible render pass, load/store ops don't affect
-    // render pass compatibility.
-    const ngf_attachment_load_op  load_op  = NGF_LOAD_OP_DONTCARE;
-    const ngf_attachment_store_op store_op = NGF_STORE_OP_DONTCARE;
-    attachment_pass_desc->load_op          = get_vk_load_op(load_op);
-    attachment_pass_desc->store_op         = get_vk_store_op(store_op);
-    const bool attachment_is_cubemap       = attachment_img_ref->image->type == NGF_IMAGE_TYPE_CUBE;
-
-    const VkImageAspectFlags subresource_aspect_flags =
-        (attachment_type == NGF_ATTACHMENT_COLOR ? VK_IMAGE_ASPECT_COLOR_BIT : 0u) |
-        (attachment_type == NGF_ATTACHMENT_DEPTH ? VK_IMAGE_ASPECT_DEPTH_BIT : 0u) |
-        (attachment_type == NGF_ATTACHMENT_DEPTH_STENCIL
-             ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT
-             : 0u);
-    const VkImageViewCreateInfo image_view_create_info = {
-        .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .pNext    = NULL,
-        .flags    = 0u,
-        .image    = (VkImage)attachment_img->alloc.obj_handle,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format   = attachment_img->vk_fmt,
-        .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-        .subresourceRange = {
-            .aspectMask     = subresource_aspect_flags,
-            .baseMipLevel   = attachment_img_ref->mip_level,
-            .levelCount     = 1u,
-            .baseArrayLayer = attachment_is_cubemap ? 6u * attachment_img_ref->layer +
-                                                          attachment_img_ref->cubemap_face
-                                                    : attachment_img_ref->layer,
-            .layerCount     = 1u,
-        }};
-    VkResult vk_err =
-        vkCreateImageView(_vk.device, &image_view_create_info, NULL, &attachment_views[a]);
-    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-    attachment_images[a] = attachment_img;
-  }
-  rt->attachment_image_views = ngfi::move(attachment_views);
-  rt->attachment_images      = ngfi::move(attachment_images);
-
-  const VkResult renderpass_create_result = ngfvk_renderpass_from_attachment_descs(
-      info.attachment_descriptions->ndescs,
-      info.attachment_descriptions->descs,
-      vk_attachment_pass_descs.data(),
-      &rt->compat_render_pass);
-  if (renderpass_create_result != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-
-  rt->width            = info.attachment_image_refs[0].image->extent.width;
-  rt->height           = info.attachment_image_refs[0].image->extent.height;
-  rt->nattachments     = info.attachment_descriptions->ndescs;
-  rt->attachment_descs = ngfi::fixed_array<ngf_attachment_description> {rt->nattachments};
-  rt->attachment_compat_pass_descs = ngfi::move(vk_attachment_pass_descs);
-  memcpy(
-      &rt->attachment_descs[0],
-      info.attachment_descriptions->descs,
-      sizeof(rt->attachment_descs[0]) * info.attachment_descriptions->ndescs);
-
-  // Create a framebuffer.
-  const VkFramebufferCreateInfo fb_info = {
-      .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-      .pNext           = NULL,
-      .flags           = 0u,
-      .renderPass      = rt->compat_render_pass,
-      .attachmentCount = info.attachment_descriptions->ndescs,
-      .pAttachments    = rt->attachment_image_views.data(),
-      .width           = rt->width,
-      .height          = rt->height,
-      .layers          = 1u};
-  VkResult vk_err = vkCreateFramebuffer(_vk.device, &fb_info, NULL, &rt->frame_buffer);
-  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-
-  return rt;
-}
-
-ngfi::maybe_ngfptr<ngf_render_target_t>
-ngf_render_target_t::make(uint32_t width, uint32_t height, uint32_t nattachment_descs)
-    NGF_NOEXCEPT {
-  auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
-  if (!rt) return NGF_ERROR_OUT_OF_MEM;
-
-  rt->is_default       = true;
-  rt->width            = width;
-  rt->height           = height;
-  rt->frame_buffer     = VK_NULL_HANDLE;
-  rt->nattachments     = nattachment_descs;
-  rt->attachment_descs = ngfi::fixed_array<ngf_attachment_description> {nattachment_descs};
-  rt->attachment_compat_pass_descs =
-      ngfi::fixed_array<ngfvk_attachment_pass_desc> {nattachment_descs};
-
-  return rt;
-}
-
 extern "C" ngf_error ngf_create_render_target(
     const ngf_render_target_info* info,
     ngf_render_target*            result) NGF_NOEXCEPT {
@@ -5626,22 +5640,6 @@ extern "C" ngf_error ngf_create_render_target(
   if (!maybe_rt.has_error()) result[0] = maybe_rt.value().release();
   return maybe_rt.has_error() ? maybe_rt.error() : NGF_ERROR_OK;
 }
-
-ngf_render_target_t::~ngf_render_target_t() NGF_NOEXCEPT {
-  if (CURRENT_CONTEXT) {
-    ngfvk_frame_resources* res = &CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id];
-    if (!is_default) {
-      if (frame_buffer != VK_NULL_HANDLE) { res->retire.append(frame_buffer); }
-    }
-    if (compat_render_pass != VK_NULL_HANDLE) { res->retire.append(compat_render_pass); }
-    for (VkImageView v : attachment_image_views) { res->retire.append(v); }
-    // clear out the entire renderpass cache to make sure the entries associated
-    // with this target don't stick around.
-    // TODO: clear out all caches across all contexts.
-    ngfvk_reset_renderpass_cache(CURRENT_CONTEXT);
-  }
-}
-
 extern "C" void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT {
   if (target) {
     if (target->is_default) {
@@ -5651,7 +5649,6 @@ extern "C" void ngf_destroy_render_target(ngf_render_target target) NGF_NOEXCEPT
     NGFI_FREE(target);
   }
 }
-
 extern "C" void ngf_cmd_dispatch(
     ngf_compute_encoder enc,
     uint32_t            x_threadgroups,
