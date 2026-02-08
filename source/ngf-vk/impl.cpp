@@ -20,8 +20,6 @@
  * IN THE SOFTWARE.
  */
 
-#include "ngf-common/silence.h"
-
 #include "ngf-common/arena.h"
 #include "ngf-common/array.h"
 #include "ngf-common/chunked-list.h"
@@ -30,6 +28,7 @@
 #include "ngf-common/frame-token.h"
 #include "ngf-common/hashtable.h"
 #include "ngf-common/macros.h"
+#include "ngf-common/silence.h"
 #include "ngf-common/unique-ptr.h"
 #include "ngf-common/util.h"
 #include "ngf-common/value-or-error.h"
@@ -119,7 +118,7 @@ struct ngfvk_swapchain {
   uint32_t         height;
   VkPresentModeKHR present_mode;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_swapchain>> make(
+  static ngfi::maybe_ngfptr<ngfvk_swapchain> make(
       const ngf_swapchain_info& swapchain_info,
       ngf_render_target         rt,
       VkSurfaceKHR              surface) noexcept;
@@ -181,7 +180,7 @@ struct ngfvk_desc_binding {
 struct ngfvk_desc_set_layout {
   VkDescriptorSetLayout vk_handle;
   ngfvk_desc_count      counts;
-  uint32_t              nall_descs;     // < Total number of descriptors across all bindings.
+  uint32_t              nall_descs;  // < Total number of descriptors across all bindings.
   ngfi::fixed_array<ngfvk_desc_binding> binding_properties;
 };
 
@@ -310,10 +309,10 @@ struct ngfvk_generic_pipeline {
   VkSpecializationInfo               vk_spec_info;
   VkRenderPass                       compat_render_pass;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_generic_pipeline>>
+  static ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
   make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_generic_pipeline>>
+  static ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
   make(const ngf_compute_pipeline_info& info) NGF_NOEXCEPT;
 
   ~ngfvk_generic_pipeline() NGF_NOEXCEPT;
@@ -487,14 +486,14 @@ struct ngf_cmd_buffer_t {
   bool                   xfer_pass_active : 1;     // < Has an active transfer pass.
   bool                   destroy_on_submit : 1;    // < Destroy after submitting.
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_cmd_buffer_t>> make() noexcept;
+  static ngfi::maybe_ngfptr<ngf_cmd_buffer_t> make() noexcept;
   ~ngf_cmd_buffer_t() noexcept;
 };
 
 struct ngf_sampler_t {
   VkSampler vksampler;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_sampler_t>> make(const ngf_sampler_info& info) NGF_NOEXCEPT;
+  static ngfi::maybe_ngfptr<ngf_sampler_t> make(const ngf_sampler_info& info) NGF_NOEXCEPT;
   ~ngf_sampler_t() NGF_NOEXCEPT;
 };
 
@@ -507,15 +506,14 @@ struct ngf_buffer_t {
   uint32_t                usage_flags;
   ngf_buffer_storage_type storage_type;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_buffer_t>>
-  make(const ngf_buffer_info& info) NGF_NOEXCEPT;
+  static ngfi::maybe_ngfptr<ngf_buffer_t> make(const ngf_buffer_info& info) NGF_NOEXCEPT;
 };
 
 struct ngf_texel_buffer_view_t {
   VkBufferView vk_buf_view;
   ngf_buffer   buffer;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_texel_buffer_view_t>>
+  static ngfi::maybe_ngfptr<ngf_texel_buffer_view_t>
   make(const ngf_texel_buffer_view_info& info) NGF_NOEXCEPT;
   ~ngf_texel_buffer_view_t() NGF_NOEXCEPT;
 };
@@ -533,8 +531,9 @@ struct ngf_image_t {
   uint32_t         nlevels;
   uint32_t         nlayers;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_t>> make(const ngf_image_info& wrapper_info, ngfvk_alloc&& alloc) NGF_NOEXCEPT;
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_t>> make(const ngf_image_info& wrapper_info) NGF_NOEXCEPT;
+  static ngfi::maybe_ngfptr<ngf_image_t>
+  make(const ngf_image_info& wrapper_info, ngfvk_alloc&& alloc) NGF_NOEXCEPT;
+  static ngfi::maybe_ngfptr<ngf_image_t> make(const ngf_image_info& wrapper_info) NGF_NOEXCEPT;
 
   ~ngf_image_t() NGF_NOEXCEPT;
 };
@@ -543,8 +542,7 @@ struct ngf_image_view_t {
   VkImageView vk_view;
   ngf_image   src;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_view_t>>
-  make(const ngf_image_view_info& info) NGF_NOEXCEPT;
+  static ngfi::maybe_ngfptr<ngf_image_view_t> make(const ngf_image_view_info& info) NGF_NOEXCEPT;
 
   ~ngf_image_view_t() NGF_NOEXCEPT;
 };
@@ -564,17 +562,17 @@ struct ngf_context_t {
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_context_t>> make(const ngf_context_info& info);
+  static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
   ~ngf_context_t() noexcept;
 };
 
 struct ngf_shader_stage_t {
-  VkShaderModule         vk_module;
-  VkShaderStageFlagBits  vk_stage_bits;
-  SpvReflectShaderModule spv_reflect_module;
+  VkShaderModule          vk_module;
+  VkShaderStageFlagBits   vk_stage_bits;
+  SpvReflectShaderModule  spv_reflect_module;
   ngfi::fixed_array<char> entry_point_name;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_shader_stage_t>>
+  static ngfi::maybe_ngfptr<ngf_shader_stage_t>
   make(const ngf_shader_stage_info& info) NGF_NOEXCEPT;
   ~ngf_shader_stage_t() NGF_NOEXCEPT;
 };
@@ -592,10 +590,10 @@ struct ngf_render_target_t {
   uint32_t                                      width;
   uint32_t                                      height;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_render_target_t>>
+  static ngfi::maybe_ngfptr<ngf_render_target_t>
   make(const ngf_render_target_info& info) NGF_NOEXCEPT;
 
-  static ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_render_target_t>>
+  static ngfi::maybe_ngfptr<ngf_render_target_t>
   make(uint32_t width, uint32_t height, uint32_t nattachment_descs) NGF_NOEXCEPT;
 
   ~ngf_render_target_t() NGF_NOEXCEPT;
@@ -1249,7 +1247,7 @@ static inline uint64_t ngfvk_ptr_hash(void* data) {
   return mmh3_out[0] ^ mmh3_out[1];
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_texel_buffer_view_t>>
+ngfi::maybe_ngfptr<ngf_texel_buffer_view_t>
 ngf_texel_buffer_view_t::make(const ngf_texel_buffer_view_info& info) NGF_NOEXCEPT {
   auto buf_view = ngfi::unique_ptr<ngf_texel_buffer_view_t>::make();
   if (!buf_view) return NGF_ERROR_OUT_OF_MEM;
@@ -1272,7 +1270,7 @@ ngf_texel_buffer_view_t::~ngf_texel_buffer_view_t() NGF_NOEXCEPT {
   vkDestroyBufferView(_vk.device, vk_buf_view, nullptr);
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_generic_pipeline>>
+ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
 ngfvk_generic_pipeline::make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT {
   ngfi::tmp_arena().reset();
   auto pipeline = ngfi::unique_ptr<ngfvk_generic_pipeline>::make();
@@ -1537,7 +1535,7 @@ ngfvk_generic_pipeline::make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEP
   return pipeline;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_generic_pipeline>>
+ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
 ngfvk_generic_pipeline::make(const ngf_compute_pipeline_info& info) NGF_NOEXCEPT {
   ngfi::tmp_arena().reset();
   auto pipeline = ngfi::unique_ptr<ngfvk_generic_pipeline>::make();
@@ -1743,7 +1741,7 @@ ngf_error ngfvk_generic_pipeline::common_init(
     }
     const uint32_t nall_bindings = nall_bindings_per_set[bindings[cur].binding_data.set];
     if (nall_bindings > 0u) {
-      set_layout.binding_properties = ngfi::fixed_array<ngfvk_desc_binding> { nall_bindings };
+      set_layout.binding_properties = ngfi::fixed_array<ngfvk_desc_binding> {nall_bindings};
       for (size_t i = 0u; i < nall_bindings; ++i) {
         set_layout.binding_properties[i].type = VK_DESCRIPTOR_TYPE_MAX_ENUM;
       }
@@ -1818,7 +1816,7 @@ ngfvk_generic_pipeline::~ngfvk_generic_pipeline() NGF_NOEXCEPT {
   }
   if (compat_render_pass != VK_NULL_HANDLE) res->retire.append(compat_render_pass);
 }
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_shader_stage_t>>
+ngfi::maybe_ngfptr<ngf_shader_stage_t>
 ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
   auto stage = ngfi::unique_ptr<ngf_shader_stage_t>::make();
   if (!stage) return NGF_ERROR_OUT_OF_MEM;
@@ -1835,7 +1833,7 @@ ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
   if (spverr != SPV_REFLECT_RESULT_SUCCESS) return NGF_ERROR_OBJECT_CREATION_FAILED;
   stage->vk_stage_bits           = get_vk_shader_stage(info.type);
   size_t entry_point_name_length = strlen(info.entry_point_name) + 1u;
-  stage->entry_point_name        = ngfi::fixed_array<char>{entry_point_name_length};
+  stage->entry_point_name        = ngfi::fixed_array<char> {entry_point_name_length};
   strncpy(stage->entry_point_name.data(), info.entry_point_name, entry_point_name_length);
   return stage;
 }
@@ -1846,8 +1844,7 @@ ngf_shader_stage_t::~ngf_shader_stage_t() NGF_NOEXCEPT {
     spvReflectDestroyShaderModule(&spv_reflect_module);
   }
 }
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_buffer_t>>
-ngf_buffer_t::make(const ngf_buffer_info& info) NGF_NOEXCEPT {
+ngfi::maybe_ngfptr<ngf_buffer_t> ngf_buffer_t::make(const ngf_buffer_info& info) NGF_NOEXCEPT {
   auto a = ngfvk_alloc::make(info);
   if (a.has_error()) { return a.error(); }
 
@@ -1864,7 +1861,7 @@ ngf_buffer_t::make(const ngf_buffer_info& info) NGF_NOEXCEPT {
   return buf;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_view_t>>
+ngfi::maybe_ngfptr<ngf_image_view_t>
 ngf_image_view_t::make(const ngf_image_view_info& info) NGF_NOEXCEPT {
   auto view = ngfi::unique_ptr<ngf_image_view_t>::make();
   if (!view) return NGF_ERROR_OUT_OF_MEM;
@@ -1892,9 +1889,11 @@ ngf_image_view_t::make(const ngf_image_view_info& info) NGF_NOEXCEPT {
   return view;
 }
 
-ngf_image_view_t::~ngf_image_view_t() NGF_NOEXCEPT { vkDestroyImageView(_vk.device, vk_view, nullptr); }
+ngf_image_view_t::~ngf_image_view_t() NGF_NOEXCEPT {
+  vkDestroyImageView(_vk.device, vk_view, nullptr);
+}
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_t>>
+ngfi::maybe_ngfptr<ngf_image_t>
 ngf_image_t::make(const ngf_image_info& info, ngfvk_alloc&& alloc) NGF_NOEXCEPT {
   auto       result     = ngfi::unique_ptr<ngf_image_t>::make();
   const bool is_cubemap = info.type == NGF_IMAGE_TYPE_CUBE;
@@ -1935,8 +1934,7 @@ ngf_image_t::make(const ngf_image_info& info, ngfvk_alloc&& alloc) NGF_NOEXCEPT 
   return result;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_image_t>>
-ngf_image_t::make(const ngf_image_info& info) NGF_NOEXCEPT {
+ngfi::maybe_ngfptr<ngf_image_t> ngf_image_t::make(const ngf_image_info& info) NGF_NOEXCEPT {
   auto maybe_alloc = ngfvk_alloc::make(info);
   if (maybe_alloc.has_error()) return maybe_alloc.error();
   return ngf_image_t::make(info, ngfi::move(maybe_alloc.value()));
@@ -2139,7 +2137,7 @@ ngfvk_swapchain::~ngfvk_swapchain() noexcept {
   if (depth_img) { ngf_destroy_image(depth_img); }
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_swapchain>> ngfvk_swapchain::make(
+ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
     const ngf_swapchain_info& swapchain_info,
     ngf_render_target         rt,
     VkSurfaceKHR              surface) noexcept {
@@ -2256,7 +2254,9 @@ ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_swapchain>> ngfvk_swapchain::make(
       .sample_count = NGF_SAMPLE_COUNT_1,
       .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT};
   for (size_t i = 0u; i < swapchain->nimgs; ++i) {
-    auto wrap_img = ngf_image_t::make(wrapper_image_info, ngfi::move(ngfvk_alloc::wrap(swapchain->imgs[i]).value()));
+    auto wrap_img = ngf_image_t::make(
+        wrapper_image_info,
+        ngfi::move(ngfvk_alloc::wrap(swapchain->imgs[i]).value()));
     if (wrap_img.has_error()) return wrap_img.error();
     swapchain->wrapper_imgs[i] = ngfi::move(wrap_img.value());
   }
@@ -2273,7 +2273,8 @@ ngfi::value_or_ngferr<ngfi::unique_ptr<ngfvk_swapchain>> ngfvk_swapchain::make(
         .sample_count = swapchain_info.sample_count,
         .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT | ngfvk::global::img_usage_transient_attachment,
     };
-    swapchain->multisample_imgs = ngfi::fixed_array<ngfi::unique_ptr<ngf_image_t>> {swapchain->nimgs};
+    swapchain->multisample_imgs =
+        ngfi::fixed_array<ngfi::unique_ptr<ngf_image_t>> {swapchain->nimgs};
     if (swapchain->multisample_imgs.data() == nullptr) { return NGF_ERROR_OUT_OF_MEM; }
     for (size_t i = 0u; i < swapchain->nimgs; ++i) {
       auto maybe_ms_alloc = ngfvk_alloc::make(ms_image_info);
@@ -2442,7 +2443,9 @@ static void ngfvk_retire_resources(ngfvk_frame_resources* frame_res) {
   frame_res->retire.clear<ngf_sampler>();
 
   // Destroy retired image views
-  for (VkImageView v : frame_res->retire.list<VkImageView>()) { vkDestroyImageView(_vk.device, v, nullptr); }
+  for (VkImageView v : frame_res->retire.list<VkImageView>()) {
+    vkDestroyImageView(_vk.device, v, nullptr);
+  }
   frame_res->retire.list<VkImageView>().clear();
   for (ngf_image_view v : frame_res->retire.list<ngf_image_view>()) { NGFI_FREE(v); }
   frame_res->retire.list<ngf_image_view>().clear();
@@ -2564,7 +2567,7 @@ static ngf_error ngfvk_cmd_buffer_allocate_for_frame(
 static ngf_error
 ngfvk_create_desc_superpool(ngfvk_desc_superpool* superpool, uint8_t pools_lists, uint16_t ctx_id) {
   superpool->ctx_id      = ctx_id;
-  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{pools_lists};
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {pools_lists};
   memset(superpool->pools_lists.data(), 0, pools_lists * sizeof(ngfvk_desc_pools_list));
   return NGF_ERROR_OK;
 }
@@ -2579,7 +2582,7 @@ static void ngfvk_destroy_desc_superpool(ngfvk_desc_superpool* superpool) {
       p = next;
     }
   }
-  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{};
+  superpool->pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {};
 }
 
 static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) {
@@ -2598,7 +2601,7 @@ static ngfvk_desc_pools_list* ngfvk_find_desc_pools_list(ngf_frame_token token) 
   if (superpool == NULL) {
     ngfvk_desc_superpool new_superpool = {
         .ctx_id      = (uint16_t)~0,
-        .pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list>{}};
+        .pools_lists = ngfi::fixed_array<ngfvk_desc_pools_list> {}};
     CURRENT_CONTEXT->desc_superpools.emplace_back(ngfi::move(new_superpool));
     superpool = &CURRENT_CONTEXT->desc_superpools.back();
     ngfvk_create_desc_superpool(superpool, nframes, ctx_id);
@@ -4107,7 +4110,8 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   // Transition the swapchain image to VK_IMAGE_LAYOUT_PRESENT_SRC if necessary.
   const bool needs_present = wait_semaphore != VK_NULL_HANDLE;
   if (needs_present) {
-    ngf_image swapchain_image = CURRENT_CONTEXT->swapchain->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get();
+    ngf_image swapchain_image =
+        CURRENT_CONTEXT->swapchain->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get();
     if (swapchain_image->sync_state.layout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
       VkCommandBuffer aux_cmd_buf;
       VkCommandPool   aux_cmd_pool;
@@ -4682,8 +4686,7 @@ extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_
   return &ngfvk::global::phys_device_caps;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_context_t>>
-ngf_context_t::make(const ngf_context_info& info) {
+ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& info) {
   auto ctx = ngfi::unique_ptr<ngf_context_t>::make();
   if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
 
@@ -4928,7 +4931,7 @@ extern "C" ngf_context ngf_get_context() NGF_NOEXCEPT {
   return CURRENT_CONTEXT;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_cmd_buffer_t>> ngf_cmd_buffer_t::make() NGF_NOEXCEPT {
+ngfi::maybe_ngfptr<ngf_cmd_buffer_t> ngf_cmd_buffer_t::make() NGF_NOEXCEPT {
   auto cmd_buf = ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
   if (!cmd_buf) { return NGF_ERROR_OUT_OF_MEM; }
   cmd_buf->parent_frame                       = ~0u;
@@ -5081,9 +5084,11 @@ extern "C" ngf_error ngf_cmd_begin_render_pass(
           cmd_buf->active_rt->is_default
               ? (attachment_sample_count == NGF_SAMPLE_COUNT_1
                      ? CURRENT_CONTEXT->swapchain
-                            ->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get()
+                           ->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx]
+                           .get()
                      : CURRENT_CONTEXT->swapchain
-                            ->multisample_imgs[CURRENT_CONTEXT->swapchain->image_idx].get())
+                           ->multisample_imgs[CURRENT_CONTEXT->swapchain->image_idx]
+                           .get())
               : pass_info->render_target->attachment_images[i];
       ngfvk_sync_res res = ngfvk_sync_res_from_img(color_image);
       ngfvk_sync_req_batch_add_with_lookup(&sync_req_batch, cmd_buf, &res, &sync_req);
@@ -5415,7 +5420,8 @@ extern "C" ngf_error ngf_create_graphics_pipeline(
   assert(info);
   assert(result);
   auto maybe_pipeline = ngfvk_generic_pipeline::make(*info);
-  if (!maybe_pipeline.has_error()) result[0] = (ngf_graphics_pipeline)maybe_pipeline.value().release();
+  if (!maybe_pipeline.has_error())
+    result[0] = (ngf_graphics_pipeline)maybe_pipeline.value().release();
   return maybe_pipeline.has_error() ? maybe_pipeline.error() : NGF_ERROR_OK;
 }
 
@@ -5432,7 +5438,8 @@ extern "C" ngf_error ngf_create_compute_pipeline(
   assert(info);
   assert(result);
   auto maybe_pipeline = ngfvk_generic_pipeline::make(*info);
-  if (!maybe_pipeline.has_error()) result[0] = (ngf_compute_pipeline)maybe_pipeline.value().release();
+  if (!maybe_pipeline.has_error())
+    result[0] = (ngf_compute_pipeline)maybe_pipeline.value().release();
   return maybe_pipeline.has_error() ? maybe_pipeline.error() : NGF_ERROR_OK;
 }
 
@@ -5464,7 +5471,7 @@ ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
   }
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_render_target_t>>
+ngfi::maybe_ngfptr<ngf_render_target_t>
 ngf_render_target_t::make(const ngf_render_target_info& info) NGF_NOEXCEPT {
   auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
   if (!rt) return NGF_ERROR_OUT_OF_MEM;
@@ -5592,7 +5599,7 @@ ngf_render_target_t::make(const ngf_render_target_info& info) NGF_NOEXCEPT {
   return rt;
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_render_target_t>>
+ngfi::maybe_ngfptr<ngf_render_target_t>
 ngf_render_target_t::make(uint32_t width, uint32_t height, uint32_t nattachment_descs)
     NGF_NOEXCEPT {
   auto rt = ngfi::unique_ptr<ngf_render_target_t>::make();
@@ -5659,9 +5666,10 @@ extern "C" void ngf_cmd_dispatch(
   ngfvk_sync_req_batch_init(cmd_buf->npending_bind_ops, &sync_req_batch);
 
   for (const ngf_resource_bind_op& bind_op_ref : cmd_buf->pending_bind_ops) {
-    const ngf_resource_bind_op* bind_op = &bind_op_ref;
-    ngfvk_sync_req              sync_req =
-        ngfvk_sync_req_for_bind_op(bind_op, (ngfvk_generic_pipeline*)(cmd_buf->active_compute_pipe));
+    const ngf_resource_bind_op* bind_op  = &bind_op_ref;
+    ngfvk_sync_req              sync_req = ngfvk_sync_req_for_bind_op(
+        bind_op,
+        (ngfvk_generic_pipeline*)(cmd_buf->active_compute_pipe));
     if (sync_req.barrier_masks.stage_mask == 0u) { continue; }
     const ngfvk_sync_res res = ngfvk_sync_res_from_bind_op(bind_op);
     if (res.type == NGFVK_SYNC_RES_COUNT) { continue; }
@@ -6167,7 +6175,7 @@ extern "C" ngf_error
 ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
   assert(info);
   assert(result);
- 
+
   auto maybe_buf = ngf_buffer_t::make(*info);
   if (!maybe_buf.has_error()) { result[0] = maybe_buf.value().release(); }
   return maybe_buf.has_error() ? maybe_buf.error() : NGF_ERROR_OK;
@@ -6201,7 +6209,6 @@ ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) N
   return maybe_view.has_error() ? maybe_view.error() : NGF_ERROR_OK;
 }
 
-
 extern "C" void ngf_destroy_image_view(ngf_image_view view) NGF_NOEXCEPT {
   if (view) {
     const uint32_t fi = CURRENT_CONTEXT->frame_id;
@@ -6224,8 +6231,7 @@ extern "C" void ngf_destroy_image(ngf_image img) NGF_NOEXCEPT {
   }
 }
 
-ngfi::value_or_ngferr<ngfi::unique_ptr<ngf_sampler_t>>
-ngf_sampler_t::make(const ngf_sampler_info& info) NGF_NOEXCEPT {
+ngfi::maybe_ngfptr<ngf_sampler_t> ngf_sampler_t::make(const ngf_sampler_info& info) NGF_NOEXCEPT {
   auto sampler = ngfi::unique_ptr<ngf_sampler_t>::make();
   if (!sampler) return NGF_ERROR_OUT_OF_MEM;
   const VkSamplerCreateInfo vk_sampler_info = {
@@ -6262,7 +6268,9 @@ ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCE
   return maybe_sampler.has_error() ? maybe_sampler.error() : NGF_ERROR_OK;
 }
 
-ngf_sampler_t::~ngf_sampler_t() NGF_NOEXCEPT { vkDestroySampler(_vk.device, vksampler, nullptr); }
+ngf_sampler_t::~ngf_sampler_t() NGF_NOEXCEPT {
+  vkDestroySampler(_vk.device, vksampler, nullptr);
+}
 
 extern "C" void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT {
   if (sampler) {
