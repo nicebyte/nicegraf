@@ -42,7 +42,6 @@ const ngf_allocation_callbacks NGF_DEFAULT_ALLOC_CB = {ngf_default_alloc, ngf_de
 const ngf_allocation_callbacks* NGF_ALLOC_CB = &NGF_DEFAULT_ALLOC_CB;
 
 void ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks) {
-  static bool mutex_inited = false;
   if (callbacks == NULL) {
     NGF_ALLOC_CB = &NGF_DEFAULT_ALLOC_CB;
   } else {

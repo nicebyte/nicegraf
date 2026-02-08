@@ -174,7 +174,7 @@ void freen(T* ptr, size_t n) noexcept {
         ptr[i].~T();
       }
     }
-    NGF_ALLOC_CB->free(ptr, sizeof(T), n, NGF_ALLOC_CB->userdata);
+    NGF_ALLOC_CB->free((void*)ptr, sizeof(T), n, NGF_ALLOC_CB->userdata);
   }
 }
 
