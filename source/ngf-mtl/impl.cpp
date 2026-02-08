@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2025 nicegraf contributors
+ * Copyright (c) 2026 nicegraf contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -20,22 +20,20 @@
  * IN THE SOFTWARE.
  */
 
+#include "ngf-common/array.h"
 #include "ngf-common/cmdbuf-state.h"
 #include "ngf-common/default-arenas.h"
 #include "ngf-common/macros.h"
+#include "ngf-common/unique-ptr.h"
+#include "ngf-common/value-or-error.h"
+#include "nicegraf-mtl-handles.h"
 #include "nicegraf-wrappers.h"
 #include "nicegraf.h"
-#include "nicegraf-mtl-handles.h"
 
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #define CA_PRIVATE_IMPLEMENTATION
 #include <MetalSingleHeader.hpp>
-#include <memory>
-#include <new>
-#include <optional>
-#include <string>
-#include <vector>
 
 // Indicates the maximum amount of buffers (attrib, index and uniform) that
 // can be bound at the same time.
@@ -50,6 +48,8 @@
 // nicegraf's attrib binding 0 becomes Metal vertex buffer binding 30
 // attrib binding 1 becomes Metal vertex buffer binding 29
 // ...and so on.
+// NOTE: the specific value 30 is based on the max total number of buffer bindings
+// specified in metal feature set tables.
 // TODO: consider using information from pipeline metadata to use an alternative
 //       remapping scheme: attrib binding 0 -> N; attrib binding 1 -> N+1;...
 //       etc. where N is the total number of uniform buffers consumed by the
@@ -225,7 +225,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
                                                   // because metal validator doesn't
                                                   // like it for some reason...
 #else
-    {},                                         // DEPTH16, iOS does not support.
+    {},                                           // DEPTH16, iOS does not support.
     {MTL::PixelFormatDepth32Float_Stencil8, 32},  // Emulate DEPTH24_STENCIL8 on iOS
 #endif
     {}
@@ -412,7 +412,7 @@ static MTL::Winding get_mtl_winding(ngf_front_face_mode w) {
   return windings[w];
 }
 
-static std::optional<MTL::TextureType>
+static ngfi::value_or_ngferr<MTL::TextureType>
 get_mtl_texture_type(ngf_image_type type, uint32_t nlayers, ngf_sample_count sample_count) {
   if (type == NGF_IMAGE_TYPE_IMAGE_2D && nlayers == 1 && sample_count == NGF_SAMPLE_COUNT_1) {
     return MTL::TextureType2D;
@@ -430,11 +430,12 @@ get_mtl_texture_type(ngf_image_type type, uint32_t nlayers, ngf_sample_count sam
   } else if (type == NGF_IMAGE_TYPE_CUBE && nlayers > 1) {
     return MTL::TextureTypeCubeArray;
   }
-  return std::nullopt;
+  return NGF_ERROR_INVALID_FORMAT;
 }
 
-static std::optional<MTL::SamplerAddressMode> get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
-  static const std::optional<MTL::SamplerAddressMode> modes[NGF_WRAP_MODE_COUNT] = {
+static ngfi::value_or_ngferr<const MTL::SamplerAddressMode>
+get_mtl_address_mode(ngf_sampler_wrap_mode mode) {
+  static const MTL::SamplerAddressMode modes[NGF_WRAP_MODE_COUNT] = {
       MTL::SamplerAddressModeClampToEdge,
       MTL::SamplerAddressModeRepeat,
       MTL::SamplerAddressModeMirrorRepeat};
@@ -502,10 +503,10 @@ template<typename T> class ngf_id {
     destroy_if_necessary();
   }
 
-  ngf_id(const ngf_id&)            = delete;
+  ngf_id(const ngf_id&) = delete;
   ngf_id& operator=(const ngf_id&) = delete;
   ngf_id(ngf_id&& other) : ptr_(nullptr) {
-    *this = std::move(other);
+    *this = ngfi::move(other);
   }
   ngf_id& operator=(ngf_id&& other) {
     destroy_if_necessary();
@@ -533,73 +534,34 @@ template<typename T> class ngf_id {
 };
 
 struct ngf_render_target_t {
-  ngf_error initialize(
+  static ngfi::maybe_ngfptr<ngf_render_target_t>
+  make(const ngf_render_target_info& info) NGF_NOEXCEPT;
+
+  static ngfi::maybe_ngfptr<ngf_render_target_t> make(
       const ngf_attachment_descriptions& attachment_descs,
       const ngf_image_ref*               img_refs,
       uint32_t                           rt_width,
-      uint32_t                           rt_height) {
-    width                             = rt_width;
-    height                            = rt_height;
-    ngf_attachment_description* attachment_descs_copy = NGFI_ALLOCN(ngf_attachment_description, attachment_descs.ndescs);
-    this->attachment_descs.descs = attachment_descs_copy;
-    if (this->attachment_descs.descs == NULL) {
-      return NGF_ERROR_OUT_OF_MEM;
-    }
-    this->attachment_descs.ndescs = attachment_descs.ndescs;
-    
-    for (uint32_t i = 0; i < this->attachment_descs.ndescs; ++i) {
-      if (attachment_descs.descs[i].is_resolve) {
-        ++nresolve_attachments;
-      } else {
-        ++nrender_attachments;
-      }
-      attachment_descs_copy[i] = attachment_descs.descs[i];
-    }
+      uint32_t                           rt_height) NGF_NOEXCEPT;
 
-    if (img_refs) {
-      render_image_refs = NGFI_ALLOCN(ngf_image_ref, nrender_attachments);
-
-      if (nresolve_attachments > 0u) {
-        resolve_image_refs = NGFI_ALLOCN(ngf_image_ref, nresolve_attachments);
-      }
-
-      uint32_t image_ref_idx         = 0u;
-      uint32_t resolve_image_ref_idx = 0u;
-      for (uint32_t i = 0; i < this->attachment_descs.ndescs; ++i) {
-        if (!this->attachment_descs.descs[i].is_resolve) {
-          render_image_refs[image_ref_idx++] = img_refs[i];
-        } else if (nresolve_attachments > 0u) {
-          resolve_image_refs[resolve_image_ref_idx++] = img_refs[i];
-        } else {
-          assert(0);
-        }
-      }
-    }
-
-    return NGF_ERROR_OK;
+  ~ngf_render_target_t() NGF_NOEXCEPT {
+    if (attachment_descs.descs) { NGFI_FREEN(attachment_descs.descs, attachment_descs.ndescs); }
   }
 
-  ~ngf_render_target_t() {
-    if (attachment_descs.descs) {
-      if (nresolve_attachments > 0u) { NGFI_FREEN(resolve_image_refs, nresolve_attachments); }
-      NGFI_FREEN(render_image_refs, nrender_attachments);
-      NGFI_FREEN(attachment_descs.descs, attachment_descs.ndescs);
-    }
-  }
-
-  ngf_attachment_descriptions attachment_descs;
-  ngf_image_ref*              render_image_refs    = nullptr;
-  ngf_image_ref*              resolve_image_refs   = nullptr;
-  uint32_t                    nrender_attachments  = 0u;
-  uint32_t                    nresolve_attachments = 0u;
-  bool                        is_default           = false;
-  NS::UInteger                width;
-  NS::UInteger                height;
+  ngf_attachment_descriptions      attachment_descs;
+  ngfi::fixed_array<ngf_image_ref> render_image_refs;
+  ngfi::fixed_array<ngf_image_ref> resolve_image_refs;
+  uint32_t                         nrender_attachments  = 0u;
+  uint32_t                         nresolve_attachments = 0u;
+  bool                             is_default           = false;
+  NS::UInteger                     width;
+  NS::UInteger                     height;
 };
 
 struct ngf_cmd_buffer_t {
-  ngfi_cmd_buffer_state       state                     = NGFI_CMD_BUFFER_NEW;
+  ngfi::cmd_buffer_state      state                     = ngfi::CMD_BUFFER_STATE_NEW;
   bool                        renderpass_active         = false;
+  bool                        compute_pass_active       = false;
+  bool                        xfer_pass_active          = false;
   MTL::CommandBuffer*         mtl_cmd_buffer            = nullptr;
   MTL::RenderCommandEncoder*  active_rce                = nullptr;
   MTL::BlitCommandEncoder*    active_bce                = nullptr;
@@ -611,21 +573,29 @@ struct ngf_cmd_buffer_t {
   MTL::IndexType              bound_index_buffer_type   = MTL::IndexTypeUInt16;
   size_t                      bound_index_buffer_offset = 0u;
 
-  ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>  sample_buf_attachment_for_next_render_pass  = nullptr;
-  ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor> sample_buf_attachment_for_next_compute_pass = nullptr;
+  ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>
+      sample_buf_attachment_for_next_render_pass = nullptr;
+  ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>
+      sample_buf_attachment_for_next_compute_pass = nullptr;
+
+  static ngfi::maybe_ngfptr<ngf_cmd_buffer_t> make(const ngf_cmd_buffer_info&) NGF_NOEXCEPT {
+    return ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
+  }
 };
 #define NGFMTL_ENC2CMDBUF(enc) ((ngf_cmd_buffer)((void*)enc.pvt_data_donotuse.d0))
 
 struct ngfmtl_niceshade_metadata {
-  std::vector<std::vector<uint32_t>> native_binding_map;
+  ngfi::array<ngfi::array<uint32_t>> native_binding_map;
   uint32_t                           threadgroup_size[3];
 };
 
 struct ngf_shader_stage_t {
-  ngf_id<MTL::Library> func_lib = nullptr;
-  ngf_stage_type       type;
-  std::string          entry_point_name;
-  std::string          source_code;
+  ngf_id<MTL::Library>    func_lib = nullptr;
+  ngf_stage_type          type;
+  ngfi::fixed_array<char> entry_point_name;
+  ngfi::fixed_array<char> source_code;
+
+  static ngfi::maybe_ngfptr<ngf_shader_stage_t> make(const ngf_shader_stage_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_graphics_pipeline_t {
@@ -642,24 +612,37 @@ struct ngf_graphics_pipeline_t {
   float              blend_color[4] {0};
 
   ngfmtl_niceshade_metadata niceshade_metadata;
+
+  static ngfi::maybe_ngfptr<ngf_graphics_pipeline_t>
+  make(const ngf_graphics_pipeline_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_compute_pipeline_t {
   ngf_id<MTL::ComputePipelineState> pipeline = nullptr;
   ngfmtl_niceshade_metadata         niceshade_metadata;
+
+  static ngfi::maybe_ngfptr<ngf_compute_pipeline_t>
+  make(const ngf_compute_pipeline_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_buffer_t {
   ngf_id<MTL::Buffer> mtl_buffer    = nullptr;
   size_t              mapped_offset = 0;
+
+  static ngfi::maybe_ngfptr<ngf_buffer_t> make(const ngf_buffer_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_texel_buffer_view_t {
   ngf_id<MTL::Texture> mtl_buffer_view = nullptr;
+
+  static ngfi::maybe_ngfptr<ngf_texel_buffer_view_t>
+  make(const ngf_texel_buffer_view_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_sampler_t {
   ngf_id<MTL::SamplerState> sampler = nullptr;
+
+  static ngfi::maybe_ngfptr<ngf_sampler_t> make(const ngf_sampler_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_image_t {
@@ -668,37 +651,16 @@ struct ngf_image_t {
   // Workaround for binding srgb images as writeable storage images.
   ngf_id<MTL::Texture> non_srgb_view = nullptr;
 
-  ngf_image_format     format;
-  uint32_t             usage_flags = 0u;
+  ngf_image_format format;
+  uint32_t         usage_flags = 0u;
+
+  static ngfi::maybe_ngfptr<ngf_image_t> make(const ngf_image_info&) NGF_NOEXCEPT;
 };
 
 struct ngf_image_view_t {
   ngf_id<MTL::Texture> view = nullptr;
-};
 
-template<class NgfObjType, void (*Dtor)(NgfObjType*)> class ngfmtl_object_nursery {
-  public:
-  template<class... Args>
-  explicit ngfmtl_object_nursery(NgfObjType* memory, Args&&... a) : ptr_(memory) {
-    new (memory) NgfObjType(std::forward<Args>(a)...);
-  }
-  ~ngfmtl_object_nursery() {
-    if (ptr_ != nullptr) { Dtor(ptr_); }
-  }
-  NgfObjType* operator->() {
-    return ptr_;
-  }
-  NgfObjType* release() {
-    NgfObjType* tmp = ptr_;
-    ptr_            = nullptr;
-    return tmp;
-  }
-  operator bool() {
-    return ptr_ != nullptr;
-  }
-
-  private:
-  NgfObjType* ptr_;
+  static ngfi::maybe_ngfptr<ngf_image_view_t> make(const ngf_image_view_info& info) NGF_NOEXCEPT;
 };
 
 CA::MetalLayer* ngf_layer_add_to_view(
@@ -735,7 +697,6 @@ class ngfmtl_swapchain {
     MTL::Texture* depth_attachment_texture() {
       return depth_texture;
     }
-    
 
     CA::MetalDrawable* color_drawable      = nullptr;
     MTL::Texture*      depth_texture       = nullptr;
@@ -745,12 +706,12 @@ class ngfmtl_swapchain {
 
   ngfmtl_swapchain() = default;
   ngfmtl_swapchain(ngfmtl_swapchain&& other) {
-    *this = std::move(other);
+    *this = ngfi::move(other);
   }
   ngfmtl_swapchain& operator=(ngfmtl_swapchain&& other) {
     layer_        = other.layer_;
     other.layer_  = nullptr;
-    depth_images_ = std::move(other.depth_images_);
+    depth_images_ = ngfi::move(other.depth_images_);
     capacity_     = other.capacity_;
     img_idx_      = other.img_idx_;
 
@@ -786,12 +747,12 @@ class ngfmtl_swapchain {
     // Initialize depth attachments if necessary.
     initialize_depth_attachments(swapchain_info);
     initialize_multisample_images(swapchain_info);
-    
+
     compute_access_enabled_ = swapchain_info.enable_compute_access;
 
     return NGF_ERROR_OK;
   }
-  
+
   bool compute_access_enabled() const noexcept {
     return compute_access_enabled_;
   }
@@ -817,8 +778,10 @@ class ngfmtl_swapchain {
         depth_images_.size() > 0 ? depth_images_[img_idx_].get() : nullptr,
         is_multisampled() ? multisample_images_[img_idx_]->texture.get() : nullptr};
   }
-  
-  MTL::PixelFormat get_pixel_format() const { return pixel_format_; }
+
+  MTL::PixelFormat get_pixel_format() const {
+    return pixel_format_;
+  }
 
   operator bool() {
     return layer_;
@@ -864,7 +827,7 @@ class ngfmtl_swapchain {
   void initialize_multisample_images(const ngf_swapchain_info& swapchain_info) {
     destroy_multisample_images();
     if (swapchain_info.sample_count > NGF_SAMPLE_COUNT_1) {
-      multisample_images_.resize(capacity_, nullptr);
+      multisample_images_.resize(capacity_);
       for (size_t i = 0; i < capacity_; ++i) {
         const ngf_image_info info = {
             .type   = NGF_IMAGE_TYPE_IMAGE_2D,
@@ -890,16 +853,13 @@ class ngfmtl_swapchain {
   CA::MetalLayer*                   layer_    = nullptr;
   uint32_t                          img_idx_  = 0u;
   uint32_t                          capacity_ = 0u;
-  std::vector<ngf_id<MTL::Texture>> depth_images_;
-  std::vector<ngf_image>            multisample_images_;
+  ngfi::array<ngf_id<MTL::Texture>> depth_images_;
+  ngfi::array<ngf_image>            multisample_images_;
   MTL::PixelFormat                  pixel_format_;
   bool                              compute_access_enabled_;
 };
 
 struct ngf_context_t {
-  ~ngf_context_t() {
-    if (last_cmd_buffer) { last_cmd_buffer->waitUntilCompleted(); }
-  }
   ngf_id<MTL::Device>        device = nullptr;
   ngfmtl_swapchain           swapchain;
   ngfmtl_swapchain::frame    frame;
@@ -910,6 +870,12 @@ struct ngf_context_t {
   ngf_id<MTL::CommandBuffer> last_cmd_buffer    = nullptr;
   dispatch_semaphore_t       frame_sync_sem     = nullptr;
   ngf_render_target          default_rt;
+
+  static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info&) NGF_NOEXCEPT;
+
+  ~ngf_context_t() NGF_NOEXCEPT {
+    if (last_cmd_buffer) { last_cmd_buffer->waitUntilCompleted(); }
+  }
 };
 
 constexpr MTL::GPUFamily NGFMTL_GPU_FAMILIES[] = {
@@ -942,10 +908,8 @@ static size_t ngfmtl_max_supported_gpu_family(MTL::Device* mtldev) {
   return 0;
 }
 
-extern "C" {
 void             ngfi_set_allocation_callbacks(const ngf_allocation_callbacks* callbacks);
 ngf_sample_count ngfi_get_highest_sample_count(size_t counts_bitmap);
-}
 
 static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL::Device* mtldev) {
   ngfdev.handle = handle;
@@ -1039,322 +1003,7 @@ static void ngfmtl_populate_ngf_device(uint32_t handle, ngf_device& ngfdev, MTL:
 
 NGFI_THREADLOCAL ngf_context CURRENT_CONTEXT = nullptr;
 
-std::vector<ngf_device> NGFMTL_DEVICES_LIST;
-const NS::Array*        NGFMTL_MTL_DEVICES;
-
-#define NGFMTL_NURSERY(type, name, ...)                           \
-  ngfmtl_object_nursery<ngf_##type##_t, ngf_destroy_##type> name( \
-      NGFI_ALLOC(ngf_##type##_t),                                 \
-      ##__VA_ARGS__);
-
-#pragma mark ngf_function_implementations
-
-ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT {
-  if (NGFMTL_DEVICES_LIST.empty()) {
-#if TARGET_OS_OSX
-    NGFMTL_MTL_DEVICES = MTL::CopyAllDevices();
-    NGFMTL_DEVICES_LIST.resize(NGFMTL_MTL_DEVICES->count());
-    for (uint32_t d = 0u; d < NGFMTL_MTL_DEVICES->count(); ++d) {
-      ngfmtl_populate_ngf_device(
-          d,
-          NGFMTL_DEVICES_LIST[d],
-          static_cast<MTL::Device*>(NGFMTL_MTL_DEVICES->object(d)));
-    }
-#else
-    NGFMTL_MTL_DEVICES = NS::Array::array(MTLCreateSystemDefaultDevice());
-    NGFMTL_DEVICES_LIST.resize(1);
-    ngfmtl_populate_ngf_device(0, NGFMTL_DEVICES_LIST[0], (MTL::Device*)NGFMTL_MTL_DEVICES->object(0));
-#endif
-  }
-  if (devices) { *devices = NGFMTL_DEVICES_LIST.data(); }
-  if (ndevices) { *ndevices = (uint32_t)NGFMTL_DEVICES_LIST.size(); }
-  return NGF_ERROR_OK;
-}
-
-ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT {
-  if (MTL_DEVICE != nullptr || init_info->device >= NGFMTL_DEVICES_LIST.size()) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if (init_info->diag_info != NULL) {
-    ngfi_diag_info = *init_info->diag_info;
-  } else {
-    ngfi_diag_info.callback  = NULL;
-    ngfi_diag_info.userdata  = NULL;
-    ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
-  }
-  ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
-
-  MTL_DEVICE = static_cast<MTL::Device*>(NGFMTL_MTL_DEVICES->object(init_info->device));
-
-  // Initialize device capabilities.
-  DEVICE_CAPS = NGFMTL_DEVICES_LIST[init_info->device].capabilities;
-
-  return (MTL_DEVICE != nullptr) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
-}
-
-void ngf_shutdown() NGF_NOEXCEPT {
-  NGFI_DIAG_INFO("Shutting down nicegraf.");
-}
-
-const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT {
-  return &DEVICE_CAPS;
-}
-
-extern "C" {
-void* objc_autoreleasePoolPush(void);
-void  objc_autoreleasePoolPop(void* pool);
-}
-
-
-ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
-  *token = (uintptr_t)objc_autoreleasePoolPush();
-  dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
-  CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
-  if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->swapchain.compute_access_enabled()) {
-    CURRENT_CONTEXT->frame.img_wrapper.texture = CURRENT_CONTEXT->frame.color_drawable->texture()->newTextureView(CURRENT_CONTEXT->swapchain.get_pixel_format());
-  }
-  return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
-}
-
-ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
-  ngf_context ctx = CURRENT_CONTEXT;
-  if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
-    CURRENT_CONTEXT->pending_cmd_buffer->addCompletedHandler(
-        [ctx](MTL::CommandBuffer*) { dispatch_semaphore_signal(ctx->frame_sync_sem); });
-    CURRENT_CONTEXT->pending_cmd_buffer->presentDrawable(CURRENT_CONTEXT->frame.color_drawable);
-    CURRENT_CONTEXT->last_cmd_buffer =
-        ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
-    CURRENT_CONTEXT->pending_cmd_buffer->commit();
-    CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
-    CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {};
-  } else {
-    dispatch_semaphore_signal(ctx->frame_sync_sem);
-  }
-  objc_autoreleasePoolPop((void*)token);
-  return NGF_ERROR_OK;
-}
-
-
-ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NOEXCEPT {
-  assert(CURRENT_CONTEXT);
-  *result = &CURRENT_CONTEXT->frame.img_wrapper;
-  return NGF_ERROR_OK;
-}
-
-ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
-  return CURRENT_CONTEXT->default_rt;
-}
-
-const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
-  return &CURRENT_CONTEXT->default_rt->attachment_descs;
-}
-
-ngf_error ngf_create_context(const ngf_context_info* info, ngf_context* result) NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
-  NGFMTL_NURSERY(context, ctx);
-  if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
-
-  ctx->device = MTL_DEVICE;
-  if (info->shared_context != nullptr) {
-    ctx->queue = ngf_id<MTL::CommandQueue>::add_retain(info->shared_context->queue.get());
-  } else {
-    ctx->queue = ctx->device->newCommandQueue();
-  }
-
-  if (info->swapchain_info) {
-    ctx->swapchain_info = *(info->swapchain_info);
-    ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device.get());
-    if (err != NGF_ERROR_OK) return err;
-    ngf_attachment_descriptions attachment_descs;
-    ngf_attachment_description  desc_array[3];
-    attachment_descs.descs     = desc_array;
-    attachment_descs.ndescs    = 1;
-    desc_array[0].format       = ctx->swapchain_info.color_format;
-    desc_array[0].type         = NGF_ATTACHMENT_COLOR;
-    desc_array[0].sample_count = ctx->swapchain_info.sample_count;
-    desc_array[0].is_resolve   = false;
-    if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
-      attachment_descs.ndescs++;
-      desc_array[1].format     = ctx->swapchain_info.depth_format;
-      desc_array[1].type = ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8
-                               ? NGF_ATTACHMENT_DEPTH_STENCIL
-                               : NGF_ATTACHMENT_DEPTH;
-      desc_array[1].sample_count = ctx->swapchain_info.sample_count;
-      desc_array[1].is_resolve   = false;
-    }
-
-    NGFMTL_NURSERY(render_target, default_rt);
-    if (!default_rt) { return NGF_ERROR_OUT_OF_MEM; }
-
-    err = default_rt->initialize(
-        attachment_descs,
-        nullptr,
-        info->swapchain_info->width,
-        info->swapchain_info->height);
-    if (err != NGF_ERROR_OK) { return err; }
-
-    ctx->default_rt             = default_rt.release();
-    ctx->default_rt->is_default = true;
-  }
-
-  ctx->frame_sync_sem = dispatch_semaphore_create(ctx->swapchain_info.capacity_hint);
-  *result             = ctx.release();
-
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT {
-  // TODO: unset current context
-  assert(ctx);
-  ctx->~ngf_context_t();
-  NGFI_FREE(ctx);
-}
-
-ngf_error
-ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT {
-  assert(ctx);
-  ctx->swapchain_info.width  = new_width;
-  ctx->swapchain_info.height = new_height;
-  ctx->default_rt->width     = new_width;
-  ctx->default_rt->height    = new_height;
-  return ctx->swapchain.resize(ctx->swapchain_info);
-}
-
-ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
-  CURRENT_CONTEXT = ctx;
-  ctx->is_current = true;
-  return NGF_ERROR_OK;
-}
-
-ngf_context ngf_get_context() NGF_NOEXCEPT {
-  return CURRENT_CONTEXT;
-}
-
-ngf_error
-ngf_create_shader_stage(const ngf_shader_stage_info* info, ngf_shader_stage* result) NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
-
-  NGFMTL_NURSERY(shader_stage, stage);
-  if (!stage) { return NGF_ERROR_OUT_OF_MEM; }
-
-  stage->type        = info->type;
-  stage->source_code = std::string {(const char*)info->content, info->content_length};
-
-  // Create a MTLLibrary for this stage.
-  ngf_id<NS::String> source = NS::String::alloc()->init(
-      (void*)info->content,
-      info->content_length,
-      NS::UTF8StringEncoding,
-      false);
-  ngf_id<MTL::CompileOptions> opts = id_default;
-  NS::Error*                  err  = nullptr;
-  stage->func_lib = CURRENT_CONTEXT->device->newLibrary(source.get(), opts.get(), &err);
-  if (!stage->func_lib) {
-    NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
-    return NGF_ERROR_OBJECT_CREATION_FAILED;
-  }
-
-  // Set debug name.
-  if (info->debug_name != nullptr) {
-    stage->func_lib->setLabel(
-        ngf_id<NS::String>(NS::String::alloc()->init(info->debug_name, NS::UTF8StringEncoding))
-            .get());
-  }
-
-  if (info->entry_point_name) {
-    stage->entry_point_name = info->entry_point_name;
-  } else {
-    stage->entry_point_name = stage->func_lib->functionNames()->object<NS::String>(0)->utf8String();
-  }
-
-  *result = stage.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_shader_stage(ngf_shader_stage stage) NGF_NOEXCEPT {
-  if (stage != nullptr) {
-    stage->~ngf_shader_stage_t();
-    NGFI_FREE(stage);
-  }
-}
-
-void ngfmtl_attachment_set_common(
-    MTL::RenderPassAttachmentDescriptor* attachment,
-    uint32_t                             render_image_idx,
-    ngf_attachment_type                  type,
-    const ngf_render_target              rt,
-    ngf_attachment_load_op               load_op,
-    ngf_attachment_store_op              store_op) NGF_NOEXCEPT {
-  if (!rt->is_default) {
-    attachment->setTexture(rt->render_image_refs[render_image_idx].image->texture.get());
-    attachment->setLevel(rt->render_image_refs[render_image_idx].mip_level);
-    attachment->setSlice(rt->render_image_refs[render_image_idx].layer);
-  } else {
-    attachment->setTexture(
-        type == NGF_ATTACHMENT_COLOR ? CURRENT_CONTEXT->frame.color_attachment_texture()
-                                     : CURRENT_CONTEXT->frame.depth_attachment_texture());
-    attachment->setLevel(0);
-    attachment->setSlice(0);
-  }
-  attachment->setLoadAction(get_mtl_load_action(load_op));
-  attachment->setStoreAction(get_mtl_store_action(store_op));
-}
-
-ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_render_target* result)
-    NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
-
-  NGFMTL_NURSERY(render_target, rt);
-  if (!rt) { return NGF_ERROR_OUT_OF_MEM; }
-
-  ngf_error err = rt->initialize(
-      *info->attachment_descriptions,
-      info->attachment_image_refs,
-      (uint32_t)info->attachment_image_refs[0].image->texture->width(),
-      (uint32_t)info->attachment_image_refs[0].image->texture->height());
-  if (err != NGF_ERROR_OK) { return err; }
-
-  *result = rt.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_render_target(ngf_render_target rt) NGF_NOEXCEPT {
-  if (rt != nullptr) {
-    rt->~ngf_render_target_t();
-    NGFI_FREE(rt);
-  }
-}
-
-ngf_id<MTL::Function> ngfmtl_get_shader_main(
-    MTL::Library*                func_lib,
-    const char*                  entry_point_name,
-    MTL::FunctionConstantValues* spec_consts) {
-  NS::Error*  err                 = nullptr;
-  NS::String* ns_entry_point_name = NS::String::string(entry_point_name, NS::UTF8StringEncoding);
-  ngf_id<MTL::Function> result    = func_lib->newFunction(ns_entry_point_name, spec_consts, &err);
-  if (err) {
-    NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
-    return nullptr;
-  } else {
-    return result;
-  }
-}
-
-ngf_id<MTL::StencilDescriptor> ngfmtl_create_stencil_descriptor(const ngf_stencil_info& info) {
-  ngf_id<MTL::StencilDescriptor> result = id_default;
-  result->setStencilCompareFunction(get_mtl_compare_function(info.compare_op));
-  result->setStencilFailureOperation(get_mtl_stencil_op(info.fail_op));
-  result->setDepthStencilPassOperation(get_mtl_stencil_op(info.pass_op));
-  result->setDepthFailureOperation(get_mtl_stencil_op(info.depth_fail_op));
-  result->setWriteMask(info.write_mask);
-  result->setReadMask(info.compare_mask);
-  return result;
-}
-
-ngf_error ngfmtl_parse_niceshade_metadata(
+static ngf_error ngfmtl_parse_niceshade_metadata(
     const char*                input,
     bool                       need_threadgroup_size,
     ngfmtl_niceshade_metadata* output) {
@@ -1403,12 +1052,12 @@ ngf_error ngfmtl_parse_niceshade_metadata(
     uint32_t binding;
     uint32_t native_binding;
   };
-  
-  std::vector<ngfmtl_binding_map_entry> tmp_binding_map_entries;
-  uint32_t                  consumed_input_bytes;
-  uint32_t                  max_set     = 0u;
-  uint32_t                  max_binding = 0u;
-  ngfmtl_binding_map_entry current_binding_map_entry;
+
+  ngfi::array<ngfmtl_binding_map_entry> tmp_binding_map_entries;
+  uint32_t                              consumed_input_bytes;
+  uint32_t                              max_set     = 0u;
+  uint32_t                              max_binding = 0u;
+  ngfmtl_binding_map_entry              current_binding_map_entry;
   while (sscanf(
              serialized_binding_map,
              " ( %d %d ) : %d%n",
@@ -1419,17 +1068,21 @@ ngf_error ngfmtl_parse_niceshade_metadata(
          current_binding_map_entry.set != -1 && current_binding_map_entry.binding != -1 &&
          current_binding_map_entry.native_binding != -1) {
     serialized_binding_map += consumed_input_bytes;
-    max_set                   = std::max(max_set, current_binding_map_entry.set);
-    max_binding               = std::max(max_binding, current_binding_map_entry.binding);
+    max_set     = NGFI_MAX(max_set, current_binding_map_entry.set);
+    max_binding = NGFI_MAX(max_binding, current_binding_map_entry.binding);
     tmp_binding_map_entries.emplace_back(current_binding_map_entry);
   }
 
-  std::vector<std::vector<uint32_t>> native_binding_map(max_set + 1, std::vector<uint32_t>(max_binding + 1, ~0u));
+  ngfi::array<ngfi::array<uint32_t>> native_binding_map {max_set + 1};
   for (uint32_t e = 0u; e < tmp_binding_map_entries.size(); ++e) {
-    native_binding_map[tmp_binding_map_entries[e].set][tmp_binding_map_entries[e].binding] =
-        tmp_binding_map_entries[e].native_binding;
+    auto& set_map = native_binding_map[tmp_binding_map_entries[e].set];
+    if (set_map.size() == 0) {
+      set_map.resize(max_binding + 1);
+      memset(set_map.data(), ~0, sizeof(set_map[0]) * set_map.size());
+    }
+    set_map[tmp_binding_map_entries[e].binding] = tmp_binding_map_entries[e].native_binding;
   }
-  output->native_binding_map = std::move(native_binding_map);
+  output->native_binding_map = ngfi::move(native_binding_map);
 
   if (need_threadgroup_size && serialized_threadgroup_size) {
     if (sscanf(
@@ -1446,7 +1099,22 @@ ngf_error ngfmtl_parse_niceshade_metadata(
   return NGF_ERROR_OK;
 }
 
-ngf_id<MTL::FunctionConstantValues>
+static ngf_id<MTL::Function> ngfmtl_get_shader_main(
+    MTL::Library*                func_lib,
+    const char*                  entry_point_name,
+    MTL::FunctionConstantValues* spec_consts) {
+  NS::Error*  err                 = nullptr;
+  NS::String* ns_entry_point_name = NS::String::string(entry_point_name, NS::UTF8StringEncoding);
+  ngf_id<MTL::Function> result    = func_lib->newFunction(ns_entry_point_name, spec_consts, &err);
+  if (err) {
+    NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
+    return nullptr;
+  } else {
+    return result;
+  }
+}
+
+static ngf_id<MTL::FunctionConstantValues>
 ngfmtl_function_consts(const ngf_specialization_info* spec_info) {
   // Populate specialization constant values.
   ngf_id<MTL::FunctionConstantValues> spec_consts = id_default;
@@ -1462,61 +1130,67 @@ ngfmtl_function_consts(const ngf_specialization_info* spec_info) {
   return spec_consts;
 }
 
-ngf_error ngf_create_compute_pipeline(
-    const ngf_compute_pipeline_info* info,
-    ngf_compute_pipeline*            result) NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
+static ngf_id<MTL::StencilDescriptor>
+ngfmtl_create_stencil_descriptor(const ngf_stencil_info& info) {
+  ngf_id<MTL::StencilDescriptor> result = id_default;
+  result->setStencilCompareFunction(get_mtl_compare_function(info.compare_op));
+  result->setStencilFailureOperation(get_mtl_stencil_op(info.fail_op));
+  result->setDepthStencilPassOperation(get_mtl_stencil_op(info.pass_op));
+  result->setDepthFailureOperation(get_mtl_stencil_op(info.depth_fail_op));
+  result->setWriteMask(info.write_mask);
+  result->setReadMask(info.compare_mask);
+  return result;
+}
 
+ngfi::maybe_ngfptr<ngf_compute_pipeline_t>
+ngf_compute_pipeline_t::make(const ngf_compute_pipeline_info& info) NGF_NOEXCEPT {
   ngfmtl_niceshade_metadata metadata;
   const ngf_error           metadata_parse_error =
-      ngfmtl_parse_niceshade_metadata(info->shader_stage->source_code.c_str(), true, &metadata);
+      ngfmtl_parse_niceshade_metadata(info.shader_stage->source_code.data(), true, &metadata);
   if (metadata_parse_error != NGF_ERROR_OK) return metadata_parse_error;
 
-  ngf_id<MTL::FunctionConstantValues> func_const_values = ngfmtl_function_consts(info->spec_info);
+  ngf_id<MTL::FunctionConstantValues> func_const_values = ngfmtl_function_consts(info.spec_info);
   ngf_id<MTL::Function>               function          = ngfmtl_get_shader_main(
-      info->shader_stage->func_lib.get(),
-      info->shader_stage->entry_point_name.c_str(),
+      info.shader_stage->func_lib.get(),
+      info.shader_stage->entry_point_name.data(),
       func_const_values.get());
   if (!function) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
 
   ngf_id<MTL::ComputePipelineDescriptor> mtl_compute_desc = id_default;
   mtl_compute_desc->setComputeFunction(function.get());
 
-  if (info->debug_name != nullptr) {
-    mtl_compute_desc->setLabel(NS::String::string(info->debug_name, NS::UTF8StringEncoding));
+  if (info.debug_name != nullptr) {
+    mtl_compute_desc->setLabel(NS::String::string(info.debug_name, NS::UTF8StringEncoding));
   }
 
-  NS::Error*                        err = nullptr;
-  ngf_id<MTL::ComputePipelineState> computePSO =
-      CURRENT_CONTEXT->device->newComputePipelineState(mtl_compute_desc.get(), MTL::PipelineOptionNone, nullptr, &err);
+  NS::Error*                        err        = nullptr;
+  ngf_id<MTL::ComputePipelineState> computePSO = CURRENT_CONTEXT->device->newComputePipelineState(
+      mtl_compute_desc.get(),
+      MTL::PipelineOptionNone,
+      nullptr,
+      &err);
 
   if (err) {
     NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
-  NGFMTL_NURSERY(compute_pipeline, compute_pipeline);
-  compute_pipeline->pipeline           = std::move(computePSO);
-  compute_pipeline->niceshade_metadata = std::move(metadata);
-  *result                              = compute_pipeline.release();
-  return NGF_ERROR_OK;
+  auto compute_pipeline                = ngfi::unique_ptr<ngf_compute_pipeline_t>::make();
+  compute_pipeline->pipeline           = ngfi::move(computePSO);
+  compute_pipeline->niceshade_metadata = ngfi::move(metadata);
+  return ngfi::move(compute_pipeline);
 }
 
-ngf_error ngf_create_graphics_pipeline(
-    const ngf_graphics_pipeline_info* info,
-    ngf_graphics_pipeline*            result) NGF_NOEXCEPT {
-  assert(info);
-  assert(result);
-
+ngfi::maybe_ngfptr<ngf_graphics_pipeline_t>
+ngf_graphics_pipeline_t::make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT {
   ngf_id<MTL::RenderPipelineDescriptor> mtl_pipe_desc      = id_default;
-  const ngf_attachment_descriptions&    attachment_descs   = *info->compatible_rt_attachment_descs;
+  const ngf_attachment_descriptions&    attachment_descs   = *info.compatible_rt_attachment_descs;
   uint32_t                              ncolor_attachments = 0u;
   for (uint32_t i = 0u; i < attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = attachment_descs.descs[i];
     if (attachment_desc.is_resolve) continue;
     if (attachment_desc.type == NGF_ATTACHMENT_COLOR) {
-      const ngf_blend_info                          blend = info->color_attachment_blend_states
-                                                                ? info->color_attachment_blend_states[ncolor_attachments]
+      const ngf_blend_info                          blend = info.color_attachment_blend_states
+                                                                ? info.color_attachment_blend_states[ncolor_attachments]
                                                                 : ngf_blend_info {};
       MTL::RenderPipelineColorAttachmentDescriptor* mtl_attachment_desc =
           mtl_pipe_desc->colorAttachments()->object(ncolor_attachments++);
@@ -1534,7 +1208,7 @@ ngf_error ngf_create_graphics_pipeline(
         mtl_attachment_desc->setRgbBlendOperation(get_mtl_blend_operation(blend.blend_op_color));
         mtl_attachment_desc->setAlphaBlendOperation(get_mtl_blend_operation(blend.blend_op_alpha));
       }
-      if (info->color_attachment_blend_states) {
+      if (info.color_attachment_blend_states) {
         mtl_attachment_desc->setWriteMask(
             (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_R ? MTL::ColorWriteMaskRed : 0) |
             (blend.color_write_mask & NGF_COLOR_MASK_WRITE_BIT_G ? MTL::ColorWriteMaskGreen : 0) |
@@ -1549,8 +1223,8 @@ ngf_error ngf_create_graphics_pipeline(
     }
   }
 
-  mtl_pipe_desc->setRasterSampleCount(info->multisample->sample_count);
-  mtl_pipe_desc->setAlphaToCoverageEnabled(info->multisample->alpha_to_coverage);
+  mtl_pipe_desc->setRasterSampleCount(info.multisample->sample_count);
+  mtl_pipe_desc->setAlphaToCoverageEnabled(info.multisample->alpha_to_coverage);
 
   mtl_pipe_desc->setStencilAttachmentPixelFormat(MTL::PixelFormatInvalid);
 
@@ -1559,16 +1233,16 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Populate specialization constant values.
-  ngf_id<MTL::FunctionConstantValues> spec_consts = ngfmtl_function_consts(info->spec_info);
+  ngf_id<MTL::FunctionConstantValues> spec_consts = ngfmtl_function_consts(info.spec_info);
 
   // Set stage functions.
   bool                      have_niceshade_metadata = false;
   ngfmtl_niceshade_metadata metadata;
-  for (uint32_t s = 0u; s < info->nshader_stages; ++s) {
-    const ngf_shader_stage stage = info->shader_stages[s];
+  for (uint32_t s = 0u; s < info.nshader_stages; ++s) {
+    const ngf_shader_stage stage = info.shader_stages[s];
     if (!have_niceshade_metadata) {
       const ngf_error metadata_parse_result = ngfmtl_parse_niceshade_metadata(
-          stage->source_code.c_str(),
+          stage->source_code.data(),
           stage->type == NGF_STAGE_COMPUTE,
           &metadata);
       have_niceshade_metadata = (metadata_parse_result == NGF_ERROR_OK);
@@ -1577,14 +1251,14 @@ ngf_error ngf_create_graphics_pipeline(
       assert(!mtl_pipe_desc->vertexFunction());
       mtl_pipe_desc->setVertexFunction(ngfmtl_get_shader_main(
                                            stage->func_lib.get(),
-                                           stage->entry_point_name.c_str(),
+                                           stage->entry_point_name.data(),
                                            spec_consts.get())
                                            .get());
     } else if (stage->type == NGF_STAGE_FRAGMENT) {
       assert(!mtl_pipe_desc->fragmentFunction());
       mtl_pipe_desc->setFragmentFunction(ngfmtl_get_shader_main(
                                              stage->func_lib.get(),
-                                             stage->entry_point_name.c_str(),
+                                             stage->entry_point_name.data(),
                                              spec_consts.get())
                                              .get());
     }
@@ -1595,7 +1269,7 @@ ngf_error ngf_create_graphics_pipeline(
   }
 
   // Configure vertex input.
-  const ngf_vertex_input_info& vertex_input_info = *info->input_info;
+  const ngf_vertex_input_info& vertex_input_info = *info.input_info;
   MTL::VertexDescriptor*       vert_desc         = mtl_pipe_desc->vertexDescriptor();
   for (uint32_t a = 0u; a < vertex_input_info.nattribs; ++a) {
     MTL::VertexAttributeDescriptor* attr_desc = vert_desc->attributes()->object(a);
@@ -1619,35 +1293,35 @@ ngf_error ngf_create_graphics_pipeline(
 
   // Set primitive topology.
   mtl_pipe_desc->setInputPrimitiveTopology(
-      get_mtl_primitive_topology_class(info->input_assembly_info->primitive_topology));
+      get_mtl_primitive_topology_class(info.input_assembly_info->primitive_topology));
   if (mtl_pipe_desc->inputPrimitiveTopology() == MTL::PrimitiveTopologyClassUnspecified) {
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
 
-  NGFMTL_NURSERY(graphics_pipeline, pipeline);
-  pipeline->niceshade_metadata = std::move(metadata);
-  memcpy(pipeline->blend_color, info->blend_consts, sizeof(pipeline->blend_color));
+  auto pipeline                = ngfi::unique_ptr<ngf_graphics_pipeline_t>::make();
+  pipeline->niceshade_metadata = ngfi::move(metadata);
+  memcpy(pipeline->blend_color, info.blend_consts, sizeof(pipeline->blend_color));
 
-  if (info->debug_name != nullptr) {
-    mtl_pipe_desc->setLabel(NS::String::string(info->debug_name, NS::UTF8StringEncoding));
+  if (info.debug_name != nullptr) {
+    mtl_pipe_desc->setLabel(NS::String::string(info.debug_name, NS::UTF8StringEncoding));
   }
 
   NS::Error* err     = nullptr;
   pipeline->pipeline = CURRENT_CONTEXT->device->newRenderPipelineState(mtl_pipe_desc.get(), &err);
-  pipeline->primitive_type = get_mtl_primitive_type(info->input_assembly_info->primitive_topology);
+  pipeline->primitive_type = get_mtl_primitive_type(info.input_assembly_info->primitive_topology);
 
   // Set winding order and culling mode.
-  pipeline->winding = get_mtl_winding(info->rasterization->front_face);
-  pipeline->culling = get_mtl_culling(info->rasterization->cull_mode);
+  pipeline->winding = get_mtl_winding(info.rasterization->front_face);
+  pipeline->culling = get_mtl_culling(info.rasterization->cull_mode);
 
   // Set up depth and stencil state.
 
   pipeline->depth_stencil_desc                     = id_default;
-  const ngf_depth_stencil_info& depth_stencil_info = *info->depth_stencil;
+  const ngf_depth_stencil_info& depth_stencil_info = *info.depth_stencil;
   pipeline->depth_stencil_desc->setDepthCompareFunction(
       depth_stencil_info.depth_test ? get_mtl_compare_function(depth_stencil_info.depth_compare)
                                     : MTL::CompareFunctionAlways);
-  pipeline->depth_stencil_desc->setDepthWriteEnabled(info->depth_stencil->depth_write);
+  pipeline->depth_stencil_desc->setDepthWriteEnabled(info.depth_stencil->depth_write);
 
   ngf_id<MTL::StencilDescriptor> backface_descriptor =
       ngfmtl_create_stencil_descriptor(depth_stencil_info.back_stencil);
@@ -1664,27 +1338,12 @@ ngf_error ngf_create_graphics_pipeline(
     NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   } else {
-    *result = pipeline.release();
-    return NGF_ERROR_OK;
+    return ngfi::move(pipeline);
   }
 }
 
-void ngf_destroy_graphics_pipeline(ngf_graphics_pipeline pipe) NGF_NOEXCEPT {
-  if (pipe != nullptr) {
-    pipe->~ngf_graphics_pipeline_t();
-    NGFI_FREE(pipe);
-  }
-}
-
-void ngf_destroy_compute_pipeline(ngf_compute_pipeline pipe) NGF_NOEXCEPT {
-  if (pipe != nullptr) {
-    pipe->~ngf_compute_pipeline_t();
-    NGFI_FREE(pipe);
-  }
-}
-
-ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
-  MTL::ResourceOptions options         = 0u;
+ngfi::maybe_ngfptr<ngf_buffer_t> ngf_buffer_t::make(const ngf_buffer_info& info) NGF_NOEXCEPT {
+  MTL::ResourceOptions options = 0u;
   switch (info.storage_type) {
   case NGF_BUFFER_STORAGE_HOST_READABLE:
   case NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE:
@@ -1701,63 +1360,422 @@ ngf_id<MTL::Buffer> ngfmtl_create_buffer(const ngf_buffer_info& info) {
   default:
     assert(false);
   }
-  return CURRENT_CONTEXT->device->newBuffer(info.size, options);
+  auto result        = ngfi::unique_ptr<ngf_buffer_t>::make();
+  result->mtl_buffer = ngf_id<MTL::Buffer> {CURRENT_CONTEXT->device->newBuffer(info.size, options)};
+  if (!result->mtl_buffer) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  return ngfi::move(result);
 }
 
-uint8_t* _ngf_map_buffer(MTL::Buffer* buffer, size_t offset, [[maybe_unused]] size_t size) {
-  return (uint8_t*)buffer->contents() + offset;
-}
-
-ngf_error ngf_create_texel_buffer_view(
-    const ngf_texel_buffer_view_info* info,
-    ngf_texel_buffer_view*            result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(texel_buffer_view, view);
+ngfi::maybe_ngfptr<ngf_texel_buffer_view_t>
+ngf_texel_buffer_view_t::make(const ngf_texel_buffer_view_info& info) NGF_NOEXCEPT {
+  auto                           view = ngfi::unique_ptr<ngf_texel_buffer_view_t>::make();
   ngf_id<MTL::TextureDescriptor> texel_buf_descriptor = id_default;
 
   texel_buf_descriptor->setDepth(1);
   texel_buf_descriptor->setMipmapLevelCount(1);
-  texel_buf_descriptor->setPixelFormat(get_mtl_pixel_format(info->texel_format).format);
+  texel_buf_descriptor->setPixelFormat(get_mtl_pixel_format(info.texel_format).format);
   texel_buf_descriptor->setTextureType(MTL::TextureTypeTextureBuffer);
   texel_buf_descriptor->setArrayLength(1);
   texel_buf_descriptor->setSampleCount(1);
   texel_buf_descriptor->setUsage(MTL::TextureUsageShaderRead);
-  texel_buf_descriptor->setStorageMode(info->buffer->mtl_buffer->storageMode());
-  texel_buf_descriptor->setWidth(info->size / ngfmtl_get_bytesperpel(info->texel_format));
+  texel_buf_descriptor->setStorageMode(info.buffer->mtl_buffer->storageMode());
+  texel_buf_descriptor->setWidth(info.size / ngfmtl_get_bytesperpel(info.texel_format));
   texel_buf_descriptor->setHeight(1);
   view->mtl_buffer_view =
-      info->buffer->mtl_buffer->newTexture(texel_buf_descriptor.get(), info->offset, info->size);
-  *result = view.release();
-  return NGF_ERROR_OK;
+      info.buffer->mtl_buffer->newTexture(texel_buf_descriptor.get(), info.offset, info.size);
+  return ngfi::move(view);
 }
 
-void ngf_destroy_texel_buffer_view(ngf_texel_buffer_view buf_view) NGF_NOEXCEPT {
-  if (buf_view) {
-    buf_view->~ngf_texel_buffer_view_t();
-    NGFI_FREE(buf_view);
+static ngf_sample_count ngfmtl_get_ngf_sample_count(NS::UInteger sc) {
+  switch (sc) {
+  case 0:
+  case 1:
+    return NGF_SAMPLE_COUNT_1;
+
+  case 2:
+    return NGF_SAMPLE_COUNT_2;
+  case 4:
+    return NGF_SAMPLE_COUNT_4;
+  case 8:
+    return NGF_SAMPLE_COUNT_8;
+  case 16:
+    return NGF_SAMPLE_COUNT_16;
+  case 32:
+    return NGF_SAMPLE_COUNT_32;
+  case 64:
+    return NGF_SAMPLE_COUNT_64;
   }
+  return NGF_SAMPLE_COUNT_1;
 }
 
-ngf_error ngf_create_buffer(const ngf_buffer_info* info, ngf_buffer* result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(buffer, buf);
-  if (info->storage_type > NGF_BUFFER_STORAGE_DEVICE_LOCAL && !DEVICE_CAPS.device_local_memory_is_host_visible) {
-    NGFI_DIAG_ERROR("Host-visible device-local memory requested, but not supported.");
+ngfi::maybe_ngfptr<ngf_image_view_t>
+ngf_image_view_t::make(const ngf_image_view_info& info) NGF_NOEXCEPT {
+  const auto maybe_texture_type = get_mtl_texture_type(
+      info.view_type,
+      info.nlayers,
+      ngfmtl_get_ngf_sample_count(info.src_image->texture->sampleCount()));
+  if (!maybe_texture_type) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  MTL::Texture* view = info.src_image->texture->newTextureView(
+      get_mtl_pixel_format(info.view_format).format,
+      maybe_texture_type.value(),
+      NS::Range(info.base_mip_level, info.nmips),
+      NS::Range(info.base_layer, info.nlayers));
+  if (!view) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+
+  auto image_view  = ngfi::unique_ptr<ngf_image_view_t>::make();
+  image_view->view = view;
+  return ngfi::move(image_view);
+}
+
+ngfi::maybe_ngfptr<ngf_image_t> ngf_image_t::make(const ngf_image_info& info) NGF_NOEXCEPT {
+  ngf_id<MTL::TextureDescriptor> mtl_img_desc = id_default;
+
+  const MTL::PixelFormat fmt = get_mtl_pixel_format(info.format).format;
+  if (fmt == MTL::PixelFormatInvalid) {
+    NGFI_DIAG_ERROR("Image format %d not supported by Metal backend.", info.format);
+    return NGF_ERROR_INVALID_FORMAT;
+  }
+
+  ngfi::value_or_ngferr<MTL::TextureType> maybe_texture_type =
+      get_mtl_texture_type(info.type, info.nlayers, info.sample_count);
+  if (!maybe_texture_type.has_value()) {
+    NGFI_DIAG_ERROR("Image type %d not supported by Metal backend.", info.type);
+    return NGF_ERROR_INVALID_ENUM;
+  }
+  mtl_img_desc->setTextureType(maybe_texture_type.value());
+  mtl_img_desc->setPixelFormat(fmt);
+  mtl_img_desc->setWidth(info.extent.width);
+  mtl_img_desc->setHeight(info.extent.height);
+  mtl_img_desc->setDepth(info.extent.depth);
+  mtl_img_desc->setArrayLength(info.nlayers);
+  mtl_img_desc->setMipmapLevelCount(info.nmips);
+  mtl_img_desc->setStorageMode(MTL::StorageModePrivate);
+  mtl_img_desc->setSampleCount(info.sample_count);
+  if (info.usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
+    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageRenderTarget);
+  }
+  if (info.usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
+    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderRead);
+  }
+  if (info.usage_hint & NGF_IMAGE_USAGE_STORAGE) {
+    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderWrite);
+  }
+  auto image         = ngfi::unique_ptr<ngf_image_t>::make();
+  image->texture     = MTL_DEVICE->newTexture(mtl_img_desc.get());
+  image->usage_flags = info.usage_hint;
+  image->format      = info.format;
+  return ngfi::move(image);
+}
+
+ngfi::maybe_ngfptr<ngf_sampler_t> ngf_sampler_t::make(const ngf_sampler_info& info) NGF_NOEXCEPT {
+  ngf_id<MTL::SamplerDescriptor> sampler_desc = id_default;
+  auto s = get_mtl_address_mode(info.wrap_u), t = get_mtl_address_mode(info.wrap_v),
+       r = get_mtl_address_mode(info.wrap_w);
+  if (!(s && t && r)) { return NGF_ERROR_INVALID_ENUM; }
+  sampler_desc->setSAddressMode(s.value());
+  sampler_desc->setTAddressMode(t.value());
+  sampler_desc->setRAddressMode(r.value());
+  sampler_desc->setMinFilter(get_mtl_minmag_filter(info.min_filter));
+  sampler_desc->setMagFilter(get_mtl_minmag_filter(info.mag_filter));
+  sampler_desc->setMipFilter(get_mtl_mip_filter(info.mip_filter));
+  sampler_desc->setMaxAnisotropy(info.enable_anisotropy ? (NS::UInteger)info.max_anisotropy : 1);
+  sampler_desc->setLodMinClamp(info.lod_min);
+  sampler_desc->setLodMaxClamp(info.lod_max);
+  if (info.compare_op != NGF_COMPARE_OP_NEVER) {
+    sampler_desc->setCompareFunction(get_mtl_compare_function(info.compare_op));
+  }
+
+  auto sampler     = ngfi::unique_ptr<ngf_sampler_t>::make();
+  sampler->sampler = CURRENT_CONTEXT->device->newSamplerState(sampler_desc.get());
+  return ngfi::move(sampler);
+}
+
+ngfi::maybe_ngfptr<ngf_render_target_t>
+ngf_render_target_t::make(const ngf_render_target_info& info) NGF_NOEXCEPT {
+  return ngf_render_target_t::make(
+      *info.attachment_descriptions,
+      info.attachment_image_refs,
+      (uint32_t)info.attachment_image_refs[0].image->texture->width(),
+      (uint32_t)info.attachment_image_refs[0].image->texture->height());
+}
+
+ngfi::maybe_ngfptr<ngf_render_target_t> ngf_render_target_t::make(
+    const ngf_attachment_descriptions& attachment_descs,
+    const ngf_image_ref*               img_refs,
+    uint32_t                           rt_width,
+    uint32_t                           rt_height) NGF_NOEXCEPT {
+  auto rt    = ngfi::unique_ptr<ngf_render_target_t>::make();
+  rt->width  = rt_width;
+  rt->height = rt_height;
+
+  ngf_attachment_description* attachment_descs_copy =
+      NGFI_ALLOCN(ngf_attachment_description, attachment_descs.ndescs);
+  rt->attachment_descs.descs = attachment_descs_copy;
+  if (!rt->attachment_descs.descs) { return NGF_ERROR_OUT_OF_MEM; }
+  rt->attachment_descs.ndescs = attachment_descs.ndescs;
+  for (uint32_t i = 0; i < rt->attachment_descs.ndescs; ++i) {
+    if (attachment_descs.descs[i].is_resolve) {
+      ++rt->nresolve_attachments;
+    } else {
+      ++rt->nrender_attachments;
+    }
+    attachment_descs_copy[i] = attachment_descs.descs[i];
+  }
+
+  if (img_refs) {
+    rt->render_image_refs = ngfi::fixed_array<ngf_image_ref> {rt->nrender_attachments};
+    if (rt->nresolve_attachments > 0u) {
+      rt->resolve_image_refs = ngfi::fixed_array<ngf_image_ref> {rt->nresolve_attachments};
+    }
+
+    uint32_t image_ref_idx         = 0u;
+    uint32_t resolve_image_ref_idx = 0u;
+    for (uint32_t i = 0; i < rt->attachment_descs.ndescs; ++i) {
+      if (!rt->attachment_descs.descs[i].is_resolve) {
+        rt->render_image_refs[image_ref_idx++] = img_refs[i];
+      } else if (rt->nresolve_attachments > 0u) {
+        rt->resolve_image_refs[resolve_image_ref_idx++] = img_refs[i];
+      } else {
+        assert(0);
+      }
+    }
+  }
+  return ngfi::move(rt);
+}
+
+ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& info) NGF_NOEXCEPT {
+  auto ctx = ngfi::unique_ptr<ngf_context_t>::make();
+  if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
+
+  ctx->device = MTL_DEVICE;
+  ctx->queue  = ctx->device->newCommandQueue();
+
+  if (info.swapchain_info) {
+    ctx->swapchain_info = *(info.swapchain_info);
+    ngf_error err       = ctx->swapchain.initialize(ctx->swapchain_info, ctx->device.get());
+    if (err != NGF_ERROR_OK) return err;
+    ngf_attachment_descriptions attachment_descs;
+    ngf_attachment_description  desc_array[3];
+    attachment_descs.descs     = desc_array;
+    attachment_descs.ndescs    = 1;
+    desc_array[0].format       = ctx->swapchain_info.color_format;
+    desc_array[0].type         = NGF_ATTACHMENT_COLOR;
+    desc_array[0].sample_count = ctx->swapchain_info.sample_count;
+    desc_array[0].is_resolve   = false;
+    if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
+      attachment_descs.ndescs++;
+      desc_array[1].format = ctx->swapchain_info.depth_format;
+      desc_array[1].type   = ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8
+                                 ? NGF_ATTACHMENT_DEPTH_STENCIL
+                                 : NGF_ATTACHMENT_DEPTH;
+      desc_array[1].sample_count = ctx->swapchain_info.sample_count;
+      desc_array[1].is_resolve   = false;
+    }
+
+    auto maybe_default_rt = ngf_render_target_t::make(
+        attachment_descs,
+        nullptr,
+        info.swapchain_info->width,
+        info.swapchain_info->height);
+    if (maybe_default_rt.has_error()) { return maybe_default_rt.error(); }
+    ctx->default_rt             = maybe_default_rt.value().release();
+    ctx->default_rt->is_default = true;
+  }
+  ctx->frame_sync_sem = dispatch_semaphore_create(ctx->swapchain_info.capacity_hint);
+  return ngfi::move(ctx);
+}
+
+ngfi::maybe_ngfptr<ngf_shader_stage_t>
+ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
+  auto stage = ngfi::unique_ptr<ngf_shader_stage_t>::make();
+  if (!stage) { return NGF_ERROR_OUT_OF_MEM; }
+
+  stage->type        = info.type;
+  stage->source_code = ngfi::fixed_array {(const char*)info.content, info.content_length};
+
+  // Create a MTLLibrary for this stage.
+  ngf_id<NS::String> source = NS::String::alloc()->init(
+      (void*)info.content,
+      info.content_length,
+      NS::UTF8StringEncoding,
+      false);
+  ngf_id<MTL::CompileOptions> opts = id_default;
+  NS::Error*                  err  = nullptr;
+  stage->func_lib = CURRENT_CONTEXT->device->newLibrary(source.get(), opts.get(), &err);
+  if (!stage->func_lib) {
+    NGFI_DIAG_ERROR(err->localizedDescription()->utf8String());
     return NGF_ERROR_OBJECT_CREATION_FAILED;
   }
-  buf->mtl_buffer = ngfmtl_create_buffer(*info);
-  *result         = buf.release();
+
+  // Set debug name.
+  if (info.debug_name != nullptr) {
+    stage->func_lib->setLabel(
+        ngf_id<NS::String>(NS::String::alloc()->init(info.debug_name, NS::UTF8StringEncoding))
+            .get());
+  }
+  stage->entry_point_name =
+      ngfi::fixed_array {info.entry_point_name, strlen(info.entry_point_name)};
+  return ngfi::move(stage);
+}
+
+ngfi::array<ngf_device, ngfi::system_alloc_callbacks> NGFMTL_DEVICES_LIST;
+const NS::Array*                                      NGFMTL_MTL_DEVICES;
+
+#pragma mark ngf_function_implementations
+
+ngf_error ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT {
+  if (NGFMTL_DEVICES_LIST.empty()) {
+#if TARGET_OS_OSX
+    NGFMTL_MTL_DEVICES = MTL::CopyAllDevices();
+    NGFMTL_DEVICES_LIST.resize(NGFMTL_MTL_DEVICES->count());
+    for (uint32_t d = 0u; d < NGFMTL_MTL_DEVICES->count(); ++d) {
+      ngfmtl_populate_ngf_device(
+          d,
+          NGFMTL_DEVICES_LIST[d],
+          static_cast<MTL::Device*>(NGFMTL_MTL_DEVICES->object(d)));
+    }
+#else
+    NGFMTL_MTL_DEVICES = NS::Array::array(MTLCreateSystemDefaultDevice());
+    NGFMTL_DEVICES_LIST.resize(1);
+    ngfmtl_populate_ngf_device(
+        0,
+        NGFMTL_DEVICES_LIST[0],
+        (MTL::Device*)NGFMTL_MTL_DEVICES->object(0));
+#endif
+  }
+  if (devices) { *devices = NGFMTL_DEVICES_LIST.data(); }
+  if (ndevices) { *ndevices = (uint32_t)NGFMTL_DEVICES_LIST.size(); }
   return NGF_ERROR_OK;
 }
 
-void ngf_destroy_buffer(ngf_buffer buf) NGF_NOEXCEPT {
-  if (buf != nullptr) {
-    buf->~ngf_buffer_t();
-    NGFI_FREE(buf);
+ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT {
+  if (MTL_DEVICE != nullptr || init_info->device >= NGFMTL_DEVICES_LIST.size()) {
+    return NGF_ERROR_INVALID_OPERATION;
   }
+  if (init_info->diag_info != NULL) {
+    ngfi_diag_info = *init_info->diag_info;
+  } else {
+    ngfi_diag_info.callback  = NULL;
+    ngfi_diag_info.userdata  = NULL;
+    ngfi_diag_info.verbosity = NGF_DIAGNOSTICS_VERBOSITY_DEFAULT;
+  }
+  ngfi_set_allocation_callbacks(init_info->allocation_callbacks);
+
+  MTL_DEVICE = static_cast<MTL::Device*>(NGFMTL_MTL_DEVICES->object(init_info->device));
+
+  // Initialize device capabilities.
+  DEVICE_CAPS = NGFMTL_DEVICES_LIST[init_info->device].capabilities;
+
+  return (MTL_DEVICE != nullptr) ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
+}
+
+void ngf_shutdown() NGF_NOEXCEPT {
+  NGFI_DIAG_INFO("Shutting down nicegraf.");
+}
+
+const ngf_device_capabilities* ngf_get_device_capabilities() NGF_NOEXCEPT {
+  return &DEVICE_CAPS;
+}
+
+extern "C" {
+void* objc_autoreleasePoolPush(void);
+void  objc_autoreleasePoolPop(void* pool);
+}
+
+ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
+  *token = (uintptr_t)objc_autoreleasePoolPush();
+  dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
+  CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
+  if (CURRENT_CONTEXT->frame.color_drawable &&
+      CURRENT_CONTEXT->swapchain.compute_access_enabled()) {
+    CURRENT_CONTEXT->frame.img_wrapper.texture =
+        CURRENT_CONTEXT->frame.color_drawable->texture()->newTextureView(
+            CURRENT_CONTEXT->swapchain.get_pixel_format());
+  }
+  return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
+}
+
+ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
+  ngf_context ctx = CURRENT_CONTEXT;
+  if (CURRENT_CONTEXT->frame.color_drawable && CURRENT_CONTEXT->pending_cmd_buffer) {
+    CURRENT_CONTEXT->pending_cmd_buffer->addCompletedHandler(
+        [ctx](MTL::CommandBuffer*) { dispatch_semaphore_signal(ctx->frame_sync_sem); });
+    CURRENT_CONTEXT->pending_cmd_buffer->presentDrawable(CURRENT_CONTEXT->frame.color_drawable);
+    CURRENT_CONTEXT->last_cmd_buffer =
+        ngf_id<MTL::CommandBuffer>::add_retain(CURRENT_CONTEXT->pending_cmd_buffer);
+    CURRENT_CONTEXT->pending_cmd_buffer->commit();
+    CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
+    CURRENT_CONTEXT->frame              = ngfmtl_swapchain::frame {};
+  } else {
+    dispatch_semaphore_signal(ctx->frame_sync_sem);
+  }
+  objc_autoreleasePoolPop((void*)token);
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NOEXCEPT {
+  assert(CURRENT_CONTEXT);
+  *result = &CURRENT_CONTEXT->frame.img_wrapper;
+  return NGF_ERROR_OK;
+}
+
+ngf_render_target ngf_default_render_target() NGF_NOEXCEPT {
+  return CURRENT_CONTEXT->default_rt;
+}
+
+const ngf_attachment_descriptions* ngf_default_render_target_attachment_descs() NGF_NOEXCEPT {
+  return &CURRENT_CONTEXT->default_rt->attachment_descs;
+}
+
+ngf_error
+ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT {
+  assert(ctx);
+  ctx->swapchain_info.width  = new_width;
+  ctx->swapchain_info.height = new_height;
+  ctx->default_rt->width     = new_width;
+  ctx->default_rt->height    = new_height;
+  return ctx->swapchain.resize(ctx->swapchain_info);
+}
+
+ngf_error ngf_set_context(ngf_context ctx) NGF_NOEXCEPT {
+  CURRENT_CONTEXT = ctx;
+  ctx->is_current = true;
+  return NGF_ERROR_OK;
+}
+
+ngf_context ngf_get_context() NGF_NOEXCEPT {
+  return CURRENT_CONTEXT;
+}
+
+void ngfmtl_attachment_set_common(
+    MTL::RenderPassAttachmentDescriptor* attachment,
+    uint32_t                             render_image_idx,
+    ngf_attachment_type                  type,
+    const ngf_render_target              rt,
+    ngf_attachment_load_op               load_op,
+    ngf_attachment_store_op              store_op) NGF_NOEXCEPT {
+  if (!rt->is_default) {
+    attachment->setTexture(rt->render_image_refs[render_image_idx].image->texture.get());
+    attachment->setLevel(rt->render_image_refs[render_image_idx].mip_level);
+    attachment->setSlice(rt->render_image_refs[render_image_idx].layer);
+  } else {
+    attachment->setTexture(
+        type == NGF_ATTACHMENT_COLOR ? CURRENT_CONTEXT->frame.color_attachment_texture()
+                                     : CURRENT_CONTEXT->frame.depth_attachment_texture());
+    attachment->setLevel(0);
+    attachment->setSlice(0);
+  }
+  attachment->setLoadAction(get_mtl_load_action(load_op));
+  attachment->setStoreAction(get_mtl_store_action(store_op));
+}
+
+uint8_t* ngf_map_buffer(MTL::Buffer* buffer, size_t offset, [[maybe_unused]] size_t size) {
+  return (uint8_t*)buffer->contents() + offset;
 }
 
 void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
-  return (void*)_ngf_map_buffer(buf->mtl_buffer.get(), offset, size);
+  return (void*)ngf_map_buffer(buf->mtl_buffer.get(), offset, size);
 }
 
 void ngf_buffer_flush_range(
@@ -1769,152 +1787,12 @@ void ngf_buffer_flush_range(
 void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
 }
 
-ngf_error ngf_create_sampler(const ngf_sampler_info* info, ngf_sampler* result) NGF_NOEXCEPT {
-  ngf_id<MTL::SamplerDescriptor>         sampler_desc = id_default;
-  std::optional<MTL::SamplerAddressMode> s            = get_mtl_address_mode(info->wrap_u),
-                                         t            = get_mtl_address_mode(info->wrap_v),
-                                         r            = get_mtl_address_mode(info->wrap_w);
-  if (!(s && t && r)) { return NGF_ERROR_INVALID_ENUM; }
-  sampler_desc->setSAddressMode(*s);
-  sampler_desc->setTAddressMode(*t);
-  sampler_desc->setRAddressMode(*r);
-  sampler_desc->setMinFilter(get_mtl_minmag_filter(info->min_filter));
-  sampler_desc->setMagFilter(get_mtl_minmag_filter(info->mag_filter));
-  sampler_desc->setMipFilter(get_mtl_mip_filter(info->mip_filter));
-  sampler_desc->setMaxAnisotropy(info->enable_anisotropy ? (NS::UInteger)info->max_anisotropy : 1);
-  sampler_desc->setLodMinClamp(info->lod_min);
-  sampler_desc->setLodMaxClamp(info->lod_max);
-  if (info->compare_op != NGF_COMPARE_OP_NEVER) {
-    sampler_desc->setCompareFunction(get_mtl_compare_function(info->compare_op));
-  }
-    
-  NGFMTL_NURSERY(sampler, sampler);
-  sampler->sampler = CURRENT_CONTEXT->device->newSamplerState(sampler_desc.get());
-  *result          = sampler.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_sampler(ngf_sampler sampler) NGF_NOEXCEPT {
-  if (sampler) {
-    sampler->~ngf_sampler_t();
-    NGFI_FREE(sampler);
-  }
-}
-
-ngf_error ngf_create_cmd_buffer(const ngf_cmd_buffer_info*, ngf_cmd_buffer* result) NGF_NOEXCEPT {
-  NGFMTL_NURSERY(cmd_buffer, cmd_buffer);
-  *result = cmd_buffer.release();
-  return NGF_ERROR_OK;
-}
-
-static ngf_sample_count get_ngf_sample_count(NS::UInteger sc) {
-  switch(sc) {
-    case 0:
-    case 1:
-      return NGF_SAMPLE_COUNT_1;
-      
-    case 2:
-      return NGF_SAMPLE_COUNT_2;
-    case 4:
-      return NGF_SAMPLE_COUNT_4;
-    case 8:
-      return NGF_SAMPLE_COUNT_8;
-    case 16:
-      return NGF_SAMPLE_COUNT_16;
-    case 32:
-      return NGF_SAMPLE_COUNT_32;
-    case 64:
-      return NGF_SAMPLE_COUNT_64;
-  }
-  return NGF_SAMPLE_COUNT_1;
-}
-
-ngf_error ngf_create_image_view(const ngf_image_view_info* info, ngf_image_view* result) NGF_NOEXCEPT {
-  const auto maybe_texture_type = get_mtl_texture_type(info->view_type,
-                                                       info->nlayers,
-                                                       get_ngf_sample_count(info->src_image->texture->sampleCount()));
-  if (!maybe_texture_type) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  MTL::Texture* view = info->src_image->texture->newTextureView(
-                                           get_mtl_pixel_format(info->view_format).format,
-                                           maybe_texture_type.value(),
-                                           NS::Range(info->base_mip_level, info->nmips),
-                                           NS::Range(info->base_layer, info->nlayers));
-  if (!view) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  
-  NGFMTL_NURSERY(image_view, image_view);
-  image_view->view = view;
-  *result = image_view.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_image_view(ngf_image_view view) NGF_NOEXCEPT {
-  if (view != nullptr) {
-    view->~ngf_image_view_t();
-    NGFI_FREE(view);
-  }
-}
-
-ngf_error ngf_create_image(const ngf_image_info* info, ngf_image* result) NGF_NOEXCEPT {
-  ngf_id<MTL::TextureDescriptor> mtl_img_desc = id_default;
-
-  const MTL::PixelFormat fmt = get_mtl_pixel_format(info->format).format;
-  if (fmt == MTL::PixelFormatInvalid) {
-    NGFI_DIAG_ERROR("Image format %d not supported by Metal backend.", info->format);
-    return NGF_ERROR_INVALID_FORMAT;
-  }
-
-  std::optional<MTL::TextureType> maybe_texture_type =
-      get_mtl_texture_type(info->type, info->nlayers, info->sample_count);
-  if (!maybe_texture_type.has_value()) {
-    NGFI_DIAG_ERROR("Image type %d not supported by Metal backend.", info->type);
-    return NGF_ERROR_INVALID_ENUM;
-  }
-  mtl_img_desc->setTextureType(maybe_texture_type.value());
-  mtl_img_desc->setPixelFormat(fmt);
-  mtl_img_desc->setWidth(info->extent.width);
-  mtl_img_desc->setHeight(info->extent.height);
-  mtl_img_desc->setDepth(info->extent.depth);
-  mtl_img_desc->setArrayLength(info->nlayers);
-  mtl_img_desc->setMipmapLevelCount(info->nmips);
-  mtl_img_desc->setStorageMode(MTL::StorageModePrivate);
-  mtl_img_desc->setSampleCount(info->sample_count);
-  if (info->usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
-    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageRenderTarget);
-  }
-  if (info->usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
-    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderRead);
-  }
-  if (info->usage_hint & NGF_IMAGE_USAGE_STORAGE) {
-    mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderWrite);
-  }
-  NGFMTL_NURSERY(image, image);
-  image->texture     = MTL_DEVICE->newTexture(mtl_img_desc.get());
-  image->usage_flags = info->usage_hint;
-  image->format      = info->format;
-  *result            = image.release();
-  return NGF_ERROR_OK;
-}
-
-void ngf_destroy_image(ngf_image image) NGF_NOEXCEPT {
-  if (image != nullptr) {
-    image->~ngf_image_t();
-    NGFI_FREE(image);
-  }
-}
-
-void ngf_destroy_cmd_buffer(ngf_cmd_buffer cmd_buffer) NGF_NOEXCEPT {
-  if (cmd_buffer != nullptr) {
-    cmd_buffer->~ngf_cmd_buffer_t();
-    NGFI_FREE(cmd_buffer);
-  }
-}
-
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer, ngf_frame_token) NGF_NOEXCEPT {
   assert(cmd_buffer);
   cmd_buffer->mtl_cmd_buffer = CURRENT_CONTEXT->queue->commandBuffer();
   assert(!cmd_buffer->active_rce);
   assert(!cmd_buffer->active_bce);
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_READY);
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, ngfi::CMD_BUFFER_STATE_READY);
   return NGF_ERROR_OK;
 }
 
@@ -1924,14 +1802,14 @@ ngf_error ngf_submit_cmd_buffers(uint32_t n, ngf_cmd_buffer* cmd_buffers) NGF_NO
     CURRENT_CONTEXT->pending_cmd_buffer = nullptr;
   }
   for (uint32_t b = 0u; b < n; ++b) {
-    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_PENDING);
+    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], ngfi::CMD_BUFFER_STATE_PENDING);
     if (b < n - 1u) {
       cmd_buffers[b]->mtl_cmd_buffer->commit();
     } else {
       CURRENT_CONTEXT->pending_cmd_buffer = cmd_buffers[b]->mtl_cmd_buffer;
     }
     cmd_buffers[b]->mtl_cmd_buffer = nullptr;
-    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], NGFI_CMD_BUFFER_SUBMITTED);
+    NGFI_TRANSITION_CMD_BUF(cmd_buffers[b], ngfi::CMD_BUFFER_STATE_SUBMITTED);
   }
   return NGF_ERROR_OK;
 }
@@ -1951,14 +1829,14 @@ void ngfmtl_finish_pending_encoders(ngf_cmd_buffer cmd_buffer) {
 }
 
 ngf_error ngf_cmd_begin_render_pass_simple(
-    ngf_cmd_buffer    cmd_buf,
-    ngf_render_target rt,
-    float             clear_color_r,
-    float             clear_color_g,
-    float             clear_color_b,
-    float             clear_color_a,
-    float             clear_depth,
-    uint32_t          clear_stencil,
+    ngf_cmd_buffer      cmd_buf,
+    ngf_render_target   rt,
+    float               clear_color_r,
+    float               clear_color_g,
+    float               clear_color_b,
+    float               clear_color_a,
+    float               clear_depth,
+    uint32_t            clear_stencil,
     ngf_render_encoder* enc) NGF_NOEXCEPT {
   ngfi::tmp_arena().reset();
   const uint32_t nattachments = rt->attachment_descs.ndescs;
@@ -1981,7 +1859,7 @@ ngf_error ngf_cmd_begin_render_pass_simple(
     }
     const bool needs_resolve = rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_COLOR &&
                                rt->attachment_descs.descs[i].sample_count > NGF_SAMPLE_COUNT_1 &&
-                               (rt->resolve_image_refs || rt->is_default);
+                               (rt->resolve_image_refs.data() || rt->is_default);
     store_ops[i] = (needs_resolve) ? NGF_STORE_OP_RESOLVE : NGF_STORE_OP_STORE;
   }
   const ngf_render_pass_info pass_info =
@@ -1993,7 +1871,7 @@ ngf_error ngf_cmd_begin_render_pass(
     ngf_cmd_buffer              cmd_buffer,
     const ngf_render_pass_info* pass_info,
     ngf_render_encoder*         enc) NGF_NOEXCEPT {
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, ngfi::CMD_BUFFER_STATE_RECORDING);
   assert(pass_info);
   const ngf_render_target rt = pass_info->render_target;
   assert(rt);
@@ -2011,20 +1889,22 @@ ngf_error ngf_cmd_begin_render_pass(
   pass_descriptor->setDepthAttachment(nullptr);
   pass_descriptor->setStencilAttachment(nullptr);
 
-  if (cmd_buffer->sample_buf_attachment_for_next_render_pass)
-  {
+  if (cmd_buffer->sample_buf_attachment_for_next_render_pass) {
     const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_render_pass;
-    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
+    const auto  attachment            = pass_descriptor->sampleBufferAttachments()->object(0);
 
-    attachment->setSampleBuffer( attachment_descriptor->sampleBuffer() );
+    attachment->setSampleBuffer(attachment_descriptor->sampleBuffer());
 
-    if (attachment_descriptor->startOfVertexSampleIndex() < attachment_descriptor->endOfVertexSampleIndex()) {
+    if (attachment_descriptor->startOfVertexSampleIndex() <
+        attachment_descriptor->endOfVertexSampleIndex()) {
       attachment->setStartOfVertexSampleIndex(attachment_descriptor->startOfVertexSampleIndex());
       attachment->setEndOfVertexSampleIndex(attachment_descriptor->endOfVertexSampleIndex());
     }
 
-    if (attachment_descriptor->startOfFragmentSampleIndex() < attachment_descriptor->endOfFragmentSampleIndex()) {
-      attachment->setStartOfFragmentSampleIndex(attachment_descriptor->startOfFragmentSampleIndex());
+    if (attachment_descriptor->startOfFragmentSampleIndex() <
+        attachment_descriptor->endOfFragmentSampleIndex()) {
+      attachment->setStartOfFragmentSampleIndex(
+          attachment_descriptor->startOfFragmentSampleIndex());
       attachment->setEndOfFragmentSampleIndex(attachment_descriptor->endOfFragmentSampleIndex());
     }
 
@@ -2034,14 +1914,20 @@ ngf_error ngf_cmd_begin_render_pass(
   for (uint32_t i = 0u; i < rt->attachment_descs.ndescs; ++i) {
     const ngf_attachment_description& attachment_desc = rt->attachment_descs.descs[i];
     if (attachment_desc.is_resolve) { continue; }
-    const ngf_attachment_load_op      load_op         = pass_info->load_ops[i];
-    const ngf_attachment_store_op     store_op        = pass_info->store_ops[i];
-    const ngf_clear_info*             clear_info =
+    const ngf_attachment_load_op  load_op  = pass_info->load_ops[i];
+    const ngf_attachment_store_op store_op = pass_info->store_ops[i];
+    const ngf_clear_info*         clear_info =
         load_op == NGF_LOAD_OP_CLEAR && pass_info->clears ? &pass_info->clears[i] : nullptr;
     switch (attachment_desc.type) {
     case NGF_ATTACHMENT_COLOR: {
       ngf_id<MTL::RenderPassColorAttachmentDescriptor> mtl_desc = id_default;
-      ngfmtl_attachment_set_common(mtl_desc.get(), render_image_idx++, attachment_desc.type, rt, load_op, store_op);
+      ngfmtl_attachment_set_common(
+          mtl_desc.get(),
+          render_image_idx++,
+          attachment_desc.type,
+          rt,
+          load_op,
+          store_op);
       if (clear_info) {
         mtl_desc->setClearColor(MTL::ClearColor::Make(
             clear_info->clear_color[0],
@@ -2053,7 +1939,7 @@ ngf_error ngf_cmd_begin_render_pass(
       if (attachment_desc.sample_count > NGF_SAMPLE_COUNT_1) {
         if (rt->is_default) {
           mtl_desc->setResolveTexture(CURRENT_CONTEXT->frame.resolve_attachment_texture());
-        } else if (rt->resolve_image_refs) {
+        } else if (rt->resolve_image_refs.data()) {
           mtl_desc->setResolveTexture(
               rt->resolve_image_refs[resolve_attachment_idx++].image->texture.get());
         }
@@ -2064,7 +1950,13 @@ ngf_error ngf_cmd_begin_render_pass(
     }
     case NGF_ATTACHMENT_DEPTH: {
       ngf_id<MTL::RenderPassDepthAttachmentDescriptor> mtl_desc = id_default;
-      ngfmtl_attachment_set_common(mtl_desc.get(), render_image_idx++, attachment_desc.type, rt, load_op, store_op);
+      ngfmtl_attachment_set_common(
+          mtl_desc.get(),
+          render_image_idx++,
+          attachment_desc.type,
+          rt,
+          load_op,
+          store_op);
       if (clear_info) { mtl_desc->setClearDepth(clear_info->clear_depth_stencil.clear_depth); }
       pass_descriptor->setDepthAttachment(mtl_desc.get());
       break;
@@ -2116,7 +2008,7 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
   }
   cmd_buffer->renderpass_active = false;
   cmd_buffer->active_rt         = nullptr;
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, ngfi::CMD_BUFFER_STATE_READY_TO_SUBMIT);
 
   return NGF_ERROR_OK;
 }
@@ -2124,16 +2016,18 @@ ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEPT {
 ngf_error
 ngf_cmd_begin_xfer_pass(ngf_cmd_buffer cmd_buf, const ngf_xfer_pass_info*, ngf_xfer_encoder* enc)
     NGF_NOEXCEPT {
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_RECORDING);
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, ngfi::CMD_BUFFER_STATE_RECORDING);
   ngfmtl_finish_pending_encoders(cmd_buf);
+  cmd_buf->xfer_pass_active = true;
   enc->pvt_data_donotuse.d0 = (uintptr_t)cmd_buf;
   cmd_buf->active_bce       = cmd_buf->mtl_cmd_buffer->blitCommandEncoder();
   return NGF_ERROR_OK;
 }
 
 ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
-  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
+  auto cmd_buf              = NGFMTL_ENC2CMDBUF(enc);
+  cmd_buf->xfer_pass_active = false;
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, ngfi::CMD_BUFFER_STATE_READY_TO_SUBMIT);
   if (cmd_buf->active_bce) {
     cmd_buf->active_bce->endEncoding();
     cmd_buf->active_bce = nullptr;
@@ -2142,20 +2036,22 @@ ngf_error ngf_cmd_end_xfer_pass(ngf_xfer_encoder enc) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_cmd_begin_compute_pass(
-    ngf_cmd_buffer cmd_buffer,
+    ngf_cmd_buffer               cmd_buffer,
     const ngf_compute_pass_info* pass_info,
-    ngf_compute_encoder* enc) NGF_NOEXCEPT {
-  NGFI_TRANSITION_CMD_BUF(cmd_buffer, NGFI_CMD_BUFFER_RECORDING);
-
-  ngf_id<MTL::ComputePassDescriptor> pass_descriptor        = id_default;
+    ngf_compute_encoder*         enc) NGF_NOEXCEPT {
+  NGFI_TRANSITION_CMD_BUF(cmd_buffer, ngfi::CMD_BUFFER_STATE_RECORDING);
+  cmd_buffer->compute_pass_active                    = true;
+  ngf_id<MTL::ComputePassDescriptor> pass_descriptor = id_default;
 
   if (cmd_buffer->sample_buf_attachment_for_next_compute_pass) {
     const auto& attachment_descriptor = cmd_buffer->sample_buf_attachment_for_next_compute_pass;
-    const auto attachment = pass_descriptor->sampleBufferAttachments()->object(0);
+    const auto  attachment            = pass_descriptor->sampleBufferAttachments()->object(0);
 
     attachment->setSampleBuffer(attachment_descriptor->sampleBuffer());
 
-    assert(attachment_descriptor->startOfEncoderSampleIndex() < attachment_descriptor->endOfEncoderSampleIndex());
+    assert(
+        attachment_descriptor->startOfEncoderSampleIndex() <
+        attachment_descriptor->endOfEncoderSampleIndex());
     attachment->setStartOfEncoderSampleIndex(attachment_descriptor->startOfEncoderSampleIndex());
     attachment->setEndOfEncoderSampleIndex(attachment_descriptor->endOfEncoderSampleIndex());
 
@@ -2171,7 +2067,8 @@ ngf_error ngf_cmd_begin_compute_pass(
 ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   assert(cmd_buf);
-  NGFI_TRANSITION_CMD_BUF(cmd_buf, NGFI_CMD_BUFFER_READY_TO_SUBMIT);
+  cmd_buf->compute_pass_active = false;
+  NGFI_TRANSITION_CMD_BUF(cmd_buf, ngfi::CMD_BUFFER_STATE_READY_TO_SUBMIT);
   if (cmd_buf->active_cce) {
     cmd_buf->active_cce->endEncoding();
     cmd_buf->active_cce          = nullptr;
@@ -2332,7 +2229,8 @@ void ngf_cmd_bind_resources(
     }
     const uint32_t native_binding =
         cmd_buf->active_gfx_pipe->niceshade_metadata
-      .native_binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
+            .native_binding_map[bind_op.target_set][bind_op.target_binding] +
+        bind_op.array_index;
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
@@ -2361,7 +2259,8 @@ void ngf_cmd_bind_resources(
     }
     case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get()
+                                                  : img_bind_op.resource.image->texture.get();
       cmd_buf->active_rce->setVertexTexture(t, native_binding);
       cmd_buf->active_rce->setVertexSamplerState(
           img_bind_op.sampler->sampler.get(),
@@ -2374,7 +2273,8 @@ void ngf_cmd_bind_resources(
     }
     case NGF_DESCRIPTOR_IMAGE: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get()
+                                                  : img_bind_op.resource.image->texture.get();
       cmd_buf->active_rce->setVertexTexture(t, native_binding);
       cmd_buf->active_rce->setFragmentTexture(t, native_binding);
       break;
@@ -2394,8 +2294,12 @@ void ngf_cmd_bind_resources(
                       "currently unsupported.");
       break;
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
-      cmd_buf->active_rce->setVertexAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
-      cmd_buf->active_rce->setFragmentAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
+      cmd_buf->active_rce->setVertexAccelerationStructure(
+          (MTL::AccelerationStructure*)bind_op.info.acceleration_structure,
+          native_binding);
+      cmd_buf->active_rce->setFragmentAccelerationStructure(
+          (MTL::AccelerationStructure*)bind_op.info.acceleration_structure,
+          native_binding);
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
@@ -2403,13 +2307,19 @@ void ngf_cmd_bind_resources(
   }
 }
 
-static std::optional<ngf_image_format> get_regular_format_from_srgb(const ngf_image_format f) {
+static ngfi::value_or_ngferr<ngf_image_format>
+get_regular_format_from_srgb(const ngf_image_format f) {
   switch (f) {
-    case NGF_IMAGE_FORMAT_SRGB8: return NGF_IMAGE_FORMAT_RGB8;
-    case NGF_IMAGE_FORMAT_SRGBA8: return NGF_IMAGE_FORMAT_RGBA8;
-    case NGF_IMAGE_FORMAT_BGR8_SRGB: return NGF_IMAGE_FORMAT_BGR8;
-    case NGF_IMAGE_FORMAT_BGRA8_SRGB: return NGF_IMAGE_FORMAT_BGRA8;
-    default: return std::nullopt;
+  case NGF_IMAGE_FORMAT_SRGB8:
+    return NGF_IMAGE_FORMAT_RGB8;
+  case NGF_IMAGE_FORMAT_SRGBA8:
+    return NGF_IMAGE_FORMAT_RGBA8;
+  case NGF_IMAGE_FORMAT_BGR8_SRGB:
+    return NGF_IMAGE_FORMAT_BGR8;
+  case NGF_IMAGE_FORMAT_BGRA8_SRGB:
+    return NGF_IMAGE_FORMAT_BGRA8;
+  default:
+    return NGF_ERROR_INVALID_ENUM;
   }
 }
 
@@ -2434,7 +2344,8 @@ void ngf_cmd_bind_compute_resources(
     }
     const uint32_t native_binding =
         cmd_buf->active_compute_pipe->niceshade_metadata
-      .native_binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
+            .native_binding_map[bind_op.target_set][bind_op.target_binding] +
+        bind_op.array_index;
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
@@ -2459,7 +2370,8 @@ void ngf_cmd_bind_compute_resources(
     }
     case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER: {
       const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
-      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get() : img_bind_op.resource.image->texture.get();
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get()
+                                                  : img_bind_op.resource.image->texture.get();
       cmd_buf->active_cce->setTexture(t, native_binding);
       cmd_buf->active_cce->setSamplerState(img_bind_op.sampler->sampler.get(), native_binding);
       break;
@@ -2470,13 +2382,19 @@ void ngf_cmd_bind_compute_resources(
       if (img_bind_op.is_image_view) {
         cmd_buf->active_cce->setTexture(img_bind_op.resource.view->view.get(), native_binding);
       } else {
-        if (const auto maybe_format = get_regular_format_from_srgb(img_bind_op.resource.image->format) ) {
+        if (const auto maybe_format =
+                get_regular_format_from_srgb(img_bind_op.resource.image->format)) {
           if (!img_bind_op.resource.image->non_srgb_view)
-            img_bind_op.resource.image->non_srgb_view = img_bind_op.resource.image->texture.get()->newTextureView(
-                                                                                                get_mtl_pixel_format(maybe_format.value()).format);
-          cmd_buf->active_cce->setTexture(img_bind_op.resource.image->non_srgb_view.get(), native_binding);
+            img_bind_op.resource.image->non_srgb_view =
+                img_bind_op.resource.image->texture.get()->newTextureView(
+                    get_mtl_pixel_format(maybe_format.value()).format);
+          cmd_buf->active_cce->setTexture(
+              img_bind_op.resource.image->non_srgb_view.get(),
+              native_binding);
         } else {
-          cmd_buf->active_cce->setTexture(img_bind_op.resource.image->texture.get(), native_binding);
+          cmd_buf->active_cce->setTexture(
+              img_bind_op.resource.image->texture.get(),
+              native_binding);
         }
       }
       break;
@@ -2487,7 +2405,9 @@ void ngf_cmd_bind_compute_resources(
       break;
     }
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
-      cmd_buf->active_cce->setAccelerationStructure((MTL::AccelerationStructure*)bind_op.info.acceleration_structure, native_binding);
+      cmd_buf->active_cce->setAccelerationStructure(
+          (MTL::AccelerationStructure*)bind_op.info.acceleration_structure,
+          native_binding);
       break;
     case NGF_DESCRIPTOR_TYPE_COUNT:
       assert(false);
@@ -2522,67 +2442,36 @@ void ngf_cmd_copy_buffer(
       src_offset,
       dst_offset);
 }
-                                      
+
 void ngf_cmd_write_image(
     ngf_xfer_encoder       enc,
     ngf_buffer             src,
     ngf_image              dst,
     const ngf_image_write* writes,
     uint32_t               nwrites) NGF_NOEXCEPT {
-        auto buf = NGFMTL_ENC2CMDBUF(enc);
+  auto buf = NGFMTL_ENC2CMDBUF(enc);
   assert(buf->active_rce == nil);
   for (size_t i = 0u; i < nwrites; ++i) {
     const ngf_image_write* w = &writes[i];
     for (uint32_t l = 0u; l < w->nlayers; ++l) {
-      const uint32_t pitch    = ngfmtl_get_pitch(w->extent.width , dst->format);
+      const uint32_t pitch    = ngfmtl_get_pitch(w->extent.width, dst->format);
       const uint32_t num_rows = ngfmtl_get_num_rows(w->extent.height, dst->format);
-      buf->active_bce->copyFromBuffer(src->mtl_buffer.get(),
-                                      w->src_offset + (l * pitch * num_rows),
-                                      pitch,
-                                      pitch * num_rows,
-                                      MTL::Size::Make(w->extent.width, w->extent.height, w->extent.depth),
-                                      dst->texture.get(),
-                                      w->dst_base_layer + l,
-                                      w->dst_level,
-                                      MTL::Origin::Make(
-                                                        (NS::UInteger)w->dst_offset.x,
-                                                        (NS::UInteger)w->dst_offset.y,
-                                                        (NS::UInteger)w->dst_offset.z));
+      buf->active_bce->copyFromBuffer(
+          src->mtl_buffer.get(),
+          w->src_offset + (l * pitch * num_rows),
+          pitch,
+          pitch * num_rows,
+          MTL::Size::Make(w->extent.width, w->extent.height, w->extent.depth),
+          dst->texture.get(),
+          w->dst_base_layer + l,
+          w->dst_level,
+          MTL::Origin::Make(
+              (NS::UInteger)w->dst_offset.x,
+              (NS::UInteger)w->dst_offset.y,
+              (NS::UInteger)w->dst_offset.z));
     }
   }
 }
-                
-/*
-void ngf_cmd_write_image(
-    ngf_xfer_encoder enc,
-    const ngf_buffer src,
-    size_t           src_offset,
-    ngf_image_ref    dst,
-    ngf_offset3d     offset,
-    ngf_extent3d     extent,
-    uint32_t         nlayers) NGF_NOEXCEPT {
-  auto buf = NGFMTL_ENC2CMDBUF(enc);
-  assert(buf->active_rce == nullptr);
-  const MTL::TextureType texture_type = dst.image->texture->textureType();
-  const bool             is_cubemap =
-      texture_type == MTL::TextureTypeCube || texture_type == MTL::TextureTypeCubeArray;
-  const uint32_t target_slice =
-      (is_cubemap ? 6u : 1u) * dst.layer + (is_cubemap ? dst.cubemap_face : 0);
-  const uint32_t pitch    = ngfmtl_get_pitch(extent.width, dst.image->format);
-  const uint32_t num_rows = ngfmtl_get_num_rows(extent.height, dst.image->format);
-  for (uint32_t l = 0; l < nlayers; ++l) {
-    buf->active_bce->copyFromBuffer(
-        src->mtl_buffer.get(),
-        src_offset + (l * pitch * num_rows),
-        pitch,
-        pitch * num_rows,
-        MTL::Size::Make(extent.width, extent.height, extent.depth),
-        dst.image->texture.get(),
-        target_slice + l,
-        dst.mip_level,
-        MTL::Origin::Make((NS::UInteger)offset.x, (NS::UInteger)offset.y, (NS::UInteger)offset.z));
-  }
-}*/
 
 void ngf_cmd_copy_image_to_buffer(
     ngf_xfer_encoder    enc,
@@ -2629,9 +2518,6 @@ ngf_error ngf_cmd_generate_mipmaps(ngf_xfer_encoder xfenc, ngf_image img) NGF_NO
   buf->active_bce->generateMipmaps(img->texture.get());
   return NGF_ERROR_OK;
 }
-#define PLACEHOLDER_CMD(name, ...)                    \
-  void ngf_cmd_##name(ngf_cmd_buffer*, __VA_ARGS__) { \
-  }
 
 void ngf_cmd_stencil_reference(ngf_render_encoder enc, uint32_t front, uint32_t back) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
@@ -2661,12 +2547,16 @@ void ngf_cmd_stencil_write_mask(ngf_render_encoder enc, uint32_t front, uint32_t
   cmd_buf->active_rce->setDepthStencilState(depth_stencil_state.get());
 }
 
-void ngf_cmd_set_depth_bias(ngf_render_encoder enc, float const_scale, float slope_scale, float clamp) NGF_NOEXCEPT {
+void ngf_cmd_set_depth_bias(
+    ngf_render_encoder enc,
+    float              const_scale,
+    float              slope_scale,
+    float              clamp) NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
   cmd_buf->active_rce->setDepthBias(const_scale, slope_scale, clamp);
 }
 
-void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buf,  const char* name) NGF_NOEXCEPT {
+void ngf_cmd_begin_debug_group(ngf_cmd_buffer cmd_buf, const char* name) NGF_NOEXCEPT {
   auto name_nsstr = NS::String::string(name, NS::ASCIIStringEncoding);
   cmd_buf->mtl_cmd_buffer->pushDebugGroup(name_nsstr);
 }
@@ -2737,16 +2627,22 @@ uintptr_t ngf_get_mtl_device() NGF_NOEXCEPT {
   return (uintptr_t)(void*)MTL_DEVICE;
 }
 
-void ngf_mtl_set_sample_attachment_for_next_render_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
-{
-  cmd_buffer->sample_buf_attachment_for_next_render_pass = ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>::add_retain(
-    static_cast< MTL::RenderPassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
-  );
+void ngf_mtl_set_sample_attachment_for_next_render_pass(
+    ngf_cmd_buffer cmd_buffer,
+    uintptr_t      sample_buf_attachment_descriptor) NGF_NOEXCEPT {
+  cmd_buffer->sample_buf_attachment_for_next_render_pass =
+      ngf_id<MTL::RenderPassSampleBufferAttachmentDescriptor>::add_retain(
+          static_cast<MTL::RenderPassSampleBufferAttachmentDescriptor*>(
+              (void*)sample_buf_attachment_descriptor));
 }
 
-void ngf_mtl_set_sample_attachment_for_next_compute_pass( ngf_cmd_buffer cmd_buffer, uintptr_t sample_buf_attachment_descriptor ) NGF_NOEXCEPT
-{
-  cmd_buffer->sample_buf_attachment_for_next_compute_pass = ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>::add_retain(
-    static_cast< MTL::ComputePassSampleBufferAttachmentDescriptor* >( (void*)sample_buf_attachment_descriptor )
-  );
+void ngf_mtl_set_sample_attachment_for_next_compute_pass(
+    ngf_cmd_buffer cmd_buffer,
+    uintptr_t      sample_buf_attachment_descriptor) NGF_NOEXCEPT {
+  cmd_buffer->sample_buf_attachment_for_next_compute_pass =
+      ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>::add_retain(
+          static_cast<MTL::ComputePassSampleBufferAttachmentDescriptor*>(
+              (void*)sample_buf_attachment_descriptor));
 }
+
+#include "ngf-common/create-destroy.cpp"

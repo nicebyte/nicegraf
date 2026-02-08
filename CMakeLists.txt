@@ -44,7 +44,7 @@ nmk_static_library(NAME nicegraf-internal
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/unique-ptr.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/value-or-error.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/cmdbuf-state.h
-                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.c
+                        ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/internal.cpp
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/util.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.h
                         ${CMAKE_CURRENT_LIST_DIR}/source/ngf-common/arena.cpp
@@ -120,6 +120,13 @@ else()
                      SRCS ${NICEGRAF_VK_SRCS}
                      PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/include
                      DEPS ${NICEGRAF_VK_DEPS})
+
+  if (NGF_BUILD_TESTS STREQUAL "yes")
+    nmk_binary(NAME vk-backend-tests
+               SRCS ${NICEGRAF_VK_SRCS}
+               DEPS utest ${NICEGRAF_VK_DEPS}
+               PVT_DEFINES NGFVK_TEST_MODE)
+  endif()
 endif()
 
 # Build tests only if explicitly requested.
@@ -129,10 +136,6 @@ if (NGF_BUILD_TESTS STREQUAL "yes")
   nmk_binary(NAME common-tests
              SRCS ${CMAKE_CURRENT_LIST_DIR}/tests/common-tests.cpp
              DEPS utest nicegraf-internal "$<IF:$<NOT:$<BOOL:${WIN32}>>,pthread,>")
-  nmk_binary(NAME vk-backend-tests
-             SRCS ${NICEGRAF_VK_SRCS}
-             DEPS utest ${NICEGRAF_VK_DEPS}
-             PVT_DEFINES NGFVK_TEST_MODE)
 endif()
 
 

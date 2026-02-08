@@ -16,6 +16,7 @@ template<class ValueT, class ErrorT> class value_or_error {
   ErrorT error_;
 
   public:
+  value_or_error(const ValueT& v) noexcept : error_{non_error<ErrorT>()} { new  (value_) ValueT { v }; }
   value_or_error(ValueT&& v) noexcept : error_{non_error<ErrorT>()} {
     new (value_) ValueT {ngfi::move(v)};
   }
@@ -60,6 +61,9 @@ template<class ValueT, class ErrorT> class value_or_error {
 
   value_or_error& operator=(const value_or_error&) = delete;
 
+  bool has_value() const noexcept {  return !has_error(); }
+  operator bool() const noexcept { return has_value(); }
+
   private:
   void maybe_destroy_value() noexcept {
     if (!has_error()) {
@@ -70,6 +74,7 @@ template<class ValueT, class ErrorT> class value_or_error {
 };
 
 template<class ValueT> using value_or_ngferr = value_or_error<ValueT, ngf_error>;
+template<class ValueT> using maybe_ngfptr = value_or_error<ngfi::unique_ptr<ValueT>, ngf_error>;
 
 template<> ngf_error missing_value_error<ngf_error>() noexcept {
   return NGF_ERROR_INVALID_OPERATION;

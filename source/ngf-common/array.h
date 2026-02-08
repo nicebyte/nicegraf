@@ -53,6 +53,9 @@ public:
   array() noexcept = default;
   explicit array(size_t size) : data_ {ngfi::allocn<T>(size)}, size_ {size}, capacity_ {size} {
   }
+  array(const T* src, size_t count) : array{count} {
+    if (data_) { memcpy (data_, src, sizeof(T)*size_); }
+  }
   array(array&& other) noexcept {
     *this = ngfi::move(other);
   }
