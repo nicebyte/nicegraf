@@ -2757,23 +2757,27 @@ void ngfvk_alloc::destroy() NGF_NOEXCEPT {
 }
 
 static ngf_error ngfvk_maybe_acquire_swapchain_image() {
-  if (CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE &&
-      CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) {
-    const VkResult acquire_result = vkAcquireNextImageKHR(
-        _vk.device,
-        CURRENT_CONTEXT->swapchain->vk_swapchain,
-        UINT64_MAX,
-        CURRENT_CONTEXT->swapchain->img_sems[CURRENT_CONTEXT->frame_id],
-        VK_NULL_HANDLE,
-        &CURRENT_CONTEXT->swapchain->image_idx);
-    if (acquire_result == VK_SUBOPTIMAL_KHR) {
-      NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
-    } else if (acquire_result != VK_SUCCESS) {
-      NGFI_DIAG_ERROR("failed to acquire swapchain image");
-      return NGF_ERROR_INVALID_OPERATION;
+  if (CURRENT_CONTEXT->swapchain &&
+      CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE) {
+    if (CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) {
+      const VkResult acquire_result = vkAcquireNextImageKHR(
+          _vk.device,
+          CURRENT_CONTEXT->swapchain->vk_swapchain,
+          UINT64_MAX,
+          CURRENT_CONTEXT->swapchain->img_sems[CURRENT_CONTEXT->frame_id],
+          VK_NULL_HANDLE,
+          &CURRENT_CONTEXT->swapchain->image_idx);
+      if (acquire_result == VK_SUBOPTIMAL_KHR) {
+        NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
+      } else if (acquire_result != VK_SUCCESS) {
+        NGFI_DIAG_ERROR("failed to acquire swapchain image");
+        return NGF_ERROR_INVALID_OPERATION;
+      }
     }
+    return NGF_ERROR_OK;
+  } else {
+    return NGF_ERROR_INVALID_OPERATION;
   }
-  return NGF_ERROR_OK;
 }
 
 ngfvk_swapchain::~ngfvk_swapchain() noexcept {
@@ -4499,8 +4503,9 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   frame_res->submitted_cmd_bufs.clear();
 
   // Transition the swapchain image to VK_IMAGE_LAYOUT_PRESENT_SRC if necessary.
-  const bool needs_present = wait_semaphore != VK_NULL_HANDLE;
+  const bool needs_present = CURRENT_CONTEXT->swapchain && wait_semaphore != VK_NULL_HANDLE;
   if (needs_present) {
+    if (CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) ngfvk_maybe_acquire_swapchain_image();
     ngf_image swapchain_image =
         CURRENT_CONTEXT->swapchain->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get();
     if (swapchain_image->sync_state.layout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
@@ -5437,6 +5442,7 @@ extern "C" void ngf_destroy_cmd_buffer(ngf_cmd_buffer buffer) NGF_NOEXCEPT {
     buffer->destroy_on_submit = true;
   }
 }
+
 extern "C" ngf_error
 ngf_submit_cmd_buffers(uint32_t nbuffers, ngf_cmd_buffer* cmd_bufs) NGF_NOEXCEPT {
   assert(cmd_bufs);
@@ -5482,7 +5488,9 @@ extern "C" ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   ngfvk_retire_resources(next_frame_res);
   next_frame_res->res_frame_arena.reset();
 
-  CURRENT_CONTEXT->swapchain->image_idx = ngfvk::global::invalid_idx;
+  if (CURRENT_CONTEXT->swapchain) {
+    CURRENT_CONTEXT->swapchain->image_idx = ngfvk::global::invalid_idx;
+  }
   CURRENT_CONTEXT->current_frame_token  = ngfi_encode_frame_token(
       (uint16_t)((uintptr_t)CURRENT_CONTEXT & 0xffff),
       (uint8_t)CURRENT_CONTEXT->max_inflight_frames,
@@ -5501,7 +5509,7 @@ ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NO
     NGFI_DIAG_ERROR("unexpected frame token");
     return NGF_ERROR_INVALID_OPERATION;
   }
-  if (CURRENT_CONTEXT->swapchain->vk_swapchain == VK_NULL_HANDLE) {
+  if (!CURRENT_CONTEXT->swapchain || CURRENT_CONTEXT->swapchain->vk_swapchain == VK_NULL_HANDLE) {
     NGFI_DIAG_ERROR(
         "requesting a swapchain image handle from a context that does not have a swapchain");
     return NGF_ERROR_INVALID_OPERATION;
@@ -5527,7 +5535,7 @@ extern "C" ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
 
   // Submit pending commands & present.
   VkSemaphore image_semaphore = VK_NULL_HANDLE;
-  const bool  needs_present   = CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE;
+  const bool  needs_present   = CURRENT_CONTEXT->swapchain && CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE;
   if (needs_present) { image_semaphore = CURRENT_CONTEXT->swapchain->img_sems[fi]; }
 
   ngf_error submit_result = ngfvk_submit_pending_cmd_buffers(
