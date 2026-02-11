@@ -4761,6 +4761,7 @@ ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT
           append_feature_struct(ngfdevinfo->accls_features);
           append_feature_struct(ngfdevinfo->ray_query_features);
         }
+        devcaps->supports_inline_raytracing = inline_ray_tracing_supported;
         ngfdevinfo->phys_dev_features2 = VkPhysicalDeviceFeatures2 {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
             .pNext = features_structs};
