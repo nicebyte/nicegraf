@@ -1614,7 +1614,7 @@ ngf_shader_stage_t::make(const ngf_shader_stage_info& info) NGF_NOEXCEPT {
             .get());
   }
   stage->entry_point_name =
-      ngfi::fixed_array {info.entry_point_name, strlen(info.entry_point_name)};
+      ngfi::fixed_array {info.entry_point_name, strlen(info.entry_point_name) + 1};
   return ngfi::move(stage);
 }
 
@@ -2110,9 +2110,8 @@ void ngf_cmd_dispatch(
   }
   const uint32_t* threadgroup_size =
       cmd_buf->active_compute_pipe->niceshade_metadata.threadgroup_size;
-  cmd_buf->active_cce->dispatchThreadgroups(
-      MTL::Size::Make(x_threadgroups, y_threadgroups, z_threadgroups),
-      MTL::Size::Make(threadgroup_size[0], threadgroup_size[1], threadgroup_size[2]));
+      cmd_buf->active_cce->dispatchThreadgroups(MTL::Size::Make(x_threadgroups, y_threadgroups, z_threadgroups),
+                                                MTL::Size::Make(threadgroup_size[0], threadgroup_size[1], threadgroup_size[2]));
 }
 
 void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeline pipeline)
