@@ -62,7 +62,13 @@ ngf_error ngf_create_render_target(const ngf_render_target_info* info, ngf_rende
 }
 
 void ngf_destroy_render_target(ngf_render_target rt) NGF_NOEXCEPT {
-  if (rt != nullptr) { NGFI_FREE(rt); }
+  if (rt != nullptr) { 
+    if (target->is_default) {
+      NGFI_DIAG_ERROR("default RT can only be destroyed by owning context\n");
+      return;
+    }
+    NGFI_FREE(rt);
+   }
 }
 
 ngf_error ngf_create_compute_pipeline(
