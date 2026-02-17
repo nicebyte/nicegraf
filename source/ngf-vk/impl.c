@@ -2025,10 +2025,11 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
     vk_attachment_desc->samples = get_vk_sample_count(ngf_attachment_desc->sample_count);
     vk_attachment_desc->loadOp  = attachment_pass_desc->load_op;
     vk_attachment_desc->storeOp = attachment_pass_desc->store_op;
+    const bool has_stencil = ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL;
     vk_attachment_desc->stencilLoadOp =
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // attachment_pass_desc->load_op;
+        has_stencil ? attachment_pass_desc->load_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     vk_attachment_desc->stencilStoreOp =
-        VK_ATTACHMENT_STORE_OP_DONT_CARE;  // attachment_pass_desc->store_op;
+        has_stencil ? attachment_pass_desc->store_op : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     vk_attachment_desc->initialLayout = attachment_pass_desc->layout;
     vk_attachment_desc->finalLayout   = attachment_pass_desc->layout;
 
@@ -4622,7 +4623,8 @@ ngf_error ngf_cmd_begin_render_pass_simple(
       clears[i].clear_color[1] = clear_color_g;
       clears[i].clear_color[2] = clear_color_b;
       clears[i].clear_color[3] = clear_color_a;
-    } else if (rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH) {
+    } else if (rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH ||
+               rt->attachment_descs[i].type == NGF_ATTACHMENT_DEPTH_STENCIL) {
       clears[i].clear_depth_stencil.clear_depth   = clear_depth;
       clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
     } else {

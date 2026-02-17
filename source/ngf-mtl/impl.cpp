@@ -1978,7 +1978,8 @@ ngf_error ngf_cmd_begin_render_pass_simple(
       clears[i].clear_color[1] = clear_color_g;
       clears[i].clear_color[2] = clear_color_b;
       clears[i].clear_color[3] = clear_color_a;
-    } else if (rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_DEPTH) {
+    } else if (rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_DEPTH ||
+               rt->attachment_descs.descs[i].type == NGF_ATTACHMENT_DEPTH_STENCIL) {
       clears[i].clear_depth_stencil.clear_depth   = clear_depth;
       clears[i].clear_depth_stencil.clear_stencil = clear_stencil;
     } else {
