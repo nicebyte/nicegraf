@@ -3009,6 +3009,21 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
+ * 
+ * Marks the given resources as "read-only". Once a resource has been marked as read-only,
+ * nicegraf's internal hazard-tracking operations may be omitted for it, improving CPU
+ * performance. Performing any modifying operations on a resource that had previously been
+ * marked as "read-only" results in undefined behaviour.
+ * 
+ * @param img A pointer to an array of handles to images, which are to be marked as read-only.
+ * @param nimgs The number of images to be marked as read-only.
+ * @param bufs A pointer to an array of handles to buffers, which are to be marked as read-only.
+ * @param nbufs The number of buffers to be marked as read-only.
+ */
+void ngf_mark_read_only(ngf_image* imgs, uint32_t nimgs, ngf_buffer* bufs, uint32_t nbufs) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
  *
  * Creates a new command buffer.
  *

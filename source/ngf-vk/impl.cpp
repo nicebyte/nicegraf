@@ -345,6 +345,7 @@ struct ngfvk_sync_state {
   ngfvk_sync_barrier_masks active_readers_masks;
   uint32_t                 per_stage_readers_mask;
   VkImageLayout            layout;
+  bool                     skip_hazard_tracking;
 };
 
 // Type of synchronized resource.
@@ -3896,6 +3897,14 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
     ngf_cmd_buffer        cmd_buf,
     const ngfvk_sync_res* res,
     const ngfvk_sync_req* sync_req) {
+  switch(res->type) { // Ignore resources marked as read-only.
+  case NGFVK_SYNC_RES_BUFFER:
+      if (res->data.buf->sync_state.skip_hazard_tracking) return false;
+      break;
+  case NGFVK_SYNC_RES_IMAGE:
+      if (res->data.img->sync_state.skip_hazard_tracking) return false;
+      break;
+  }
   ngfvk_sync_res_data* sync_res_data;
 
   const bool fresh = ngfvk_cmd_buf_lookup_sync_res(cmd_buf, res, &sync_res_data);
@@ -4462,7 +4471,9 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
             CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id].res_frame_arena);
       }
       if (cmd_buf_res_state->sync_state.last_writer_masks.access_mask != 0) {
+        const bool skip_hazard_tracking = global_sync_state->skip_hazard_tracking;
         *global_sync_state = cmd_buf_res_state->sync_state;
+        global_sync_state->skip_hazard_tracking = skip_hazard_tracking;
       } else {
         global_sync_state->active_readers_masks.access_mask |=
             cmd_buf_res_state->sync_state.active_readers_masks.access_mask;
@@ -4580,6 +4591,21 @@ void* ngfvk_create_ca_metal_layer(const ngf_swapchain_info*);
 #endif
 
 void ngfi_dump_sys_alloc_dbgstats(FILE* out);
+
+static bool ngfi_skip_hazard_tracking_for_bind_op(const ngf_resource_bind_op& op) {
+  switch (op.type) {
+  case NGF_DESCRIPTOR_UNIFORM_BUFFER:
+  case NGF_DESCRIPTOR_STORAGE_BUFFER:
+    return op.info.buffer.buffer->sync_state.skip_hazard_tracking;
+  case NGF_DESCRIPTOR_STORAGE_IMAGE:
+  case NGF_DESCRIPTOR_IMAGE:
+  case NGF_DESCRIPTOR_IMAGE_AND_SAMPLER:
+    return !op.info.image_sampler.is_image_view
+            ? op.info.image_sampler.resource.image->sync_state.skip_hazard_tracking
+            : op.info.image_sampler.resource.view->src->sync_state.skip_hazard_tracking;
+  default: return false;
+  }
+}
 
 #pragma endregion
 
@@ -5785,6 +5811,11 @@ extern "C" void ngf_cmd_bind_resources(
         cmd,
         CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id].res_frame_arena);
 
+    // Check if the bound resource is marked as read-only.
+    // Do not add such resources to the cmd buffer's virt_bind_ops_ranges.
+    // This will preclude hazard tracking from occurring for said resources.
+    if (ngfi_skip_hazard_tracking_for_bind_op(bind_operations[i])) { continue; }
+
     // Check if this command is contiguous with the previous one (same chunk)
     if (prev_cmd != nullptr && cmd_ptr != prev_cmd + 1) {
       // New chunk started, flush current range
@@ -5794,7 +5825,7 @@ extern "C" void ngf_cmd_bind_resources(
             CURRENT_CONTEXT->frame_res[CURRENT_CONTEXT->frame_id].res_frame_arena);
       }
       curr_range.start = cmd_ptr;
-      curr_range.count = 0u;
+      curr_range.count = 0u; // 0 is intentional, we increment count at the end of loop.
     } else if (curr_range.start == nullptr) {
       // First command
       curr_range.start = cmd_ptr;
@@ -6290,6 +6321,12 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
     ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
   }
   vkDeviceWaitIdle(_vk.device);
+}
+
+extern "C" void
+ngf_mark_read_only(ngf_image* imgs, uint32_t nimgs, ngf_buffer* bufs, uint32_t nbufs) NGF_NOEXCEPT {
+  for (size_t i = 0u; i < nimgs; ++i) { imgs[i]->sync_state.skip_hazard_tracking = true; }
+  for (size_t i = 0u; i < nbufs; ++i) { bufs[i]->sync_state.skip_hazard_tracking = true; }
 }
 
 extern "C" void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
