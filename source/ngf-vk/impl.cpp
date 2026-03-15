@@ -1466,6 +1466,7 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
   for (uint32_t a = 0u; a < nattachments; ++a) {
     const ngf_attachment_description* ngf_attachment_desc  = &attachment_descs[a];
     const ngfvk_attachment_pass_desc* attachment_pass_desc = &attachment_compat_pass_descs[a];
+    const bool has_stencil = ngf_attachment_desc->type == NGF_ATTACHMENT_DEPTH_STENCIL;
     VkAttachmentDescription*          vk_attachment_desc   = &vk_attachment_descs[a];
 
     vk_attachment_desc->flags   = 0u;
@@ -1473,10 +1474,8 @@ static VkResult ngfvk_renderpass_from_attachment_descs(
     vk_attachment_desc->samples = get_vk_sample_count(ngf_attachment_desc->sample_count);
     vk_attachment_desc->loadOp  = attachment_pass_desc->load_op;
     vk_attachment_desc->storeOp = attachment_pass_desc->store_op;
-    vk_attachment_desc->stencilLoadOp =
-        VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // attachment_pass_desc->load_op;
-    vk_attachment_desc->stencilStoreOp =
-        VK_ATTACHMENT_STORE_OP_DONT_CARE;  // attachment_pass_desc->store_op;
+    vk_attachment_desc->stencilLoadOp = has_stencil ? attachment_pass_desc->load_op : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    vk_attachment_desc->stencilStoreOp = has_stencil ? attachment_pass_desc->store_op : VK_ATTACHMENT_STORE_OP_DONT_CARE;
     vk_attachment_desc->initialLayout = attachment_pass_desc->layout;
     vk_attachment_desc->finalLayout   = attachment_pass_desc->layout;
 
