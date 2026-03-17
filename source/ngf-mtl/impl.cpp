@@ -2076,10 +2076,11 @@ ngf_error ngf_cmd_begin_render_pass(
       break;
     }
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
+      const uint32_t ds_image_idx = render_image_idx++;
       ngf_id<MTL::RenderPassDepthAttachmentDescriptor> mtl_depth_desc = id_default;
       ngfmtl_attachment_set_common(
           mtl_depth_desc.get(),
-          render_image_idx++,
+          ds_image_idx,
           attachment_desc.type,
           rt,
           load_op,
@@ -2091,7 +2092,7 @@ ngf_error ngf_cmd_begin_render_pass(
       ngf_id<MTL::RenderPassStencilAttachmentDescriptor> mtl_stencil_desc = id_default;
       ngfmtl_attachment_set_common(
           mtl_stencil_desc.get(),
-          render_image_idx++,
+          ds_image_idx,
           attachment_desc.type,
           rt,
           load_op,
