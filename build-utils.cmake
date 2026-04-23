@@ -85,6 +85,7 @@ function (nmk_target)
     if ( TGT_COPTS )
       target_compile_options(${TGT_NAME} PRIVATE ${TGT_COPTS})
     endif()
+    set_target_properties(${TGT_NAME} PROPERTIES COMPILE_WARNING_AS_ERROR ON)
   endif()
 
   # Set output directory.

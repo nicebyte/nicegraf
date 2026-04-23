@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.23.3)
+cmake_minimum_required(VERSION 3.24)
 project(nicegraf)
 
 
@@ -31,10 +31,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake")
 
 # These are the compiler flags that are used on all nicegraf targets.
 if(MSVC)
-    set (NICEMAKE_COMMON_COMPILE_OPTS "/W4" "/WX")
+    set(NICEMAKE_COMMON_COMPILE_OPTS "/W4")
 else()
-	set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Werror" "-Wno-error=comment")
+    set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Wno-error=comment")
 endif()
+
 set(NICEGRAF_COMMON_DEPS nicegraf-internal)
 
 # A library with various utilities shared internally across different backends.
