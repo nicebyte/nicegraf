@@ -27,12 +27,15 @@ SOFTWARE.
 #    - `hdr`, for a header-only library;
 #    - `exe`, for an executable binary.
 #  SRCS - a list of source files for the target.
+#  DEPS - a list of dependencies for the target.
 #  COPTS - a list of compiler options.
+#  PUB_DEPS - a list of dependencies to add to the interface of this target.
 #  PVT_INCLUDES - a list of paths to add to this target's include paths.
 #  PUB_INCLUDES - a list of paths to add to the include paths of all targets depending on this target.
 #  PVT_DEFINES  - a list of preprocessor definitions to add for this target.
 #  PUB_DEFINES  - a list of preprocessor definitions to add to all targets depending on this target.
 #  OUTPUT_DIR   - the path to the folder where the output for this target shall be stored.
+#  VS_DEBUGGER_WORKING_DIR - the working directory for the Visual Studio debugger.
 function (nmk_target)
 	cmake_parse_arguments(TGT "" "NAME;TYPE" "SRCS;DEPS;COPTS;PUB_INCLUDES;PVT_INCLUDES;PUB_DEFINES;PUB_DEPS;PVT_DEFINES;OUTPUT_DIR;VS_DEBUGGER_WORKING_DIR" ${ARGN})
   if (TGT_TYPE STREQUAL "lib")
