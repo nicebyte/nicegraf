@@ -3009,57 +3009,37 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- *
- * Configuration for a "global" push-constant block, accessible from every pipeline created
- * by the current context after registration. See \ref ngf_register_global_push_constants.
+ * Configuration for the global push-constant block. See \ref ngf_register_global_push_constants.
  */
 typedef struct ngf_global_push_constants_info {
-  size_t size_bytes; /**< Size of the push-constant block, in bytes. Must be <= 128 for
-                          guaranteed cross-vendor portability on Vulkan. */
+  size_t size_bytes; /**< Block size in bytes. Must be <= 128 for cross-vendor portability. */
 } ngf_global_push_constants_info;
 
 /**
  * \ingroup ngf
+ * Registers a global push-constant block with the current context.
  *
- * Registers a "global" push-constant block with the current context.
+ * Every pipeline created afterwards bakes in a matching push-constant range covering all
+ * stages. Shaders opt in by declaring a `[[vk::push_constant]]` block of matching layout;
+ * shaders that don't reference it pay no runtime cost. Contents are auto-pushed before each
+ * draw and dispatch — call \ref ngf_update_global_push_constants to update them.
  *
- * Once registered, every pipeline created subsequently by the current context shall declare a
- * push-constant range of the requested size, covering all shader stages. Shaders that opt-in
- * (by declaring a `[[vk::push_constant]]` block of matching layout) can read its contents.
- * Shaders that don't reference the block pay no runtime cost.
- *
- * The current contents of the global block are pushed automatically before each draw and
- * dispatch. Use \ref ngf_update_global_push_constants to update them.
- *
- * Must be called before any pipeline is created in the current context. Pipelines created
- * before registration do not have the range and shall be skipped by the auto-push hook.
- *
- * @param info Configuration for the global block.
+ * Must be called before any pipeline is created. Pipelines created earlier are skipped by
+ * the auto-push hook.
  */
 ngf_error ngf_register_global_push_constants(const ngf_global_push_constants_info* info) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- *
- * Updates the contents of the "global" push-constant block registered with the current context.
- *
- * The data is copied into the context; subsequent draws and dispatches in any command buffer
- * recorded against the current context shall observe the updated values. Typically called once
- * per frame.
- *
- * @param data Pointer to the new contents.
- * @param size_bytes Size of the new contents, in bytes. Must equal the size that was passed to
- *                   \ref ngf_register_global_push_constants.
+ * Updates the global push-constant block contents on the current context. Typically once
+ * per frame. `size_bytes` must match the registered size.
  */
 void ngf_update_global_push_constants(const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- *
- * Unregisters the "global" push-constant block from the current context.
- *
- * Pipelines already created retain their push-constant range (no-op at runtime). Pipelines
- * created after this call do not have the range. Safe to call without a prior register.
+ * Unregisters the global push-constant block. Already-built pipelines keep their range
+ * (harmless); subsequent ones get no range. Safe to call without a prior register.
  */
 void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT;
 

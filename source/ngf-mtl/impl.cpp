@@ -582,9 +582,6 @@ struct ngfmtl_niceshade_metadata {
   uint32_t                           threadgroup_size[3];
 };
 
-// Looks up the Metal buffer slot the global push-constant block was assigned to in this
-// pipeline's niceshade binding map. Returns ~0u if the shader doesn't reference it.
-// Defined later, used by the pipeline-bind functions below.
 static uint32_t ngfmtl_lookup_global_pc_slot(const ngfmtl_niceshade_metadata& metadata);
 
 struct ngf_shader_stage_t {
@@ -857,12 +854,10 @@ class ngfmtl_swapchain {
   bool                              compute_access_enabled_;
 };
 
-// Maximum supported size of the global push-constant block, in bytes. Matches the Vulkan
-// portable maximum so app-side struct layouts stay consistent across backends.
+// Matches the Vulkan portable maximum so app-side layouts stay consistent across backends.
 static constexpr size_t NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE = 128u;
-// Reserved (set, binding) for the global push-constant block on the Metal path. Shaders
-// declare `[[vk::binding(0, 15)]] cbuffer DebugParamsBuf { ... }` and niceshade emits a
-// matching native_binding_map entry.
+// Reserved (set, binding) the shader uses to declare the global block on the Metal path
+// (no native push_constant primitive exists). niceshade maps this to a Metal buffer slot.
 static constexpr uint32_t NGFMTL_GLOBAL_PC_SET     = 15u;
 static constexpr uint32_t NGFMTL_GLOBAL_PC_BINDING = 0u;
 
@@ -878,8 +873,7 @@ struct ngf_context_t {
   dispatch_semaphore_t       frame_sync_sem     = nullptr;
   ngf_render_target          default_rt;
 
-  // Global push-constant block. global_pc_size == 0 means unregistered.
-  uint32_t global_pc_size = 0u;
+  uint32_t global_pc_size = 0u;  // 0 means unregistered.
   uint8_t  global_pc_data[NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE] = {};
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info&) NGF_NOEXCEPT;
@@ -2102,14 +2096,11 @@ void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline
   cmd_buf->active_cce->setComputePipelineState(pipeline->pipeline.get());
   cmd_buf->active_compute_pipe = pipeline;
 
-  // Auto-push the global push-constant block, if the shader references it.
-  if (CURRENT_CONTEXT && CURRENT_CONTEXT->global_pc_size > 0u) {
+  if (CURRENT_CONTEXT->global_pc_size > 0u) {
     const uint32_t slot = ngfmtl_lookup_global_pc_slot(pipeline->niceshade_metadata);
     if (slot != ~0u) {
       cmd_buf->active_cce->setBytes(
-          CURRENT_CONTEXT->global_pc_data,
-          CURRENT_CONTEXT->global_pc_size,
-          slot);
+          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
     }
   }
 }
@@ -2158,19 +2149,13 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
       pipeline->back_stencil_reference);
   buf->active_gfx_pipe = pipeline;
 
-  // Auto-push the global push-constant block to both vertex and fragment stages, if the
-  // shader references it.
-  if (CURRENT_CONTEXT && CURRENT_CONTEXT->global_pc_size > 0u) {
+  if (CURRENT_CONTEXT->global_pc_size > 0u) {
     const uint32_t slot = ngfmtl_lookup_global_pc_slot(pipeline->niceshade_metadata);
     if (slot != ~0u) {
       buf->active_rce->setVertexBytes(
-          CURRENT_CONTEXT->global_pc_data,
-          CURRENT_CONTEXT->global_pc_size,
-          slot);
+          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
       buf->active_rce->setFragmentBytes(
-          CURRENT_CONTEXT->global_pc_data,
-          CURRENT_CONTEXT->global_pc_size,
-          slot);
+          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
     }
   }
 }
@@ -2615,12 +2600,9 @@ void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
 }
 
-// Global push-constant API.
-// On Metal, shaders declare the block as a regular cbuffer at (set 15, binding 0) gated by
-// TARGET_METAL in Common/Debug.hlsli. niceshade emits a native_binding_map entry mapping
-// (15, 0) -> Metal buffer slot. We push the cached payload via setVertexBytes /
-// setFragmentBytes / setBytes per pipeline bind, so every draw / dispatch sees the latest
-// data without allocating a buffer.
+// Metal has no native push-constant primitive. Shaders declare the block as a regular
+// cbuffer at (NGFMTL_GLOBAL_PC_SET, NGFMTL_GLOBAL_PC_BINDING); the cached payload is
+// pushed inline via setVertexBytes / setFragmentBytes / setBytes per pipeline bind.
 ngf_error ngf_register_global_push_constants(
     const ngf_global_push_constants_info* info) NGF_NOEXCEPT {
   if (!CURRENT_CONTEXT) {
@@ -2674,8 +2656,7 @@ void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT {
   CURRENT_CONTEXT->global_pc_size = 0u;
 }
 
-// Returns the Metal buffer slot for the global push-constant block in the given pipeline,
-// or ~0u if the pipeline doesn't reference it (no entry in the binding map for set 15).
+// Returns ~0u if the shader doesn't reference the global block.
 static uint32_t ngfmtl_lookup_global_pc_slot(const ngfmtl_niceshade_metadata& metadata) {
   if (metadata.native_binding_map.size() <= NGFMTL_GLOBAL_PC_SET) return ~0u;
   const auto& set_map = metadata.native_binding_map[NGFMTL_GLOBAL_PC_SET];
