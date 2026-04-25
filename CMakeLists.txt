@@ -127,6 +127,7 @@ else()
                SRCS ${NICEGRAF_VK_SRCS}
                DEPS utest ${NICEGRAF_VK_DEPS}
                PVT_DEFINES NGFVK_TEST_MODE)
+    set_target_properties(vk-backend-tests PROPERTIES COMPILE_WARNING_AS_ERROR NO)
   endif()
 endif()
 
