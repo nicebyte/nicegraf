@@ -3904,6 +3904,7 @@ static bool ngfvk_sync_req_batch_add_with_lookup(
   case NGFVK_SYNC_RES_IMAGE:
       if (res->data.img->sync_state.skip_hazard_tracking) return false;
       break;
+  default:;
   }
   ngfvk_sync_res_data* sync_res_data;
 
