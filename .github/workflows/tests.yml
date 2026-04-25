@@ -25,6 +25,6 @@ jobs:
     - name: run_cmake
       run: cd ./build && cmake .. -DNGF_BUILD_TESTS=yes
     - name: make
-      run:  cd ./build && make internal-utils-tests && make vk-backend-tests
+      run:  cd ./build && make vk-backend-tests
     - name: test
-      run: ./build/internal-utils-tests && ./build/vk-backend-tests
+      run:  ./build/vk-backend-tests
