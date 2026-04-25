@@ -2377,7 +2377,7 @@ ngf_error ngfvk_generic_pipeline::common_init(
   uint32_t last_set_id    = ~0u;
   for (uint32_t cur = 0u; cur < nunique_bindings;) {
     ngfvk_desc_set_layout set_layout;
-    memset(&set_layout, 0, sizeof(set_layout));
+    memset((void*)&set_layout, 0, sizeof(set_layout));
     const uint32_t current_set_id = bindings[cur].binding_data.set;
     if (last_set_id == ~0u || current_set_id - last_set_id > 1u) {
       // there is a gap in descriptor sets, fill it in with empty layouts;
