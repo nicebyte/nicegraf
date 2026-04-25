@@ -310,6 +310,9 @@ struct ngfvk_generic_pipeline {
   VkPipelineLayout                   vk_pipeline_layout;
   VkSpecializationInfo               vk_spec_info;
   VkRenderPass                       compat_render_pass;
+  // Size, in bytes, of the global push-constant range baked into vk_pipeline_layout.
+  // Zero means the layout was created without the global range (no push needed at bind time).
+  uint32_t                           global_pc_size = 0u;
 
   static ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
   make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT;
@@ -550,6 +553,10 @@ struct ngf_image_view_t {
   ~ngf_image_view_t() NGF_NOEXCEPT;
 };
 
+// Maximum supported size of the global push-constant block, in bytes. Vulkan guarantees
+// maxPushConstantsSize >= 128, so this is the portable upper bound.
+static constexpr size_t NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE = 128u;
+
 struct ngf_context_t {
   ngfi::unique_ptr<ngfvk_swapchain>     swapchain;
   ngf_swapchain_info                    swapchain_info;
@@ -564,6 +571,11 @@ struct ngf_context_t {
   ngfi::array<ngfvk_command_superpool>      command_superpools;
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
+
+  // Global push-constant block. global_pc_size == 0 means unregistered.
+  // Host-side alignment doesn't matter: vkCmdPushConstants copies the bytes by value.
+  uint32_t global_pc_size = 0u;
+  uint8_t  global_pc_data[NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE] = {};
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
   ~ngf_context_t() noexcept;
@@ -2445,17 +2457,29 @@ ngf_error ngfvk_generic_pipeline::common_init(
 
   // Pipeline layout.
   const uint32_t ndescriptor_sets = static_cast<uint32_t>(descriptor_set_layouts.size());
+
+  // If a global push-constant block is registered with the current context, bake it into
+  // every pipeline layout we create. Pipelines that don't read it pay zero cost; ones that
+  // declare a [[vk::push_constant]] block get auto-pushed contents per draw/dispatch.
+  const uint32_t        ctx_global_pc_size = CURRENT_CONTEXT ? CURRENT_CONTEXT->global_pc_size : 0u;
+  VkPushConstantRange   global_pc_range    = {};
+  if (ctx_global_pc_size > 0u) {
+    global_pc_range.stageFlags = VK_SHADER_STAGE_ALL;
+    global_pc_range.offset     = 0u;
+    global_pc_range.size       = ctx_global_pc_size;
+  }
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
       .setLayoutCount         = ndescriptor_sets,
       .pSetLayouts            = vk_set_layouts,
-      .pushConstantRangeCount = 0u,
-      .pPushConstantRanges    = NULL};
+      .pushConstantRangeCount = ctx_global_pc_size > 0u ? 1u : 0u,
+      .pPushConstantRanges    = ctx_global_pc_size > 0u ? &global_pc_range : NULL};
   const VkResult vk_err =
       vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL, &vk_pipeline_layout);
   if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  global_pc_size = ctx_global_pc_size;
 
   return NGF_ERROR_OK;
 }
@@ -3354,6 +3378,23 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
           NULL);
     }
   }
+
+  // Auto-push the global push-constant block, if the pipeline layout was built with one and
+  // the context still has a registration of matching size. Pushing extra bytes would violate
+  // the layout's declared range, so we only push the minimum of the two sizes.
+  if (pipeline_data->global_pc_size > 0u && CURRENT_CONTEXT &&
+      CURRENT_CONTEXT->global_pc_size > 0u) {
+    const uint32_t push_size =
+        NGFI_MIN(pipeline_data->global_pc_size, CURRENT_CONTEXT->global_pc_size);
+    vkCmdPushConstants(
+        cmd_buf->vk_cmd_buffer,
+        pipeline_data->vk_pipeline_layout,
+        VK_SHADER_STAGE_ALL,
+        0u,
+        push_size,
+        CURRENT_CONTEXT->global_pc_data);
+  }
+
   ngfvk_cleanup_pending_binds(cmd_buf);
 }
 
@@ -6322,6 +6363,61 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
     ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
   }
   vkDeviceWaitIdle(_vk.device);
+}
+
+extern "C" ngf_error ngf_register_global_push_constants(
+    const ngf_global_push_constants_info* info) NGF_NOEXCEPT {
+  if (!CURRENT_CONTEXT) {
+    NGFI_DIAG_ERROR("ngf_register_global_push_constants called without a current context");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  if (!info || info->size_bytes == 0u) {
+    NGFI_DIAG_ERROR("ngf_register_global_push_constants requires a non-zero size");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  if (info->size_bytes > NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE) {
+    NGFI_DIAG_ERROR(
+        "global push-constant block size %zu exceeds portable max %zu",
+        info->size_bytes,
+        NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE);
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  // Push constants must be a multiple of 4 bytes per spec.
+  if ((info->size_bytes & 0x3u) != 0u) {
+    NGFI_DIAG_ERROR(
+        "global push-constant block size %zu must be a multiple of 4 bytes",
+        info->size_bytes);
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  CURRENT_CONTEXT->global_pc_size = static_cast<uint32_t>(info->size_bytes);
+  memset(CURRENT_CONTEXT->global_pc_data, 0, sizeof(CURRENT_CONTEXT->global_pc_data));
+  return NGF_ERROR_OK;
+}
+
+extern "C" void
+ngf_update_global_push_constants(const void* data, size_t size_bytes) NGF_NOEXCEPT {
+  if (!CURRENT_CONTEXT) {
+    NGFI_DIAG_ERROR("ngf_update_global_push_constants called without a current context");
+    return;
+  }
+  if (CURRENT_CONTEXT->global_pc_size == 0u) {
+    NGFI_DIAG_ERROR(
+        "ngf_update_global_push_constants called before ngf_register_global_push_constants");
+    return;
+  }
+  if (size_bytes != CURRENT_CONTEXT->global_pc_size) {
+    NGFI_DIAG_ERROR(
+        "ngf_update_global_push_constants size mismatch: got %zu, expected %u",
+        size_bytes,
+        CURRENT_CONTEXT->global_pc_size);
+    return;
+  }
+  memcpy(CURRENT_CONTEXT->global_pc_data, data, size_bytes);
+}
+
+extern "C" void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT {
+  if (!CURRENT_CONTEXT) return;
+  CURRENT_CONTEXT->global_pc_size = 0u;
 }
 
 extern "C" void
