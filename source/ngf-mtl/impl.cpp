@@ -219,15 +219,8 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTL::PixelFormatASTC_12x12_sRGB, 128, true, 12, 12},
 #endif
     {MTL::PixelFormatDepth32Float, 32},
-#if TARGET_OS_OSX
     {MTL::PixelFormatDepth16Unorm, 16},
-    {MTL::PixelFormatDepth32Float_Stencil8, 32},  // instead of 24Unorm_Stencil8,
-                                                  // because metal validator doesn't
-                                                  // like it for some reason...
-#else
-    {},                                           // DEPTH16, iOS does not support.
     {MTL::PixelFormatDepth32Float_Stencil8, 32},  // Emulate DEPTH24_STENCIL8 on iOS
-#endif
     {}
   };
   return formats[f];
@@ -1963,10 +1956,11 @@ ngf_error ngf_cmd_begin_render_pass(
       break;
     }
     case NGF_ATTACHMENT_DEPTH_STENCIL: {
+      const uint32_t ds_image_idx = render_image_idx++;
       ngf_id<MTL::RenderPassDepthAttachmentDescriptor> mtl_depth_desc = id_default;
       ngfmtl_attachment_set_common(
           mtl_depth_desc.get(),
-          render_image_idx++,
+          ds_image_idx,
           attachment_desc.type,
           rt,
           load_op,
@@ -1978,7 +1972,7 @@ ngf_error ngf_cmd_begin_render_pass(
       ngf_id<MTL::RenderPassStencilAttachmentDescriptor> mtl_stencil_desc = id_default;
       ngfmtl_attachment_set_common(
           mtl_stencil_desc.get(),
-          render_image_idx++,
+          ds_image_idx,
           attachment_desc.type,
           rt,
           load_op,
