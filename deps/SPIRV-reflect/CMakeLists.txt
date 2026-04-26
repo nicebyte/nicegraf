@@ -8,4 +8,4 @@ add_library(spvreflect STATIC
   ${CMAKE_CURRENT_LIST_DIR}/spirv_reflect.h
   ${CMAKE_CURRENT_LIST_DIR}/spirv_reflect.c)
 
-target_include_directories(spvreflect PUBLIC ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(spvreflect SYSTEM PUBLIC ${CMAKE_CURRENT_LIST_DIR})
