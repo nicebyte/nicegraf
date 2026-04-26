@@ -30,10 +30,14 @@ set(CMAKE_CXX_STANDARD 20)
 include("${CMAKE_CURRENT_LIST_DIR}/build-utils.cmake")
 
 # These are the compiler flags that are used on all nicegraf targets.
-if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+if(MSVC)
     set(NICEMAKE_COMMON_COMPILE_OPTS "/W4")
 else()
-    set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Wno-error=comment" "-Wno-unknown-warning-option" "-Wno-missing-designated-field-initializers")
+    set(NICEMAKE_COMMON_COMPILE_OPTS "-Wall" "-Wconversion" "-Wno-unknown-pragmas" "-Wno-error=comment")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    list(APPEND NICEMAKE_COMMON_COMPILE_OPTS "-Wno-unknown-warning-option" "-Wno-missing-designated-field-initializers")
 endif()
 
 set(NICEGRAF_COMMON_DEPS nicegraf-internal)
