@@ -2613,7 +2613,7 @@ static void ngfmtl_capture_push_constants(
   }
   if (size_bytes > NGF_PUSH_CONSTANTS_MAX_SIZE || (size_bytes & 0x3u) != 0u) {
     NGFI_DIAG_ERROR(
-        "ngf_cmd_push_constants: size %zu must be <= %u and a multiple of 4",
+        "push-constant size %zu must be <= %u and a multiple of 4",
         size_bytes,
         NGF_PUSH_CONSTANTS_MAX_SIZE);
     return;
