@@ -310,8 +310,6 @@ struct ngfvk_generic_pipeline {
   VkPipelineLayout                   vk_pipeline_layout;
   VkSpecializationInfo               vk_spec_info;
   VkRenderPass                       compat_render_pass;
-  // Size of the global push-constant range baked into vk_pipeline_layout, 0 if absent.
-  uint32_t                           global_pc_size = 0u;
 
   static ngfi::maybe_ngfptr<ngfvk_generic_pipeline>
   make(const ngf_graphics_pipeline_info& info) NGF_NOEXCEPT;
@@ -552,9 +550,6 @@ struct ngf_image_view_t {
   ~ngf_image_view_t() NGF_NOEXCEPT;
 };
 
-// Vulkan guarantees maxPushConstantsSize >= 128, so this is the portable upper bound.
-static constexpr size_t NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE = 128u;
-
 struct ngf_context_t {
   ngfi::unique_ptr<ngfvk_swapchain>     swapchain;
   ngf_swapchain_info                    swapchain_info;
@@ -570,10 +565,10 @@ struct ngf_context_t {
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
 
-  // global_pc_size == 0 means unregistered. No alignas needed — vkCmdPushConstants
-  // copies bytes by value, and adding it would push struct size up via tail padding.
-  uint32_t global_pc_size = 0u;
-  uint8_t  global_pc_data[NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE] = {};
+  // Layout used to push global constants without a bound pipeline. Holds only the
+  // shared 128-byte push-constant range and no descriptor sets, so it is push-constant-
+  // compatible with every pipeline created by this context.
+  VkPipelineLayout vk_default_push_layout = VK_NULL_HANDLE;
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
   ~ngf_context_t() noexcept;
@@ -1719,11 +1714,36 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
   ctx->desc_superpools.reserve(3);
   ctx->renderpass_cache.reserve(8);
 
+  // Build the default push-constant layout: just the shared 128-byte range, no descriptor
+  // sets. Used by ngf_cmd_push_constants to push without needing a bound pipeline; values
+  // persist into subsequent draws because every real pipeline layout shares this range.
+  {
+    const VkPushConstantRange default_push_range = {
+        .stageFlags = VK_SHADER_STAGE_ALL,
+        .offset     = 0u,
+        .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
+    const VkPipelineLayoutCreateInfo default_push_layout_info = {
+        .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext                  = NULL,
+        .flags                  = 0u,
+        .setLayoutCount         = 0u,
+        .pSetLayouts            = NULL,
+        .pushConstantRangeCount = 1u,
+        .pPushConstantRanges    = &default_push_range};
+    vk_err = vkCreatePipelineLayout(
+        _vk.device, &default_push_layout_info, NULL, &ctx->vk_default_push_layout);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  }
+
   return ngfi::move(ctx);
 }
 
 ngf_context_t::~ngf_context_t() noexcept {
   vkDeviceWaitIdle(_vk.device);
+
+  if (vk_default_push_layout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(_vk.device, vk_default_push_layout, NULL);
+  }
 
   if (default_render_target) {
     swapchain =
@@ -2456,27 +2476,25 @@ ngf_error ngfvk_generic_pipeline::common_init(
   // Pipeline layout.
   const uint32_t ndescriptor_sets = static_cast<uint32_t>(descriptor_set_layouts.size());
 
-  // Bake the registered global push-constant range into every pipeline layout. Shaders
-  // that don't reference it pay nothing; ones that do get auto-pushed per draw/dispatch.
-  const uint32_t      ctx_global_pc_size = CURRENT_CONTEXT ? CURRENT_CONTEXT->global_pc_size : 0u;
-  VkPushConstantRange global_pc_range    = {};
-  if (ctx_global_pc_size > 0u) {
-    global_pc_range.stageFlags = VK_SHADER_STAGE_ALL;
-    global_pc_range.offset     = 0u;
-    global_pc_range.size       = ctx_global_pc_size;
-  }
+  // Every pipeline layout reserves the same 128-byte push-constant range covering all
+  // stages. This is free unless a shader actually declares [[vk::push_constant]], and it
+  // makes all layouts push-constant-compatible (so ngf_cmd_push_constants persists across
+  // pipeline binds within an encoder).
+  const VkPushConstantRange global_pc_range = {
+      .stageFlags = VK_SHADER_STAGE_ALL,
+      .offset     = 0u,
+      .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
       .setLayoutCount         = ndescriptor_sets,
       .pSetLayouts            = vk_set_layouts,
-      .pushConstantRangeCount = ctx_global_pc_size > 0u ? 1u : 0u,
-      .pPushConstantRanges    = ctx_global_pc_size > 0u ? &global_pc_range : NULL};
+      .pushConstantRangeCount = 1u,
+      .pPushConstantRanges    = &global_pc_range};
   const VkResult vk_err =
       vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL, &vk_pipeline_layout);
   if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
-  global_pc_size = ctx_global_pc_size;
 
   return NGF_ERROR_OK;
 }
@@ -3374,17 +3392,6 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
           0,
           NULL);
     }
-  }
-
-  // MIN guards against the user re-registering a smaller block after this pipeline was built.
-  if (pipeline_data->global_pc_size > 0u && CURRENT_CONTEXT->global_pc_size > 0u) {
-    vkCmdPushConstants(
-        cmd_buf->vk_cmd_buffer,
-        pipeline_data->vk_pipeline_layout,
-        VK_SHADER_STAGE_ALL,
-        0u,
-        NGFI_MIN(pipeline_data->global_pc_size, CURRENT_CONTEXT->global_pc_size),
-        CURRENT_CONTEXT->global_pc_data);
   }
 
   ngfvk_cleanup_pending_binds(cmd_buf);
@@ -6357,58 +6364,42 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
   vkDeviceWaitIdle(_vk.device);
 }
 
-extern "C" ngf_error ngf_register_global_push_constants(
-    const ngf_global_push_constants_info* info) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) {
-    NGFI_DIAG_ERROR("ngf_register_global_push_constants called without a current context");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if (!info || info->size_bytes == 0u) {
-    NGFI_DIAG_ERROR("ngf_register_global_push_constants requires a non-zero size");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if (info->size_bytes > NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE) {
+// Pushes immediately via the context's default push-constant layout. Pushed values persist
+// across subsequent pipeline binds because every real pipeline layout shares the same
+// 128-byte push range and is therefore push-constant-compatible.
+static void ngfvk_push_constants_impl(
+    ngf_cmd_buffer cmd_buf,
+    const void*    data,
+    size_t         size_bytes) {
+  if (!data || size_bytes == 0u) return;
+  if (size_bytes > NGF_PUSH_CONSTANTS_MAX_SIZE || (size_bytes & 0x3u) != 0u) {
     NGFI_DIAG_ERROR(
-        "global push-constant block size %zu exceeds portable max %zu",
-        info->size_bytes,
-        NGFVK_MAX_GLOBAL_PUSH_CONSTANTS_SIZE);
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if ((info->size_bytes & 0x3u) != 0u) {  // Vulkan spec requires 4-byte multiples.
-    NGFI_DIAG_ERROR(
-        "global push-constant block size %zu must be a multiple of 4 bytes",
-        info->size_bytes);
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  CURRENT_CONTEXT->global_pc_size = static_cast<uint32_t>(info->size_bytes);
-  memset(CURRENT_CONTEXT->global_pc_data, 0, sizeof(CURRENT_CONTEXT->global_pc_data));
-  return NGF_ERROR_OK;
-}
-
-extern "C" void
-ngf_update_global_push_constants(const void* data, size_t size_bytes) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) {
-    NGFI_DIAG_ERROR("ngf_update_global_push_constants called without a current context");
-    return;
-  }
-  if (CURRENT_CONTEXT->global_pc_size == 0u) {
-    NGFI_DIAG_ERROR(
-        "ngf_update_global_push_constants called before ngf_register_global_push_constants");
-    return;
-  }
-  if (size_bytes != CURRENT_CONTEXT->global_pc_size) {
-    NGFI_DIAG_ERROR(
-        "ngf_update_global_push_constants size mismatch: got %zu, expected %u",
+        "ngf_cmd_push_constants: size %zu must be <= %u and a multiple of 4",
         size_bytes,
-        CURRENT_CONTEXT->global_pc_size);
+        NGF_PUSH_CONSTANTS_MAX_SIZE);
     return;
   }
-  memcpy(CURRENT_CONTEXT->global_pc_data, data, size_bytes);
+  vkCmdPushConstants(
+      cmd_buf->vk_cmd_buffer,
+      CURRENT_CONTEXT->vk_default_push_layout,
+      VK_SHADER_STAGE_ALL,
+      0u,
+      static_cast<uint32_t>(size_bytes),
+      data);
 }
 
-extern "C" void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) return;
-  CURRENT_CONTEXT->global_pc_size = 0u;
+extern "C" void ngf_cmd_push_constants(
+    ngf_render_encoder enc,
+    const void*        data,
+    size_t             size_bytes) NGF_NOEXCEPT {
+  ngfvk_push_constants_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
+}
+
+extern "C" void ngf_cmd_push_compute_constants(
+    ngf_compute_encoder enc,
+    const void*         data,
+    size_t              size_bytes) NGF_NOEXCEPT {
+  ngfvk_push_constants_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
 }
 
 extern "C" void

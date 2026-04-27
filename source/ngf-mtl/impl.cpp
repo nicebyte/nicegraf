@@ -571,6 +571,11 @@ struct ngf_cmd_buffer_t {
   ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>
       sample_buf_attachment_for_next_compute_pass = nullptr;
 
+  // Pending push-constants set via ngf_cmd_push_constants*. Re-applied via setBytes on
+  // every pipeline bind in this encoder. 0 size = nothing pending.
+  uint32_t pending_pc_size = 0u;
+  uint8_t  pending_pc_data[NGF_PUSH_CONSTANTS_MAX_SIZE] = {};
+
   static ngfi::maybe_ngfptr<ngf_cmd_buffer_t> make(const ngf_cmd_buffer_info&) NGF_NOEXCEPT {
     return ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
   }
@@ -580,9 +585,10 @@ struct ngf_cmd_buffer_t {
 struct ngfmtl_niceshade_metadata {
   ngfi::array<ngfi::array<uint32_t>> native_binding_map;
   uint32_t                           threadgroup_size[3];
+  // Metal buffer slot the push-constant block was assigned to by SPIRV-Cross. ~0u when
+  // the shader has no push constants (niceshade omits the field in that case).
+  uint32_t                           push_const_native_binding = ~0u;
 };
-
-static uint32_t ngfmtl_lookup_global_pc_slot(const ngfmtl_niceshade_metadata& metadata);
 
 struct ngf_shader_stage_t {
   ngf_id<MTL::Library>    func_lib = nullptr;
@@ -854,13 +860,6 @@ class ngfmtl_swapchain {
   bool                              compute_access_enabled_;
 };
 
-// Matches the Vulkan portable maximum so app-side layouts stay consistent across backends.
-static constexpr size_t NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE = 128u;
-// Reserved (set, binding) the shader uses to declare the global block on the Metal path
-// (no native push_constant primitive exists). niceshade maps this to a Metal buffer slot.
-static constexpr uint32_t NGFMTL_GLOBAL_PC_SET     = 15u;
-static constexpr uint32_t NGFMTL_GLOBAL_PC_BINDING = 0u;
-
 struct ngf_context_t {
   ngf_id<MTL::Device>        device = nullptr;
   ngfmtl_swapchain           swapchain;
@@ -872,9 +871,6 @@ struct ngf_context_t {
   ngf_id<MTL::CommandBuffer> last_cmd_buffer    = nullptr;
   dispatch_semaphore_t       frame_sync_sem     = nullptr;
   ngf_render_target          default_rt;
-
-  uint32_t global_pc_size = 0u;  // 0 means unregistered.
-  uint8_t  global_pc_data[NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE] = {};
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info&) NGF_NOEXCEPT;
 
@@ -1088,6 +1084,21 @@ static ngf_error ngfmtl_parse_niceshade_metadata(
     set_map[tmp_binding_map_entries[e].binding] = tmp_binding_map_entries[e].native_binding;
   }
   output->native_binding_map = ngfi::move(native_binding_map);
+
+  // After the binding-map loop, current_binding_map_entry / consumed_input_bytes still
+  // reflect the last sscanf — which is the (-1 -1) : -1 terminator that ended the loop.
+  // Advance past it and try to read the trailing push-constant native binding (added in
+  // newer niceshade outputs; -1 or absent for shaders without push constants).
+  const bool terminator_parsed = current_binding_map_entry.set == -1 &&
+                                 current_binding_map_entry.binding == -1 &&
+                                 current_binding_map_entry.native_binding == -1;
+  if (terminator_parsed) {
+    serialized_binding_map += consumed_input_bytes;
+    int pc_slot = -1;
+    if (sscanf(serialized_binding_map, " %d", &pc_slot) == 1 && pc_slot >= 0) {
+      output->push_const_native_binding = static_cast<uint32_t>(pc_slot);
+    }
+  }
 
   if (need_threadgroup_size && serialized_threadgroup_size) {
     if (sscanf(
@@ -2096,11 +2107,10 @@ void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline
   cmd_buf->active_cce->setComputePipelineState(pipeline->pipeline.get());
   cmd_buf->active_compute_pipe = pipeline;
 
-  if (CURRENT_CONTEXT->global_pc_size > 0u) {
-    const uint32_t slot = ngfmtl_lookup_global_pc_slot(pipeline->niceshade_metadata);
+  if (cmd_buf->pending_pc_size > 0u) {
+    const uint32_t slot = pipeline->niceshade_metadata.push_const_native_binding;
     if (slot != ~0u) {
-      cmd_buf->active_cce->setBytes(
-          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
+      cmd_buf->active_cce->setBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
     }
   }
 }
@@ -2149,13 +2159,11 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
       pipeline->back_stencil_reference);
   buf->active_gfx_pipe = pipeline;
 
-  if (CURRENT_CONTEXT->global_pc_size > 0u) {
-    const uint32_t slot = ngfmtl_lookup_global_pc_slot(pipeline->niceshade_metadata);
+  if (buf->pending_pc_size > 0u) {
+    const uint32_t slot = pipeline->niceshade_metadata.push_const_native_binding;
     if (slot != ~0u) {
-      buf->active_rce->setVertexBytes(
-          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
-      buf->active_rce->setFragmentBytes(
-          CURRENT_CONTEXT->global_pc_data, CURRENT_CONTEXT->global_pc_size, slot);
+      buf->active_rce->setVertexBytes(buf->pending_pc_data, buf->pending_pc_size, slot);
+      buf->active_rce->setFragmentBytes(buf->pending_pc_data, buf->pending_pc_size, slot);
     }
   }
 }
@@ -2600,68 +2608,59 @@ void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
 }
 
-// Metal has no native push-constant primitive. Shaders declare the block as a regular
-// cbuffer at (NGFMTL_GLOBAL_PC_SET, NGFMTL_GLOBAL_PC_BINDING); the cached payload is
-// pushed inline via setVertexBytes / setFragmentBytes / setBytes per pipeline bind.
-ngf_error ngf_register_global_push_constants(
-    const ngf_global_push_constants_info* info) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) {
-    NGFI_DIAG_ERROR("ngf_register_global_push_constants called without a current context");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if (!info || info->size_bytes == 0u) {
-    NGFI_DIAG_ERROR("ngf_register_global_push_constants requires a non-zero size");
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if (info->size_bytes > NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE) {
-    NGFI_DIAG_ERROR(
-        "global push-constant block size %zu exceeds portable max %zu",
-        info->size_bytes,
-        NGFMTL_MAX_GLOBAL_PUSH_CONSTANTS_SIZE);
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  if ((info->size_bytes & 0x3u) != 0u) {
-    NGFI_DIAG_ERROR(
-        "global push-constant block size %zu must be a multiple of 4 bytes",
-        info->size_bytes);
-    return NGF_ERROR_INVALID_OPERATION;
-  }
-  CURRENT_CONTEXT->global_pc_size = static_cast<uint32_t>(info->size_bytes);
-  memset(CURRENT_CONTEXT->global_pc_data, 0, sizeof(CURRENT_CONTEXT->global_pc_data));
-  return NGF_ERROR_OK;
-}
 
-void ngf_update_global_push_constants(const void* data, size_t size_bytes) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) {
-    NGFI_DIAG_ERROR("ngf_update_global_push_constants called without a current context");
+static void ngfmtl_capture_push_constants(
+    ngf_cmd_buffer cmd_buf,
+    const void*    data,
+    size_t         size_bytes) {
+  if (!data || size_bytes == 0u) {
+    cmd_buf->pending_pc_size = 0u;
     return;
   }
-  if (CURRENT_CONTEXT->global_pc_size == 0u) {
+  if (size_bytes > NGF_PUSH_CONSTANTS_MAX_SIZE || (size_bytes & 0x3u) != 0u) {
     NGFI_DIAG_ERROR(
-        "ngf_update_global_push_constants called before ngf_register_global_push_constants");
-    return;
-  }
-  if (size_bytes != CURRENT_CONTEXT->global_pc_size) {
-    NGFI_DIAG_ERROR(
-        "ngf_update_global_push_constants size mismatch: got %zu, expected %u",
+        "ngf_cmd_push_constants: size %zu must be <= %u and a multiple of 4",
         size_bytes,
-        CURRENT_CONTEXT->global_pc_size);
+        NGF_PUSH_CONSTANTS_MAX_SIZE);
     return;
   }
-  memcpy(CURRENT_CONTEXT->global_pc_data, data, size_bytes);
+  cmd_buf->pending_pc_size = static_cast<uint32_t>(size_bytes);
+  memcpy(cmd_buf->pending_pc_data, data, size_bytes);
 }
 
-void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT {
-  if (!CURRENT_CONTEXT) return;
-  CURRENT_CONTEXT->global_pc_size = 0u;
+void ngf_cmd_push_constants(
+    ngf_render_encoder enc,
+    const void*        data,
+    size_t             size_bytes) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  ngfmtl_capture_push_constants(cmd_buf, data, size_bytes);
+  // If a pipeline is already bound, push immediately so subsequent draws see the new data.
+  if (cmd_buf->active_gfx_pipe && cmd_buf->active_rce && cmd_buf->pending_pc_size > 0u) {
+    const uint32_t slot =
+        cmd_buf->active_gfx_pipe->niceshade_metadata.push_const_native_binding;
+    if (slot != ~0u) {
+      cmd_buf->active_rce->setVertexBytes(
+          cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+      cmd_buf->active_rce->setFragmentBytes(
+          cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+    }
+  }
 }
 
-// Returns ~0u if the shader doesn't reference the global block.
-static uint32_t ngfmtl_lookup_global_pc_slot(const ngfmtl_niceshade_metadata& metadata) {
-  if (metadata.native_binding_map.size() <= NGFMTL_GLOBAL_PC_SET) return ~0u;
-  const auto& set_map = metadata.native_binding_map[NGFMTL_GLOBAL_PC_SET];
-  if (set_map.size() <= NGFMTL_GLOBAL_PC_BINDING) return ~0u;
-  return set_map[NGFMTL_GLOBAL_PC_BINDING];
+void ngf_cmd_push_compute_constants(
+    ngf_compute_encoder enc,
+    const void*         data,
+    size_t              size_bytes) NGF_NOEXCEPT {
+  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  ngfmtl_capture_push_constants(cmd_buf, data, size_bytes);
+  if (cmd_buf->active_compute_pipe && cmd_buf->active_cce && cmd_buf->pending_pc_size > 0u) {
+    const uint32_t slot =
+        cmd_buf->active_compute_pipe->niceshade_metadata.push_const_native_binding;
+    if (slot != ~0u) {
+      cmd_buf->active_cce->setBytes(
+          cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+    }
+  }
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {

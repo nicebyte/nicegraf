@@ -3009,39 +3009,27 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Configuration for the global push-constant block. See \ref ngf_register_global_push_constants.
+ * Maximum push-constant block size in bytes. Matches Vulkan's portability floor.
+ * Every pipeline created by nicegraf reserves a push-constant range of this size, free
+ * for any shader to consume via `[[vk::push_constant]]`.
  */
-typedef struct ngf_global_push_constants_info {
-  size_t size_bytes; /**< Block size in bytes. Must be <= 128 for cross-vendor portability. */
-} ngf_global_push_constants_info;
+#define NGF_PUSH_CONSTANTS_MAX_SIZE 128u
 
 /**
  * \ingroup ngf
- * Registers a global push-constant block with the current context.
+ * Pushes a small inline data block to the active pipeline's push-constant range, visible
+ * to all subsequent draws in this encoder using compatible pipelines.
  *
- * Every pipeline created afterwards bakes in a matching push-constant range covering all
- * stages. Shaders opt in by declaring a `[[vk::push_constant]]` block of matching layout;
- * shaders that don't reference it pay no runtime cost. Contents are auto-pushed before each
- * draw and dispatch — call \ref ngf_update_global_push_constants to update them.
- *
- * Must be called before any pipeline is created. Pipelines created earlier are skipped by
- * the auto-push hook.
+ * Must be called after a pipeline has been bound. `size_bytes` must be <= 128 and a
+ * multiple of 4. The data is consumed inline (no buffer ownership is taken).
  */
-ngf_error ngf_register_global_push_constants(const ngf_global_push_constants_info* info) NGF_NOEXCEPT;
+void ngf_cmd_push_constants(ngf_render_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Updates the global push-constant block contents on the current context. Typically once
- * per frame. `size_bytes` must match the registered size.
+ * Compute-encoder counterpart of \ref ngf_cmd_push_constants.
  */
-void ngf_update_global_push_constants(const void* data, size_t size_bytes) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- * Unregisters the global push-constant block. Already-built pipelines keep their range
- * (harmless); subsequent ones get no range. Safe to call without a prior register.
- */
-void ngf_unregister_global_push_constants(void) NGF_NOEXCEPT;
+void ngf_cmd_push_compute_constants(ngf_compute_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
