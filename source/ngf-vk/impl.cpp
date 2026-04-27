@@ -52,6 +52,12 @@ constexpr uint32_t invalid_idx                    = ~((uint32_t)0u);
 constexpr uint32_t max_phys_dev                   = 64u;  // 64 GPUs oughta be enough for everybody.
 constexpr uint32_t img_usage_transient_attachment = (1u << 31u);
 
+// Used by every pipeline layout and by ngf_context_t::vk_default_push_layout.
+constexpr VkPushConstantRange default_push_constant_range = {
+    .stageFlags = VK_SHADER_STAGE_ALL,
+    .offset     = 0u,
+    .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
+
 }  // namespace global
 }  // namespace ngfvk
 
@@ -565,9 +571,7 @@ struct ngf_context_t {
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
 
-  // Layout used to push global constants without a bound pipeline. Holds only the
-  // shared 128-byte push-constant range and no descriptor sets, so it is push-constant-
-  // compatible with every pipeline created by this context.
+  // Push-constant-compatible layout used by ngf_cmd_push_constants when no pipeline is bound.
   VkPipelineLayout vk_default_push_layout = VK_NULL_HANDLE;
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
@@ -1714,14 +1718,7 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
   ctx->desc_superpools.reserve(3);
   ctx->renderpass_cache.reserve(8);
 
-  // Build the default push-constant layout: just the shared 128-byte range, no descriptor
-  // sets. Used by ngf_cmd_push_constants to push without needing a bound pipeline; values
-  // persist into subsequent draws because every real pipeline layout shares this range.
   {
-    const VkPushConstantRange default_push_range = {
-        .stageFlags = VK_SHADER_STAGE_ALL,
-        .offset     = 0u,
-        .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
     const VkPipelineLayoutCreateInfo default_push_layout_info = {
         .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .pNext                  = NULL,
@@ -1729,7 +1726,7 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
         .setLayoutCount         = 0u,
         .pSetLayouts            = NULL,
         .pushConstantRangeCount = 1u,
-        .pPushConstantRanges    = &default_push_range};
+        .pPushConstantRanges    = &ngfvk::global::default_push_constant_range};
     vk_err = vkCreatePipelineLayout(
         _vk.device, &default_push_layout_info, NULL, &ctx->vk_default_push_layout);
     if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
@@ -2476,14 +2473,6 @@ ngf_error ngfvk_generic_pipeline::common_init(
   // Pipeline layout.
   const uint32_t ndescriptor_sets = static_cast<uint32_t>(descriptor_set_layouts.size());
 
-  // Every pipeline layout reserves the same 128-byte push-constant range covering all
-  // stages. This is free unless a shader actually declares [[vk::push_constant]], and it
-  // makes all layouts push-constant-compatible (so ngf_cmd_push_constants persists across
-  // pipeline binds within an encoder).
-  const VkPushConstantRange global_pc_range = {
-      .stageFlags = VK_SHADER_STAGE_ALL,
-      .offset     = 0u,
-      .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = NULL,
@@ -2491,7 +2480,7 @@ ngf_error ngfvk_generic_pipeline::common_init(
       .setLayoutCount         = ndescriptor_sets,
       .pSetLayouts            = vk_set_layouts,
       .pushConstantRangeCount = 1u,
-      .pPushConstantRanges    = &global_pc_range};
+      .pPushConstantRanges    = &ngfvk::global::default_push_constant_range};
   const VkResult vk_err =
       vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL, &vk_pipeline_layout);
   if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
@@ -3393,7 +3382,6 @@ static void ngfvk_execute_pending_binds(ngf_cmd_buffer cmd_buf) {
           NULL);
     }
   }
-
   ngfvk_cleanup_pending_binds(cmd_buf);
 }
 
@@ -6364,9 +6352,7 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
   vkDeviceWaitIdle(_vk.device);
 }
 
-// Pushes immediately via the context's default push-constant layout. Pushed values persist
-// across subsequent pipeline binds because every real pipeline layout shares the same
-// 128-byte push range and is therefore push-constant-compatible.
+// Pushes via the context's default layout; values persist across compatible pipeline binds.
 static void ngfvk_push_constants_impl(
     ngf_cmd_buffer cmd_buf,
     const void*    data,

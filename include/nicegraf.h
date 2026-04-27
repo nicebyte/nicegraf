@@ -3017,17 +3017,20 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Pushes a small inline data block to the active pipeline's push-constant range, visible
- * to all subsequent draws in this encoder using compatible pipelines.
+ * Pushes a small inline data block to the encoder's push-constant range. May be called
+ * before or after binding a pipeline; the values become visible to every subsequent
+ * draw in this encoder. Because every nicegraf-built pipeline layout reserves the same
+ * \ref NGF_PUSH_CONSTANTS_MAX_SIZE byte range, all pipelines are push-constant-compatible
+ * and pushed values persist across pipeline binds.
  *
- * Must be called after a pipeline has been bound. `size_bytes` must be <= 128 and a
- * multiple of 4. The data is consumed inline (no buffer ownership is taken).
+ * `size_bytes` must be <= \ref NGF_PUSH_CONSTANTS_MAX_SIZE and a multiple of 4. The data
+ * is consumed inline (no buffer ownership is taken).
  */
 void ngf_cmd_push_constants(ngf_render_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Compute-encoder counterpart of \ref ngf_cmd_push_constants.
+ * Compute-encoder counterpart of \ref ngf_cmd_push_constants. Same ordering rules apply.
  */
 void ngf_cmd_push_compute_constants(ngf_compute_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 

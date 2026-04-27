@@ -571,8 +571,7 @@ struct ngf_cmd_buffer_t {
   ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>
       sample_buf_attachment_for_next_compute_pass = nullptr;
 
-  // Pending push-constants set via ngf_cmd_push_constants*. Re-applied via setBytes on
-  // every pipeline bind in this encoder. 0 size = nothing pending.
+  // Re-applied via setBytes on every pipeline bind in this encoder; 0 size = none pending.
   uint32_t pending_pc_size = 0u;
   uint8_t  pending_pc_data[NGF_PUSH_CONSTANTS_MAX_SIZE] = {};
 
@@ -585,8 +584,7 @@ struct ngf_cmd_buffer_t {
 struct ngfmtl_niceshade_metadata {
   ngfi::array<ngfi::array<uint32_t>> native_binding_map;
   uint32_t                           threadgroup_size[3];
-  // Metal buffer slot the push-constant block was assigned to by SPIRV-Cross. ~0u when
-  // the shader has no push constants (niceshade omits the field in that case).
+  // Metal buffer slot for the push-constant block; ~0u if the shader has none.
   uint32_t                           push_const_native_binding = ~0u;
 };
 
@@ -1085,10 +1083,8 @@ static ngf_error ngfmtl_parse_niceshade_metadata(
   }
   output->native_binding_map = ngfi::move(native_binding_map);
 
-  // After the binding-map loop, current_binding_map_entry / consumed_input_bytes still
-  // reflect the last sscanf — which is the (-1 -1) : -1 terminator that ended the loop.
-  // Advance past it and try to read the trailing push-constant native binding (added in
-  // newer niceshade outputs; -1 or absent for shaders without push constants).
+  // Reuse the loop's last sscanf state (the (-1 -1) : -1 terminator) to advance past it,
+  // then try to read the trailing push-constant slot (omitted by older niceshade outputs).
   const bool terminator_parsed = current_binding_map_entry.set == -1 &&
                                  current_binding_map_entry.binding == -1 &&
                                  current_binding_map_entry.native_binding == -1;
@@ -2607,7 +2603,6 @@ void ngf_finish() NGF_NOEXCEPT {
 
   if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
 }
-
 
 static void ngfmtl_capture_push_constants(
     ngf_cmd_buffer cmd_buf,
