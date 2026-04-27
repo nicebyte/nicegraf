@@ -1083,12 +1083,8 @@ static ngf_error ngfmtl_parse_niceshade_metadata(
   }
   output->native_binding_map = ngfi::move(native_binding_map);
 
-  // Reuse the loop's last sscanf state (the (-1 -1) : -1 terminator) to advance past it,
-  // then try to read the trailing push-constant slot (omitted by older niceshade outputs).
-  const bool terminator_parsed = current_binding_map_entry.set == -1 &&
-                                 current_binding_map_entry.binding == -1 &&
-                                 current_binding_map_entry.native_binding == -1;
-  if (terminator_parsed) {
+  // Skip the binding-map sentinel and read the trailing push-constant slot if any.
+  if (current_binding_map_entry.set == -1) {
     serialized_binding_map += consumed_input_bytes;
     int pc_slot = -1;
     if (sscanf(serialized_binding_map, " %d", &pc_slot) == 1 && pc_slot >= 0) {
