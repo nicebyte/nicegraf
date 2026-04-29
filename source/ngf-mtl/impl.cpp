@@ -573,7 +573,7 @@ struct ngf_cmd_buffer_t {
 
   // Re-applied via setBytes on every pipeline bind in this encoder; 0 size = none pending.
   uint32_t pending_pc_size = 0u;
-  uint8_t  pending_pc_data[NGF_PUSH_CONSTANTS_MAX_SIZE] = {};
+  uint8_t  pending_pc_data[NGF_MAX_ENCODER_INLINE_BYTES] = {};
 
   static ngfi::maybe_ngfptr<ngf_cmd_buffer_t> make(const ngf_cmd_buffer_info&) NGF_NOEXCEPT {
     return ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
@@ -2087,16 +2087,16 @@ ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
-static void ngfmtl_apply_push_constants_gfx(ngf_cmd_buffer cmd_buf) {
-  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_gfx_pipe) return;
+static void ngfmtl_apply_set_bytes_gfx(ngf_cmd_buffer cmd_buf) {
+  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_rce || !cmd_buf->active_gfx_pipe) return;
   const uint32_t slot = cmd_buf->active_gfx_pipe->niceshade_metadata.push_const_native_binding;
   if (slot == ~0u) return;
   cmd_buf->active_rce->setVertexBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
   cmd_buf->active_rce->setFragmentBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
 }
 
-static void ngfmtl_apply_push_constants_compute(ngf_cmd_buffer cmd_buf) {
-  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_compute_pipe) return;
+static void ngfmtl_apply_set_bytes_compute(ngf_cmd_buffer cmd_buf) {
+  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_cce || !cmd_buf->active_compute_pipe) return;
   const uint32_t slot =
       cmd_buf->active_compute_pipe->niceshade_metadata.push_const_native_binding;
   if (slot == ~0u) return;
@@ -2114,7 +2114,7 @@ void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline
   }
   cmd_buf->active_cce->setComputePipelineState(pipeline->pipeline.get());
   cmd_buf->active_compute_pipe = pipeline;
-  ngfmtl_apply_push_constants_compute(cmd_buf);
+  ngfmtl_apply_set_bytes_compute(cmd_buf);
 }
 
 void ngf_cmd_dispatch(
@@ -2160,7 +2160,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
       pipeline->front_stencil_reference,
       pipeline->back_stencil_reference);
   buf->active_gfx_pipe = pipeline;
-  ngfmtl_apply_push_constants_gfx(buf);
+  ngfmtl_apply_set_bytes_gfx(buf);
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
@@ -2603,41 +2603,46 @@ void ngf_finish() NGF_NOEXCEPT {
   if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
 }
 
-static void ngfmtl_capture_push_constants(
+static ngf_error ngfmtl_capture_set_bytes(
     ngf_cmd_buffer cmd_buf,
     const void*    data,
     size_t         size_bytes) {
   if (!data || size_bytes == 0u) {
     cmd_buf->pending_pc_size = 0u;
-    return;
+    return NGF_ERROR_OK;
   }
-  if (size_bytes > NGF_PUSH_CONSTANTS_MAX_SIZE || (size_bytes & 0x3u) != 0u) {
+  if (size_bytes > NGF_MAX_ENCODER_INLINE_BYTES || (size_bytes & 0x3u) != 0u) {
     NGFI_DIAG_ERROR(
         "push-constant size %zu must be <= %u and a multiple of 4",
         size_bytes,
-        NGF_PUSH_CONSTANTS_MAX_SIZE);
-    return;
+        NGF_MAX_ENCODER_INLINE_BYTES);
+    return NGF_ERROR_INVALID_SIZE;
   }
   cmd_buf->pending_pc_size = static_cast<uint32_t>(size_bytes);
   memcpy(cmd_buf->pending_pc_data, data, size_bytes);
+  return NGF_ERROR_OK;
 }
 
-void ngf_cmd_push_constants(
+ngf_error ngf_set_bytes(
     ngf_render_encoder enc,
     const void*        data,
     size_t             size_bytes) NGF_NOEXCEPT {
-  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  ngfmtl_capture_push_constants(cmd_buf, data, size_bytes);
-  ngfmtl_apply_push_constants_gfx(cmd_buf);
+  auto             cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  const ngf_error  err     = ngfmtl_capture_set_bytes(cmd_buf, data, size_bytes);
+  if (err != NGF_ERROR_OK) return err;
+  ngfmtl_apply_set_bytes_gfx(cmd_buf);
+  return NGF_ERROR_OK;
 }
 
-void ngf_cmd_push_compute_constants(
+ngf_error ngf_set_compute_bytes(
     ngf_compute_encoder enc,
     const void*         data,
     size_t              size_bytes) NGF_NOEXCEPT {
-  auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
-  ngfmtl_capture_push_constants(cmd_buf, data, size_bytes);
-  ngfmtl_apply_push_constants_compute(cmd_buf);
+  auto             cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  const ngf_error  err     = ngfmtl_capture_set_bytes(cmd_buf, data, size_bytes);
+  if (err != NGF_ERROR_OK) return err;
+  ngfmtl_apply_set_bytes_compute(cmd_buf);
+  return NGF_ERROR_OK;
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {

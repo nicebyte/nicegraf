@@ -3009,27 +3009,30 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Maximum push-constant block size in bytes. Matches Vulkan's portability floor.
- * Every pipeline created by nicegraf reserves a push-constant range of this size, free
- * for any shader to consume via `[[vk::push_constant]]`.
+ * Maximum size, in bytes, of the inline data block that may be set on an encoder via
+ * \ref ngf_set_bytes / \ref ngf_set_compute_bytes. Matches Vulkan's portability floor for
+ * push constants. Every pipeline created by nicegraf reserves a push-constant range of
+ * this size, free for any shader to consume via `[[vk::push_constant]]`.
  */
-#define NGF_PUSH_CONSTANTS_MAX_SIZE 128u
+#define NGF_MAX_ENCODER_INLINE_BYTES 128u
 
 /**
  * \ingroup ngf
- * Pushes a small inline data block visible to every subsequent draw and dispatch in
- * the underlying command buffer. May be called before or after binding a pipeline;
- * pushed values persist across pipeline binds and across encoders.
+ * Sets a small inline data block visible to subsequent draws in the underlying
+ * command buffer. May be called before or after binding a pipeline; pushed
+ * values persist across pipeline binds within the same encoder.
  *
- * `size_bytes` must be <= \ref NGF_PUSH_CONSTANTS_MAX_SIZE and a multiple of 4.
+ * `size_bytes` must be <= \ref NGF_MAX_ENCODER_INLINE_BYTES and a multiple of 4.
+ * Returns \ref NGF_ERROR_INVALID_SIZE if either constraint is violated.
+ * `data == NULL` or `size_bytes == 0` is a silent no-op.
  */
-void ngf_cmd_push_constants(ngf_render_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
+ngf_error ngf_set_bytes(ngf_render_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * Compute counterpart of \ref ngf_cmd_push_constants.
+ * Compute counterpart of \ref ngf_set_bytes.
  */
-void ngf_cmd_push_compute_constants(ngf_compute_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
+ngf_error ngf_set_compute_bytes(ngf_compute_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

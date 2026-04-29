@@ -56,7 +56,7 @@ constexpr uint32_t img_usage_transient_attachment = (1u << 31u);
 constexpr VkPushConstantRange default_push_constant_range = {
     .stageFlags = VK_SHADER_STAGE_ALL,
     .offset     = 0u,
-    .size       = NGF_PUSH_CONSTANTS_MAX_SIZE};
+    .size       = NGF_MAX_ENCODER_INLINE_BYTES};
 
 }  // namespace global
 }  // namespace ngfvk
@@ -571,7 +571,7 @@ struct ngf_context_t {
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
 
-  // Push-constant-compatible layout used by ngf_cmd_push_constants when no pipeline is bound.
+  // Push-constant-compatible with every pipeline layout (all share default_push_constant_range).
   VkPipelineLayout vk_default_push_layout = VK_NULL_HANDLE;
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
@@ -6353,17 +6353,17 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
 }
 
 // Pushes via the context's default layout; values persist across compatible pipeline binds.
-static void ngfvk_push_constants_impl(
+static ngf_error ngfvk_set_bytes_impl(
     ngf_cmd_buffer cmd_buf,
     const void*    data,
     size_t         size_bytes) {
-  if (!data || size_bytes == 0u) return;
-  if (size_bytes > NGF_PUSH_CONSTANTS_MAX_SIZE || (size_bytes & 0x3u) != 0u) {
+  if (!data || size_bytes == 0u) return NGF_ERROR_OK;
+  if (size_bytes > NGF_MAX_ENCODER_INLINE_BYTES || (size_bytes & 0x3u) != 0u) {
     NGFI_DIAG_ERROR(
         "push-constant size %zu must be <= %u and a multiple of 4",
         size_bytes,
-        NGF_PUSH_CONSTANTS_MAX_SIZE);
-    return;
+        NGF_MAX_ENCODER_INLINE_BYTES);
+    return NGF_ERROR_INVALID_SIZE;
   }
   vkCmdPushConstants(
       cmd_buf->vk_cmd_buffer,
@@ -6372,20 +6372,21 @@ static void ngfvk_push_constants_impl(
       0u,
       static_cast<uint32_t>(size_bytes),
       data);
+  return NGF_ERROR_OK;
 }
 
-extern "C" void ngf_cmd_push_constants(
+extern "C" ngf_error ngf_set_bytes(
     ngf_render_encoder enc,
     const void*        data,
     size_t             size_bytes) NGF_NOEXCEPT {
-  ngfvk_push_constants_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
+  return ngfvk_set_bytes_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
 }
 
-extern "C" void ngf_cmd_push_compute_constants(
+extern "C" ngf_error ngf_set_compute_bytes(
     ngf_compute_encoder enc,
     const void*         data,
     size_t              size_bytes) NGF_NOEXCEPT {
-  ngfvk_push_constants_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
+  return ngfvk_set_bytes_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
 }
 
 extern "C" void
