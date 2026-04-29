@@ -52,6 +52,12 @@ constexpr uint32_t invalid_idx                    = ~((uint32_t)0u);
 constexpr uint32_t max_phys_dev                   = 64u;  // 64 GPUs oughta be enough for everybody.
 constexpr uint32_t img_usage_transient_attachment = (1u << 31u);
 
+// Used by every pipeline layout and by ngf_context_t::vk_default_push_layout.
+constexpr VkPushConstantRange default_push_constant_range = {
+    .stageFlags = VK_SHADER_STAGE_ALL,
+    .offset     = 0u,
+    .size       = NGF_MAX_ENCODER_INLINE_BYTES};
+
 }  // namespace global
 }  // namespace ngfvk
 
@@ -564,6 +570,9 @@ struct ngf_context_t {
   ngfi::array<ngfvk_command_superpool>      command_superpools;
   ngfi::array<ngfvk_desc_superpool>         desc_superpools;
   ngfi::array<ngfvk_renderpass_cache_entry> renderpass_cache;
+
+  // Push-constant-compatible with every pipeline layout (all share default_push_constant_range).
+  VkPipelineLayout vk_default_push_layout = VK_NULL_HANDLE;
 
   static ngfi::maybe_ngfptr<ngf_context_t> make(const ngf_context_info& info);
   ~ngf_context_t() noexcept;
@@ -1709,11 +1718,29 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
   ctx->desc_superpools.reserve(3);
   ctx->renderpass_cache.reserve(8);
 
+  {
+    const VkPipelineLayoutCreateInfo default_push_layout_info = {
+        .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .pNext                  = NULL,
+        .flags                  = 0u,
+        .setLayoutCount         = 0u,
+        .pSetLayouts            = NULL,
+        .pushConstantRangeCount = 1u,
+        .pPushConstantRanges    = &ngfvk::global::default_push_constant_range};
+    vk_err = vkCreatePipelineLayout(
+        _vk.device, &default_push_layout_info, NULL, &ctx->vk_default_push_layout);
+    if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  }
+
   return ngfi::move(ctx);
 }
 
 ngf_context_t::~ngf_context_t() noexcept {
   vkDeviceWaitIdle(_vk.device);
+
+  if (vk_default_push_layout != VK_NULL_HANDLE) {
+    vkDestroyPipelineLayout(_vk.device, vk_default_push_layout, NULL);
+  }
 
   if (default_render_target) {
     swapchain =
@@ -2445,14 +2472,15 @@ ngf_error ngfvk_generic_pipeline::common_init(
 
   // Pipeline layout.
   const uint32_t ndescriptor_sets = static_cast<uint32_t>(descriptor_set_layouts.size());
+
   const VkPipelineLayoutCreateInfo vk_pipeline_layout_info = {
       .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
       .pNext                  = NULL,
       .flags                  = 0u,
       .setLayoutCount         = ndescriptor_sets,
       .pSetLayouts            = vk_set_layouts,
-      .pushConstantRangeCount = 0u,
-      .pPushConstantRanges    = NULL};
+      .pushConstantRangeCount = 1u,
+      .pPushConstantRanges    = &ngfvk::global::default_push_constant_range};
   const VkResult vk_err =
       vkCreatePipelineLayout(_vk.device, &vk_pipeline_layout_info, NULL, &vk_pipeline_layout);
   if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
@@ -6322,6 +6350,43 @@ extern "C" void ngf_finish(void) NGF_NOEXCEPT {
     ngfvk_submit_pending_cmd_buffers(frame_res, VK_NULL_HANDLE, VK_NULL_HANDLE);
   }
   vkDeviceWaitIdle(_vk.device);
+}
+
+// Pushes via the context's default layout; values persist across compatible pipeline binds.
+static ngf_error ngfvk_set_bytes_impl(
+    ngf_cmd_buffer cmd_buf,
+    const void*    data,
+    size_t         size_bytes) {
+  if (!data || size_bytes == 0u) return NGF_ERROR_OK;
+  if (size_bytes > NGF_MAX_ENCODER_INLINE_BYTES || (size_bytes & 0x3u) != 0u) {
+    NGFI_DIAG_ERROR(
+        "push-constant size %zu must be <= %u and a multiple of 4",
+        size_bytes,
+        NGF_MAX_ENCODER_INLINE_BYTES);
+    return NGF_ERROR_INVALID_SIZE;
+  }
+  vkCmdPushConstants(
+      cmd_buf->vk_cmd_buffer,
+      CURRENT_CONTEXT->vk_default_push_layout,
+      VK_SHADER_STAGE_ALL,
+      0u,
+      static_cast<uint32_t>(size_bytes),
+      data);
+  return NGF_ERROR_OK;
+}
+
+extern "C" ngf_error ngf_set_bytes(
+    ngf_render_encoder enc,
+    const void*        data,
+    size_t             size_bytes) NGF_NOEXCEPT {
+  return ngfvk_set_bytes_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
+}
+
+extern "C" ngf_error ngf_set_compute_bytes(
+    ngf_compute_encoder enc,
+    const void*         data,
+    size_t              size_bytes) NGF_NOEXCEPT {
+  return ngfvk_set_bytes_impl(NGFVK_ENC2CMDBUF(enc), data, size_bytes);
 }
 
 extern "C" void

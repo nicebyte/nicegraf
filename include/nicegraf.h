@@ -3009,7 +3009,34 @@ void ngf_finish(void) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
- * 
+ * Maximum size, in bytes, of the inline data block that may be set on an encoder via
+ * \ref ngf_set_bytes / \ref ngf_set_compute_bytes. Matches Vulkan's portability floor for
+ * push constants. Every pipeline created by nicegraf reserves a push-constant range of
+ * this size, free for any shader to consume via `[[vk::push_constant]]`.
+ */
+#define NGF_MAX_ENCODER_INLINE_BYTES 128u
+
+/**
+ * \ingroup ngf
+ * Sets a small inline data block visible to subsequent draws in the underlying
+ * command buffer. May be called before or after binding a pipeline; pushed
+ * values persist across pipeline binds within the same encoder.
+ *
+ * `size_bytes` must be <= \ref NGF_MAX_ENCODER_INLINE_BYTES and a multiple of 4.
+ * Returns \ref NGF_ERROR_INVALID_SIZE if either constraint is violated.
+ * `data == NULL` or `size_bytes == 0` is a silent no-op.
+ */
+ngf_error ngf_set_bytes(ngf_render_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ * Compute counterpart of \ref ngf_set_bytes.
+ */
+ngf_error ngf_set_compute_bytes(ngf_compute_encoder enc, const void* data, size_t size_bytes) NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
  * Marks the given resources as "read-only". Once a resource has been marked as read-only,
  * nicegraf's internal hazard-tracking operations may be omitted for it, improving CPU
  * performance. Performing any modifying operations on a resource that had previously been

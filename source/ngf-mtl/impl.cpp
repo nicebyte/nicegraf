@@ -571,6 +571,10 @@ struct ngf_cmd_buffer_t {
   ngf_id<MTL::ComputePassSampleBufferAttachmentDescriptor>
       sample_buf_attachment_for_next_compute_pass = nullptr;
 
+  // Re-applied via setBytes on every pipeline bind in this encoder; 0 size = none pending.
+  uint32_t pending_pc_size = 0u;
+  uint8_t  pending_pc_data[NGF_MAX_ENCODER_INLINE_BYTES] = {};
+
   static ngfi::maybe_ngfptr<ngf_cmd_buffer_t> make(const ngf_cmd_buffer_info&) NGF_NOEXCEPT {
     return ngfi::unique_ptr<ngf_cmd_buffer_t>::make();
   }
@@ -580,6 +584,8 @@ struct ngf_cmd_buffer_t {
 struct ngfmtl_niceshade_metadata {
   ngfi::array<ngfi::array<uint32_t>> native_binding_map;
   uint32_t                           threadgroup_size[3];
+  // Metal buffer slot for the push-constant block; ~0u if the shader has none.
+  uint32_t                           push_const_native_binding = ~0u;
 };
 
 struct ngf_shader_stage_t {
@@ -1076,6 +1082,15 @@ static ngf_error ngfmtl_parse_niceshade_metadata(
     set_map[tmp_binding_map_entries[e].binding] = tmp_binding_map_entries[e].native_binding;
   }
   output->native_binding_map = ngfi::move(native_binding_map);
+
+  // Skip the binding-map sentinel and read the trailing push-constant slot if any.
+  if (current_binding_map_entry.set == -1) {
+    serialized_binding_map += consumed_input_bytes;
+    int pc_slot = -1;
+    if (sscanf(serialized_binding_map, " %d", &pc_slot) == 1 && pc_slot >= 0) {
+      output->push_const_native_binding = static_cast<uint32_t>(pc_slot);
+    }
+  }
 
   if (need_threadgroup_size && serialized_threadgroup_size) {
     if (sscanf(
@@ -2072,6 +2087,22 @@ ngf_error ngf_cmd_end_compute_pass(ngf_compute_encoder enc) NGF_NOEXCEPT {
   return NGF_ERROR_OK;
 }
 
+static void ngfmtl_apply_set_bytes_gfx(ngf_cmd_buffer cmd_buf) {
+  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_rce || !cmd_buf->active_gfx_pipe) return;
+  const uint32_t slot = cmd_buf->active_gfx_pipe->niceshade_metadata.push_const_native_binding;
+  if (slot == ~0u) return;
+  cmd_buf->active_rce->setVertexBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+  cmd_buf->active_rce->setFragmentBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+}
+
+static void ngfmtl_apply_set_bytes_compute(ngf_cmd_buffer cmd_buf) {
+  if (cmd_buf->pending_pc_size == 0u || !cmd_buf->active_cce || !cmd_buf->active_compute_pipe) return;
+  const uint32_t slot =
+      cmd_buf->active_compute_pipe->niceshade_metadata.push_const_native_binding;
+  if (slot == ~0u) return;
+  cmd_buf->active_cce->setBytes(cmd_buf->pending_pc_data, cmd_buf->pending_pc_size, slot);
+}
+
 void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline pipeline)
     NGF_NOEXCEPT {
   auto cmd_buf = NGFMTL_ENC2CMDBUF(enc);
@@ -2083,6 +2114,7 @@ void ngf_cmd_bind_compute_pipeline(ngf_compute_encoder enc, ngf_compute_pipeline
   }
   cmd_buf->active_cce->setComputePipelineState(pipeline->pipeline.get());
   cmd_buf->active_compute_pipe = pipeline;
+  ngfmtl_apply_set_bytes_compute(cmd_buf);
 }
 
 void ngf_cmd_dispatch(
@@ -2128,6 +2160,7 @@ void ngf_cmd_bind_gfx_pipeline(ngf_render_encoder enc, const ngf_graphics_pipeli
       pipeline->front_stencil_reference,
       pipeline->back_stencil_reference);
   buf->active_gfx_pipe = pipeline;
+  ngfmtl_apply_set_bytes_gfx(buf);
 }
 
 void ngf_cmd_viewport(ngf_render_encoder enc, const ngf_irect2d* r) NGF_NOEXCEPT {
@@ -2568,6 +2601,48 @@ void ngf_finish() NGF_NOEXCEPT {
   }
 
   if (CURRENT_CONTEXT->last_cmd_buffer) { CURRENT_CONTEXT->last_cmd_buffer->waitUntilCompleted(); }
+}
+
+static ngf_error ngfmtl_capture_set_bytes(
+    ngf_cmd_buffer cmd_buf,
+    const void*    data,
+    size_t         size_bytes) {
+  if (!data || size_bytes == 0u) {
+    cmd_buf->pending_pc_size = 0u;
+    return NGF_ERROR_OK;
+  }
+  if (size_bytes > NGF_MAX_ENCODER_INLINE_BYTES || (size_bytes & 0x3u) != 0u) {
+    NGFI_DIAG_ERROR(
+        "push-constant size %zu must be <= %u and a multiple of 4",
+        size_bytes,
+        NGF_MAX_ENCODER_INLINE_BYTES);
+    return NGF_ERROR_INVALID_SIZE;
+  }
+  cmd_buf->pending_pc_size = static_cast<uint32_t>(size_bytes);
+  memcpy(cmd_buf->pending_pc_data, data, size_bytes);
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_set_bytes(
+    ngf_render_encoder enc,
+    const void*        data,
+    size_t             size_bytes) NGF_NOEXCEPT {
+  auto             cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  const ngf_error  err     = ngfmtl_capture_set_bytes(cmd_buf, data, size_bytes);
+  if (err != NGF_ERROR_OK) return err;
+  ngfmtl_apply_set_bytes_gfx(cmd_buf);
+  return NGF_ERROR_OK;
+}
+
+ngf_error ngf_set_compute_bytes(
+    ngf_compute_encoder enc,
+    const void*         data,
+    size_t              size_bytes) NGF_NOEXCEPT {
+  auto             cmd_buf = NGFMTL_ENC2CMDBUF(enc);
+  const ngf_error  err     = ngfmtl_capture_set_bytes(cmd_buf, data, size_bytes);
+  if (err != NGF_ERROR_OK) return err;
+  ngfmtl_apply_set_bytes_compute(cmd_buf);
+  return NGF_ERROR_OK;
 }
 
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
