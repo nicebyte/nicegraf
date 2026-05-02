@@ -5279,13 +5279,12 @@ extern "C" ngf_error ngf_cmd_begin_render_pass(
       sizeof(ngf_attachment_store_op) * pass_info->render_target->nattachments);
 
   uint32_t nclears       = 0u;
-  uint32_t clear_idx     = 0u;
   auto     cloned_clears = ngfi::frame_alloc<ngf_clear>(pass_info->render_target->nattachments);
   if (cloned_clears == NULL) { return NGF_ERROR_OUT_OF_MEM; }
   for (uint32_t i = 0u; i < pass_info->render_target->nattachments; ++i) {
     if (cmd_buf->pending_render_pass_info.load_ops[i] == NGF_LOAD_OP_CLEAR) {
       nclears          = NGFI_MAX(nclears, i + 1);
-      cloned_clears[i] = pass_info->clears[clear_idx++];
+      cloned_clears[i] = pass_info->clears[i];
     }
   }
   if (nclears > 0u) {
