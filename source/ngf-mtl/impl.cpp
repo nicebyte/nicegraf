@@ -2645,6 +2645,13 @@ ngf_error ngf_set_compute_bytes(
   return NGF_ERROR_OK;
 }
 
+void ngf_mark_read_only(
+    [[maybe_unused]] ngf_image*  imgs,
+    [[maybe_unused]] uint32_t    nimgs,
+    [[maybe_unused]] ngf_buffer* bufs,
+    [[maybe_unused]] uint32_t    nbufs) NGF_NOEXCEPT {
+}
+
 void ngf_renderdoc_capture_next_frame() NGF_NOEXCEPT {
   NGFI_DIAG_WARNING("RenderDoc functionality is not implemented for Metal backend");
 }
