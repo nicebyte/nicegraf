@@ -863,6 +863,7 @@ static VkFormat get_vk_image_format(ngf_image_format f) {
       VK_FORMAT_D32_SFLOAT,
       VK_FORMAT_D16_UNORM,
       VK_FORMAT_D24_UNORM_S8_UINT,
+      VK_FORMAT_D32_SFLOAT_S8_UINT,
       VK_FORMAT_UNDEFINED};
   return formats[f];
 }
@@ -2627,7 +2628,8 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_image_info& info)
   const bool is_transient     = info.usage_hint & ngfvk::global::img_usage_transient_attachment;
   const bool is_depth_stencil = info.format == NGF_IMAGE_FORMAT_DEPTH16 ||
                                 info.format == NGF_IMAGE_FORMAT_DEPTH32 ||
-                                info.format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8;
+                                info.format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8 ||
+                                info.format == NGF_IMAGE_FORMAT_DEPTH32_STENCIL8;
 
   const VkImageUsageFlagBits attachment_usage_bits =
       is_depth_stencil ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -5411,7 +5413,8 @@ extern "C" ngf_error ngf_cmd_end_render_pass(ngf_render_encoder enc) NGF_NOEXCEP
       const ngf_clear* clear        = &pass_info->clears[i];
       if (target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH16 &&
           target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH32 &&
-          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH24_STENCIL8) {
+          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH24_STENCIL8 &&
+          target->attachment_descs[i].format != NGF_IMAGE_FORMAT_DEPTH32_STENCIL8) {
         VkClearColorValue* clear_color_var = &vk_clear_val->color;
         clear_color_var->float32[0]        = clear->clear_color[0];
         clear_color_var->float32[1]        = clear->clear_color[1];

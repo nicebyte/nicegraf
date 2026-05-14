@@ -221,6 +221,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTL::PixelFormatDepth32Float, 32},
     {MTL::PixelFormatDepth16Unorm, 16},
     {MTL::PixelFormatDepth32Float_Stencil8, 32},  // Emulate DEPTH24_STENCIL8 on iOS
+    {MTL::PixelFormatDepth32Float_Stencil8, 32},
     {}
   };
   return formats[f];
@@ -1573,9 +1574,10 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
     if (ctx->swapchain_info.depth_format != NGF_IMAGE_FORMAT_UNDEFINED) {
       attachment_descs.ndescs++;
       desc_array[1].format = ctx->swapchain_info.depth_format;
-      desc_array[1].type   = ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8
-                                 ? NGF_ATTACHMENT_DEPTH_STENCIL
-                                 : NGF_ATTACHMENT_DEPTH;
+      desc_array[1].type = (ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH24_STENCIL8 ||
+                            ctx->swapchain_info.depth_format == NGF_IMAGE_FORMAT_DEPTH32_STENCIL8)
+                               ? NGF_ATTACHMENT_DEPTH_STENCIL
+                               : NGF_ATTACHMENT_DEPTH;
       desc_array[1].sample_count = ctx->swapchain_info.sample_count;
       desc_array[1].is_resolve   = false;
     }
