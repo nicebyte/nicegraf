@@ -1458,7 +1458,12 @@ ngfi::maybe_ngfptr<ngf_image_t> ngf_image_t::make(const ngf_image_info& info) NG
   mtl_img_desc->setDepth(info.extent.depth);
   mtl_img_desc->setArrayLength(info.nlayers);
   mtl_img_desc->setMipmapLevelCount(info.nmips);
-  mtl_img_desc->setStorageMode(MTL::StorageModePrivate);
+  // Memoryless is only valid for attachment-only images (no sampling or storage),
+  // so fall back to Private if those bits are set alongside the transient bit.
+  const bool is_memoryless =
+      (info.usage_hint & NGF_IMAGE_USAGE_TRANSIENT_ATTACHMENT) &&
+      !(info.usage_hint & (NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE));
+  mtl_img_desc->setStorageMode(is_memoryless ? MTL::StorageModeMemoryless : MTL::StorageModePrivate);
   mtl_img_desc->setSampleCount(info.sample_count);
   if (info.usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageRenderTarget);

@@ -1614,7 +1614,13 @@ typedef enum ngf_image_usage {
 
   /** \ingroup ngf
    * The image may be used as a source for a transfer operation. */
-  NGF_IMAGE_USAGE_XFER_SRC = 0x20
+  NGF_IMAGE_USAGE_XFER_SRC = 0x20,
+
+  /** \ingroup ngf
+   * The image is a transient attachment: produced and consumed within one render
+   * pass, kept in tile memory with no DRAM backing on tile-based GPUs (Metal
+   * memoryless, Vulkan lazily-allocated). Combine only with the ATTACHMENT bit. */
+  NGF_IMAGE_USAGE_TRANSIENT_ATTACHMENT = 0x40
 } ngf_image_usage;
 
 /**
