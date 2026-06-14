@@ -1458,20 +1458,21 @@ ngfi::maybe_ngfptr<ngf_image_t> ngf_image_t::make(const ngf_image_info& info) NG
   mtl_img_desc->setDepth(info.extent.depth);
   mtl_img_desc->setArrayLength(info.nlayers);
   mtl_img_desc->setMipmapLevelCount(info.nmips);
-  // Memoryless is only valid for attachment-only images (no sampling or storage),
-  // so fall back to Private if those bits are set alongside the transient bit.
-  const bool is_memoryless =
-      (info.usage_hint & NGF_IMAGE_USAGE_TRANSIENT_ATTACHMENT) &&
-      !(info.usage_hint & (NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE));
+  // Transient attachments are memoryless, which forbids shader access: honor memoryless,
+  // warn, and ignore the shader-usage bits if SAMPLE_FROM/STORAGE was also requested.
+  const bool is_memoryless = info.usage_hint & NGF_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
+  if (is_memoryless && (info.usage_hint & (NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE))) {
+    NGFI_DIAG_WARNING("transient/memoryless attachment cannot be shader-accessed, ignoring SAMPLE_FROM/STORAGE");
+  }
   mtl_img_desc->setStorageMode(is_memoryless ? MTL::StorageModeMemoryless : MTL::StorageModePrivate);
   mtl_img_desc->setSampleCount(info.sample_count);
   if (info.usage_hint & NGF_IMAGE_USAGE_ATTACHMENT) {
     mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageRenderTarget);
   }
-  if (info.usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM) {
+  if (!is_memoryless && (info.usage_hint & NGF_IMAGE_USAGE_SAMPLE_FROM)) {
     mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderRead);
   }
-  if (info.usage_hint & NGF_IMAGE_USAGE_STORAGE) {
+  if (!is_memoryless && (info.usage_hint & NGF_IMAGE_USAGE_STORAGE)) {
     mtl_img_desc->setUsage(mtl_img_desc->usage() | MTL::TextureUsageShaderWrite);
   }
   auto image         = ngfi::unique_ptr<ngf_image_t>::make();
