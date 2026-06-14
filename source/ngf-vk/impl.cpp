@@ -2676,9 +2676,6 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_image_info& info)
       .queueFamilyIndexCount = 0,
       .pQueueFamilyIndices   = NULL,
       .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED};
-  // Prefer lazily-allocated memory for transient attachments so they need no DRAM
-  // backing on tile-based GPUs. Preferred, not required: desktops have no such
-  // memory type, so VMA falls back to device-local instead of failing.
   VmaAllocationCreateInfo vma_alloc_info = {
       .flags          = 0u,
       .usage          = VMA_MEMORY_USAGE_GPU_ONLY,

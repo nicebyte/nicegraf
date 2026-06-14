@@ -1458,8 +1458,6 @@ ngfi::maybe_ngfptr<ngf_image_t> ngf_image_t::make(const ngf_image_info& info) NG
   mtl_img_desc->setDepth(info.extent.depth);
   mtl_img_desc->setArrayLength(info.nlayers);
   mtl_img_desc->setMipmapLevelCount(info.nmips);
-  // Transient attachments are memoryless, which forbids shader access: honor memoryless,
-  // warn, and ignore the shader-usage bits if SAMPLE_FROM/STORAGE was also requested.
   const bool is_memoryless = info.usage_hint & NGF_IMAGE_USAGE_TRANSIENT_ATTACHMENT;
   if (is_memoryless && (info.usage_hint & (NGF_IMAGE_USAGE_SAMPLE_FROM | NGF_IMAGE_USAGE_STORAGE))) {
     NGFI_DIAG_WARNING("transient/memoryless attachment cannot be shader-accessed, ignoring SAMPLE_FROM/STORAGE");
