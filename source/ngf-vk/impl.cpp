@@ -2941,7 +2941,14 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
       .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
       .presentMode           = present_mode};
   vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL, &swapchain->vk_swapchain);
-  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR(
+        "vkCreateSwapchainKHR failed (VkResult %d) at %ux%u",
+        (int)vk_err,
+        (unsigned)vk_sc_info.imageExtent.width,
+        (unsigned)vk_sc_info.imageExtent.height);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
 
   // Obtain swapchain images.
   vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain, &swapchain->nimgs, nullptr);
@@ -5191,9 +5198,8 @@ extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_
 extern "C" ngf_error
 ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT {
   assert(ctx);
-  if (!ctx || !ctx->default_render_target || !ctx->swapchain) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  // A null swapchain (creation deferred on a zero-extent surface) is recreated here.
+  if (!ctx || !ctx->default_render_target) { return NGF_ERROR_INVALID_OPERATION; }
   ctx->swapchain_info.width          = NGFI_MAX(1, new_width);
   ctx->swapchain_info.height         = NGFI_MAX(1, new_height);
   ctx->default_render_target->width  = ctx->swapchain_info.width;
