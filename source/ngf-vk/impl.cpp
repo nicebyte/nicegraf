@@ -2791,38 +2791,43 @@ static ngf_error ngfvk_recreate_swapchain(ngf_context ctx) {
   return NGF_ERROR_OK;
 }
 
+enum ngfvk_acquire_result { NGFVK_ACQUIRE_OK, NGFVK_ACQUIRE_OUT_OF_DATE, NGFVK_ACQUIRE_FAILED };
+
+static ngfvk_acquire_result ngfvk_attempt_acquire_swapchain_image() {
+  const VkResult acquire_result = vkAcquireNextImageKHR(
+      _vk.device,
+      CURRENT_CONTEXT->swapchain->vk_swapchain,
+      UINT64_MAX,
+      CURRENT_CONTEXT->swapchain->acquire_sems[CURRENT_CONTEXT->frame_id],
+      VK_NULL_HANDLE,
+      &CURRENT_CONTEXT->swapchain->image_idx);
+  if (acquire_result == VK_SUCCESS || acquire_result == VK_SUBOPTIMAL_KHR) {
+    if (acquire_result == VK_SUBOPTIMAL_KHR) {
+      NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
+    }
+    return NGFVK_ACQUIRE_OK;
+  }
+  CURRENT_CONTEXT->swapchain->image_idx = ngfvk::global::invalid_idx;
+  if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) { return NGFVK_ACQUIRE_OUT_OF_DATE; }
+  NGFI_DIAG_ERROR("failed to acquire swapchain image (VkResult %d)", (int)acquire_result);
+  return NGFVK_ACQUIRE_FAILED;
+}
+
 static ngf_error ngfvk_maybe_acquire_swapchain_image() {
   if (!CURRENT_CONTEXT->swapchain || CURRENT_CONTEXT->swapchain->vk_swapchain == VK_NULL_HANDLE) {
     return NGF_ERROR_INVALID_OPERATION;
   }
   if (CURRENT_CONTEXT->swapchain->image_idx != ngfvk::global::invalid_idx) { return NGF_ERROR_OK; }
-  for (uint32_t attempt = 0u; attempt < 2u; ++attempt) {
-    const VkResult acquire_result = vkAcquireNextImageKHR(
-        _vk.device,
-        CURRENT_CONTEXT->swapchain->vk_swapchain,
-        UINT64_MAX,
-        CURRENT_CONTEXT->swapchain->acquire_sems[CURRENT_CONTEXT->frame_id],
-        VK_NULL_HANDLE,
-        &CURRENT_CONTEXT->swapchain->image_idx);
-    if (acquire_result == VK_SUCCESS || acquire_result == VK_SUBOPTIMAL_KHR) {
-      if (acquire_result == VK_SUBOPTIMAL_KHR) {
-        NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
-      }
-      return NGF_ERROR_OK;
+  ngfvk_acquire_result acquire_result = ngfvk_attempt_acquire_swapchain_image();
+  if (acquire_result == NGFVK_ACQUIRE_OUT_OF_DATE) {
+    NGFI_DIAG_WARNING("swapchain out of date at image acquire - recreating");
+    if (ngfvk_recreate_swapchain(CURRENT_CONTEXT) != NGF_ERROR_OK) {
+      NGFI_DIAG_ERROR("failed to recreate an out-of-date swapchain");
+      return NGF_ERROR_INVALID_OPERATION;
     }
-    CURRENT_CONTEXT->swapchain->image_idx = ngfvk::global::invalid_idx;
-    if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR && attempt == 0u) {
-      NGFI_DIAG_WARNING("swapchain out of date at image acquire - recreating");
-      if (ngfvk_recreate_swapchain(CURRENT_CONTEXT) != NGF_ERROR_OK) {
-        NGFI_DIAG_ERROR("failed to recreate an out-of-date swapchain");
-        return NGF_ERROR_INVALID_OPERATION;
-      }
-      continue;
-    }
-    NGFI_DIAG_ERROR("failed to acquire swapchain image (VkResult %d)", (int)acquire_result);
-    return NGF_ERROR_INVALID_OPERATION;
+    acquire_result = ngfvk_attempt_acquire_swapchain_image();
   }
-  return NGF_ERROR_INVALID_OPERATION;
+  return acquire_result == NGFVK_ACQUIRE_OK ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 ngfvk_swapchain::~ngfvk_swapchain() noexcept {
@@ -4584,9 +4589,7 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
 
   // Transition the swapchain image to VK_IMAGE_LAYOUT_PRESENT_SRC if necessary.
   bool needs_present = CURRENT_CONTEXT->swapchain && wait_semaphore != VK_NULL_HANDLE;
-  if (needs_present &&
-      (ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK || !CURRENT_CONTEXT->swapchain ||
-       CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx)) {
+  if (needs_present && ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK) {
     NGFI_DIAG_WARNING("no swapchain image available, skipping present for this frame");
     needs_present = false;
   }
@@ -5606,8 +5609,7 @@ ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NO
         "requesting a swapchain image handle from a context that does not have a swapchain");
     return NGF_ERROR_INVALID_OPERATION;
   }
-  if (ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK || !CURRENT_CONTEXT->swapchain ||
-      CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) {
+  if (ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK) {
     NGFI_DIAG_ERROR("failed to acquire a swapchain image");
     return NGF_ERROR_INVALID_OPERATION;
   }
