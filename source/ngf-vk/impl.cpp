@@ -2777,28 +2777,57 @@ void ngfvk_alloc::destroy() NGF_NOEXCEPT {
   }
 }
 
-static ngf_error ngfvk_maybe_acquire_swapchain_image() {
-  if (CURRENT_CONTEXT->swapchain &&
-      CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE) {
-    if (CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) {
-      const VkResult acquire_result = vkAcquireNextImageKHR(
-          _vk.device,
-          CURRENT_CONTEXT->swapchain->vk_swapchain,
-          UINT64_MAX,
-          CURRENT_CONTEXT->swapchain->acquire_sems[CURRENT_CONTEXT->frame_id],
-          VK_NULL_HANDLE,
-          &CURRENT_CONTEXT->swapchain->image_idx);
-      if (acquire_result == VK_SUBOPTIMAL_KHR) {
-        NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
-      } else if (acquire_result != VK_SUCCESS) {
-        NGFI_DIAG_ERROR("failed to acquire swapchain image");
-        return NGF_ERROR_INVALID_OPERATION;
-      }
-    }
-    return NGF_ERROR_OK;
-  } else {
+static ngf_error ngfvk_recreate_swapchain(ngf_context ctx) {
+  if (!ctx->default_render_target || ctx->surface == VK_NULL_HANDLE) {
     return NGF_ERROR_INVALID_OPERATION;
   }
+  // swapchain needs to be explicitly destroyed before
+  // creating a new one with the same surface.
+  ctx->swapchain = ngfi::unique_ptr<ngfvk_swapchain> {};
+  auto maybe_swapchain =
+      ngfvk_swapchain::make(ctx->swapchain_info, ctx->default_render_target.get(), ctx->surface);
+  if (maybe_swapchain.has_error()) { return maybe_swapchain.error(); }
+  ctx->swapchain = ngfi::move(maybe_swapchain.value());
+  return NGF_ERROR_OK;
+}
+
+enum ngfvk_acquire_result { NGFVK_ACQUIRE_OK, NGFVK_ACQUIRE_OUT_OF_DATE, NGFVK_ACQUIRE_FAILED };
+
+static ngfvk_acquire_result ngfvk_attempt_acquire_swapchain_image() {
+  const VkResult acquire_result = vkAcquireNextImageKHR(
+      _vk.device,
+      CURRENT_CONTEXT->swapchain->vk_swapchain,
+      UINT64_MAX,
+      CURRENT_CONTEXT->swapchain->acquire_sems[CURRENT_CONTEXT->frame_id],
+      VK_NULL_HANDLE,
+      &CURRENT_CONTEXT->swapchain->image_idx);
+  if (acquire_result == VK_SUCCESS || acquire_result == VK_SUBOPTIMAL_KHR) {
+    if (acquire_result == VK_SUBOPTIMAL_KHR) {
+      NGFI_DIAG_WARNING("suboptimal swapchain configuration reported by vulkan");
+    }
+    return NGFVK_ACQUIRE_OK;
+  }
+  CURRENT_CONTEXT->swapchain->image_idx = ngfvk::global::invalid_idx;
+  if (acquire_result == VK_ERROR_OUT_OF_DATE_KHR) { return NGFVK_ACQUIRE_OUT_OF_DATE; }
+  NGFI_DIAG_ERROR("failed to acquire swapchain image (VkResult %d)", (int)acquire_result);
+  return NGFVK_ACQUIRE_FAILED;
+}
+
+static ngf_error ngfvk_maybe_acquire_swapchain_image() {
+  if (!CURRENT_CONTEXT->swapchain || CURRENT_CONTEXT->swapchain->vk_swapchain == VK_NULL_HANDLE) {
+    return NGF_ERROR_INVALID_OPERATION;
+  }
+  if (CURRENT_CONTEXT->swapchain->image_idx != ngfvk::global::invalid_idx) { return NGF_ERROR_OK; }
+  ngfvk_acquire_result acquire_result = ngfvk_attempt_acquire_swapchain_image();
+  if (acquire_result == NGFVK_ACQUIRE_OUT_OF_DATE) {
+    NGFI_DIAG_WARNING("swapchain out of date at image acquire - recreating");
+    if (ngfvk_recreate_swapchain(CURRENT_CONTEXT) != NGF_ERROR_OK) {
+      NGFI_DIAG_ERROR("failed to recreate an out-of-date swapchain");
+      return NGF_ERROR_INVALID_OPERATION;
+    }
+    acquire_result = ngfvk_attempt_acquire_swapchain_image();
+  }
+  return acquire_result == NGFVK_ACQUIRE_OK ? NGF_ERROR_OK : NGF_ERROR_INVALID_OPERATION;
 }
 
 ngfvk_swapchain::~ngfvk_swapchain() noexcept {
@@ -2871,6 +2900,19 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_vk.phys_dev, surface, &surface_caps);
   const VkExtent2D min_surface_extent = surface_caps.minImageExtent;
   const VkExtent2D max_surface_extent = surface_caps.maxImageExtent;
+  const VkExtent2D swapchain_extent   = {
+      .width = NGFI_MIN(
+          max_surface_extent.width,
+          NGFI_MAX(min_surface_extent.width, swapchain_info.width)),
+      .height = NGFI_MIN(
+          max_surface_extent.height,
+          NGFI_MAX(min_surface_extent.height, swapchain_info.height))};
+
+  // Creating a swapchain with a zero extent (minimized window) is invalid usage.
+  if (swapchain_extent.width == 0u || swapchain_extent.height == 0u) {
+    NGFI_DIAG_WARNING("surface reports a zero-size extent, deferring swapchain creation");
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
 
   // Determine if we should use exclusive or concurrent sharing mode for
   // swapchain images.
@@ -2894,13 +2936,7 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
       .minImageCount   = swapchain_info.capacity_hint,
       .imageFormat     = requested_format,
       .imageColorSpace = get_vk_color_space(swapchain_info.colorspace),
-      .imageExtent =
-          {.width = NGFI_MIN(
-               max_surface_extent.width,
-               NGFI_MAX(min_surface_extent.width, swapchain_info.width)),
-           .height = NGFI_MIN(
-               max_surface_extent.height,
-               NGFI_MAX(min_surface_extent.height, swapchain_info.height))},
+      .imageExtent           = swapchain_extent,
       .imageArrayLayers      = 1,
       .imageUsage            = usage_mask,
       .imageSharingMode      = sharing_mode,
@@ -2910,7 +2946,14 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
       .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
       .presentMode           = present_mode};
   vk_err = vkCreateSwapchainKHR(_vk.device, &vk_sc_info, NULL, &swapchain->vk_swapchain);
-  if (vk_err != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+  if (vk_err != VK_SUCCESS) {
+    NGFI_DIAG_ERROR(
+        "vkCreateSwapchainKHR failed (VkResult %d) at %ux%u",
+        (int)vk_err,
+        (unsigned)vk_sc_info.imageExtent.width,
+        (unsigned)vk_sc_info.imageExtent.height);
+    return NGF_ERROR_OBJECT_CREATION_FAILED;
+  }
 
   // Obtain swapchain images.
   vk_err = vkGetSwapchainImagesKHR(_vk.device, swapchain->vk_swapchain, &swapchain->nimgs, nullptr);
@@ -4545,9 +4588,14 @@ static ngf_error ngfvk_submit_pending_cmd_buffers(
   frame_res->submitted_cmd_bufs.clear();
 
   // Transition the swapchain image to VK_IMAGE_LAYOUT_PRESENT_SRC if necessary.
-  const bool needs_present = CURRENT_CONTEXT->swapchain && wait_semaphore != VK_NULL_HANDLE;
+  bool needs_present = CURRENT_CONTEXT->swapchain && wait_semaphore != VK_NULL_HANDLE;
+  if (needs_present && ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK) {
+    NGFI_DIAG_WARNING("no swapchain image available, skipping present for this frame");
+    needs_present = false;
+  }
   if (needs_present) {
-    if (CURRENT_CONTEXT->swapchain->image_idx == ngfvk::global::invalid_idx) ngfvk_maybe_acquire_swapchain_image();
+    // the acquire may have recreated the swapchain, along with its semaphores.
+    wait_semaphore = CURRENT_CONTEXT->swapchain->acquire_sems[CURRENT_CONTEXT->frame_id];
     ngf_image swapchain_image =
         CURRENT_CONTEXT->swapchain->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get();
     if (swapchain_image->sync_state.layout != VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
@@ -5153,25 +5201,14 @@ extern "C" const ngf_device_capabilities* ngf_get_device_capabilities(void) NGF_
 extern "C" ngf_error
 ngf_resize_context(ngf_context ctx, uint32_t new_width, uint32_t new_height) NGF_NOEXCEPT {
   assert(ctx);
-  if (!ctx || !ctx->default_render_target || !ctx->swapchain) {
-    return NGF_ERROR_INVALID_OPERATION;
-  }
+  // A null swapchain (creation deferred on a zero-extent surface) is recreated here.
+  if (!ctx || !ctx->default_render_target) { return NGF_ERROR_INVALID_OPERATION; }
   ctx->swapchain_info.width          = NGFI_MAX(1, new_width);
   ctx->swapchain_info.height         = NGFI_MAX(1, new_height);
   ctx->default_render_target->width  = ctx->swapchain_info.width;
   ctx->default_render_target->height = ctx->swapchain_info.height;
 
-  // swapchain needs to be explicitly destroyed before
-  // creating a new one with the same surface.
-  ctx->swapchain = ngfi::unique_ptr<ngfvk_swapchain> {};
-  auto maybe_swapchain =
-      ngfvk_swapchain::make(ctx->swapchain_info, ctx->default_render_target.get(), ctx->surface);
-  if (!maybe_swapchain.has_error()) {
-    ctx->swapchain = ngfi::move(maybe_swapchain.value());
-    return NGF_ERROR_OK;
-  } else {
-    return maybe_swapchain.error();
-  }
+  return ngfvk_recreate_swapchain(ctx);
 }
 
 extern "C" void ngf_destroy_context(ngf_context ctx) NGF_NOEXCEPT {
@@ -5572,7 +5609,10 @@ ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NO
         "requesting a swapchain image handle from a context that does not have a swapchain");
     return NGF_ERROR_INVALID_OPERATION;
   }
-  ngfvk_maybe_acquire_swapchain_image();
+  if (ngfvk_maybe_acquire_swapchain_image() != NGF_ERROR_OK) {
+    NGFI_DIAG_ERROR("failed to acquire a swapchain image");
+    return NGF_ERROR_INVALID_OPERATION;
+  }
   *result = CURRENT_CONTEXT->swapchain->wrapper_imgs[CURRENT_CONTEXT->swapchain->image_idx].get();
   return NGF_ERROR_OK;
 }
@@ -5601,8 +5641,11 @@ extern "C" ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
       image_semaphore,
       frame_res->fences[frame_res->nwait_fences++]);
 
-  // Present if necessary.
-  if (submit_result == NGF_ERROR_OK && needs_present) {
+  // Present if necessary - the submit may have skipped or recreated the swapchain.
+  const bool acquired_image = needs_present && CURRENT_CONTEXT->swapchain &&
+                              CURRENT_CONTEXT->swapchain->vk_swapchain != VK_NULL_HANDLE &&
+                              CURRENT_CONTEXT->swapchain->image_idx != ngfvk::global::invalid_idx;
+  if (submit_result == NGF_ERROR_OK && acquired_image) {
     const VkPresentInfoKHR present_info = {
         .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext              = NULL,
@@ -5613,7 +5656,13 @@ extern "C" ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
         .pImageIndices      = &CURRENT_CONTEXT->swapchain->image_idx,
         .pResults           = NULL};
     const VkResult present_result = vkQueuePresentKHR(_vk.present_queue, &present_info);
-    if (present_result != VK_SUCCESS) err = NGF_ERROR_INVALID_OPERATION;
+    if (present_result == VK_ERROR_OUT_OF_DATE_KHR || present_result == VK_SUBOPTIMAL_KHR) {
+      NGFI_DIAG_WARNING(
+          "swapchain reported out of date or suboptimal at present (VkResult %d)",
+          (int)present_result);
+    } else if (present_result != VK_SUCCESS) {
+      err = NGF_ERROR_INVALID_OPERATION;
+    }
   }
 
   // end frame capture
