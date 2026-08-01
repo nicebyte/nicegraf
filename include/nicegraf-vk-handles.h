@@ -93,6 +93,34 @@ uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT;
  */
 uint32_t ngf_get_vk_image_format_index(ngf_image_format format) NGF_NOEXCEPT;
 
+/**
+ * \ingroup ngf
+ *
+ * Returns the underlying VkPhysicalDevice handle cast to uintptr_t. The caller is responsible for
+ * casting the return value to a VkPhysicalDevice.
+ */
+uintptr_t ngf_get_vk_phys_dev_handle() NGF_NOEXCEPT;
+
+/**
+ * \ingroup ngf
+ *
+ * Retrieves the VkDeviceMemory handle (cast to uintptr_t) backing the given buffer, along with the
+ * buffer's offset within it and the allocation's size. Intended for exporting the memory of buffers
+ * created with NGF_BUFFER_USAGE_EXPORTABLE to external APIs; such buffers use a dedicated
+ * allocation, so the offset is always 0 and the size covers the whole VkDeviceMemory.
+ * Any of the out-parameters may be NULL.
+ *
+ * @param buffer A handle to a nicegraf buffer.
+ * @param memory Receives the VkDeviceMemory handle cast to uintptr_t.
+ * @param offset Receives the buffer's offset within the memory, in bytes.
+ * @param size Receives the allocation size, in bytes.
+ */
+void ngf_get_vk_buffer_memory_info(
+    ngf_buffer buffer,
+    uintptr_t* memory,
+    size_t*    offset,
+    size_t*    size) NGF_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif
