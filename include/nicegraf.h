@@ -2250,6 +2250,9 @@ typedef struct ngf_swapchain_info {
   ngf_present_mode present_mode;  /**< Desired present mode. */
   uintptr_t        native_handle; /**< HWND, ANativeWindow, NSWindow, etc. */
   bool             enable_compute_access; /**< Whether to enable access to swapchain images from compute stage. */
+  bool             enable_xfer_src; /**< Whether to allow using swapchain images as the source of transfer
+                                       operations (e.g. readback for screen capture). Granted only if the
+                                       underlying surface supports it. */
 } ngf_swapchain_info;
 
 /**
