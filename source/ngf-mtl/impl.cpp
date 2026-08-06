@@ -1783,22 +1783,19 @@ void ngfmtl_attachment_set_common(
   attachment->setStoreAction(get_mtl_store_action(store_op));
 }
 
-uint8_t* ngf_map_buffer(MTL::Buffer* buffer, size_t offset, [[maybe_unused]] size_t size) {
+uint8_t* ngf_buffer_get_mapped_ptr(MTL::Buffer* buffer, size_t offset) {
   return (uint8_t*)buffer->contents() + offset;
 }
 
-void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT {
+void* ngf_buffer_get_mapped_ptr(ngf_buffer buf, size_t offset) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
-  return (void*)ngf_map_buffer(buf->mtl_buffer.get(), offset, size);
+  return (void*)ngf_buffer_get_mapped_ptr(buf->mtl_buffer.get(), offset);
 }
 
 void ngf_buffer_flush_range(
     [[maybe_unused]] ngf_buffer buf,
     [[maybe_unused]] size_t     offset,
     [[maybe_unused]] size_t     size) NGF_NOEXCEPT {
-}
-
-void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {
 }
 
 ngf_error ngf_start_cmd_buffer(ngf_cmd_buffer cmd_buffer, ngf_frame_token) NGF_NOEXCEPT {

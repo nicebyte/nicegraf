@@ -6305,16 +6305,13 @@ extern "C" void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT {
   }
 }
 
-extern "C" void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t) NGF_NOEXCEPT {
+extern "C" void* ngf_buffer_get_mapped_ptr(ngf_buffer buf, size_t offset) NGF_NOEXCEPT {
   buf->mapped_offset = offset;
   return (uint8_t*)buf->alloc.mapped_data + buf->mapped_offset;
 }
 
 extern "C" void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT {
   vmaFlushAllocation(_vk.allocator, buf->alloc.vma_alloc, buf->mapped_offset + offset, size);
-}
-
-extern "C" void ngf_buffer_unmap(ngf_buffer) NGF_NOEXCEPT {  // vk buffers are persistently mapped.
 }
 
 extern "C" ngf_error

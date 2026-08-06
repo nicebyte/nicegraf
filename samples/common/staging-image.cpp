@@ -32,7 +32,7 @@ staging_image create_staging_image_from_tga(const char* file_name) {
       .size         = texture_size_bytes,
       .storage_type = NGF_BUFFER_STORAGE_HOST_READABLE_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC}));
-  void* mapped_staging_buf = ngf_buffer_map_range(staging_buf.get(), 0, texture_size_bytes);
+  void* mapped_staging_buf = ngf_buffer_get_mapped_ptr(staging_buf.get(), 0);
 
   /* Decode the loaded targa file, writing RGBA values directly into mapped memory. */
   load_targa(
@@ -43,9 +43,8 @@ staging_image create_staging_image_from_tga(const char* file_name) {
       &texture_width,
       &texture_height);
 
-  /* Flush and unmap the staging buffer. */
+  /* Flush the staging buffer. */
   ngf_buffer_flush_range(staging_buf.get(), 0, texture_size_bytes);
-  ngf_buffer_unmap(staging_buf.get());
 
   /* Count the number of mipmaps we'll have to generate for trilinear filtering.
      Note that we keep generating mip levels until both dimensions are reduced to 1.
