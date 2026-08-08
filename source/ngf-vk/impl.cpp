@@ -91,6 +91,9 @@ struct {
   VkPhysicalDevice         phys_dev;
   VkDevice                 device;
   VmaAllocator             allocator;
+  // Lazily created pools for NGF_BUFFER_USAGE_EXPORTABLE, one per memory type.
+  VmaPool                  exportable_pools[VK_MAX_MEMORY_TYPES];
+  pthread_mutex_t          exportable_pools_mu;
   VkQueue                  gfx_queue;
   VkQueue                  present_queue;
   uint32_t                 gfx_family_idx;
@@ -2713,6 +2716,19 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_buffer_info& info
     NGFI_DIAG_ERROR("Host-visible device-local storage requested, but not supported.");
     return NGF_ERROR_INVALID_OPERATION;
   }
+  const bool exportable = (info.buffer_usage & NGF_BUFFER_USAGE_EXPORTABLE) != 0u;
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+  static constexpr VkExternalMemoryHandleTypeFlags export_handle_types =
+      VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+#else
+  static constexpr VkExternalMemoryHandleTypeFlags export_handle_types =
+      VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+#endif
+  static const VkExternalMemoryBufferCreateInfo export_buf_info = {
+      .sType       = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO,
+      .pNext       = NULL,
+      .handleTypes = export_handle_types};
+
   const VkBufferUsageFlags    vk_usage_flags  = get_vk_buffer_usage(info.buffer_usage);
   const VkMemoryPropertyFlags vk_mem_flags    = get_vk_memory_flags(info.storage_type);
   const bool           vk_mem_is_host_visible = vk_mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -2721,7 +2737,7 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_buffer_info& info
                                                     : VMA_MEMORY_USAGE_AUTO_PREFER_HOST;
   const VkBufferCreateInfo buf_vk_info        = {
              .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-             .pNext                 = NULL,
+             .pNext                 = exportable ? &export_buf_info : NULL,
              .flags                 = 0u,
              .size                  = info.size,
              .usage                 = vk_usage_flags,
@@ -2729,7 +2745,7 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_buffer_info& info
              .queueFamilyIndexCount = 0,
              .pQueueFamilyIndices   = NULL};
 
-  const VmaAllocationCreateInfo buf_alloc_info = {
+  VmaAllocationCreateInfo buf_alloc_info = {
       .flags          = ngfvk_get_vma_alloc_flags(info.storage_type),
       .usage          = vma_usage_flags,
       .requiredFlags  = vk_mem_flags,
@@ -2737,6 +2753,38 @@ ngfi::value_or_ngferr<ngfvk_alloc> ngfvk_alloc::make(const ngf_buffer_info& info
       .memoryTypeBits = 0u,
       .pool           = VK_NULL_HANDLE,
       .pUserData      = NULL};
+
+  if (exportable) {
+    // The export info must outlive the pools, all allocations reference it.
+    static const VkExportMemoryAllocateInfo export_alloc_info = {
+        .sType       = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
+        .pNext       = NULL,
+        .handleTypes = export_handle_types};
+    uint32_t       mem_type_idx = 0u;
+    const VkResult find_result  = vmaFindMemoryTypeIndexForBufferInfo(
+        _vk.allocator,
+        &buf_vk_info,
+        &buf_alloc_info,
+        &mem_type_idx);
+    if (find_result != VK_SUCCESS) { return NGF_ERROR_OBJECT_CREATION_FAILED; }
+    pthread_mutex_lock(&_vk.exportable_pools_mu);
+    VmaPool pool = _vk.exportable_pools[mem_type_idx];
+    if (pool == VK_NULL_HANDLE) {
+      VmaPoolCreateInfo pool_info {};
+      pool_info.memoryTypeIndex     = mem_type_idx;
+      pool_info.pMemoryAllocateNext = (void*)&export_alloc_info;
+      const VkResult pool_result    = vmaCreatePool(_vk.allocator, &pool_info, &pool);
+      if (pool_result != VK_SUCCESS) {
+        pthread_mutex_unlock(&_vk.exportable_pools_mu);
+        return NGF_ERROR_OBJECT_CREATION_FAILED;
+      }
+      _vk.exportable_pools[mem_type_idx] = pool;
+    }
+    pthread_mutex_unlock(&_vk.exportable_pools_mu);
+    // Dedicated so the exported handle maps a whole VkDeviceMemory at offset 0.
+    buf_alloc_info.flags |= VMA_ALLOCATION_CREATE_DEDICATED_MEMORY_BIT;
+    buf_alloc_info.pool = pool;
+  }
 
   VkBuffer          buf;
   VmaAllocation     alloc;
@@ -4833,6 +4881,11 @@ ngf_get_device_list(const ngf_device** devices, uint32_t* ndevices) NGF_NOEXCEPT
         enabled_exts.push_back("VK_KHR_swapchain");
         const bool shader_float16_int8_supported = add_optional_ext("VK_KHR_shader_float16_int8");
         const bool sync2_supported               = add_optional_ext("VK_KHR_synchronization2");
+#if defined(VK_USE_PLATFORM_WIN32_KHR)
+        add_optional_ext("VK_KHR_external_memory_win32");
+#else
+        add_optional_ext("VK_KHR_external_memory_fd");
+#endif
         const bool inline_ray_tracing_supported =
             add_optional_ext("VK_KHR_acceleration_structure") &&
             add_optional_ext("VK_KHR_buffer_device_address") &&
@@ -5158,6 +5211,7 @@ extern "C" ngf_error ngf_initialize(const ngf_init_info* init_info) NGF_NOEXCEPT
   _vk.dummy_res.dummy_accel_struct         = VK_NULL_HANDLE;
   _vk.dummy_res.image_transitioned         = false;
   pthread_mutex_init(&_vk.dummy_res.img_mu, NULL);
+  pthread_mutex_init(&_vk.exportable_pools_mu, NULL);
 
   // Done!
 
@@ -5174,6 +5228,12 @@ extern "C" void ngf_shutdown(void) NGF_NOEXCEPT {
   NGFI_FREE(_vk.dummy_res.buf);
   NGFI_FREE(_vk.dummy_res.samp);
 
+  for (uint32_t i = 0u; i < VK_MAX_MEMORY_TYPES; ++i) {
+    if (_vk.exportable_pools[i] != VK_NULL_HANDLE) {
+      vmaDestroyPool(_vk.allocator, _vk.exportable_pools[i]);
+      _vk.exportable_pools[i] = VK_NULL_HANDLE;
+    }
+  }
   if (_vk.allocator != VK_NULL_HANDLE) { vmaDestroyAllocator(_vk.allocator); }
 
   if (_vk.device != VK_NULL_HANDLE) { vkDestroyDevice(_vk.device, NULL); }
@@ -6496,6 +6556,22 @@ extern "C" uintptr_t ngf_get_vk_cmd_buffer_handle(ngf_cmd_buffer cmd_buffer) NGF
 
 extern "C" uintptr_t ngf_get_vk_sampler_handle(ngf_sampler sampler) NGF_NOEXCEPT {
   return (uintptr_t)(sampler->vksampler);
+}
+
+extern "C" uintptr_t ngf_get_vk_phys_dev_handle() NGF_NOEXCEPT {
+  return (uintptr_t)_vk.phys_dev;
+}
+
+extern "C" void ngf_get_vk_buffer_memory_info(
+    ngf_buffer buffer,
+    uintptr_t* memory,
+    size_t*    offset,
+    size_t*    size) NGF_NOEXCEPT {
+  VmaAllocationInfo alloc_info {};
+  vmaGetAllocationInfo(_vk.allocator, buffer->alloc.vma_alloc, &alloc_info);
+  if (memory) *memory = (uintptr_t)alloc_info.deviceMemory;
+  if (offset) *offset = (size_t)alloc_info.offset;
+  if (size) *size = (size_t)alloc_info.size;
 }
 
 extern "C" uint32_t ngf_get_vk_image_format_index(ngf_image_format format) NGF_NOEXCEPT {

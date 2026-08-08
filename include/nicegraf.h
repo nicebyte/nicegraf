@@ -2074,7 +2074,14 @@ typedef enum ngf_buffer_usage {
 
   NGF_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT = 0x80,
   NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT = 0x100,
-  NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT = 0x200
+  NGF_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT = 0x200,
+
+  /** \ingroup ngf
+   * The buffer's memory may be exported to external APIs (e.g. CUDA).
+   * The backing allocation is dedicated (not suballocated) and its memory handle
+   * can be queried with backend-specific handle getters.
+   * Currently only supported by the Vulkan backend. */
+  NGF_BUFFER_USAGE_EXPORTABLE = 0x400
 
 } ngf_buffer_usage;
 
