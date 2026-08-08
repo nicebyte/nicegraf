@@ -2925,7 +2925,13 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
   // Determine usage flags.
   const auto storage_bit =
       (VkImageUsageFlagBits)(swapchain_info.enable_compute_access ? VK_IMAGE_USAGE_STORAGE_BIT : 0);
-  const auto usage_mask = (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | storage_bit);
+  const bool xfer_src_granted =
+      swapchain_info.enable_xfer_src &&
+      (surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+  const auto xfer_src_bit =
+      (VkImageUsageFlagBits)(xfer_src_granted ? VK_IMAGE_USAGE_TRANSFER_SRC_BIT : 0);
+  const auto usage_mask =
+      (VkImageUsageFlags)(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | storage_bit | xfer_src_bit);
 
   // Create swapchain.
   const VkSwapchainCreateInfoKHR vk_sc_info = {
@@ -2977,7 +2983,8 @@ ngfi::maybe_ngfptr<ngfvk_swapchain> ngfvk_swapchain::make(
       .nlayers      = 1u,
       .format       = swapchain_info.color_format,
       .sample_count = NGF_SAMPLE_COUNT_1,
-      .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT};
+      .usage_hint   = NGF_IMAGE_USAGE_ATTACHMENT |
+          (xfer_src_granted ? (uint32_t)NGF_IMAGE_USAGE_XFER_SRC : 0u)};
   for (size_t i = 0u; i < swapchain->nimgs; ++i) {
     auto wrap_img = ngf_image_t::make(
         wrapper_image_info,
