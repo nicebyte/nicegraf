@@ -81,7 +81,7 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(staging_buffer.initialize(staging_buffer_info));
 
   /** Map the staging buffer and read the volume data directly into the memory. */
-  void* mapped_staging_buffer_ptr = ngf_buffer_map_range(staging_buffer, 0, staging_buffer_size);
+  void* mapped_staging_buffer_ptr = ngf_buffer_get_mapped_ptr(staging_buffer, 0);
   const uint64_t read_bytes =
       fread(mapped_staging_buffer_ptr, 1, staging_buffer_size, volume_data_file);
   if (ferror(volume_data_file)) {
@@ -94,9 +94,8 @@ void* sample_initialize(
   }
   fclose(volume_data_file);
 
-  /** Flush and unmap the staging buffer to prepare it for the upcoming transfer. */
+  /** Flush the staging buffer to prepare it for the upcoming transfer. */
   ngf_buffer_flush_range(staging_buffer, 0, staging_buffer_size);
-  ngf_buffer_unmap(staging_buffer);
 
   /** Prepare a 3D image. */
   const ngf_image_info img_info = {
