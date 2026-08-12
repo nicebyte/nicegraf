@@ -1561,7 +1561,7 @@ ngfi::maybe_ngfptr<ngf_context_t> ngf_context_t::make(const ngf_context_info& in
   auto ctx = ngfi::unique_ptr<ngf_context_t>::make();
   if (!ctx) { return NGF_ERROR_OUT_OF_MEM; }
 
-  ctx->device = MTL_DEVICE;
+  ctx->device = ngf_id<MTL::Device>::add_retain(MTL_DEVICE);
   ctx->queue  = ctx->device->newCommandQueue();
 
   if (info.swapchain_info) {
