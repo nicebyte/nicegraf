@@ -78,7 +78,7 @@ CA::MetalLayer* ngf_layer_add_to_view(MTL::Device* device,
     [view.layer addSublayer:layer_];
     [layer_ setContentsScale:view.layer.contentsScale];
     [layer_ setContentsGravity:kCAGravityResizeAspect];
-    [layer_ setFrame:view.frame];
+    [layer_ setFrame:view.bounds];
     #endif
     CFBridgingRetain(view);
     
@@ -100,7 +100,11 @@ void ngf_resize_swapchain(CA::MetalLayer* layer,
     NGFMTL_VIEW_TYPE* view = CFBridgingRelease((void*)native_handle);
 
     [bridged_layer setContentsScale:view.layer.contentsScale];
+    #if TARGET_OS_OSX
     [bridged_layer setFrame:view.frame];
+    #else
+    [bridged_layer setFrame:view.bounds];
+    #endif
 
     CFBridgingRetain(view);
 }
