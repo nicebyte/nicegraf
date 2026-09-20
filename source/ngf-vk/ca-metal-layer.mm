@@ -35,7 +35,7 @@ void* ngfvk_create_ca_metal_layer(const ngf_swapchain_info* swapchain_info) {
       [view.layer addSublayer:layer];
       [layer setContentsScale:view.layer.contentsScale];
       [layer setContentsGravity:kCAGravityResizeAspect];
-      [layer setFrame:view.frame];
+      [layer setFrame:view.bounds];
   #endif
       CFBridgingRetain(view);
   return layer;
