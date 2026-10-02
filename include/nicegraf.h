@@ -2956,8 +2956,8 @@ void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT;
  *
  * It is an error to bind a buffer that is currently mapped using any command. If a buffer that
  * needs to be bound is mapped, first call \ref ngf_buffer_flush_range to ensure any new data in the
- * mapped range becomes visible to the subsequent commands, then call \ref ngf_buffer_unmap. Writing
- * into any region that could be in use by previously submitted commands results in undefined
+ * mapped range becomes visible to the subsequent commands. Writing into any region that could be
+ * in use by previously submitted commands results in undefined
  * behavior.
  *
  * @param buf The handle to the buffer to be mapped.
@@ -2965,11 +2965,9 @@ void ngf_destroy_buffer(ngf_buffer buffer) NGF_NOEXCEPT;
  *               satisfy platform-specific alignment requirements. See, for example, \ref
  *               ngf_device_capabilities::uniform_buffer_offset_alignment and \ref
  *               ngf_device_capabilities::texel_buffer_offet_alignment.
- * @param size  The size of the mapped region, in bytes.
- * @param flags A combination of flags from \ref ngf_buffer_map_flags.
  * @return A pointer to the mapped memory, or NULL if the buffer could not be mapped.
  */
-void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
+void* ngf_buffer_get_mapped_ptr(ngf_buffer buf, size_t offset) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf
@@ -2982,18 +2980,6 @@ void* ngf_buffer_map_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXC
  * @param size  The size of the flushed region, in bytes.
  */
 void ngf_buffer_flush_range(ngf_buffer buf, size_t offset, size_t size) NGF_NOEXCEPT;
-
-/**
- * \ingroup ngf
- *
- * Unmaps a previously mapped buffer.
- *
- * If multiple regions were mapped, all of them are unmapped. Any pointers returned by prior calls
- * to \ref ngf_buffer_map_range are invalidated.
- *
- * @param buf The buffer that needs to be unmapped.
- */
-void ngf_buffer_unmap(ngf_buffer buf) NGF_NOEXCEPT;
 
 /**
  * \ingroup ngf

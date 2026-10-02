@@ -30,12 +30,11 @@
 namespace ngf_misc {
 
 static void read_into_mapped_buffer(FILE* f, ngf_buffer buf, size_t data_size) {
-  void* mapped_buffer_mem = ngf_buffer_map_range(buf, 0u, data_size);
+  void* mapped_buffer_mem = ngf_buffer_get_mapped_ptr(buf, 0u);
   const size_t read_elements =
       fread(mapped_buffer_mem, sizeof(char), data_size, f);
   NGF_MISC_ASSERT(read_elements == data_size);
   ngf_buffer_flush_range(buf, 0, data_size);
-  ngf_buffer_unmap(buf);
 }
 
 mesh load_mesh_from_file(const char* mesh_file_name, ngf_xfer_encoder xfenc) {
