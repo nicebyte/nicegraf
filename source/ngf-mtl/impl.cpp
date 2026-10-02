@@ -1697,17 +1697,26 @@ void* objc_autoreleasePoolPush(void);
 void  objc_autoreleasePoolPop(void* pool);
 }
 
+static bool ngfmtl_acquire_drawable() {
+  ngf_context ctx = CURRENT_CONTEXT;
+  if (ctx->frame.color_drawable) { return true; }
+  if (ctx->pending_cmd_buffer) {
+    ctx->pending_cmd_buffer->commit();
+    ctx->pending_cmd_buffer = nullptr;
+  }
+  ctx->frame = ctx->swapchain.next_frame();
+  if (ctx->frame.color_drawable && ctx->swapchain.compute_access_enabled()) {
+    ctx->frame.img_wrapper.texture = ctx->frame.color_drawable->texture()->newTextureView(
+        ctx->swapchain.get_pixel_format());
+  }
+  return ctx->frame.color_drawable != nullptr;
+}
+
 ngf_error ngf_begin_frame(ngf_frame_token* token) NGF_NOEXCEPT {
   *token = (uintptr_t)objc_autoreleasePoolPush();
   dispatch_semaphore_wait(CURRENT_CONTEXT->frame_sync_sem, DISPATCH_TIME_FOREVER);
-  CURRENT_CONTEXT->frame = CURRENT_CONTEXT->swapchain.next_frame();
-  if (CURRENT_CONTEXT->frame.color_drawable &&
-      CURRENT_CONTEXT->swapchain.compute_access_enabled()) {
-    CURRENT_CONTEXT->frame.img_wrapper.texture =
-        CURRENT_CONTEXT->frame.color_drawable->texture()->newTextureView(
-            CURRENT_CONTEXT->swapchain.get_pixel_format());
-  }
-  return (!CURRENT_CONTEXT->frame.color_drawable) ? NGF_ERROR_INVALID_OPERATION : NGF_ERROR_OK;
+  CURRENT_CONTEXT->frame = ngfmtl_swapchain::frame {};
+  return NGF_ERROR_OK;
 }
 
 ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
@@ -1730,6 +1739,7 @@ ngf_error ngf_end_frame(ngf_frame_token token) NGF_NOEXCEPT {
 
 ngf_error ngf_get_current_swapchain_image(ngf_frame_token token, ngf_image* result) NGF_NOEXCEPT {
   assert(CURRENT_CONTEXT);
+  if (!ngfmtl_acquire_drawable()) { return NGF_ERROR_INVALID_OPERATION; }
   *result = &CURRENT_CONTEXT->frame.img_wrapper;
   return NGF_ERROR_OK;
 }
@@ -1892,6 +1902,8 @@ ngf_error ngf_cmd_begin_render_pass(
   const ngf_render_target rt = pass_info->render_target;
   assert(rt);
   assert(cmd_buffer);
+
+  if (rt->is_default && !ngfmtl_acquire_drawable()) { return NGF_ERROR_INVALID_OPERATION; }
 
   ngfmtl_finish_pending_encoders(cmd_buffer);
   cmd_buffer->renderpass_active = true;
