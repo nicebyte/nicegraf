@@ -791,6 +791,7 @@ static VkBlendOp get_vk_blend_op(ngf_blend_op op) {
 static VkFormat get_vk_image_format(ngf_image_format f) {
   static const VkFormat formats[NGF_IMAGE_FORMAT_COUNT] = {
       VK_FORMAT_R8_UNORM,
+      VK_FORMAT_R8_SNORM,
       VK_FORMAT_R8G8_UNORM,
       VK_FORMAT_R8G8_SNORM,
       VK_FORMAT_R8G8B8_UNORM,

@@ -104,6 +104,7 @@ struct mtl_format {
 static mtl_format get_mtl_pixel_format(ngf_image_format f) {
   static const mtl_format formats[NGF_IMAGE_FORMAT_COUNT] = {
     {MTL::PixelFormatR8Unorm, 8},
+    {MTL::PixelFormatR8Snorm, 8},
     {MTL::PixelFormatRG8Unorm, 16},
     {MTL::PixelFormatRG8Snorm, 16},
     {},  // RGB8, unsupported
