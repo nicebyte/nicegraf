@@ -170,13 +170,11 @@ void sample_draw_frame(
    * Write the updated values to the uniform buffer at current offset.
    * Map the range, write the data using memcpy, then flush and unmap.
    */
-  void* mapped_uniform_buffer_offset = ngf_buffer_map_range(
+  void* mapped_uniform_buffer_offset = ngf_buffer_get_mapped_ptr(
       state->uniform_buffer,
-      state->uniform_buffer_offset,
-      state->aligned_uniform_data_size);
+      state->uniform_buffer_offset);
   memcpy(mapped_uniform_buffer_offset, &state->uniform_values, sizeof(state->uniform_values));
   ngf_buffer_flush_range(state->uniform_buffer, 0, state->aligned_uniform_data_size);
-  ngf_buffer_unmap(state->uniform_buffer);
 
   /**
    * Record the rendering commands.

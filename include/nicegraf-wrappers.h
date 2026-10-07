@@ -185,16 +185,12 @@ static inline const attachment_descriptions* default_render_target_attachment_de
   return ngf_default_render_target_attachment_descs();
 }
 
-static inline void* buffer_map_range(unowned_buffer buf, size_t offset, size_t size) noexcept {
-  return ngf_buffer_map_range(buf, offset, size);
+static inline void* buffer_get_mapped_ptr(unowned_buffer buf, size_t offset) noexcept {
+  return ngf_buffer_get_mapped_ptr(buf, offset);
 }
 
 static inline void buffer_flush_range(unowned_buffer buf, size_t offset, size_t size) noexcept {
   ngf_buffer_flush_range(buf, offset, size);
-}
-
-static inline void buffer_unmap(unowned_buffer buf) noexcept {
-  ngf_buffer_unmap(buf);
 }
 
 static inline void finish() noexcept {
@@ -1053,10 +1049,9 @@ template<typename T> class uniform_multibuffer {
 
   void write(const T& data) {
     current_offset_  = (frame_)*aligned_per_frame_size_;
-    void* mapped_buf = ngf_buffer_map_range(buf_.get(), current_offset_, aligned_per_frame_size_);
+    void* mapped_buf = ngf_buffer_get_mapped_ptr(buf_.get(), current_offset_);
     memcpy(mapped_buf, (void*)&data, sizeof(T));
     ngf_buffer_flush_range(buf_.get(), 0, aligned_per_frame_size_);
-    ngf_buffer_unmap(buf_.get());
     frame_ = (frame_ + 1u) % nframes_;
   }
 

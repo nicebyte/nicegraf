@@ -123,10 +123,7 @@ ngf_imgui::ngf_imgui(
       NGF_BUFFER_USAGE_XFER_SRC};
   err = texture_data_.initialize(pbuffer_info);
   NGF_MISC_ASSERT(err == NGF_ERROR_OK);
-  void* mapped_texture_data = ngf_buffer_map_range(
-      texture_data_.get(),
-      0,
-      4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
+  void* mapped_texture_data = ngf_buffer_get_mapped_ptr(texture_data_.get(), 0);
   memcpy(
       mapped_texture_data,
       font_atlas_bytes,
@@ -135,7 +132,6 @@ ngf_imgui::ngf_imgui(
       texture_data_.get(),
       0,
       4 * (size_t)font_atlas_width * (size_t)font_atlas_height);
-  ngf_buffer_unmap(texture_data_.get());
   const ngf_image_write img_write {
       .src_offset     = 0u,
       .dst_offset     = {0, 0, 0},
@@ -273,11 +269,10 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf_buffer attrib_buffer = nullptr;
   ngf_create_buffer(&attrib_buffer_info, &attrib_buffer);
   attrib_buffer_.reset(attrib_buffer);
-  void* mapped_attrib_buffer = ngf_buffer_map_range(attrib_buffer, 0, attrib_buffer_info.size);
+  void* mapped_attrib_buffer = ngf_buffer_get_mapped_ptr(attrib_buffer, 0);
   NGF_MISC_ASSERT(mapped_attrib_buffer != nullptr);
   memcpy(mapped_attrib_buffer, vertex_data.data(), attrib_buffer_info.size);
   ngf_buffer_flush_range(attrib_buffer, 0, attrib_buffer_info.size);
-  ngf_buffer_unmap(attrib_buffer);
 
   ngf_buffer_info index_buffer_info {
       sizeof(ImDrawIdx) * index_data.size(),
@@ -286,11 +281,10 @@ void ngf_imgui::record_rendering_commands(ngf_render_encoder enc) {
   ngf_buffer index_buffer = nullptr;
   ngf_create_buffer(&index_buffer_info, &index_buffer);
   index_buffer_.reset(index_buffer);
-  void* mapped_index_buffer = ngf_buffer_map_range(index_buffer, 0, index_buffer_info.size);
+  void* mapped_index_buffer = ngf_buffer_get_mapped_ptr(index_buffer, 0);
   NGF_MISC_ASSERT(mapped_index_buffer != nullptr);
   memcpy(mapped_index_buffer, index_data.data(), index_buffer_info.size);
   ngf_buffer_flush_range(index_buffer, 0, index_buffer_info.size);
-  ngf_buffer_unmap(index_buffer);
 
   ngf_cmd_bind_index_buffer(
       enc,
