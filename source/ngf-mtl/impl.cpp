@@ -117,6 +117,7 @@ static mtl_format get_mtl_pixel_format(ngf_image_format f) {
     {MTL::PixelFormatBGRA8Unorm_sRGB, 32, true},
     {MTL::PixelFormatRGB10A2Unorm, 32},
     {MTL::PixelFormatBGR10A2Unorm, 32},
+    {MTL::PixelFormatB5G6R5Unorm, 16},
     {MTL::PixelFormatR32Float, 32},
     {MTL::PixelFormatRG32Float, 64},
     {},  // RGB32F, unsupported
