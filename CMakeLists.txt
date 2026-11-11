@@ -20,7 +20,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ]]
 
-cmake_minimum_required(VERSION 3.24)
+cmake_minimum_required(VERSION 3.5)
 project(nicegraf)
 
 
@@ -192,7 +192,7 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
         set(NGF_IMGUI_COPTS "")
     else()
         # Turn off reporting warnings as errors for ImGui on gcc/clang, because it has a lot of them.
-        set(NGF_IMGUI_COPTS "-Wno-error")
+        set(NGF_IMGUI_COPTS "-Wno-error" "-Wno-nontrivial-memcall" "-Wno-conversion")
     endif()
 
     nmk_static_library(NAME ngf-imgui
@@ -201,8 +201,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                 PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                 PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui
                              ${CMAKE_CURRENT_LIST_DIR}/samples/deps/imgui/backends
-	            PVT_DEFINES "GLFW_INCLUDE_NONE"
-	           	COPTS ${NGF_IMGUI_COPTS})
+	        PVT_DEFINES "GLFW_INCLUDE_NONE"
+	        COPTS ${NGF_IMGUI_COPTS})
     nmk_static_library(NAME ngf-samples-common
                        SRCS ${CMAKE_CURRENT_LIST_DIR}/samples/common/main.cpp
                             ${CMAKE_CURRENT_LIST_DIR}/samples/common/diagnostic-callback.cpp
@@ -219,7 +219,9 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                        PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath
                                     ${CMAKE_CURRENT_LIST_DIR}/samples/common
                        PUB_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/common
-                                    ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath)
+                                    ${CMAKE_CURRENT_LIST_DIR}/samples/deps/nicemath
+		       COPTS	${NGF_IMGUI_COPTS})
+
     set_target_properties(ngf-samples-common PROPERTIES FOLDER "samples")
 
     function (ngf_sample)
@@ -231,7 +233,8 @@ if (NGF_BUILD_SAMPLES STREQUAL "yes")
                    DEPS nicegraf ngf-samples-common nicegraf-misc-common nicegraf-util ngf-imgui
                    PVT_INCLUDES ${CMAKE_CURRENT_LIST_DIR}/samples/${SAMPLE_NAME}
 		           PVT_DEFINES "GLFW_INCLUDE_NONE"
-                   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}")
+                   OUTPUT_DIR "${NGF_SAMPLES_OUTPUT_DIR}"
+		   COPTS ${NGF_IMGUI_COPTS})
         add_dependencies(${SAMPLE_NAME} sample-shaders)                   
         set_target_properties(${SAMPLE_NAME} PROPERTIES FOLDER "samples")
     endfunction()
