@@ -240,15 +240,13 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(state->vertex_attrib_buffer.initialize(vertex_buffer_info));
   NGF_MISC_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
   void* mapped_vertex_buffer =
-      ngf_buffer_map_range(vertex_staging_buffer.get(), 0u, vertex_staging_buffer_info.size);
+      ngf_buffer_get_mapped_ptr(vertex_staging_buffer.get(), 0u);
   void* mapped_index_buffer =
-      ngf_buffer_map_range(index_staging_buffer.get(), 0u, index_staging_buffer_info.size);
+      ngf_buffer_get_mapped_ptr(index_staging_buffer.get(), 0u);
   memcpy(mapped_vertex_buffer, vertex_attribs::vertex_data, vertex_staging_buffer_info.size);
   memcpy(mapped_index_buffer, vertex_attribs::index_data, index_staging_buffer_info.size);
   ngf_buffer_flush_range(vertex_staging_buffer.get(), 0, vertex_staging_buffer_info.size);
   ngf_buffer_flush_range(index_staging_buffer.get(), 0, index_staging_buffer_info.size);
-  ngf_buffer_unmap(vertex_staging_buffer.get());
-  ngf_buffer_unmap(index_staging_buffer.get());
   ngf_cmd_copy_buffer(
       xfer_encoder,
       vertex_staging_buffer.get(),
@@ -286,10 +284,9 @@ void* sample_initialize(
     .texel_format = NGF_IMAGE_FORMAT_RGBA32F
   };
   NGF_MISC_CHECK_NGF_ERROR(state->per_instance_data_view.initialize(instance_data_view_info));
-  auto mapped_per_instance_staging_buffer = (float*)ngf_buffer_map_range(
+  auto mapped_per_instance_staging_buffer = (float*)ngf_buffer_get_mapped_ptr(
       instance_data_staging_buffer.get(),
-      0,
-      instance_data_staging_buffer_info.size);
+      0);
   for (uint32_t r = 0; r < vertex_attribs::INSTANCES_GRID_SIZE; ++r) {
     for (uint32_t c = 0; c < vertex_attribs::INSTANCES_GRID_SIZE; ++c) {
       const uint32_t idx = r * (vertex_attribs::INSTANCES_GRID_SIZE) + c;
@@ -308,7 +305,6 @@ void* sample_initialize(
       instance_data_staging_buffer.get(),
       0,
       instance_data_staging_buffer_info.size);
-  ngf_buffer_unmap(instance_data_staging_buffer.get());
   ngf_cmd_copy_buffer(
       xfer_encoder,
       instance_data_staging_buffer,
@@ -340,7 +336,7 @@ void* sample_initialize(
       .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
       .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC});
   auto mapped_staging_buffer =
-      (char*)ngf_buffer_map_range(staging_buffer.get(), 0, staging_buffer_size);
+      (char*)ngf_buffer_get_mapped_ptr(staging_buffer.get(), 0);
   std::vector<char> texture_rgba_data;
   texture_rgba_data.resize(staging_buffer_size);
   load_targa(
@@ -354,7 +350,6 @@ void* sample_initialize(
 
   /* Flush and unmap the staging buffer. */
   ngf_buffer_flush_range(staging_buffer.get(), 0, staging_buffer_size);
-  ngf_buffer_unmap(staging_buffer.get());
 
   /* Create the texture. */
   const uint32_t nmips =

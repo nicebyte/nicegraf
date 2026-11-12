@@ -149,7 +149,7 @@ void* sample_initialize(
   NGF_MISC_CHECK_NGF_ERROR(staging_index_buffer.initialize(staging_index_buffer_info));
   NGF_MISC_CHECK_NGF_ERROR(state->index_buffer.initialize(index_buffer_info));
   auto mapped_staging_index_buffer = (uint32_t*)
-      ngf_buffer_map_range(staging_index_buffer.get(), 0u, staging_index_buffer_info.size);
+      ngf_buffer_get_mapped_ptr(staging_index_buffer.get(), 0u);
   uint32_t idx = 0u;
   for (uint32_t strip = 0u; strip < compute_verts::nverts_per_side - 1; ++strip) {
     for (uint32_t v = 0u; v < compute_verts::nverts_per_side; ++v) {
@@ -162,7 +162,6 @@ void* sample_initialize(
     mapped_staging_index_buffer[idx++] = ~0u;
   }
   ngf_buffer_flush_range(staging_index_buffer.get(), 0, staging_index_buffer_info.size);
-  ngf_buffer_unmap(staging_index_buffer.get());
   ngf_cmd_copy_buffer(
       xfer_encoder,
       staging_index_buffer.get(),

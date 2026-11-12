@@ -91,7 +91,7 @@ void* sample_initialize(
           .storage_type = NGF_BUFFER_STORAGE_HOST_WRITEABLE,
           .buffer_usage = NGF_BUFFER_USAGE_XFER_SRC});
       mapped_staging_buffer =
-          (char*)ngf_buffer_map_range(staging_buffer.get(), 0, staging_buffer_size);
+          (char*)ngf_buffer_get_mapped_ptr(staging_buffer.get(), 0);
     } else if (face_width != width || face_height != height) {
       loge("All faces of the cubemap must have the same dimensions");
       return nullptr;
@@ -113,7 +113,6 @@ void* sample_initialize(
 
   /* Flush and unmap the staging buffer. */
   ngf_buffer_flush_range(staging_buffer.get(), 0, staging_buffer_size);
-  ngf_buffer_unmap(staging_buffer.get());
 
   /* Create the cubemap texture. */
   NGF_MISC_CHECK_NGF_ERROR(state->texture.initialize(ngf_image_info {
