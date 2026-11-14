@@ -2274,10 +2274,13 @@ void ngf_cmd_bind_resources(
                       "command encoder.");
       return;
     }
+    const auto& gfx_binding_map = cmd_buf->active_gfx_pipe->niceshade_metadata.native_binding_map;
+    if (bind_op.target_set >= gfx_binding_map.size() ||
+        bind_op.target_binding >= gfx_binding_map[bind_op.target_set].size()) {
+      continue;
+    }
     const uint32_t native_binding =
-        cmd_buf->active_gfx_pipe->niceshade_metadata
-            .native_binding_map[bind_op.target_set][bind_op.target_binding] +
-        bind_op.array_index;
+        gfx_binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
     if (native_binding == ~0) {
       NGFI_DIAG_ERROR(
           "Failed to  find  native binding for set %d binding %d",
@@ -2336,10 +2339,13 @@ void ngf_cmd_bind_resources(
           native_binding);
       break;
     }
-    case NGF_DESCRIPTOR_STORAGE_IMAGE:
-      NGFI_DIAG_ERROR("Binding storage images to non-compute shader is "
-                      "currently unsupported.");
+    case NGF_DESCRIPTOR_STORAGE_IMAGE: {
+      const ngf_image_sampler_bind_info& img_bind_op = bind_op.info.image_sampler;
+      MTL::Texture* t = img_bind_op.is_image_view ? img_bind_op.resource.view->view.get()
+                                                  : img_bind_op.resource.image->texture.get();
+      cmd_buf->active_rce->setFragmentTexture(t, native_binding);
       break;
+    }
     case NGF_DESCRIPTOR_ACCELERATION_STRUCTURE:
       cmd_buf->active_rce->setVertexAccelerationStructure(
           (MTL::AccelerationStructure*)bind_op.info.acceleration_structure,
