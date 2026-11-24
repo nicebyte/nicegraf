@@ -2256,6 +2256,23 @@ void ngf_cmd_bind_index_buffer(
   cmd_buf->bound_index_buffer_offset = offset;
 }
 
+// Returns the Metal slot for the bind op, or ~0u if the pipeline doesn't use its set or binding.
+static uint32_t ngfmtl_get_native_binding(
+    const ngfmtl_niceshade_metadata& metadata,
+    const ngf_resource_bind_op&      bind_op) {
+  const auto& binding_map = metadata.native_binding_map;
+  if (bind_op.target_set >= binding_map.size() ||
+      bind_op.target_binding >= binding_map[bind_op.target_set].size() ||
+      binding_map[bind_op.target_set][bind_op.target_binding] == ~0u) {
+    NGFI_DIAG_ERROR(
+        "Failed to  find  native binding for set %d binding %d",
+        bind_op.target_set,
+        bind_op.target_binding);
+    return ~0u;
+  }
+  return binding_map[bind_op.target_set][bind_op.target_binding] + bind_op.array_index;
+}
+
 void ngf_cmd_bind_resources(
     ngf_render_encoder          enc,
     const ngf_resource_bind_op* bind_ops,
@@ -2276,16 +2293,8 @@ void ngf_cmd_bind_resources(
       return;
     }
     const uint32_t native_binding =
-        cmd_buf->active_gfx_pipe->niceshade_metadata
-            .native_binding_map[bind_op.target_set][bind_op.target_binding] +
-        bind_op.array_index;
-    if (native_binding == ~0) {
-      NGFI_DIAG_ERROR(
-          "Failed to  find  native binding for set %d binding %d",
-          bind_op.target_set,
-          bind_op.target_binding);
-      continue;
-    }
+        ngfmtl_get_native_binding(cmd_buf->active_gfx_pipe->niceshade_metadata, bind_op);
+    if (native_binding == ~0u) continue;
     switch (bind_op.type) {
     case NGF_DESCRIPTOR_TEXEL_BUFFER: {
       cmd_buf->active_rce->setVertexTexture(
@@ -2391,16 +2400,8 @@ void ngf_cmd_bind_compute_resources(
       return;
     }
     const uint32_t native_binding =
-        cmd_buf->active_compute_pipe->niceshade_metadata
-            .native_binding_map[bind_op.target_set][bind_op.target_binding] +
-        bind_op.array_index;
-    if (native_binding == ~0) {
-      NGFI_DIAG_ERROR(
-          "Failed to  find  native binding for set %d binding %d",
-          bind_op.target_set,
-          bind_op.target_binding);
-      continue;
-    }
+        ngfmtl_get_native_binding(cmd_buf->active_compute_pipe->niceshade_metadata, bind_op);
+    if (native_binding == ~0u) continue;
     switch (bind_op.type) {
     case NGF_DESCRIPTOR_TEXEL_BUFFER: {
       cmd_buf->active_cce->setTexture(
